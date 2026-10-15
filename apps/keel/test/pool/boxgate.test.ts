@@ -8,7 +8,7 @@ import { env } from "cloudflare:workers";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
 import type { NamespaceId } from "@keeltown/core/kernel";
 import { NamespaceUsage } from "@keeltown/core/ports";
-import { freshNamespace } from "@keeltown/testing";
+import { freshId, freshNamespace } from "@keeltown/testing";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { NamespaceUsageRpc } from "../../src/adapters/driven/do-rpc/namespace-usage.ts";
@@ -60,7 +60,60 @@ describe("BoxGate", () => {
     expect(await gate(namespace).acquire({ holder: "cand-halted", ttlMs: TTL })).toMatchObject({
       granted: false,
       limit: 0,
+      halted: true,
     });
+    await configure(namespace, { overrides: {}, halted: false });
+    expect(await gate(namespace).acquire({ holder: "cand-later", ttlMs: TTL })).not.toHaveProperty(
+      "halted",
+    );
+  });
+
+  it("[boxgate.do.waiters] a lane refused for want of room is kept once and told when a box is freed, by a lapse or a release, then forgotten; one that cannot be told is logged and dropped; a refusal of a halted namespace keeps none", async () => {
+    const namespace = freshNamespace();
+    const lane = `lane:${freshId("prj")}:main`;
+    // No Lane takes this address, so telling it fails where the gate can say so.
+    const lost = "lane:not-a-lane";
+    const warned = vi.spyOn(console, "warn");
+    const limit = DEFAULT_QUOTAS["concurrent-containers"];
+    const held = await Promise.all(
+      Array.from({ length: limit }, (_, i) =>
+        gate(namespace).acquire({ holder: `cand-${i}`, ttlMs: i === 0 ? 1_500 : TTL }),
+      ),
+    );
+    const waiting = () =>
+      runInDurableObject(
+        gate(namespace),
+        (_instance, state) => state.storage.kv.get<string[]>("waiters") ?? [],
+      );
+    for (const [holder, waiter] of [
+      ["cand-a", lost],
+      ["cand-b", lost],
+    ] as const)
+      expect(await gate(namespace).acquire({ holder, ttlMs: TTL, waiter })).toMatchObject({
+        granted: false,
+      });
+    expect(await waiting()).toEqual([lost]);
+    // The first lease lapses: the waiter is told once, and forgotten.
+    await new Promise((resolve) => setTimeout(resolve, 1_600));
+    await runDurableObjectAlarm(gate(namespace));
+    await vi.waitFor(async () => expect(await waiting()).toEqual([]), WAIT);
+    expect(
+      warned.mock.calls.filter(([line]) => String(line).includes(`lane ${lost} not told`)),
+    ).toHaveLength(1);
+    // Refused again, a lane waits again; a lease given back tells it.
+    expect((await gate(namespace).acquire({ holder: "cand-c", ttlMs: TTL })).granted).toBe(true);
+    await gate(namespace).acquire({ holder: "cand-d", ttlMs: TTL, waiter: lane });
+    expect(await waiting()).toEqual([lane]);
+    const second = held[1];
+    if (second === undefined || !second.granted) throw new Error("no second lease");
+    await gate(namespace).release(second.leaseId);
+    expect(await waiting()).toEqual([]);
+    expect(warned.mock.calls.filter(([line]) => String(line).includes(`lane ${lane}`))).toEqual([]);
+    // Halted, a refusal keeps no waiter: there is no room to wait for.
+    await configure(namespace, { overrides: {}, halted: true });
+    await gate(namespace).acquire({ holder: "cand-e", ttlMs: TTL, waiter: lane });
+    expect(await waiting()).toEqual([]);
+    warned.mockRestore();
   });
 
   it("[boxgate.do.lapses] reclaims a lease never given back at its deadline, on the gate's own alarm, and arms nothing once none is left", async () => {

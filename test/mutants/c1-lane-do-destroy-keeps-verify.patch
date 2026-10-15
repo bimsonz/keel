@@ -2,14 +2,14 @@
 # kills: lane.do.destroy
 # why: Destroy leaves the look at a verifying batch armed, so a destroyed Lane object still wakes on it
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index 9fac126..34ff059 100644
+index d2e75559..f3cb4310 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
-@@ -89,7 +89,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+@@ -126,7 +126,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
      const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
      await cancelAlarm(this.ctx.storage, LANE_STEP);
      await cancelAlarm(this.ctx.storage, LANE_REOFFER);
 -    await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+     await cancelAlarm(this.ctx.storage, LANE_BUDGET);
      return answer;
    }
- 

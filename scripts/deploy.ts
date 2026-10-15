@@ -204,7 +204,7 @@ function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string;
   if (quotas.kind === "configured") {
     set(["vars", QUOTAS_VAR], quotas.value);
     console.log(
-      `${source}: ${QUOTAS_VAR} configures ${quotas.namespaces} namespace${quotas.namespaces === 1 ? "" : "s"}${quotas.defaults ? " and the instance's defaults" : ""}`,
+      `${source}: ${QUOTAS_VAR} configures ${quotas.namespaces} namespace${quotas.namespaces === 1 ? "" : "s"}${quotas.defaults ? " and the instance's defaults" : ""}${quotas.halted > 0 ? `, and halts ${quotas.halted}` : ""}`,
     );
   }
   // The half of the bundle URL key pair that only verifies: a var, so keel-verify holds no secret.

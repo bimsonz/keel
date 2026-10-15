@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import type { ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { PlanStep, StepResult } from "../../domain/verification/index.ts";
-import { DepsBuilder } from "../ports/index.ts";
+import { Clock, DepsBuilder, NamespaceUsage } from "../ports/index.ts";
 import { readMarkers, type RunnerEvidence } from "./runner-output.ts";
 
 /**
@@ -38,6 +38,9 @@ export const DEPS_MAX_BYTES = 2 * 1024 ** 3;
 
 /** How long the install may run. Past it the build is refused `install-timeout`. */
 export const DEPS_INSTALL_SECONDS = 480;
+
+/** The container-minutes a deps build is counted as: the install's own deadline, and three minutes for the box around it. */
+export const DEPS_BUILD_MINUTES = Math.ceil((DEPS_INSTALL_SECONDS + 180) / 60);
 
 /** The name of the deps box's in-band report, on a line of its own before its markers. */
 export const DEPS_BUILD_PROTOCOL = "KEEL_DEPS_BUILD/1";
@@ -536,14 +539,18 @@ const unread = (reason: string) => Effect.succeed<DepsNeed>({ _tag: "NeedUnread"
  * digest. A candidate with no lockfile, or whose install inputs are longer
  * than a deps box is handed, is `DepsRefused` with the reason: only a change
  * to it ends that. One whose bundle is missing or unreadable is
- * `DepsUnavailable` with the reason. Neither builds anything.
+ * `DepsUnavailable` with the reason. Neither builds anything. A build, or the
+ * pointer kept for its digest, is counted against the namespace's
+ * container-minutes as DEPS_BUILD_MINUTES once a UTC day for the digest
+ * (`deps:<install>:<day>`), inside its step, so a replay counts nothing again.
+ * It never refuses: the verification that needs it was admitted before.
  */
 export const ensureDeps = (
   namespace: NamespaceId,
   bundle: ContentHash,
   planSteps: readonly PlanStep[],
   steps: DepsSteps,
-): Effect.Effect<DepsAnswer, never, DepsBuilder> =>
+): Effect.Effect<DepsAnswer, never, DepsBuilder | NamespaceUsage | Clock> =>
   Effect.gen(function* () {
     if (!needsDeps(planSteps)) return { _tag: "DepsUnneeded" } satisfies DepsAnswer;
     const builder = yield* DepsBuilder;
@@ -559,5 +566,19 @@ export const ensureDeps = (
       return { _tag: "DepsRefused", reason: need.reason } satisfies DepsAnswer;
     if (need._tag === "NeedUnread")
       return { _tag: "DepsUnavailable", reason: need.reason } satisfies DepsAnswer;
-    return yield* steps.build(need.install, builder.build(namespace, need, bundle));
+    const usage = yield* NamespaceUsage;
+    const clock = yield* Clock;
+    const counted = Effect.gen(function* () {
+      const day = new Date(yield* clock.now).toISOString().slice(0, 10);
+      yield* usage.record(
+        namespace,
+        "container-minutes",
+        DEPS_BUILD_MINUTES,
+        `deps:${need.install}:${day}`,
+      );
+    });
+    return yield* steps.build(
+      need.install,
+      Effect.andThen(counted, builder.build(namespace, need, bundle)),
+    );
   });

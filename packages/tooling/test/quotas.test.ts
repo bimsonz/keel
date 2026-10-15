@@ -23,6 +23,7 @@ const GOOD = {
     [ORG]: { "container-minutes": 20000, "concurrent-containers": 60 },
     [AGENT]: { "model-calls": 2000 },
   },
+  halted: [AGENT],
 };
 
 const BAD: readonly unknown[] = [
@@ -35,6 +36,9 @@ const BAD: readonly unknown[] = [
   { namespaces: { keel: { projects: 3 } } },
   { namespaces: { [ORG]: { projects: Number.MAX_VALUE * 2 } } },
   { namespaces: [] },
+  { halted: ORG },
+  { halted: ["keel"] },
+  { halted: [ORG, 3] },
 ];
 
 describe("the instance's quota configuration at deploy", () => {
@@ -57,6 +61,7 @@ describe("the instance's quota configuration at deploy", () => {
         value: JSON.stringify(GOOD),
         namespaces: 2,
         defaults: true,
+        halted: 1,
       });
     }
     // The var is committed as "{}", and a Worker without it is left alone.

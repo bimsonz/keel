@@ -2,10 +2,10 @@
 # kills: red.every-member-leaves
 # why: the members of an interaction failure wait for a bisection that never comes
 diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
-index 2f428a4..a901996 100644
+index bb620f38..8c849c24 100644
 --- a/packages/core/src/domain/integration/red-exit.ts
 +++ b/packages/core/src/domain/integration/red-exit.ts
-@@ -26,7 +26,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
+@@ -28,7 +28,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
      case "textual":
        return requeue("textual");
      case "interaction":
@@ -13,4 +13,4 @@ index 2f428a4..a901996 100644
 +      return { _tag: "Bisection" };
      case "unattributed":
        return { _tag: "Bisection" };
-     default:
+     case "halted":

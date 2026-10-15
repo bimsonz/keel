@@ -6,6 +6,7 @@ import {
   GuardId,
   InstantSchema,
   LeaseId,
+  NamespaceId,
   NextAction,
   WorkspaceId,
 } from "../kernel/index.ts";
@@ -44,6 +45,17 @@ export class ChangeInOtherProject extends Schema.TaggedError<ChangeInOtherProjec
   "ChangeInOtherProject",
   { changeId: ChangeId },
 ) {}
+
+/**
+ * A submission while the namespace of the caller's project has its
+ * verification spend stopped: a verification there runs nothing and bounces
+ * every change, so none is taken. `nextActions` says what its owner does: ask
+ * for the namespace to be resumed, then submit again.
+ */
+export class NamespaceHalted extends Schema.TaggedError<NamespaceHalted>()("NamespaceHalted", {
+  namespace: NamespaceId,
+  nextActions: Schema.Array(NextAction),
+}) {}
 
 /**
  * `adopt` while the lease is still alive: adoption needs a Lapsed lease.

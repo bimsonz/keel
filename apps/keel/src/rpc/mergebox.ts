@@ -79,6 +79,8 @@ export const BoxLeaseAnswer = Schema.Union([
     retryAfterMs: Schema.Number,
     held: Schema.Number,
     limit: Schema.Number,
+    /** The namespace's verification spend is stopped: no lease is granted until it is resumed, however many are free. */
+    halted: Schema.optionalKey(Schema.Literal(true)),
   }),
 ]);
 export type BoxLeaseAnswer = typeof BoxLeaseAnswer.Type;

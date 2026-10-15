@@ -15,6 +15,7 @@ import {
   type ProbeTemplate,
 } from "../../../src/application/verification/index.ts";
 import {
+  NamespaceUsage,
   PlatformFunction,
   type PlatformFunctionCall,
   ProbeRunner,
@@ -22,6 +23,7 @@ import {
   ProbeStore,
 } from "../../../src/application/ports/index.ts";
 import { Proposition } from "../../../src/domain/coordination/index.ts";
+import { QuotaExceeded } from "../../../src/domain/identity/index.ts";
 import { ContentHash, NamespaceId } from "../../../src/domain/kernel/index.ts";
 import {
   type FlowWorld,
@@ -160,13 +162,32 @@ function drafting(
   matrix: Matrix,
   aNoop: (recipe: NoopRecipe) => Effect.Effect<ContentHash, NoNoop> = () => Effect.succeed(A_NOOP),
   template: ProbeTemplate<FreshnessSlots> = FRESHNESS_TEMPLATE,
+  refuse: (n: number) => QuotaExceeded | undefined = () => undefined,
 ) {
   const recipes: NoopRecipe[] = [];
+  /** Each model-calls admission asked, as `<namespace> <amount> <key>`. */
+  const admissions: string[] = [];
   const calls: PlatformFunctionCall[] = [];
   const requests: ProbeRunRequest[] = [];
   const attemptOf = new Map<string, number>();
   let puts = 0;
   const layer = Layer.mergeAll(
+    Layer.succeed(
+      NamespaceUsage,
+      NamespaceUsage.of({
+        admit: (namespace, kind, amount, key) =>
+          Effect.suspend(() => {
+            admissions.push(`${namespace} ${kind} ${amount} ${key}`);
+            const refused = refuse(admissions.length);
+            return refused === undefined
+              ? Effect.succeed({ limit: 500, remaining: 500 - admissions.length })
+              : Effect.fail(refused);
+          }),
+        record: () => Effect.die("drafting records nothing"),
+        settings: () => Effect.die("drafting reads no settings"),
+        configure: () => Effect.die("drafting configures nothing"),
+      }),
+    ),
     Layer.succeed(
       PlatformFunction,
       PlatformFunction.of({
@@ -208,15 +229,21 @@ function drafting(
   );
   const run = () =>
     Effect.runPromise(
-      draftProbe(NAMESPACE, template, CONTEXT, WORLDS, (recipe) =>
-        Effect.suspend(() => {
-          recipes.push(recipe);
-          return aNoop(recipe);
-        }),
+      draftProbe(
+        NAMESPACE,
+        template,
+        CONTEXT,
+        WORLDS,
+        (recipe) =>
+          Effect.suspend(() => {
+            recipes.push(recipe);
+            return aNoop(recipe);
+          }),
+        "probe-c1:draft",
       ).pipe(Effect.provide(layer)),
     );
   const promptOf = (n: number) => String(calls[n - 1]?.input["prompt"]);
-  return { calls, requests, recipes, run, promptOf };
+  return { calls, requests, recipes, admissions, run, promptOf };
 }
 
 describe("draftProbe: template first, repaired from deterministic text only", () => {
@@ -280,6 +307,65 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
     expect(d.promptOf(2)).toContain(
       `- attempt 1: non-discriminating: every world failed with ${JSON.stringify(reason)}`,
     );
+  });
+
+  it("[draft.model-calls] each call to the model is admitted first, one model call under the draft's key and its attempt; a refusal ends the draft abstained rate-limited, saying why, and calls nothing", async () => {
+    const repaired = drafting(
+      (n) => (n === 1 ? BAD : good()),
+      (_, world) => discriminates(world),
+    );
+    expect(await repaired.run()).toMatchObject({ _tag: "Admitted", attempts: 2 });
+    expect(repaired.admissions).toEqual([
+      `${NAMESPACE} model-calls 1 draft:probe-c1:draft:1`,
+      `${NAMESPACE} model-calls 1 draft:probe-c1:draft:2`,
+    ]);
+    const spent = new QuotaExceeded({
+      kind: "model-calls",
+      reason: "limit",
+      limit: 500,
+      used: 500,
+      requested: 1,
+      nextActions: [],
+    });
+    const limited = drafting(
+      (n) => (n === 1 ? BAD : good()),
+      (_, world) => discriminates(world),
+      undefined,
+      undefined,
+      (n) => (n === 2 ? spent : undefined),
+    );
+    expect(await limited.run()).toEqual({
+      _tag: "Abstained",
+      reason: "rate-limited",
+      attempts: 1,
+      detail: `quota.exceeded: ${NAMESPACE} has used 500 of its 500 model-calls for today`,
+      feedback: [`attempt 1: slots: ${BAD_TEXT}`],
+    });
+    expect(limited.calls).toHaveLength(1);
+    const halted = drafting(
+      () => good(),
+      (_, world) => discriminates(world),
+      undefined,
+      undefined,
+      () =>
+        new QuotaExceeded({
+          kind: "model-calls",
+          reason: "halted",
+          limit: 500,
+          used: 0,
+          requested: 1,
+          nextActions: [],
+        }),
+    );
+    expect(await halted.run()).toEqual({
+      _tag: "Abstained",
+      reason: "rate-limited",
+      attempts: 0,
+      detail: `namespace.halted: verification spend is stopped for ${NAMESPACE}`,
+      feedback: [],
+    });
+    expect(halted.calls).toEqual([]);
+    expect(halted.requests).toEqual([]);
   });
 
   it("[draft.bounded] stops after DRAFT_REPAIRS repairs: 1 + 3 calls, then discards", async () => {

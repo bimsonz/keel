@@ -21,13 +21,16 @@ export type UsageSettings = typeof UsageSettings.Type;
 
 /**
  * The instance's quota configuration (R9), as whoever runs it sets it: limits
- * that replace `DEFAULT_QUOTAS` for every namespace (`defaults`), and limits
- * for named namespaces (`namespaces`). A namespace's own settings come before
- * both. Empty, every namespace has the defaults.
+ * that replace `DEFAULT_QUOTAS` for every namespace (`defaults`), limits for
+ * named namespaces (`namespaces`), and the namespaces whose verification spend
+ * is stopped (`halted`, the instance's kill switch). A namespace's own limits
+ * come before both; a namespace listed as halted is halted whatever its own
+ * settings say. Empty, every namespace has the defaults and none is halted.
  */
 export const InstanceQuotasConfig = Schema.Struct({
   defaults: Schema.optionalKey(Limits),
   namespaces: Schema.optionalKey(Schema.Record(NamespaceId, Limits)),
+  halted: Schema.optionalKey(Schema.Array(NamespaceId)),
 });
 export type InstanceQuotasConfig = typeof InstanceQuotasConfig.Type;
 
@@ -74,8 +77,8 @@ export class NamespaceUsage extends Context.Service<
     /**
      * The namespace's settings as they apply: its own limits, then the
      * instance's for it, then the instance's defaults, each kind from the first
-     * that names it (`DEFAULT_QUOTAS` for a kind none names); not halted until
-     * it is configured.
+     * that names it (`DEFAULT_QUOTAS` for a kind none names); halted when its
+     * own settings say so or the instance's configuration lists it.
      */
     readonly settings: (namespace: NamespaceId) => Effect.Effect<UsageSettings>;
     /**

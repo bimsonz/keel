@@ -47,8 +47,9 @@ const UNSET: UsageSettings = { overrides: {}, halted: false };
 
 /**
  * The namespace's settings as they apply: its own limits before the instance's
- * for it, and those before the instance's defaults, kind by kind. What is
- * stored stays the namespace's own.
+ * for it, and those before the instance's defaults, kind by kind; halted when
+ * it is stored halted or the instance lists it. What is stored stays the
+ * namespace's own.
  */
 const settingsOf = (
   store: Store,
@@ -58,8 +59,8 @@ const settingsOf = (
   const stored = store.get(SETTINGS, namespace);
   const own = stored === undefined ? UNSET : decodeSettings(stored);
   return {
-    ...own,
     overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
+    halted: own.halted || (instance.halted?.includes(namespace) ?? false),
   };
 };
 

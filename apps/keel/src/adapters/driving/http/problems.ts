@@ -56,6 +56,7 @@ const TITLES: Record<ProblemCode, string> = {
   "why.nothing_to_explain": "No active decision explains the path or subject asked about",
   "change.lease_stale": "The lease is not the change's active lease",
   "change.lease_not_lapsed": "The change's lease has not lapsed, so it cannot be adopted yet",
+  "namespace.halted": "Verification spend is stopped for the namespace, so it takes no submission",
   "change.state_refused": "The change's state does not allow this",
   "change.revision_mismatch": "The change moved past the revision you last read",
   "change.commit_not_in_workspace": "The commit is not in the change's workspace",

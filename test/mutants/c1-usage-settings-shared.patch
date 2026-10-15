@@ -2,10 +2,10 @@
 # kills: usage.contract.settings
 # why: Settings are kept under one id for every namespace, so one namespace's limits and halt are every namespace's
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index c81576c7..3103bc7e 100644
+index f4cd461b..29f607fb 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -55,7 +55,7 @@ const settingsOf = (
+@@ -56,7 +56,7 @@ const settingsOf = (
    namespace: NamespaceId,
    instance: InstanceQuotasConfig,
  ): UsageSettings => {
@@ -13,8 +13,8 @@ index c81576c7..3103bc7e 100644
 +  const stored = store.get(SETTINGS, "every-org");
    const own = stored === undefined ? UNSET : decodeSettings(stored);
    return {
-     ...own,
-@@ -201,5 +201,5 @@ export const configureUsage = Effect.fn("identity/configureUsage")(function* (
+     overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
+@@ -202,5 +202,5 @@ export const configureUsage = Effect.fn("identity/configureUsage")(function* (
    settings: UsageSettings,
  ) {
    const store = yield* EntityStore;

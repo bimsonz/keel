@@ -31,12 +31,13 @@ const NAMESPACE_ID = /^(usr|agt|org)_[0-9A-HJKMNP-TV-Z]{26}$/;
 export type QuotasAtDeploy =
   /** The config has no `KEEL_QUOTAS`: nothing to fill. */
   | { readonly kind: "none" }
-  /** The file, checked, as the var's compact JSON, and how many namespaces it names. */
+  /** The file, checked, as the var's compact JSON, how many namespaces it names, and how many it halts. */
   | {
       readonly kind: "configured";
       readonly value: string;
       readonly namespaces: number;
       readonly defaults: boolean;
+      readonly halted: number;
     }
   /** No file, outside keel.town: the committed `"{}"` stands, and every namespace has the defaults. */
   | { readonly kind: "defaults"; readonly said: string }
@@ -62,8 +63,15 @@ const limitsProblem = (limits: unknown, where: string): string | undefined => {
 export const quotasProblem = (json: unknown): string | undefined => {
   if (!isObject(json)) return "it is not a JSON object";
   for (const key of Object.keys(json))
-    if (key !== "defaults" && key !== "namespaces")
-      return `it has ${JSON.stringify(key)}, and only "defaults" and "namespaces" are read`;
+    if (key !== "defaults" && key !== "namespaces" && key !== "halted")
+      return `it has ${JSON.stringify(key)}, and only "defaults", "namespaces" and "halted" are read`;
+  const halted = json["halted"];
+  if (halted !== undefined) {
+    if (!Array.isArray(halted)) return "halted is not a list of namespace ids";
+    for (const [n, id] of halted.entries())
+      if (typeof id !== "string" || !NAMESPACE_ID.test(id))
+        return `halted's entry number ${n + 1} is no namespace id`;
+  }
   if (json["defaults"] !== undefined) {
     const problem = limitsProblem(json["defaults"], "defaults");
     if (problem !== undefined) return problem;
@@ -124,5 +132,6 @@ export function quotasAtDeploy(
     value: JSON.stringify(json),
     namespaces: Object.keys(namespaces).length,
     defaults: isObject(json) && json["defaults"] !== undefined,
+    halted: isObject(json) && Array.isArray(json["halted"]) ? json["halted"].length : 0,
   };
 }

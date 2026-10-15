@@ -1,6 +1,7 @@
 import { introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
+  haltedActions,
   JS_TS_SUITE_PACK,
   parseFlow,
   SettledVerdict,
@@ -8,8 +9,8 @@ import {
   storedPlanText,
 } from "@keeltown/core/application/verification";
 import { compile, type FlowPlan } from "@keeltown/core/domain/verification";
-import { BatchId, CandidateId, ContentHash, makeId } from "@keeltown/core/kernel";
-import { EvidenceStore, PlanStore } from "@keeltown/core/ports";
+import { BatchId, CandidateId, ContentHash, makeId, NamespaceId } from "@keeltown/core/kernel";
+import { EvidenceStore, NamespaceUsage, PlanStore } from "@keeltown/core/ports";
 import {
   guardedPlan,
   suitePlan,
@@ -20,6 +21,7 @@ import {
 import { Effect, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { NamespaceUsageRpc } from "../../src/adapters/driven/do-rpc/namespace-usage.ts";
 import { evidenceKey, EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
 import { PlanStoreR2, planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { type KeelVerifyJob, keelVerifyParams } from "../../src/rpc/index.ts";
@@ -665,6 +667,75 @@ describe("KeelVerify ensuring a candidate's deps", () => {
     expect(await storedEvidence(ran.verdict)).toMatchObject({
       outcome: "abstain",
       why: `deps-unavailable: ${reason}`,
+    });
+  });
+});
+
+/** A project of its own in a fresh org, its plan stored there as Precheck stores it, and its namespace's usage set. */
+const budgeted = async (settings: Parameters<NamespaceUsage["Service"]["configure"]>[1]) => {
+  const namespace = Schema.decodeSync(NamespaceId)(`org_${ulid()}`);
+  const projectId = makeId("prj", ulid());
+  await placeProject(projectId, namespace);
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      return yield* (yield* PlanStore).put(namespace, SUITE);
+    }).pipe(Effect.provide(PlanStoreR2(env.ARCHIVE))),
+  );
+  await Effect.runPromise(
+    NamespaceUsage.use((usage) => usage.configure(namespace, settings)).pipe(
+      Effect.provide(NamespaceUsageRpc(env.NAMESPACE_USAGE)),
+    ),
+  );
+  return {
+    namespace,
+    params: keelVerifyParams(
+      job({ projectId, namespace, laneId: `lane:${projectId}:main`, planHash: SUITE.planHash }),
+    ),
+  };
+};
+
+/** The next midnight UTC, as a daily quota resets. */
+const nextMidnight = (now: number) => (Math.floor(now / 86_400_000) + 1) * 86_400_000;
+
+describe("KeelVerify within its namespace's budget", () => {
+  it("[budget.pool.admit-park] a namespace whose container-minutes cannot cover the plan runs nothing: the verdict parks unrun, with the time its minutes reset", async () => {
+    const { namespace, params } = await budgeted({
+      overrides: { "container-minutes": 1 },
+      halted: false,
+    });
+    const before = Date.now();
+    // Were the admission not asked, the mocked runner's green suite would land it.
+    const verdict = await runWith(
+      "keel-verify-budget-spent",
+      { [SUITE_STEP]: runnerOutput(await suiteStdout(200, 0)) },
+      params,
+    );
+    expect(verdict).toMatchObject({ outcome: "park", unrun: true, failingTests: [] });
+    expect([nextMidnight(before), nextMidnight(Date.now())]).toContain(verdict.retryAt);
+    expect(verdict.evidence).toEqual([
+      expect.stringMatching(
+        new RegExp(
+          `^quota\\.exceeded: ${namespace} has used 0 of its 1 container-minutes for today, and this verification needs \\d+; nothing ran$`,
+        ),
+      ),
+    ]);
+  });
+
+  it("[budget.pool.halted-bounce] a halted namespace's verification runs nothing and bounces, halted, with what its owner does", async () => {
+    const { namespace, params } = await budgeted({ overrides: {}, halted: true });
+    const verdict = await runWith(
+      "keel-verify-budget-halted",
+      { [SUITE_STEP]: runnerOutput(await suiteStdout(200, 0)) },
+      params,
+    );
+    expect(verdict).toMatchObject({
+      outcome: "bounce",
+      halted: true,
+      failingTests: [],
+      evidence: [
+        `namespace.halted: verification spend is stopped for ${namespace}; the change itself passed nothing and failed nothing`,
+      ],
+      nextActions: haltedActions(namespace),
     });
   });
 });

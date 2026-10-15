@@ -2,6 +2,7 @@ import { Effect, Option, Result, Schema } from "effect";
 import {
   type CandidateId,
   ContentHash,
+  InstantSchema,
   NextAction,
   type NamespaceId,
   VerdictId,
@@ -73,8 +74,12 @@ export const SettledVerdict = Schema.Struct({
   failingTests: Schema.Array(Schema.String),
   /** On a bounce, the remedy: fix what failed, push, and submit again. Empty otherwise. */
   nextActions: Schema.Array(NextAction),
-  /** A park that rests only on steps the verifier could not run (`unrunOnly`). */
+  /** A park that rests only on steps the verifier could not run (`unrunOnly`), or on none run for want of quota. */
   unrun: Schema.optionalKey(Schema.Literal(true)),
+  /** On a park for want of quota, when the namespace's limit resets: the lane forms nothing before it. */
+  retryAt: Schema.optionalKey(InstantSchema),
+  /** A bounce because the namespace's verification spend is stopped: no fault of the change's. */
+  halted: Schema.optionalKey(Schema.Literal(true)),
 });
 export type SettledVerdict = typeof SettledVerdict.Type;
 
@@ -327,5 +332,7 @@ export const recordBatchVerdict = Effect.fn("verification/recordBatchVerdict")(f
     failingTests: input.settled.failingTests,
     ...(input.settled.nextActions.length === 0 ? {} : { nextActions: input.settled.nextActions }),
     ...(input.settled.unrun === true ? { unrun: true } : {}),
+    ...(input.settled.retryAt === undefined ? {} : { retryAt: input.settled.retryAt }),
+    ...(input.settled.halted === true ? { halted: true } : {}),
   });
 });

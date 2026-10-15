@@ -2,10 +2,10 @@
 # kills: deps.ensure.unlocked, deps.ensure.too-large, deps.ensure.bundle-missing, deps.ensure.bundle-unreadable
 # why: A candidate with no lockfile, with inputs too long, or whose bundle cannot be read still asks for a build, under a made-up digest
 diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
-index fd393147..127cc94d 100644
+index f6ee5736..1eb6d14d 100644
 --- a/packages/core/src/application/verification/deps.ts
 +++ b/packages/core/src/application/verification/deps.ts
-@@ -551,9 +551,10 @@ export const ensureDeps = (
+@@ -562,10 +562,11 @@ export const ensureDeps = (
          Effect.catchTag("ManifestUnreadable", (e) => unread(`bundle-unreadable: ${e.reason}`)),
        ),
      );
@@ -18,5 +18,6 @@ index fd393147..127cc94d 100644
 +        "unlocked",
 +        builder.build(namespace, { _tag: "Locked", install: "0".repeat(64), inputs: "" }, bundle),
 +      );
-     return yield* steps.build(need.install, builder.build(namespace, need, bundle));
-   });
+     const usage = yield* NamespaceUsage;
+     const clock = yield* Clock;
+     const counted = Effect.gen(function* () {

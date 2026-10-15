@@ -102,7 +102,7 @@ const stepArb: fc.Arbitrary<Step> = fc.record({
   ),
   pick: fc.nat(),
   fenced: weighted(1, 6),
-  blame: fc.nat({ max: 5 }),
+  blame: fc.nat({ max: 6 }),
 });
 
 interface Plan {
@@ -154,6 +154,7 @@ const blameFor = (state: Batch | undefined, plan: Plan, step: Step): BatchAttrib
     "unattributed",
     "unattributed",
     STRANGER,
+    "halted",
   ];
   return choices[step.blame] ?? "infra";
 };
@@ -371,6 +372,7 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
       const valid =
         (a === "interaction" && before.members.length > 1) ||
         a === "infra" ||
+        a === "halted" ||
         (a === "unattributed" && before.members.length > 1) ||
         before.members.some((m) => m === a);
       return before.state === "verifying" && fresh(command) && valid ? "red" : "refused";
@@ -682,6 +684,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
                 a === "interaction" ||
                 a === "infra" ||
                 a === "unattributed" ||
+                a === "halted" ||
                 (r.before?.members.includes(a) ?? false),
             );
           }),
@@ -854,6 +857,7 @@ const BLAMES: readonly BatchAttribution[] = [
   "interaction",
   "infra",
   "unattributed",
+  "halted",
   A,
   B,
 ];
@@ -874,11 +878,13 @@ interface Folded {
 
 /** Which blame a failure may carry from each state (state-machines.md § Candidate). */
 const blamed = (from: Folded, blame: BatchAttribution): boolean => {
-  const named = !["textual", "interaction", "infra", "unattributed"].includes(blame);
+  const named = !["textual", "interaction", "infra", "unattributed", "halted"].includes(blame);
+  // A halted namespace is told by a refused composition or by a verdict, never by a bundle.
   if (from.state === "forming")
     return (
       blame === "textual" ||
       blame === "infra" ||
+      blame === "halted" ||
       (from.members.length === 1 && blame === from.members[0])
     );
   if (from.state === "assembled") return named || blame === "infra";
@@ -1008,18 +1014,18 @@ describe("the Candidate fold", () => {
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
     // Twenty-two rows: a batch of two and a batch of one in every state each reaches, and a batch
-    // of one red with nobody blamed. Each meets the same 379 forms of the events the walks
+    // of one red with nobody blamed. Each meets the same 406 forms of the events the walks
     // committed: 2 formings in 7 forms (14); 12 assemblies in 2 (24); 12 starts and 12
     // verifications in 3 (72); 6 bisections in 3 (18); 2 promotions and 2 invalidations in 3,
     // the pair's forms as another candidate's one form (10); the step starts and results the
     // walks commit while verifying, each in its forms; and 28 failures, 27 pairs of verdict and
-    // candidate in each of 6 blames (162), each failure as another batch's (28) and as another
+    // candidate in each of 7 blames (189), each failure as another batch's (28) and as another
     // candidate's, where two that differ only in candidate meet (27); and since a batch behind
     // another may be cancelled short of a verdict, the cancellations a walk commits from forming,
-    // assembled and verifying too. 22 × 523 = 11506 folds, 1637 of them taken and 9869 refused.
+    // assembled and verifying too. 22 × 550 = 12100 folds, 1745 of them taken and 10355 refused.
     expect(foldShape(cases)).toEqual({
-      folds: 11506,
-      refused: 9869,
+      folds: 12100,
+      refused: 10355,
       rows: [
         "none",
         `${BATCH} forming of 2${HOME}`,

@@ -20,12 +20,14 @@ import { FlowWorld, InfraFailure, StepKind, StepOutcome } from "../verification/
 /**
  * Who a failed batch is blamed on: one member, a refused composition
  * (`textual`), every subset passing while the union fails (`interaction`),
- * the infrastructure (`infra`), or nobody yet (`unattributed`: a
- * multi-member failure `attribute` could not pin, the only kind bisected).
+ * the infrastructure (`infra`), nobody yet (`unattributed`: a
+ * multi-member failure `attribute` could not pin, the only kind bisected), or
+ * nobody at all (`halted`: the namespace's verification spend is stopped, so
+ * every member bounces with what its owner does, none of them at fault).
  */
 export const BatchAttribution = Schema.Union([
   ChangeId,
-  Schema.Literals(["textual", "interaction", "infra", "unattributed"]),
+  Schema.Literals(["textual", "interaction", "infra", "unattributed", "halted"]),
 ]);
 export type BatchAttribution = typeof BatchAttribution.Type;
 

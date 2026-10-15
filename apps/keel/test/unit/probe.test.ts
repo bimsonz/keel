@@ -56,6 +56,7 @@ import {
   makeProbeChangesMemory,
   makeProbeLedgerMemory,
   makeTrunksMemory,
+  makeNamespaceUsageMemory,
   makeWorldChecksMemory,
   sampleNamespace,
 } from "@keeltown/testing";
@@ -246,6 +247,7 @@ function probeWorld(options: Options = {}) {
           }),
         ).pipe(Layer.provide(ledger.layer));
   const layer = Layer.mergeAll(
+    makeNamespaceUsageMemory().layer,
     host.layer,
     ledgerLayer,
     changes.layer,

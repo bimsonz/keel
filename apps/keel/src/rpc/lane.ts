@@ -1,6 +1,13 @@
 import { CandidateNotFound, ResultFenced, StepReported } from "@keeltown/core/domain/integration";
 import { VerdictOutcome } from "@keeltown/core/domain/verification";
-import { BatchId, CandidateId, ContentHash, NextAction, VerdictId } from "@keeltown/core/kernel";
+import {
+  BatchId,
+  CandidateId,
+  ContentHash,
+  InstantSchema,
+  NextAction,
+  VerdictId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
@@ -24,6 +31,10 @@ export const RecordVerdictCommand = Schema.Struct({
   nextActions: Schema.optionalKey(Schema.Array(NextAction)),
   /** A park resting only on steps the verifier could not run: counted toward no member's infra limit. Absent otherwise. */
   unrun: Schema.optionalKey(Schema.Literal(true)),
+  /** On a park for want of quota, when the namespace's limit resets. Absent otherwise. */
+  retryAt: Schema.optionalKey(InstantSchema),
+  /** A bounce because the namespace's verification spend is stopped: no member is blamed. Absent otherwise. */
+  halted: Schema.optionalKey(Schema.Literal(true)),
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 
@@ -55,6 +66,7 @@ export const LaneCodecs = {
   recordStep: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
   destroy: exitCodec(Schema.Void, Schema.Never),
   verificationEnded: exitCodec(Schema.Void, Schema.Never),
+  boxFreed: exitCodec(Schema.Void, Schema.Never),
 };
 
 /**
@@ -88,4 +100,6 @@ export interface LaneRpc {
    * duplicate, a late or a stray report changes nothing.
    */
   verificationEnded(command: typeof VerificationEndedCommand.Encoded): Promise<ExitJson>;
+  /** The namespace's box gate freed a box the lane was refused: the lane waits on the gate no longer, and steps. */
+  boxFreed(): Promise<ExitJson>;
 }

@@ -2,12 +2,12 @@
 # kills: lane.step-staged
 # why: a step that formed a batch goes on to compose it in the same invocation, so nothing it committed is published until the step stops
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 493d1fa4..6fe13c65 100644
+index 5de5f424..8a6be802 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1635,8 +1635,6 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
-     if (active === undefined) {
-       if (lane.queue.length === 0) return "idle" satisfies LaneStep;
+@@ -2074,8 +2074,6 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
+       if (waitsAt(lane, yield* (yield* Clock).now) !== undefined)
+         return "waiting" satisfies LaneStep;
        yield* formBatch(lane);
 -      if (laneOf(yield* EntityStore, laneId)?.active !== undefined)
 -        return "staged" satisfies LaneStep;

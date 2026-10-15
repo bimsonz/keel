@@ -6,6 +6,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   batchOf,
+  boxFreed,
+  budgetDue,
   bundleBlame,
   checkVerification,
   COUNTERPART_WALK,
@@ -120,6 +122,8 @@ interface WorldOptions {
   readonly refuseDetail?: string;
   /** The paths the composer's refusal names: none unless given. */
   readonly refusePaths?: readonly string[];
+  /** How long the composer's gate says until it has room, with `refuseReason`. */
+  readonly refuseRetryAfterMs?: number;
   readonly bundles?: Layer.Layer<CandidateBundles>;
   readonly verification?: "required" | "off";
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
@@ -242,6 +246,9 @@ function world(options: WorldOptions = {}) {
     ...(options.refuseReason === undefined ? {} : { reason: options.refuseReason }),
     ...(options.refuseDetail === undefined ? {} : { detail: options.refuseDetail }),
     ...(options.refusePaths === undefined ? {} : { paths: options.refusePaths }),
+    ...(options.refuseRetryAfterMs === undefined
+      ? {}
+      : { retryAfterMs: options.refuseRetryAfterMs }),
   });
   const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
@@ -1204,6 +1211,69 @@ describe("the Lane", () => {
           rounds.map(() => "hold"),
         );
         expect(laneOf(yield* EntityStore, LANE)?.infra).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.box-wait] a gate with no room holds the batch and the lane forms nothing until its soonest lease ends, unless the gate says a box was freed first: then it forms at once",
+    () => {
+      const refusing = [change(1)];
+      const w = world({
+        refuseCompose: refusing,
+        refuseReason: "box-unavailable",
+        refuseRetryAfterMs: 600_000,
+      });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        expect(yield* stepped(LANE)).toBe("idle");
+        const failed = (yield* payloads("BatchFailed")).at(-1);
+        expect(failed?.["attribution"]).toBe("infra");
+        yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+        expect(yield* budgetDue(LANE)).toBe(w.clock.now() + 600_000);
+        w.clock.advance(599_999);
+        expect(yield* stepped(LANE)).toBe("waiting");
+        expect(yield* payloads("BatchFormed")).toHaveLength(1);
+        // A box is freed: the lane waits on the gate no longer.
+        refusing.length = 0;
+        yield* boxFreed(LANE);
+        expect(yield* budgetDue(LANE)).toBeUndefined();
+        yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual([change(1)]);
+        expect(laneOf(yield* EntityStore, LANE)?.infra).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.box-halted] a gate of a halted namespace bounces every member once, blamed on none, saying the change passed and failed nothing",
+    () => {
+      const w = world({
+        maxBatchSize: 2,
+        refuseCompose: [change(1), change(2)],
+        refuseReason: "namespace-halted",
+        refuseDetail: "verification spend is stopped for the namespace",
+      });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        for (const n of [1, 2]) yield* queue(w, change(n));
+        expect(yield* stepped(LANE)).toBe("idle");
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(["halted"]);
+        const issued = yield* payloads("VerdictIssued");
+        expect(issued.map((p) => p["outcome"])).toEqual(["bounce"]);
+        expect(issued[0]?.["evidence"]).toEqual([
+          "composition-refused: namespace-halted: verification spend is stopped for the namespace; the change itself passed nothing and failed nothing",
+        ]);
+        expect(issued[0]?.["nextActions"]).toMatchObject([
+          { kind: "escalate" },
+          { kind: "call", operationId: "submit" },
+        ]);
+        const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.infra).toEqual([]);
+        expect(lane?.outcomes ?? []).toEqual([]);
+        expect(lane?.alone ?? []).toEqual([]);
+        expect(lane?.boxWait).toBeUndefined();
       }).pipe(Effect.provide(w.layer));
     },
   );
@@ -2619,6 +2689,73 @@ describe("the Lane's batches", () => {
           for (const id of two.toReversed()) yield* requeuedFor(id, v.batchId, "infra-failure");
         }
         const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.infra).toEqual([]);
+        expect(lane?.alone ?? []).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.quota-wait] a park for want of quota forms nothing until the time it gives, which the lane's own deadline is armed for; then the batch forms again whole, counted against no one",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const two = [1, 2].map(change);
+        for (const id of two) yield* queue(w, id);
+        const v = yield* toVerifying(w);
+        const retryAt = Instant(w.clock.now() + 3_600_000);
+        yield* recordVerdict(LANE, {
+          ...verdict(v.batchId, v.candidateId, v.instanceId, "park"),
+          unrun: true,
+          retryAt,
+        });
+        for (const id of two.toReversed()) yield* requeuedFor(id, v.batchId, "infra-failure");
+        const started = w.verification.started.size;
+        expect(yield* stepped(LANE)).toBe("waiting");
+        expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
+        expect(yield* budgetDue(LANE)).toBe(retryAt);
+        w.clock.advance(3_600_000 - 1);
+        expect(yield* stepped(LANE)).toBe("waiting");
+        expect(laneOf(yield* EntityStore, LANE)?.active).toBeUndefined();
+        expect(w.verification.started.size).toBe(started);
+        w.clock.advance(1);
+        expect(yield* budgetDue(LANE)).toBeUndefined();
+        yield* toVerifying(w);
+        expect(yield* membersInFlight).toEqual(two);
+        expect(laneOf(yield* EntityStore, LANE)?.infra).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.halted-bounce] a halted namespace's verdict bounces every member with what its owner does, blamed on none: no failure the batch size reads, no infra count, no member alone",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const two = [1, 2].map(change);
+        for (const id of two) yield* queue(w, id);
+        const v = yield* toVerifying(w);
+        const owner = [
+          { kind: "escalate" as const, title: "ask whoever runs this Keel to resume it" },
+        ];
+        yield* recordVerdict(LANE, {
+          ...verdict(v.batchId, v.candidateId, v.instanceId, "bounce"),
+          failingTests: [],
+          evidence: ["namespace.halted: the change itself passed nothing and failed nothing"],
+          nextActions: owner,
+          halted: true,
+        });
+        expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("halted");
+        const issued = (yield* payloads("VerdictIssued")).at(-1);
+        expect(issued?.["outcome"]).toBe("bounce");
+        expect(issued?.["nextActions"]).toEqual(owner);
+        expect(issued?.["evidence"]).toEqual([
+          "namespace.halted: the change itself passed nothing and failed nothing",
+        ]);
+        const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.outcomes ?? []).toEqual([]);
         expect(lane?.infra).toEqual([]);
         expect(lane?.alone ?? []).toEqual([]);
       }).pipe(Effect.provide(w.layer));

@@ -65,6 +65,8 @@ export function makeCandidateComposerMemory(
     readonly detail?: string;
     /** The paths the refusal names: none unless given. */
     readonly paths?: readonly string[];
+    /** How long a gate with no room said until its soonest lease ends, with `reason`. */
+    readonly retryAfterMs?: number;
     /** Each composition waits for it once its request is recorded: a compose that takes as long as a test wants. */
     readonly held?: Promise<void>;
   } = {},
@@ -87,6 +89,9 @@ export function makeCandidateComposerMemory(
                 reason: options.reason ?? "overlap",
                 paths: [...(options.paths ?? [])],
                 ...(options.detail === undefined ? {} : { detail: options.detail }),
+                ...(options.retryAfterMs === undefined
+                  ? {}
+                  : { retryAfterMs: options.retryAfterMs }),
               });
             const commits: { changeId: ChangeId; sha: CommitSha }[] = [];
             let parent: string = request.base;

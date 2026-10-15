@@ -591,6 +591,14 @@ export const tier2RunnerFor = (
       };
 };
 
+/**
+ * How long one attempt of a Tier 2 step may hold its box, as its namespace's
+ * container-minutes are admitted for it: its runner's timeout. Undefined for
+ * a step no runner takes here, which abstains unrun.
+ */
+export const tier2DeadlineMs = (step: PlanStep): number | undefined =>
+  step.tier.tier === 2 ? tier2RunnerFor(step)?.config.timeout : undefined;
+
 const abstained = (step: PlanStep, failure: InfraFailure): StepReport => ({
   stepId: step.id,
   outcome: "abstain",

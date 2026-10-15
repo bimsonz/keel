@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/budget.test.ts
+# kills: budget.halted
+# why: a verification its namespace refused is taken as admitted, so it runs past its limit and while halted
+diff --git a/packages/core/src/application/verification/budget.ts b/packages/core/src/application/verification/budget.ts
+index fe8208cd..80fa93c1 100644
+--- a/packages/core/src/application/verification/budget.ts
++++ b/packages/core/src/application/verification/budget.ts
+@@ -63,7 +63,7 @@ export const admitVerification = Effect.fn("verification/admitVerification")(fun
+   return yield* usage.admit(namespace, "container-minutes", minutes, admitKey(instanceId)).pipe(
+     Effect.as<Admission>({ _tag: "Admitted", minutes }),
+     Effect.catchTag("QuotaExceeded", (exceeded) =>
+-      Effect.succeed<Admission>({ _tag: "Refused", exceeded }),
++      Effect.succeed<Admission>({ _tag: "Admitted", minutes }),
+     ),
+   );
+ });

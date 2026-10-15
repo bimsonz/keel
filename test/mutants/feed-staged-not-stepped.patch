@@ -2,11 +2,11 @@
 # kills: lane.do.stage-published
 # why: the Lane DO arms no next step after a staged one, so a formed batch is never composed
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index e35620de..c5daa2a4 100644
+index d2e75559..7ce359da 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
-@@ -136,7 +136,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
-       await this.armReoffer();
+@@ -170,7 +170,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
+       await this.armBudget();
        // A batch formed, a candidate assembled or a batch failed on the infrastructure: the lane goes on
        // at once, in a new invocation, which publishes what this one committed before it steps again.
 -      if (exit.value === "staged" || exit.value === "again") await this.step(Date.now());

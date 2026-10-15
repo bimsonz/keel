@@ -2,12 +2,12 @@
 # kills: red.every-member-leaves
 # why: a co-member of a change-blamed failure waits for a bisection that never comes, stranded in Integrating
 diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
-index 2f428a4..5429013 100644
+index bb620f38..0b540c22 100644
 --- a/packages/core/src/domain/integration/red-exit.ts
 +++ b/packages/core/src/domain/integration/red-exit.ts
-@@ -30,7 +30,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
-     case "unattributed":
-       return { _tag: "Bisection" };
+@@ -34,7 +34,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
+     case "halted":
+       return { _tag: "Bounce" };
      default:
 -      return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
 +      return attribution === member ? { _tag: "Bounce" } : { _tag: "Bisection" };

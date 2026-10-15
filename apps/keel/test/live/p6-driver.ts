@@ -15,11 +15,24 @@ import {
 import { Proposition } from "@keeltown/core/domain/coordination";
 import { FlowWorld } from "@keeltown/core/domain/verification";
 import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
-import { Effect, Schema } from "effect";
+import { NamespaceUsage } from "@keeltown/core/ports";
+import { Effect, Layer, Schema } from "effect";
 import { BundleStoreR2 } from "../../src/adapters/driven/r2/bundle-store.ts";
 import { noopWorld } from "../../src/adapters/driven/r2/noop-world.ts";
 import type { StreamingAi } from "../../src/adapters/driven/workers-ai/platform-function.ts";
 import { probeDraftingLayer } from "../../src/composition/workflow.ts";
+
+/** The spike's driver drafts for no tenant: it has no namespace's usage to count its model calls against. */
+const UNCOUNTED = Layer.succeed(
+  NamespaceUsage,
+  NamespaceUsage.of({
+    admit: () =>
+      Effect.succeed({ limit: Number.MAX_SAFE_INTEGER, remaining: Number.MAX_SAFE_INTEGER }),
+    record: () => Effect.void,
+    settings: () => Effect.succeed({ overrides: {}, halted: false }),
+    configure: () => Effect.void,
+  }),
+);
 
 interface DriverEnv {
   readonly AI: StreamingAi;
@@ -91,9 +104,15 @@ async function draft(request: Request, env: DriverEnv): Promise<Response> {
   const aNoop = noopWorld(body.namespace, a);
   const started = Date.now();
   const outcome = await Effect.runPromise(
-    draftProbe(body.namespace, FRESHNESS_TEMPLATE, context, body.worlds, (recipe) =>
-      aNoop(recipe).pipe(Effect.provide(BundleStoreR2(env.BUNDLES))),
+    draftProbe(
+      body.namespace,
+      FRESHNESS_TEMPLATE,
+      context,
+      body.worlds,
+      (recipe) => aNoop(recipe).pipe(Effect.provide(BundleStoreR2(env.BUNDLES))),
+      `p6:${started}`,
     ).pipe(
+      Effect.provide(UNCOUNTED),
       Effect.provide(
         probeDraftingLayer({
           AI: recording(env.AI, served),

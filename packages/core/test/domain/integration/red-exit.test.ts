@@ -206,6 +206,7 @@ const failureArb = (members: readonly ChangeId[]): fc.Arbitrary<Failure> =>
         "interaction",
         "unattributed",
         "textual",
+        "halted",
         ...members,
       ),
     }),
@@ -263,14 +264,17 @@ describe("a Red batch's members", () => {
     ]);
   });
 
-  it("[red.only-blamed-bounces] exactly the member the failure names bounces; infra, textual, interaction and unattributed bounce nobody", () => {
+  it("[red.only-blamed-bounces] exactly the member the failure names bounces; infra, textual, interaction and unattributed bounce nobody, and halted bounces every member", () => {
     fc.assert(
       fc.property(redArb, (red) => {
         if (red === undefined) return true;
         const bounced = exits(red)
           .filter((o) => o.state === "bounced")
           .map((o) => o.member);
-        const named = red.members.filter((m) => m === red.attribution);
+        const named =
+          red.attribution === "halted"
+            ? red.members
+            : red.members.filter((m) => m === red.attribution);
         return bounced.length === named.length && bounced.every((m, i) => m === named[i]);
       }),
     );
@@ -278,6 +282,10 @@ describe("a Red batch's members", () => {
       exits(redOf([A, B], { via: "verify", blame: "infra" })).filter((o) => o.state === "bounced"),
     ).toEqual([]);
     expect(exits(redOf([A], { via: "compose" })).map((o) => o.state)).toEqual(["bounced"]);
+    expect(exits(redOf([A, B], { via: "verify", blame: "halted" })).map((o) => o.state)).toEqual([
+      "bounced",
+      "bounced",
+    ]);
   });
 
   it("[red.reason-names-cause] every requeued member's reason is its failure's cause, never another's", () => {

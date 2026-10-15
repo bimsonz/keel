@@ -15,7 +15,9 @@ const requeue = (reason: RequeueReason): RedExit => ({ _tag: "Requeue", reason }
  * change it blames bounces, and every other member goes back to its lane with
  * the failure's cause as its reason (the Lane counts `infra-failure`s, so a
  * reason never names another cause). A failure nobody could be blamed for
- * waits for bisection, whose CandidateBisected requeues it. No member stays
+ * waits for bisection, whose CandidateBisected requeues it. A batch failed
+ * because its namespace is halted bounces every member: none is at fault,
+ * and none can be verified until the namespace is resumed. No member stays
  * Integrating. The Candidate machine makes a batch of one's failure its
  * member's, so no member list is needed.
  */
@@ -29,6 +31,8 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
       return requeue("interaction");
     case "unattributed":
       return { _tag: "Bisection" };
+    case "halted":
+      return { _tag: "Bounce" };
     default:
       return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
   }

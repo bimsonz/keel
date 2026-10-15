@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts
+# kills: draft.model-calls
+# why: a probe draft calls the model whatever its namespace's model-calls say
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 8ef5267b..ff0adfe9 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -221,7 +221,7 @@ export const draftProbe = <S, R>(
+       const admitted = yield* Effect.result(
+         usage.admit(namespace, "model-calls", 1, `draft:${key}:${attempt}`),
+       );
+-      if (Result.isFailure(admitted)) {
++      if (false) {
+         const refused = admitted.failure;
+         return {
+           _tag: "Abstained",

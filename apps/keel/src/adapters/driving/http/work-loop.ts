@@ -29,6 +29,7 @@ import {
   LEASE_TTL_MS,
   type LeaseNotLapsed,
   type LeaseStale,
+  type NamespaceHalted,
   type PoolExhausted,
   type Preflight,
   MfpEffectProposition,
@@ -624,6 +625,7 @@ export function changeNotFound(
 export function submitError(
   caller: Caller,
   error:
+    | NamespaceHalted
     | ChangeNotFound
     | LeaseStale
     | ChangeStateRefused
@@ -631,6 +633,14 @@ export function submitError(
     | IdempotencyConflict,
 ): SubmitResult {
   switch (error._tag) {
+    case "NamespaceHalted":
+      return {
+        status: 403,
+        body: problem(403, "namespace.halted", caller.requestId, {
+          detail: `Verification spend is stopped for ${error.namespace}, so it takes no submission: a verification there would run nothing and bounce the change.`,
+          nextActions: apiActions(error.nextActions),
+        }),
+      };
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":

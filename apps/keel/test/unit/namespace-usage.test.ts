@@ -174,11 +174,45 @@ describe("the instance's quota configuration", () => {
       }).pipe(Effect.provide(configured().layer)),
   );
 
+  it.effect(
+    "[usage.instance-halted] a namespace the configuration lists as halted is refused every spend kind as halted, whatever its own settings say, and still admitted the rest",
+    () =>
+      Effect.gen(function* () {
+        // Stored as not halted, with room of its own: the instance's list still stops it.
+        yield* configureUsage(AGENT, { overrides: { "container-minutes": 50 }, halted: false });
+        for (const kind of ["container-minutes", "model-calls", "concurrent-containers"] as const) {
+          const refused = yield* Effect.flip(admitUsage(AGENT, kind, 1, `halted-${kind}`));
+          expect(refused).toMatchObject({ _tag: "QuotaExceeded", kind, reason: "halted" });
+        }
+        expect(yield* admitUsage(AGENT, "projects", 1, "halted-p")).toEqual({
+          limit: 4,
+          remaining: 3,
+        });
+        expect(yield* usageSettings(AGENT)).toEqual({
+          overrides: { "container-minutes": 50, projects: 4 },
+          halted: true,
+        });
+        // One the list does not name is not halted.
+        expect((yield* usageSettings(ORG)).halted).toBe(false);
+        expect(yield* admitUsage(ORG, "model-calls", 1, "org-m")).toMatchObject({ limit: 500 });
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            world().layer,
+            Layer.succeed(InstanceQuotas, { ...CONFIG, halted: [AGENT] }),
+          ),
+        ),
+      ),
+  );
+
   it("[usage.instance-quotas] KEEL_QUOTAS decodes as the configuration, empty is none, and anything else stops the composition", () => {
     expect(instanceQuotas("{}")).toEqual({});
     expect(instanceQuotas("")).toEqual({});
     expect(instanceQuotas(JSON.stringify(CONFIG))).toEqual(CONFIG);
+    expect(instanceQuotas(JSON.stringify({ halted: [ORG] }))).toEqual({ halted: [ORG] });
     for (const bad of [
+      JSON.stringify({ halted: ORG }),
+      JSON.stringify({ halted: ["keel"] }),
       "not json",
       "[]",
       JSON.stringify({ defaults: { "container-minutes": -1 } }),

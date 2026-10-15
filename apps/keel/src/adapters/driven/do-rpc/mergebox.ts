@@ -23,7 +23,11 @@ export const BOX_COMPOSE_MS = 8 * 60_000;
 
 /** A namespace's BoxGate, as the client calls it. */
 export interface BoxGateStub {
-  readonly acquire: (ask: { readonly holder: string; readonly ttlMs: number }) => Promise<unknown>;
+  readonly acquire: (ask: {
+    readonly holder: string;
+    readonly ttlMs: number;
+    readonly waiter?: string;
+  }) => Promise<unknown>;
   readonly release: (leaseId: string) => Promise<unknown>;
 }
 
@@ -45,12 +49,18 @@ const decodeAnswer = Schema.decodeUnknownEffect(BoxComposeAnswer);
 /** How much of what failed in the box a refusal carries into the evidence. */
 const DETAIL_MAX = 500;
 
-const refuse = (reason: string, paths: readonly string[] = [], detail?: string) =>
+const refuse = (
+  reason: string,
+  paths: readonly string[] = [],
+  detail?: string,
+  retryAfterMs?: number,
+) =>
   Effect.fail(
     new CompositionRefused({
       reason,
       paths: [...paths],
       ...(detail === undefined ? {} : { detail: scrubbed(detail).slice(0, DETAIL_MAX) }),
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     }),
   );
 
@@ -78,10 +88,17 @@ export const boxRequest = (request: CandidateRequest): BoxComposeRequest => ({
  * dying by a signal is `git-crashed`, asked once. What the box cannot do for
  * its own sake is infra's (`box-unavailable`, `box-failed`, `box-check`),
  * which the Lane holds and requeues, with what failed in the box as the
- * refusal's detail. An answer is logged by its kind, never with a remote,
- * which carries the account id.
+ * refusal's detail. A gate with no room says how long until its soonest lease
+ * ends, and keeps `waiter` (the lane) to tell it when a box is freed; a gate
+ * of a halted namespace is `namespace-halted`, which bounces the batch. An
+ * answer is logged by its kind, never with a remote, which carries the
+ * account id.
  */
-export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects): BoxComposer {
+export function boxComposerRpc(
+  projectId: () => ProjectId,
+  objects: BoxObjects,
+  waiter?: () => string,
+): BoxComposer {
   return {
     compose: (request) =>
       Effect.gen(function* () {
@@ -95,7 +112,11 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
         }
         const gate = objects.gate(namespace.value);
         const lease = yield* Effect.tryPromise(() =>
-          gate.acquire({ holder: request.candidateId, ttlMs: BOX_LEASE_MS }),
+          gate.acquire({
+            holder: request.candidateId,
+            ttlMs: BOX_LEASE_MS,
+            ...(waiter === undefined ? {} : { waiter: waiter() }),
+          }),
         ).pipe(Effect.flatMap(decodeLease), Effect.option);
         if (Option.isNone(lease)) {
           yield* Effect.logWarning(`mergebox ${request.candidateId}: the gate did not answer`);
@@ -103,10 +124,16 @@ export function boxComposerRpc(projectId: () => ProjectId, objects: BoxObjects):
         }
         if (!lease.value.granted) {
           const busy = lease.value;
+          if (busy.halted === true)
+            return yield* refuse(
+              "namespace-halted",
+              [],
+              `verification spend is stopped for ${namespace.value}`,
+            );
           yield* Effect.logWarning(
             `mergebox ${request.candidateId}: no box, ${busy.held} of ${busy.limit} held, room in ${busy.retryAfterMs} ms`,
           );
-          return yield* refuse("box-unavailable");
+          return yield* refuse("box-unavailable", [], undefined, busy.retryAfterMs);
         }
         const leaseId = lease.value.leaseId;
         const answer = yield* Effect.tryPromise({

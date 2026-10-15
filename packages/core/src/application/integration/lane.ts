@@ -42,6 +42,7 @@ import {
   type EventEnvelope,
   globsMayOverlap,
   type Instant,
+  InstantSchema,
   type NamespaceId,
   NextAction,
   ProjectId,
@@ -78,7 +79,7 @@ import {
   type Transaction,
   type Transition,
 } from "../ports/index.ts";
-import { projectNamespace } from "../verification/index.ts";
+import { haltedActions, projectNamespace } from "../verification/index.ts";
 import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kinds the Lane keeps: its queue and batch in flight, and each batch as its events fold. */
@@ -185,6 +186,8 @@ const ActiveBatch = Schema.Struct({
       failingTests: Schema.Array(Schema.String),
       nextActions: Schema.optionalKey(Schema.Array(NextAction)),
       unrun: Schema.optionalKey(Schema.Literal(true)),
+      retryAt: Schema.optionalKey(InstantSchema),
+      halted: Schema.optionalKey(Schema.Literal(true)),
     }),
   ),
 });
@@ -241,6 +244,18 @@ export const Lane = Schema.Struct({
   ),
   /** Trunk's head as the last TrunkAdvanced heard named it: no batch forms on a staging main anywhere else. */
   trunkHead: Schema.optional(CommitSha),
+  /**
+   * When the project's namespace has container-minutes again (epoch ms): a
+   * verification parked unrun for want of them said so, and no batch forms,
+   * in flight or behind, before then.
+   */
+  notBefore: Schema.optional(Schema.Number),
+  /**
+   * When the namespace's box gate said its soonest lease ends (epoch ms),
+   * after it had no room for a composition: no batch forms before then,
+   * unless the gate says a box was freed first (`boxFreed`).
+   */
+  boxWait: Schema.optional(Schema.Number),
   /** The last candidate bundle this lane stored: the next takes from it what did not change. */
   lastBundle: Schema.optional(ContentHash),
   /** The outcome of each member verified lately, oldest first, at most OUTCOME_WINDOW: the batch size is read from it. */
@@ -1001,6 +1016,7 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
   refusal: string,
   wait: string,
   capacity = false,
+  retryAfterMs?: number,
 ) {
   const verdictId = yield* (yield* Ids).next("vrd");
   let exhausted: string | undefined;
@@ -1030,7 +1046,11 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
           ],
         },
       ],
-      lane: () => ({ ...infra.lane, active: undefined }),
+      lane: () => ({
+        ...infra.lane,
+        active: undefined,
+        ...(retryAfterMs === undefined ? {} : { boxWait: at + retryAfterMs }),
+      }),
     };
   }).pipe(Effect.orDie);
   if (exhausted !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${exhausted}`);
@@ -1132,7 +1152,46 @@ const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
     refusalEvidence(refused),
     "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
     refused.reason === "box-unavailable",
+    refused.reason === "box-unavailable" ? refused.retryAfterMs : undefined,
   );
+
+/** What a gate refuses for a namespace whose verification spend is stopped. */
+export const NAMESPACE_HALTED = "namespace-halted";
+
+/**
+ * A composition the gate refused because the namespace is halted: every
+ * member bounces once, blamed on none, with what its owner does next.
+ */
+const bounceHalted = Effect.fn("integration/bounceHalted")(function* (
+  lane: Lane,
+  batch: Batch,
+  refused: CompositionRefused,
+) {
+  const namespace = yield* Effect.option(projectNamespace(lane.projectId));
+  const verdictId = yield* (yield* Ids).next("vrd");
+  yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => ({
+    moves: [
+      {
+        command: { _tag: "RefuseComposition", verdictId, attribution: "halted" },
+        before: [
+          verdictDraft(
+            VerdictIssued.make({
+              verdictId,
+              subject: batch.id,
+              outcome: "bounce",
+              evidence: [
+                `${refusalEvidence(refused)}; the change itself passed nothing and failed nothing`,
+              ],
+              nextActions: Option.isSome(namespace) ? haltedActions(namespace.value) : [],
+            }),
+            batch.members,
+          ),
+        ],
+      },
+    ],
+    lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
+  })).pipe(Effect.orDie);
+});
 
 /** A composition refused for the batch's sake: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
 const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
@@ -1143,6 +1202,10 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
 ) {
   if (BOX_INFRA_REASONS.has(refused.reason)) {
     yield* holdForBox(lane, batch, refused);
+    return;
+  }
+  if (refused.reason === NAMESPACE_HALTED) {
+    yield* bounceHalted(lane, batch, refused);
     return;
   }
   // A batch of one bounces on the paths: name what landed on them since the change's base.
@@ -1655,6 +1718,41 @@ export const reofferDue = Effect.fn("integration/reofferDue")(function* (laneId:
   return (last?.at ?? found.verified.at) + reofferDelay(last?.count ?? 0);
 });
 
+/**
+ * Until when the lane forms nothing at `now`: the later of the times still to
+ * come of its namespace's container-minutes (`notBefore`) and its box gate
+ * (`boxWait`). Undefined when neither is.
+ */
+const waitsAt = (lane: Lane, now: number): number | undefined => {
+  const waits = [lane.notBefore, lane.boxWait].filter(
+    (until): until is number => until !== undefined && until > now,
+  );
+  return waits.length === 0 ? undefined : Math.max(...waits);
+};
+
+/**
+ * When the lane steps again for its namespace: the time it forms nothing
+ * until (`waitsAt`), while changes wait in the queue. Undefined otherwise.
+ */
+export const budgetDue = Effect.fn("integration/budgetDue")(function* (laneId: string) {
+  const lane = laneOf(yield* EntityStore, laneId);
+  if (lane === undefined || lane.queue.length === 0) return undefined;
+  return waitsAt(lane, yield* (yield* Clock).now);
+});
+
+/**
+ * The namespace's box gate freed a box the lane was refused one of: the lane
+ * no longer waits on the gate. It still waits on its container-minutes.
+ */
+export const boxFreed = Effect.fn("integration/boxFreed")(function* (laneId: string) {
+  const lane = laneOf(yield* EntityStore, laneId);
+  if (lane?.boxWait === undefined) return;
+  const at = yield* (yield* Clock).now;
+  yield* noteLane(lane, `box-freed:${at}`, ({ boxWait: _freed, ...rest }) => rest).pipe(
+    Effect.orDie,
+  );
+});
+
 /** A BatchVerified handed to trunk again: the same event under a fresh dedupe key. */
 export interface Reoffer {
   readonly subscriber: string;
@@ -1917,6 +2015,7 @@ const stepBehind = Effect.fn("integration/stepBehind")(function* (laneId: string
   const tail = (lane.behind ?? []).at(-1) ?? active;
   if (tail.composed === undefined || lane.queue.length === 0) return false;
   if (lane.heldBehind === active.batchId) return false;
+  if (waitsAt(lane, yield* (yield* Clock).now) !== undefined) return false;
   // Depth is chosen, not capped: another batch while a box is free to verify it.
   if ((yield* (yield* BatchVerification).capacity()).free <= 0) return false;
   yield* formBatch(lane, tail);
@@ -1971,6 +2070,9 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
     }
     if (active === undefined) {
       if (lane.queue.length === 0) return "idle" satisfies LaneStep;
+      // The namespace's container-minutes are spent, or its gate has no box: the lane's own deadline steps it then.
+      if (waitsAt(lane, yield* (yield* Clock).now) !== undefined)
+        return "waiting" satisfies LaneStep;
       yield* formBatch(lane);
       if (laneOf(yield* EntityStore, laneId)?.active !== undefined)
         return "staged" satisfies LaneStep;
@@ -2046,7 +2148,15 @@ interface Issued {
 /** What a verdict is issued from: KeelVerify's own, or the Lane's for an instance that will send none. */
 type Verdict = Pick<
   BatchVerdict,
-  "verdictId" | "outcome" | "planHash" | "evidence" | "failingTests" | "nextActions" | "unrun"
+  | "verdictId"
+  | "outcome"
+  | "planHash"
+  | "evidence"
+  | "failingTests"
+  | "nextActions"
+  | "unrun"
+  | "retryAt"
+  | "halted"
 >;
 
 /** A failure of the infrastructure's capacity (no box, rate-limited): the members are requeued and nothing is counted, since it says nothing about any of them. */
@@ -2068,6 +2178,15 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
     verdict.nextActions === undefined || verdict.nextActions.length === 0
       ? {}
       : { nextActions: verdict.nextActions };
+  // Halted: every member bounces with what its owner does, and none is blamed, counted or run alone.
+  if (verdict.outcome === "bounce" && verdict.halted === true)
+    return {
+      outcome: "bounce",
+      evidence: verdict.evidence,
+      ...verifiersRemedy,
+      attribution: "halted",
+      lane: cleared,
+    };
   if (verdict.outcome === "bounce") {
     const attribution = blameOf(batch, verdict.failingTests);
     return {
@@ -2082,9 +2201,10 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
     };
   }
   // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row, unless no step could run.
+  // A park for want of quota says when there is room again: nothing forms before then.
   const infra =
     verdict.outcome === "park" && verdict.unrun === true
-      ? uncounted(lane)
+      ? uncounted(verdict.retryAt === undefined ? lane : { ...lane, notBefore: verdict.retryAt })
       : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`, at);
   return infra.exhausted === undefined
     ? {

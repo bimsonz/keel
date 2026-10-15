@@ -110,6 +110,8 @@ export class CompositionRefused extends Schema.TaggedError<CompositionRefused>()
     paths: Schema.Array(Schema.String),
     /** What failed where the composer could see it (MergeBox's stage, exit and stderr's tail), for the evidence; never a remote. */
     detail: Schema.optional(Schema.String),
+    /** For a gate with no room (`box-unavailable`), how long until its soonest lease ends: the lane forms nothing before then unless a box is freed sooner. */
+    retryAfterMs: Schema.optional(Schema.Number),
   },
 ) {}
 

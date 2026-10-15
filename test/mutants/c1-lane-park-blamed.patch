@@ -2,10 +2,10 @@
 # kills: lane.verdict-order
 # why: A parked verdict is blamed on the batch's change, so an infrastructure fault bounces an agent's work
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e48f8594..97a7a066 100644
+index 5de5f424..acb11b5d 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1742,6 +1742,13 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
+@@ -2200,6 +2200,13 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
          : cleared,
      };
    }
@@ -17,5 +17,5 @@ index e48f8594..97a7a066 100644
 +      lane: cleared,
 +    };
    // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row, unless no step could run.
+   // A park for want of quota says when there is room again: nothing forms before then.
    const infra =
-     verdict.outcome === "park" && verdict.unrun === true

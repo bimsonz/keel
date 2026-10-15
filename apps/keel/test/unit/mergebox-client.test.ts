@@ -58,7 +58,9 @@ function objects(
     },
     gate: (namespace) => ({
       acquire: async (ask) => {
-        asked.push(`acquire ${namespace} ${ask.holder} ${ask.ttlMs}`);
+        asked.push(
+          `acquire ${namespace} ${ask.holder} ${ask.ttlMs}${ask.waiter === undefined ? "" : ` for ${ask.waiter}`}`,
+        );
         return (init.lease ?? (async () => ({ granted: true, leaseId: "lse-1", expiresAt: 1 })))();
       },
       release: async (leaseId) => {
@@ -87,8 +89,8 @@ function objects(
   return { boxes, asked, requests };
 }
 
-const composeWith = (boxes: BoxObjects) =>
-  Effect.runPromise(Effect.exit(boxComposerRpc(() => PROJECT, boxes).compose(REQUEST)));
+const composeWith = (boxes: BoxObjects, waiter?: () => string) =>
+  Effect.runPromise(Effect.exit(boxComposerRpc(() => PROJECT, boxes, waiter).compose(REQUEST)));
 
 const refusalOf = (exit: Exit.Exit<unknown, CompositionRefused>) =>
   Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
@@ -137,9 +139,19 @@ describe("MergeBox's client", () => {
     ]);
   });
 
-  it("[mergebox.client-busy] a gate with no room, or one that does not answer, is box-unavailable, and the box is never asked", async () => {
+  it("[mergebox.client-busy] a gate with no room, or one that does not answer, is box-unavailable, and the box is never asked; no room says how long until a lease ends, and the lane asks as the gate's waiter", async () => {
+    const busy = objects({
+      lease: async () => ({ granted: false, retryAfterMs: 30_000, held: 2, limit: 2 }),
+    });
+    const waited = refusalOf(await composeWith(busy.boxes, () => "lane:prj:main"));
+    expect(waited).toEqual(
+      new CompositionRefused({ reason: "box-unavailable", paths: [], retryAfterMs: 30_000 }),
+    );
+    expect(busy.asked).toEqual([
+      `place ${PROJECT}`,
+      `acquire ${NAMESPACE} ${CANDIDATE} ${BOX_LEASE_MS} for lane:prj:main`,
+    ]);
     for (const lease of [
-      async () => ({ granted: false, retryAfterMs: 30_000, held: 2, limit: 2 }),
       async () => {
         throw new Error("the gate is overloaded");
       },
@@ -149,6 +161,22 @@ describe("MergeBox's client", () => {
       expect(refusalOf(await composeWith(world.boxes))).toEqual(refused("box-unavailable"));
       expect(world.asked.filter((line) => /^(compose|release)/.test(line))).toEqual([]);
     }
+  });
+
+  it("[mergebox.client-halted] a gate of a halted namespace is namespace-halted, naming the namespace, and the box is never asked", async () => {
+    const world = objects({
+      lease: async () => ({
+        granted: false,
+        retryAfterMs: 60_000,
+        held: 0,
+        limit: 0,
+        halted: true,
+      }),
+    });
+    expect(refusalOf(await composeWith(world.boxes, () => "lane:prj:main"))).toEqual(
+      refused("namespace-halted", [], `verification spend is stopped for ${NAMESPACE}`),
+    );
+    expect(world.asked.filter((line) => /^(compose|release)/.test(line))).toEqual([]);
   });
 
   it("[mergebox.client-unplaced] a project with no namespace has no gate to ask: box-unavailable, nothing asked", async () => {

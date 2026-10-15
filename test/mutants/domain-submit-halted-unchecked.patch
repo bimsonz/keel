@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/submit-halted.test.ts
+# kills: submit.halted
+# why: a submission is taken while its namespace's verification spend is stopped, so it bounces having run nothing, and its agent submits again into the same bounce
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index b04c89c6..9085d5d8 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -179,8 +179,6 @@ export const submitChange: (
+   if (Option.isSome(place)) {
+     const { namespace } = place.value;
+     const settings = yield* NamespaceUsage.use((usage) => usage.settings(namespace));
+-    if (settings.halted)
+-      return yield* new NamespaceHalted({ namespace, nextActions: haltedActions(namespace) });
+   }
+   return yield* Changes.use((changes) => changes.submit(principal, input));
+ });

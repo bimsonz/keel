@@ -1264,7 +1264,9 @@ union Tier {
 /**
  * Who a failed batch is blamed on: one member, a refused composition
  * (`textual`), every subset passing while the union fails (`interaction`), the
- * infrastructure (`infra`), or nobody yet (`unattributed`).
+ * infrastructure (`infra`), nobody yet (`unattributed`), or nobody at all
+ * (`halted`: the namespace's verification spend is stopped, so every member
+ * bounces, none of them at fault).
  */
 union BatchAttribution {
   ChangeId,
@@ -1272,6 +1274,7 @@ union BatchAttribution {
   "interaction",
   "infra",
   "unattributed",
+  "halted",
 }
 
 model BatchFormed {

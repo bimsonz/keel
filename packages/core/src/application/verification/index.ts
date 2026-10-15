@@ -29,6 +29,7 @@ export const getConflict: (
   conflictId: ConflictId,
 ) => Effect.Effect<Conflict, ConflictNotFound, EntityStore> = stub("verification/getConflict");
 
+export * from "./budget.ts";
 export * from "./command.ts";
 export * from "./deps.ts";
 export * from "./derive-submission.ts";

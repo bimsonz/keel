@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/boxgate.test.ts
+# kills: boxgate.do.limit
+# why: the gate of a halted namespace refuses as if it were only full, so a halted batch waits for a box that never comes
+diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
+index 6e5bf7d4..d3b2f449 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate.ts
+@@ -91,7 +91,7 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+     );
+     await this.keep(leases);
+     if (answer.granted) return answer;
+-    if (halted) return { ...answer, halted: true };
++    if (halted) return answer;
+     if (ask.waiter !== undefined && !this.waitingLanes.includes(ask.waiter))
+       this.ctx.storage.kv.put(WAITERS, [...this.waitingLanes, ask.waiter]);
+     return answer;

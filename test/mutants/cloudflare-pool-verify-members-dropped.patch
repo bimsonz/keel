@@ -2,10 +2,10 @@
 # kills: cf.pool.preview-smoke-land
 # why: the preview step is run for no change, so no agent is told where its preview answers and the preview has no stable alias
 diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-index 118b2499..319032ed 100644
+index aa912ee8..fbfef5f5 100644
 --- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
 +++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-@@ -103,7 +103,7 @@ export class KeelVerify extends CIWorkflow<Env> {
+@@ -118,7 +118,7 @@ export class KeelVerify extends CIWorkflow<Env> {
          projectId: job.projectId,
          namespace,
          candidateId: job.candidateId,
@@ -13,4 +13,4 @@ index 118b2499..319032ed 100644
 +        members: [],
          ...(job.candidateCommit === undefined ? {} : { candidateCommit: job.candidateCommit }),
        };
-       const deployServices = await runtime.runPromise(Effect.context<DeployServices>());
+       // Persisted as JSON, since a refusal's next actions' args are open; decoded, so a replay is checked too.

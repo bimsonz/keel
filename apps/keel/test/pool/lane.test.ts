@@ -43,6 +43,7 @@ import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import {
+  LANE_BUDGET,
   LANE_REOFFER,
   LANE_STEP,
   LANE_VERIFY,
@@ -239,6 +240,30 @@ const queued = (laneId: string, n: number) => {
     payload: { _tag: "ChangeQueued", changeId, laneId, planHash: PLAN.planHash },
   };
 };
+
+/** The change's own object putting it back in the lane's queue once its batch parked. */
+const requeued = (
+  laneId: string,
+  changeId: string,
+  batchId: VerificationJob["fence"]["batchId"],
+  n: number,
+) => ({
+  eventId: makeId("evt", ulid()),
+  type: "ChangeRequeued",
+  entity: { kind: "change", id: changeId },
+  seq: n,
+  at: Date.now(),
+  dedupeKey: `change:${changeId}/requeue/ChangeRequeued#${n}`,
+  affected: [],
+  notified: [laneId],
+  payload: {
+    _tag: "ChangeRequeued",
+    changeId,
+    batchId,
+    reason: "infra-failure",
+    planHash: PLAN.planHash,
+  },
+});
 
 /** KeelVerify's report on the batch: `land`, for the fence's `attempt`. */
 const landing = (job: VerificationJob, instanceId: string, attempt = 0) => ({
@@ -669,6 +694,50 @@ describe("the Lane DO", () => {
       },
       { timeout: 20_000, interval: 50 },
     );
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.budget-armed] a verification parked for want of container-minutes arms the lane's own deadline for when they reset; the lane forms nothing before it, and forms the batch again once it runs", async () => {
+    const { stub, laneId, verification } = await lane();
+    const budgetArmed = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        armedAlarms(state.storage).filter((a) => a.reason === LANE_BUDGET),
+      );
+    const change = queued(laneId, 1);
+    await stub.receive([change]);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    // KeelVerify's verdict when the namespace's minutes are spent: it ran nothing, and says when they reset. Far
+    // enough ahead that the lane is seen waiting before it, however loaded the machine.
+    const retryAt = Date.now() + 8_000;
+    expect(
+      decodeExit(
+        LaneCodecs.recordVerdict,
+        await stub.recordVerdict({
+          ...landing(job, instanceId),
+          outcome: "park",
+          evidence: ["quota.exceeded: nothing ran"],
+          unrun: true,
+          retryAt,
+        }),
+      ),
+    ).toEqual(Exit.void);
+    await stub.receive([requeued(laneId, change.entity.id, job.fence.batchId, 2)]);
+    await vi.waitFor(
+      async () => expect((await budgetArmed()).map((armed) => armed.at)).toEqual([retryAt]),
+      { timeout: 6_000, interval: 25 },
+    );
+    // Armed, and not yet due: the requeued change has formed no batch.
+    expect(Date.now()).toBeLessThan(retryAt);
+    expect(verification.started.size).toBe(1);
+    // The deadline runs the lane's step: the batch forms again, and a second verification starts.
+    await vi.waitFor(() => expect(verification.started.size).toBe(2), {
+      timeout: 20_000,
+      interval: 50,
+    });
+    expect(Date.now()).toBeGreaterThanOrEqual(retryAt);
+    await vi.waitFor(async () => expect(await budgetArmed()).toEqual([]), { timeout: 5_000 });
     await drainOutbox(stub);
   });
 

@@ -310,6 +310,7 @@ export const draftConflict = (
   plan: ProbeWorldPlan,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,
   hunks: DraftHunks,
+  key: string,
 ) =>
   Effect.gen(function* () {
     const predicate = parties.premise.proposition.predicate;
@@ -333,6 +334,7 @@ export const draftConflict = (
       draftContextOf(parties, source, hunks),
       worlds,
       (recipe) => noop.build(namespace, worlds.A, recipe),
+      key,
     );
     return { _tag: "Drafted", outcome } satisfies DraftAnswer;
   }).pipe(
@@ -648,7 +650,15 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
       const step = n === 1 ? "draft" : `draft#${n}`;
       const answered = yield* steps.step(
         step,
-        draftConflict(call.namespace, parties, planned.plan, worlds.success, planned.hunks),
+        // Its model calls are counted under the instance and the step, so a retried step counts none twice.
+        draftConflict(
+          call.namespace,
+          parties,
+          planned.plan,
+          worlds.success,
+          planned.hunks,
+          `${call.instanceId}:${step}`,
+        ),
         "draft",
       );
       const wait = PROBE_DRAFT_WAITS_MS[n - 1];

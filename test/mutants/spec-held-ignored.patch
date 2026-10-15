@@ -2,14 +2,14 @@
 # kills: lane.speculate-held
 # why: a batch refused behind the head forms again behind it at once, a loop of composes until the head lands
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index ec24f7ea..3317a28d 100644
+index 5de5f424..4251f76b 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1797,7 +1797,6 @@ const stepBehind = Effect.fn("integration/stepBehind")(function* (laneId: string
+@@ -2014,7 +2014,6 @@ const stepBehind = Effect.fn("integration/stepBehind")(function* (laneId: string
    }
    const tail = (lane.behind ?? []).at(-1) ?? active;
    if (tail.composed === undefined || lane.queue.length === 0) return false;
 -  if (lane.heldBehind === active.batchId) return false;
+   if (waitsAt(lane, yield* (yield* Clock).now) !== undefined) return false;
    // Depth is chosen, not capped: another batch while a box is free to verify it.
    if ((yield* (yield* BatchVerification).capacity()).free <= 0) return false;
-   yield* formBatch(lane, tail);

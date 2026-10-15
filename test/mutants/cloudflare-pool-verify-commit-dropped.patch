@@ -2,14 +2,14 @@
 # kills: cf.pool.deliver-promotes
 # why: a preview is recorded without the candidate's commit, so Deliver refuses every landing as commit-differs and trunk is never deployed
 diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-index 118b2499..bd85f08c 100644
+index aa912ee8..660ed76f 100644
 --- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
 +++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-@@ -104,7 +104,6 @@ export class KeelVerify extends CIWorkflow<Env> {
+@@ -119,7 +119,6 @@ export class KeelVerify extends CIWorkflow<Env> {
          namespace,
          candidateId: job.candidateId,
          members: job.members ?? [],
 -        ...(job.candidateCommit === undefined ? {} : { candidateCommit: job.candidateCommit }),
        };
-       const deployServices = await runtime.runPromise(Effect.context<DeployServices>());
-       const deploy: DeployStepRunner = (planStep, earlier) =>
+       // Persisted as JSON, since a refusal's next actions' args are open; decoded, so a replay is checked too.
+       const admission = Result.isSuccess(plan)

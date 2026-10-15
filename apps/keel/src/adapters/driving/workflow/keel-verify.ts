@@ -6,6 +6,8 @@ import {
   runDeployStep,
 } from "@keeltown/core/application/delivery";
 import {
+  Admission,
+  admitVerification,
   candidateRunner,
   type DeployStepRunner,
   ensureDeps,
@@ -16,11 +18,18 @@ import {
   resolvePlan,
   runPlan,
   SettledVerdict,
+  settleMinutes,
+  settleRefused,
   settleUnresolved,
   settleVerdict,
 } from "@keeltown/core/application/verification";
 import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
-import { durableReport, durableTell, keelVerifyRuntime } from "../../../composition/workflow.ts";
+import {
+  admittedMinutes,
+  durableReport,
+  durableTell,
+  keelVerifyRuntime,
+} from "../../../composition/workflow.ts";
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
@@ -41,7 +50,9 @@ const RECORD_RETRIES = {
  * Steps: `namespace` (the project's namespace, which must be the one the
  * payload names: the bundle, the plan and the evidence are all kept under
  * it), `plan` (the payload, and the plan Precheck compiled and stored under
- * the job's `planHash`), then, for a plan with a Tier 2 step, `deps-need` and
+ * the job's `planHash`), `admit` (the namespace's container-minutes for one
+ * attempt of the plan's Tier 2 steps, `planMinutes`: a refusal runs nothing,
+ * and the verdict is `settleRefused`'s), then, for a plan with a Tier 2 step, `deps-need` and
  * `deps:<install digest>` (core's `ensureDeps`: the candidate's dependencies,
  * built once for the namespace and that digest, or why there are none), then
  * the plan's own steps as `runPlan` reaches them: a Tier 2 step is its runner's step (which persists its raw
@@ -51,7 +62,8 @@ const RECORD_RETRIES = {
  * <step>` after it, for the public feed's step events),
  * run here in the Worker: the token of the target's account is opened inside
  * that step for Cloudflare's call and is never in what it returns, which is
- * persisted; then `verdict` and `record`. A plan the store does
+ * persisted; then `verdict` (which settles the admitted minutes to what the
+ * runners reported) and `record`. A plan the store does
  * not hold, or holds corrupt, runs nothing and settles park: the lane is
  * never left waiting on a failed instance.
  */
@@ -109,34 +121,55 @@ export class KeelVerify extends CIWorkflow<Env> {
         members: job.members ?? [],
         ...(job.candidateCommit === undefined ? {} : { candidateCommit: job.candidateCommit }),
       };
-      const deployServices = await runtime.runPromise(Effect.context<DeployServices>());
-      const deploy: DeployStepRunner = (planStep, earlier) =>
-        runDeployStep(run, planStep, earlier).pipe(Effect.provideContext(deployServices));
-      const reports = Result.isSuccess(plan)
-        ? await runtime.runPromise(
-            runPlan(
-              plan.success,
-              candidateRunner(
-                namespace,
-                { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
-                durableReport(step),
-                await runtime.runPromise(
-                  ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
+      // Persisted as JSON, since a refusal's next actions' args are open; decoded, so a replay is checked too.
+      const admission = Result.isSuccess(plan)
+        ? Schema.decodeUnknownSync(Admission)(
+            JSON.parse(
+              await step.do("admit", async () =>
+                JSON.stringify(
+                  Schema.encodeSync(Admission)(
+                    await runtime.runPromise(
+                      admitVerification(
+                        namespace,
+                        event.instanceId,
+                        admittedMinutes(plan.success.steps),
+                      ),
+                    ),
+                  ),
                 ),
-                deploy,
-              ),
-              laneSteps(
-                {
-                  laneId: job.laneId,
-                  instanceId: event.instanceId,
-                  fence: job.fence,
-                  candidateId: job.candidateId,
-                },
-                durableTell(step),
               ),
             ),
           )
-        : [];
+        : undefined;
+      const deployServices = await runtime.runPromise(Effect.context<DeployServices>());
+      const deploy: DeployStepRunner = (planStep, earlier) =>
+        runDeployStep(run, planStep, earlier).pipe(Effect.provideContext(deployServices));
+      const reports =
+        Result.isSuccess(plan) && admission?._tag === "Admitted"
+          ? await runtime.runPromise(
+              runPlan(
+                plan.success,
+                candidateRunner(
+                  namespace,
+                  { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
+                  durableReport(step),
+                  await runtime.runPromise(
+                    ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
+                  ),
+                  deploy,
+                ),
+                laneSteps(
+                  {
+                    laneId: job.laneId,
+                    instanceId: event.instanceId,
+                    fence: job.fence,
+                    candidateId: job.candidateId,
+                  },
+                  durableTell(step),
+                ),
+              ),
+            )
+          : [];
       // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
       const settled = Schema.decodeUnknownSync(SettledVerdict)(
         JSON.parse(
@@ -144,9 +177,20 @@ export class KeelVerify extends CIWorkflow<Env> {
             JSON.stringify(
               Schema.encodeSync(SettledVerdict)(
                 await runtime.runPromise(
-                  Result.isSuccess(plan)
-                    ? settleVerdict(namespace, plan.success, reports)
-                    : settleUnresolved(job.planHash, plan.failure),
+                  Result.isFailure(plan)
+                    ? settleUnresolved(job.planHash, plan.failure)
+                    : admission?._tag === "Refused"
+                      ? settleRefused(namespace, job.planHash, admission.exceeded)
+                      : settleVerdict(namespace, plan.success, reports).pipe(
+                          Effect.tap(() =>
+                            settleMinutes(
+                              namespace,
+                              event.instanceId,
+                              admission?.minutes ?? 0,
+                              reports,
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),

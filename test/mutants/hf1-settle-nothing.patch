@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/budget.test.ts
+# kills: budget.admit-settle
+# why: a verification's minutes are never settled to what its runners took: the admitted figure stands, used or not
+diff --git a/packages/core/src/application/verification/budget.ts b/packages/core/src/application/verification/budget.ts
+index fe8208cd..2ec0ed45 100644
+--- a/packages/core/src/application/verification/budget.ts
++++ b/packages/core/src/application/verification/budget.ts
+@@ -83,7 +83,7 @@ export const settleMinutes = Effect.fn("verification/settleMinutes")(function* (
+   yield* usage.record(
+     namespace,
+     "container-minutes",
+-    usedMinutes(reports) - admitted,
++    0,
+     `${admitKey(instanceId)}:settle`,
+   );
+ });

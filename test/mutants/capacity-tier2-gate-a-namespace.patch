@@ -2,14 +2,14 @@
 # kills: capacity.tier2-gate
 # why: the Tier 2 gate reads its limit as a namespace's quota, which it is not, so it cannot count
 diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
-index 31d25965..79efa802 100644
+index 6e5bf7d4..2cb868eb 100644
 --- a/apps/keel/src/adapters/driving/do/boxgate.ts
 +++ b/apps/keel/src/adapters/driving/do/boxgate.ts
-@@ -54,7 +54,6 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+@@ -61,7 +61,6 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
  
-   /** The namespace's limit, read before the leases so no ask interleaves between their read and write. */
-   private async limit(): Promise<number> {
--    if (this.ctx.id.name === TIER2_GATE) return TIER2_BOX_CAP;
+   /** The namespace's limit and whether it is halted, read before the leases so no ask interleaves between their read and write. */
+   private async room(): Promise<{ readonly limit: number; readonly halted: boolean }> {
+-    if (this.ctx.id.name === TIER2_GATE) return { limit: TIER2_BOX_CAP, halted: false };
      const namespace = namespaceOf(this.ctx.id.name);
      const settings = await this.runtime.runPromise(
        NamespaceUsage.use((usage) => usage.settings(namespace)),

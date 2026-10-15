@@ -2,14 +2,14 @@
 # kills: verify.remedy-over-rpc
 # why: The RPC client drops the remedy, so the Lane never sees it
 diff --git a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
-index 9292dc5a..2194ec79 100644
+index 6708a464..25056e25 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
-@@ -29,7 +29,6 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
+@@ -35,7 +35,6 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
                planHash: verdict.planHash,
                evidence: verdict.evidence,
                failingTests: verdict.failingTests,
 -              ...(verdict.nextActions === undefined ? {} : { nextActions: verdict.nextActions }),
                ...(verdict.unrun === true ? { unrun: true } : {}),
-             }),
-           ),
+               ...(verdict.retryAt === undefined ? {} : { retryAt: verdict.retryAt }),
+               ...(verdict.halted === true ? { halted: true } : {}),

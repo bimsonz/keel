@@ -2,15 +2,15 @@
 # kills: lane.box-capacity
 # why: a MergeBox with no room counts against the change, which bounces on the third busy box
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e48f8594..94194fd3 100644
+index 5de5f424..9e6f406d 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -944,7 +944,7 @@ const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
+@@ -1151,7 +1151,7 @@ const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
      (verdictId, attribution) => ({ _tag: "RefuseComposition", verdictId, attribution }),
      refusalEvidence(refused),
      "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
 -    refused.reason === "box-unavailable",
 +    false,
+     refused.reason === "box-unavailable" ? refused.retryAfterMs : undefined,
    );
  
- /** A composition refused for the batch's sake: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */

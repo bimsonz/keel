@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import {
+  DEPS_BUILD_MINUTES,
   DepsAnswer,
   DepsNeed,
   type DepsSteps,
@@ -12,8 +13,9 @@ import {
 } from "@keeltown/core/application/verification";
 import type { PlanStep } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
-import { DepsBuilder, ManifestUnreadable } from "@keeltown/core/ports";
+import { DepsBuilder, ManifestUnreadable, NamespaceUsage } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
+import { makeNamespaceUsageMemory } from "../src/memory/namespace-usage.ts";
 import { makeDepsBuilderMemory } from "../src/memory/verification.ts";
 import { otherNamespace, sampleNamespace } from "../src/namespaces.ts";
 import { suitePlan, workerAppPlan } from "../src/plans.ts";
@@ -40,6 +42,16 @@ const memorySteps = (kept = new Map<string, string>()) => {
   };
   return { kept, ran, steps };
 };
+
+/** A deps builder, with the namespaces' usage its builds are counted against and the clock they are counted on. */
+const counted = <E>(builder: Layer.Layer<DepsBuilder, E>, usage = makeNamespaceUsageMemory()) =>
+  Layer.mergeAll(builder, usage.layer, usage.clock.layer);
+
+/** The container-minutes a namespace has used today, read by admitting none. */
+const usedToday = (namespace: typeof sampleNamespace) =>
+  NamespaceUsage.use((usage) =>
+    usage.admit(namespace, "container-minutes", 0, `read:${crypto.randomUUID()}`),
+  ).pipe(Effect.map(({ limit, remaining }) => limit - remaining));
 
 /** A candidate's files on a lockfile named by `marker`. */
 const candidate = (marker: string, more: Readonly<Record<string, string>> = {}) => ({
@@ -99,7 +111,7 @@ describe("ensuring a plan's deps", () => {
         expect(durable.ran).toEqual([]);
         expect(memory.asked).toEqual([]);
         expect(memory.built).toEqual([]);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -121,7 +133,7 @@ describe("ensuring a plan's deps", () => {
         ]);
         expect(answer.parts).toEqual([...memory.pointers.values()][0]?.parts);
         expect(answer.parts.length).toBeGreaterThan(0);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -173,7 +185,7 @@ describe("ensuring a plan's deps", () => {
           rebuilt,
         );
         expect(memory.built).toHaveLength(3);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -194,7 +206,7 @@ describe("ensuring a plan's deps", () => {
         expect(durable.ran).toEqual(["deps-need"]);
         expect(memory.asked).toEqual([`need ${bundle}`]);
         expect(memory.built).toEqual([]);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -222,7 +234,7 @@ describe("ensuring a plan's deps", () => {
         expect(durable.ran).toEqual(["deps-need"]);
         expect(memory.asked).toEqual([`need ${bundle}`]);
         expect(memory.built).toEqual([]);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -242,7 +254,7 @@ describe("ensuring a plan's deps", () => {
           expect(durable.ran).toEqual(["deps-need"]);
         }
         expect(memory.built).toEqual([]);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -271,7 +283,7 @@ describe("ensuring a plan's deps", () => {
         });
         expect(durable.ran).toEqual(["deps-need"]);
         expect(asked).toEqual([]);
-      }).pipe(Effect.provide(unreadable));
+      }).pipe(Effect.provide(counted(unreadable)));
     },
   );
 
@@ -291,7 +303,7 @@ describe("ensuring a plan's deps", () => {
         });
         expect(durable.ran).toEqual(["deps-need", `deps:${install}`]);
         expect(memory.built).toEqual([]);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -323,7 +335,7 @@ describe("ensuring a plan's deps", () => {
         expect(resumed.ran).toEqual([`deps:${install}`]);
         expect(memory.asked.slice(asked.length)).toEqual([`build ${install}`]);
         expect(memory.built).toHaveLength(1);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
     },
   );
 
@@ -346,7 +358,39 @@ describe("ensuring a plan's deps", () => {
         expect(yield* ensureDeps(sampleNamespace, bundle, TIER2, replay.steps)).toEqual(refused);
         expect(replay.ran).toEqual([]);
         expect(memory.asked).toEqual(asked);
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(counted(memory.layer)));
+    },
+  );
+
+  it.effect(
+    "[deps.ensure.counted] a build is counted against its namespace's container-minutes once a UTC day for its digest: a replay, another instance and another namespace's build count nothing more of it, and the next day counts it again",
+    () => {
+      const memory = makeDepsBuilderMemory();
+      const usage = makeNamespaceUsageMemory();
+      return Effect.gen(function* () {
+        expect(DEPS_BUILD_MINUTES).toBe(11);
+        const files = candidate("counted");
+        const bundle = yield* memory.candidate(sampleNamespace, files);
+        // Nothing is counted for a plan that needs no deps.
+        yield* ensureDeps(sampleNamespace, bundle, [], memorySteps().steps);
+        expect(yield* usedToday(sampleNamespace)).toBe(0);
+        const durable = memorySteps();
+        yield* ensureDeps(sampleNamespace, bundle, TIER2, durable.steps);
+        expect(yield* usedToday(sampleNamespace)).toBe(11);
+        // A replay of the same instance, and another instance the same day, count it once.
+        yield* ensureDeps(sampleNamespace, bundle, TIER2, durable.steps);
+        yield* ensureDeps(sampleNamespace, bundle, TIER2, memorySteps().steps);
+        expect(yield* usedToday(sampleNamespace)).toBe(11);
+        // Another namespace's build is its own.
+        const theirs = yield* memory.candidate(otherNamespace, files);
+        yield* ensureDeps(otherNamespace, theirs, TIER2, memorySteps().steps);
+        expect(yield* usedToday(otherNamespace)).toBe(11);
+        expect(yield* usedToday(sampleNamespace)).toBe(11);
+        // The next UTC day it is counted again, on a fresh day's count.
+        usage.clock.advance(86_400_000);
+        yield* ensureDeps(sampleNamespace, bundle, TIER2, memorySteps().steps);
+        expect(yield* usedToday(sampleNamespace)).toBe(11);
+      }).pipe(Effect.provide(counted(memory.layer, usage)));
     },
   );
 });

@@ -2,10 +2,10 @@
 # kills: lane.do.verify-armed
 # why: No deadline is armed for the end of a verifying batch's budget
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index 9fac126..e041452 100644
+index d2e75559..d190e839 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
-@@ -176,7 +176,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+@@ -234,7 +234,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
    private async armVerification(): Promise<void> {
      const due = await this.runtime.runPromise(verificationDue(this.laneId));
      if (due === undefined || due <= Date.now()) await cancelAlarm(this.ctx.storage, LANE_VERIFY);
@@ -13,4 +13,4 @@ index 9fac126..e041452 100644
 +    else await cancelAlarm(this.ctx.storage, LANE_VERIFY);
    }
  
-   /** Arms the step: a debounce, so a burst of deliveries runs it once. */
+   /** Arms `lane budget` for when the namespace has container-minutes again, as its state gives it, and clears it otherwise. */

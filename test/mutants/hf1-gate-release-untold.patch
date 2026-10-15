@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/boxgate.test.ts
+# kills: boxgate.do.waiters
+# why: a lease given back frees a box no waiting lane is told of
+diff --git a/apps/keel/src/adapters/driving/do/boxgate.ts b/apps/keel/src/adapters/driving/do/boxgate.ts
+index 6e5bf7d4..3cc78489 100644
+--- a/apps/keel/src/adapters/driving/do/boxgate.ts
++++ b/apps/keel/src/adapters/driving/do/boxgate.ts
+@@ -102,7 +102,6 @@ export class BoxGate extends KeelObjectWith<BoxGateServices> {
+     const before = liveLeases(this.leases, Date.now()).length;
+     const after = releaseLease(this.leases, leaseId, Date.now());
+     await this.keep(after);
+-    if (after.length < before) await this.tellWaiters();
+   }
+ 
+   /** How many more leases the limit allows now, never below 0. */

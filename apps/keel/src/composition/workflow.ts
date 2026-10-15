@@ -2,6 +2,7 @@ import type { WorkflowStep } from "cloudflare:workers";
 import {
   type DurableReport,
   type DurableTell,
+  planMinutes,
   StoredStepReport,
 } from "@keeltown/core/application/verification";
 import { ContentHash, type ProjectId } from "@keeltown/core/kernel";
@@ -22,6 +23,7 @@ import type {
   EvidenceStore,
   FlowSpecSource,
   Ids,
+  NamespaceUsage,
   NoopWorlds,
   PlanStore,
   PlatformFunction,
@@ -48,6 +50,7 @@ import {
   type Durable,
   type SuiteRunner,
   SuiteRuntimeCi,
+  tier2DeadlineMs,
 } from "../adapters/driven/ci/suite-runtime.ts";
 import { TIER2_GATE } from "../adapters/driving/do/boxgate-leases.ts";
 import { PRECHECK_TREES } from "../adapters/driven/artifacts/code-host.ts";
@@ -65,6 +68,7 @@ import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { DepsBuilderRpc } from "../adapters/driven/do-rpc/deps-builder.ts";
+import { NamespaceUsageRpc } from "../adapters/driven/do-rpc/namespace-usage.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
@@ -159,6 +163,10 @@ const tier2Boxes = (env: Env): BoxLedger => {
   };
 };
 
+/** The container-minutes a verification is admitted for: one attempt of its Tier 2 steps, each at its runner's deadline. */
+export const admittedMinutes = (steps: Parameters<typeof planMinutes>[0]): number =>
+  planMinutes(steps, tier2DeadlineMs);
+
 export function keelVerifyRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
@@ -169,6 +177,7 @@ export function keelVerifyRuntime(
   | BatchVerdicts
   | VerifierRuntime
   | DepsBuilder
+  | NamespaceUsage
   | PlanStore
   | ProbeRunner
   | ProjectNamespaces
@@ -201,6 +210,7 @@ export function keelVerifyRuntime(
       DepsBuilderRpc(verifierEntrypoint(env.VERIFIER), env.BUNDLE_URL_SIGNING_KEY).pipe(
         Layer.provide(BundleStoreR2(env.BUNDLES)),
       ),
+      NamespaceUsageRpc(env.NAMESPACE_USAGE),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
@@ -330,6 +340,7 @@ export type ProbeServices =
   | PlatformFunction
   | ProbeStore
   | ProbeRunner
+  | NamespaceUsage
   | FlowSpecSource
   | PlanStore
   | WorldChecks
@@ -363,6 +374,7 @@ export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServi
       NoopWorldsBundles.pipe(Layer.provide(bundles)),
       EvidenceStoreR2(env.ARCHIVE),
       probeDraftingLayer(env),
+      NamespaceUsageRpc(env.NAMESPACE_USAGE),
       FlowSpecSourceCodeHost.pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
       WorldChecksWorkflow(env.WORLD_CHECK),
@@ -386,6 +398,7 @@ export function worldCheckRuntime(
   | EvidenceStore
   | VerifierRuntime
   | DepsBuilder
+  | NamespaceUsage
   | PlanStore
   | ProbeLedger
   | ProbeChanges
@@ -410,6 +423,7 @@ export function worldCheckRuntime(
       DepsBuilderRpc(verifierEntrypoint(env.VERIFIER), env.BUNDLE_URL_SIGNING_KEY).pipe(
         Layer.provide(BundleStoreR2(env.BUNDLES)),
       ),
+      NamespaceUsageRpc(env.NAMESPACE_USAGE),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,

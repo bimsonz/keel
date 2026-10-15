@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/budget.test.ts
+# kills: budget.plan-minutes
+# why: a step's deadline is rounded down to the minute, so a plan is admitted less than it may take
+diff --git a/packages/core/src/application/verification/budget.ts b/packages/core/src/application/verification/budget.ts
+index fe8208cd..ed7b05cb 100644
+--- a/packages/core/src/application/verification/budget.ts
++++ b/packages/core/src/application/verification/budget.ts
+@@ -28,7 +28,7 @@ export const planMinutes = (
+   steps.reduce((sum, step) => {
+     if (step.tier.tier !== 2) return sum;
+     const ms = deadlineMs(step);
+-    return ms === undefined ? sum : sum + Math.ceil(ms / MINUTE_MS);
++    return ms === undefined ? sum : sum + Math.floor(ms / MINUTE_MS);
+   }, 0);
+ 
+ /** The minutes a verification's Tier 2 steps took, as their runners reported them, rounded up. */

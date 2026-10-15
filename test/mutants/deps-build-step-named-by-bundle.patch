@@ -2,13 +2,15 @@
 # kills: deps.ensure.built, deps.ensure.pointer, deps.ensure.refused, deps.ensure.replay
 # why: The build's durable step is named by the candidate bundle, not by the install digest it builds
 diff --git a/packages/core/src/application/verification/deps.ts b/packages/core/src/application/verification/deps.ts
-index fd393147..b167caa0 100644
+index f6ee5736..291001e8 100644
 --- a/packages/core/src/application/verification/deps.ts
 +++ b/packages/core/src/application/verification/deps.ts
-@@ -555,5 +555,5 @@ export const ensureDeps = (
-       return { _tag: "DepsRefused", reason: need.reason } satisfies DepsAnswer;
-     if (need._tag === "NeedUnread")
-       return { _tag: "DepsUnavailable", reason: need.reason } satisfies DepsAnswer;
--    return yield* steps.build(need.install, builder.build(namespace, need, bundle));
-+    return yield* steps.build(bundle, builder.build(namespace, need, bundle));
+@@ -578,7 +578,7 @@ export const ensureDeps = (
+       );
+     });
+     return yield* steps.build(
+-      need.install,
++      bundle,
+       Effect.andThen(counted, builder.build(namespace, need, bundle)),
+     );
    });

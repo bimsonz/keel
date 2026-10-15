@@ -2,15 +2,15 @@
 # kills: lane.do.destroy
 # why: Destroy leaves the lane's step and re-offer armed, so a destroyed Lane DO still wakes on them
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index 9fac126..5e335c4 100644
+index d2e75559..45f2d1f7 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
-@@ -87,8 +87,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+@@ -124,8 +124,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
  
    async destroy(by: string) {
      const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
 -    await cancelAlarm(this.ctx.storage, LANE_STEP);
 -    await cancelAlarm(this.ctx.storage, LANE_REOFFER);
      await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+     await cancelAlarm(this.ctx.storage, LANE_BUDGET);
      return answer;
-   }

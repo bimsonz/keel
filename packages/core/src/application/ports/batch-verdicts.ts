@@ -8,6 +8,7 @@ import type {
   BatchId,
   CandidateId,
   ContentHash,
+  Instant,
   NextAction,
   VerdictId,
 } from "../../domain/kernel/index.ts";
@@ -41,6 +42,13 @@ export interface BatchVerdict {
    * counts it toward no member's infra limit and runs no member alone for it.
    */
   readonly unrun?: true;
+  /** On a park for want of quota, when the namespace's limit resets: the lane forms nothing before it. */
+  readonly retryAt?: Instant;
+  /**
+   * Set on a bounce because the namespace's verification spend is stopped: every
+   * member bounces, and none of them is blamed, counted or run alone for it.
+   */
+  readonly halted?: true;
 }
 
 /** KeelVerify's report of one step of a batch's plan, as it runs: that it started, or its result. */

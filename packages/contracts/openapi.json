@@ -9988,7 +9988,7 @@
       "post": {
         "operationId": "submit",
         "summary": "Submit a change",
-        "description": "Submit a commit for verification and integration. The authoritative signal: pushes alone only observe. Follow `Location` with `?wait` to long-poll.",
+        "description": "Submit a commit for verification and integration. The authoritative signal: pushes alone only observe.\nFollow `Location` with `?wait` to long-poll. While verification spend is stopped for the project's\nnamespace, a submission is 403 `namespace.halted`, with what its owner does next.",
         "parameters": [
           {
             "$ref": "#/components/parameters/LeaseHeader"
@@ -12506,11 +12506,12 @@
               "textual",
               "interaction",
               "infra",
-              "unattributed"
+              "unattributed",
+              "halted"
             ]
           }
         ],
-        "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), or nobody yet (`unattributed`)."
+        "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), nobody yet (`unattributed`), or nobody at all\n(`halted`: the namespace's verification spend is stopped, so every member\nbounces, none of them at fault)."
       },
       "BatchDropped": {
         "type": "object",
@@ -22700,6 +22701,7 @@
           "project.upstream_unreachable",
           "trunk.not_fast_forward",
           "trunk.busy",
+          "namespace.halted",
           "deploy_target.refused",
           "deploy_target.unreachable",
           "deploy_target.no_workers_dev",

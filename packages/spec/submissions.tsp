@@ -29,7 +29,11 @@ model SubmissionEnvelope is AgentEnvelope<Submission>;
 
 @tag("Submissions")
 interface Submissions {
-  /** Submit a commit for verification and integration. The authoritative signal: pushes alone only observe. Follow `Location` with `?wait` to long-poll. */
+  /**
+   * Submit a commit for verification and integration. The authoritative signal: pushes alone only observe.
+   * Follow `Location` with `?wait` to long-poll. While verification spend is stopped for the project's
+   * namespace, a submission is 403 `namespace.halted`, with what its owner does next.
+   */
   @summary("Submit a change")
   @tag("mcp")
   @operationId("submit")

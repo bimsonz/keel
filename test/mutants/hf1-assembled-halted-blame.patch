@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: a BatchFailed blaming halted folds onto an assembled batch, though only a refused composition or a verdict may carry that blame
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 25338bcb..721edd3f 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -396,8 +396,7 @@ const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
+       return (
+         attribution !== "textual" &&
+         attribution !== "interaction" &&
+-        attribution !== "unattributed" &&
+-        attribution !== "halted"
++        attribution !== "unattributed"
+       );
+     case "verifying":
+       return attribution !== "textual";

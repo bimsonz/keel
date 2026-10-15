@@ -9,6 +9,7 @@ import {
   type World,
 } from "../../domain/verification/index.ts";
 import {
+  NamespaceUsage,
   PlatformFunction,
   type ProbeRunner,
   type ProbeRunnerUnavailable,
@@ -193,7 +194,11 @@ const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
  * other matrix result is discarded as admission judged it, a template with no
  * recipe is incomplete, and an abstaining model ends it too, with the
  * abstain's detail and the feedback so far. A runner that cannot run at all
- * fails, for the caller to draft again.
+ * fails, for the caller to draft again. Each call to the model is admitted
+ * first against the namespace's model-calls, under `<key>:<attempt>`, so a
+ * retried draft counts each call once: a refusal (the day's limit, or a
+ * halted namespace) ends the draft as abstained `rate-limited` with why, and
+ * calls nothing.
  */
 export const draftProbe = <S, R>(
   namespace: NamespaceId,
@@ -201,16 +206,34 @@ export const draftProbe = <S, R>(
   context: DraftContext,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,
   aNoop: (recipe: NoopRecipe) => Effect.Effect<ContentHash, NoNoop, R>,
+  key: string,
 ): Effect.Effect<
   DraftOutcome,
   ProbeRunnerUnavailable,
-  PlatformFunction | ProbeStore | ProbeRunner | R
+  PlatformFunction | ProbeStore | ProbeRunner | NamespaceUsage | R
 > =>
   Effect.gen(function* () {
     const model = yield* PlatformFunction;
     const store = yield* ProbeStore;
+    const usage = yield* NamespaceUsage;
     const feedback: string[] = [];
     for (let attempt = 1; attempt <= 1 + DRAFT_REPAIRS; attempt++) {
+      const admitted = yield* Effect.result(
+        usage.admit(namespace, "model-calls", 1, `draft:${key}:${attempt}`),
+      );
+      if (Result.isFailure(admitted)) {
+        const refused = admitted.failure;
+        return {
+          _tag: "Abstained",
+          reason: "rate-limited",
+          attempts: attempt - 1,
+          detail:
+            refused.reason === "halted"
+              ? `namespace.halted: verification spend is stopped for ${namespace}`
+              : `quota.exceeded: ${namespace} has used ${refused.used} of its ${refused.limit} model-calls for today`,
+          feedback,
+        } satisfies DraftOutcome;
+      }
       const reply = yield* model
         .call({
           name: template.fn,

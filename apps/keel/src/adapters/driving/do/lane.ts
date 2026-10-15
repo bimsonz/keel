@@ -1,4 +1,6 @@
 import {
+  boxFreed,
+  budgetDue,
   checkVerification,
   destroyLane,
   laneHeard,
@@ -32,6 +34,8 @@ export const LANE_STEP = "lane step";
 export const LANE_REOFFER = "lane reoffer";
 /** The end of the verifying batch's budget: the lane's step runs then, and looks at the batch's KeelVerify instance once. */
 export const LANE_VERIFY = "lane verification";
+/** When the namespace has container-minutes again after a verification parked for want of them: the lane's step runs then. */
+export const LANE_BUDGET = "lane budget";
 
 const decodeVerdict = Schema.decodeUnknownEffect(RecordVerdictCommand);
 const decodeStep = Schema.decodeUnknownEffect(RecordStepCommand);
@@ -74,7 +78,11 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     super(
       ctx,
       env,
-      laneServices(env, () => laneProject(laneIdOf(ctx.id.name))),
+      laneServices(
+        env,
+        () => laneProject(laneIdOf(ctx.id.name)),
+        () => laneIdOf(ctx.id.name),
+      ),
     );
   }
 
@@ -107,11 +115,19 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     return this.answer(LaneCodecs.recordStep, program);
   }
 
+  /** The namespace's box gate freed a box this lane was refused: it waits on the gate no longer, and steps. */
+  async boxFreed() {
+    const answer = await this.answer(LaneCodecs.boxFreed, boxFreed(this.laneId));
+    await this.step(Date.now());
+    return answer;
+  }
+
   async destroy(by: string) {
     const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
     await cancelAlarm(this.ctx.storage, LANE_STEP);
     await cancelAlarm(this.ctx.storage, LANE_REOFFER);
     await cancelAlarm(this.ctx.storage, LANE_VERIFY);
+    await cancelAlarm(this.ctx.storage, LANE_BUDGET);
     return answer;
   }
 
@@ -139,7 +155,11 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
 
   protected override async onDeadline(request: StartedAlarm): Promise<void> {
     if (request.reason === LANE_REOFFER) return this.reoffer();
-    if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
+    if (
+      request.reason !== LANE_STEP &&
+      request.reason !== LANE_VERIFY &&
+      request.reason !== LANE_BUDGET
+    )
       return super.onDeadline(request);
     const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
     // Whether or not the step got through: a batch may be Verifying with its instance never made.
@@ -147,6 +167,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     if (Exit.isSuccess(exit)) {
       this.failures = 0;
       await this.armReoffer();
+      await this.armBudget();
       // A batch formed, a candidate assembled or a batch failed on the infrastructure: the lane goes on
       // at once, in a new invocation, which publishes what this one committed before it steps again.
       if (exit.value === "staged" || exit.value === "again") await this.step(Date.now());
@@ -214,6 +235,13 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     const due = await this.runtime.runPromise(verificationDue(this.laneId));
     if (due === undefined || due <= Date.now()) await cancelAlarm(this.ctx.storage, LANE_VERIFY);
     else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_VERIFY, at: due });
+  }
+
+  /** Arms `lane budget` for when the namespace has container-minutes again, as its state gives it, and clears it otherwise. */
+  private async armBudget(): Promise<void> {
+    const due = await this.runtime.runPromise(budgetDue(this.laneId));
+    if (due === undefined) await cancelAlarm(this.ctx.storage, LANE_BUDGET);
+    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_BUDGET, at: due });
   }
 
   /** Arms the step: a debounce, so a burst of deliveries runs it once. */

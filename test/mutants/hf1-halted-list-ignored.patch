@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/namespace-usage.test.ts
+# kills: usage.instance-halted
+# why: a namespace the instance's configuration lists as halted spends on, as if it were not listed
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index f4cd461b..2a0f135f 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -60,7 +60,7 @@ const settingsOf = (
+   const own = stored === undefined ? UNSET : decodeSettings(stored);
+   return {
+     overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
+-    halted: own.halted || (instance.halted?.includes(namespace) ?? false),
++    halted: own.halted,
+   };
+ };
+ 

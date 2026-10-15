@@ -230,6 +230,7 @@ union ProblemCode {
   projectUpstreamUnreachable: "project.upstream_unreachable",
   trunkNotFastForward: "trunk.not_fast_forward",
   trunkBusy: "trunk.busy",
+  namespaceHalted: "namespace.halted",
   deployTargetRefused: "deploy_target.refused",
   deployTargetUnreachable: "deploy_target.unreachable",
   deployTargetNoWorkersDev: "deploy_target.no_workers_dev",

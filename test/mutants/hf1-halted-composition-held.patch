@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.box-halted
+# why: a composition refused because the namespace is halted is taken for a path refusal, not bounced once with what its owner does
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 5de5f424..ec3b03d5 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1204,7 +1204,7 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+     yield* holdForBox(lane, batch, refused);
+     return;
+   }
+-  if (refused.reason === NAMESPACE_HALTED) {
++  if (false) {
+     yield* bounceHalted(lane, batch, refused);
+     return;
+   }

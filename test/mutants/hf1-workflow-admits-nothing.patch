@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts
+# kills: budget.pool.admit-park
+# why: KeelVerify asks for none of the plan's minutes, so a namespace with too few left still runs it
+diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+index aa912ee8..4902b0d7 100644
+--- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
++++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+@@ -132,7 +132,7 @@ export class KeelVerify extends CIWorkflow<Env> {
+                       admitVerification(
+                         namespace,
+                         event.instanceId,
+-                        admittedMinutes(plan.success.steps),
++                        0,
+                       ),
+                     ),
+                   ),

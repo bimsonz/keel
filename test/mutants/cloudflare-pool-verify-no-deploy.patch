@@ -2,14 +2,16 @@
 # kills: cf.pool.preview-smoke-land
 # why: KeelVerify gives the plan's runner no way to run a deploy step, so a candidate on a connected account is never previewed or smoked and parks instead of landing
 diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-index f67249a7..6f55e8c3 100644
+index aa912ee8..892dd20f 100644
 --- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
 +++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
-@@ -123,7 +123,6 @@ export class KeelVerify extends CIWorkflow<Env> {
-                 await runtime.runPromise(
-                   ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
-                 ),
--                deploy,
-               ),
-               laneSteps(
-                 {
+@@ -156,8 +156,7 @@ export class KeelVerify extends CIWorkflow<Env> {
+                   await runtime.runPromise(
+                     ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
+                   ),
+-                  deploy,
+-                ),
++                  ),
+                 laneSteps(
+                   {
+                     laneId: job.laneId,

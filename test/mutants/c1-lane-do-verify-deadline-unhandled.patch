@@ -2,17 +2,20 @@
 # kills: lane.do.verify-armed
 # why: The deadline at the budget's end runs no step, so nothing looks at the instance
 diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
-index b314f22d..fca370e8 100644
+index d2e75559..e4ed73be 100644
 --- a/apps/keel/src/adapters/driving/do/lane.ts
 +++ b/apps/keel/src/adapters/driving/do/lane.ts
-@@ -126,8 +126,8 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
+@@ -155,11 +155,8 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
  
    protected override async onDeadline(request: StartedAlarm): Promise<void> {
      if (request.reason === LANE_REOFFER) return this.reoffer();
--    if (request.reason !== LANE_STEP && request.reason !== LANE_VERIFY)
--      return super.onDeadline(request);
+-    if (
+-      request.reason !== LANE_STEP &&
+-      request.reason !== LANE_VERIFY &&
+-      request.reason !== LANE_BUDGET
+-    )
 +    if (request.reason === LANE_VERIFY) return;
-+    if (request.reason !== LANE_STEP) return super.onDeadline(request);
++    if (request.reason !== LANE_STEP && request.reason !== LANE_BUDGET)
+       return super.onDeadline(request);
      const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
      // Whether or not the step got through: a batch may be Verifying with its instance never made.
-     await this.armVerification();

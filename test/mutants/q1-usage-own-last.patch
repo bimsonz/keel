@@ -2,15 +2,15 @@
 # kills: usage.configured
 # why: the instance's limits win over a namespace's own
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index c81576c7..c8b76391 100644
+index f4cd461b..a08f1e3d 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
 @@ -59,7 +59,7 @@ const settingsOf = (
+   const stored = store.get(SETTINGS, namespace);
    const own = stored === undefined ? UNSET : decodeSettings(stored);
    return {
-     ...own,
 -    overrides: { ...instance.defaults, ...instance.namespaces?.[namespace], ...own.overrides },
 +    overrides: { ...own.overrides, ...instance.defaults, ...instance.namespaces?.[namespace] },
+     halted: own.halted || (instance.halted?.includes(namespace) ?? false),
    };
  };
- 

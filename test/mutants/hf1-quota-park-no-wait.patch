@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.quota-wait
+# why: a park for want of container-minutes forgets when they reset, so the lane forms the batch again at once, in a loop
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 5de5f424..d1c9f8d4 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2204,7 +2204,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
+   // A park for want of quota says when there is room again: nothing forms before then.
+   const infra =
+     verdict.outcome === "park" && verdict.unrun === true
+-      ? uncounted(verdict.retryAt === undefined ? lane : { ...lane, notBefore: verdict.retryAt })
++      ? uncounted(lane)
+       : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`, at);
+   return infra.exhausted === undefined
+     ? {

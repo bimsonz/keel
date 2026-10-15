@@ -75,8 +75,8 @@ export type CandidateCommand =
   | {
       readonly _tag: "RefuseComposition";
       readonly verdictId: VerdictId;
-      /** Who the refusal is blamed on, when the composer says: infra for MergeBox's own failures. */
-      readonly attribution?: ChangeId | "infra";
+      /** Who the refusal is blamed on, when the composer says: infra for MergeBox's own failures, halted for a namespace whose verification spend is stopped. */
+      readonly attribution?: ChangeId | "infra" | "halted";
     }
   | {
       /**
@@ -204,7 +204,12 @@ export const decideCandidate = (
     case "RefuseComposition": {
       if (batch.state !== "forming") return refuse(batchId, batch.state, command);
       const given = command.attribution;
-      if (given !== undefined && given !== "infra" && !batch.members.includes(given))
+      if (
+        given !== undefined &&
+        given !== "infra" &&
+        given !== "halted" &&
+        !batch.members.includes(given)
+      )
         return Result.fail(
           new InvalidBatch({ batchId, reason: `${given} is not a member of the batch` }),
         );
@@ -304,6 +309,7 @@ export const decideCandidate = (
         blamed !== "interaction" &&
         blamed !== "infra" &&
         blamed !== "unattributed" &&
+        blamed !== "halted" &&
         !batch.members.includes(blamed)
       ) {
         return Result.fail(
@@ -379,15 +385,19 @@ export const decideCandidate = (
 const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
   switch (batch.state) {
     case "forming":
-      // A composition is refused for the batch's text, its sole member, or MergeBox's own failure.
+      // A composition is refused for the batch's text, its sole member, MergeBox's own failure, or a halted namespace.
       return (
         attribution === "textual" ||
         attribution === "infra" ||
+        attribution === "halted" ||
         (batch.members.length === 1 && attribution === batch.members[0])
       );
     case "assembled":
       return (
-        attribution !== "textual" && attribution !== "interaction" && attribution !== "unattributed"
+        attribution !== "textual" &&
+        attribution !== "interaction" &&
+        attribution !== "unattributed" &&
+        attribution !== "halted"
       );
     case "verifying":
       return attribution !== "textual";

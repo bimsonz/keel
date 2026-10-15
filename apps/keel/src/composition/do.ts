@@ -285,7 +285,11 @@ export type LaneServices =
  * main after trunk. It never holds a trunk write token. `projectId` is read
  * lazily, on first use, from the object's name.
  */
-export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<LaneServices> {
+export function laneServices(
+  env: Env,
+  projectId: () => ProjectId,
+  laneId: () => string,
+): Layer.Layer<LaneServices> {
   return Layer.suspend(() => {
     const repos = projectRepos(projectId());
     const host = codeHostLayer(env);
@@ -296,15 +300,19 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
     const project = (id: ProjectId) => env.PROJECT.get(env.PROJECT.idFromName(`project:${id}`));
     const places = ProjectNamespacesD1(env.DB);
-    const box = boxComposerRpc(projectId, {
-      namespaceOf: (id) =>
-        ProjectNamespaces.use((namespaces) => namespaces.byId(id)).pipe(
-          Effect.map(Option.map((place) => place.namespace)),
-          Effect.provide(places),
-        ),
-      gate: (namespace) => env.BOXGATE.get(env.BOXGATE.idFromName(`boxgate:${namespace}`)),
-      box: (id) => env.MERGEBOX.get(env.MERGEBOX.idFromName(`mergebox:${id}`)),
-    });
+    const box = boxComposerRpc(
+      projectId,
+      {
+        namespaceOf: (id) =>
+          ProjectNamespaces.use((namespaces) => namespaces.byId(id)).pipe(
+            Effect.map(Option.map((place) => place.namespace)),
+            Effect.provide(places),
+          ),
+        gate: (namespace) => env.BOXGATE.get(env.BOXGATE.idFromName(`boxgate:${namespace}`)),
+        box: (id) => env.MERGEBOX.get(env.MERGEBOX.idFromName(`mergebox:${id}`)),
+      },
+      laneId,
+    );
     return Layer.mergeAll(
       host,
       ChangesRpc({ change, agentSession }),

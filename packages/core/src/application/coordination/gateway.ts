@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import {
   type Change,
   type ChangeInOtherProject,
@@ -8,6 +8,7 @@ import {
   type CommitNotInWorkspace,
   type LeaseNotLapsed,
   type LeaseStale,
+  NamespaceHalted,
   type PoolExhausted,
   type Preflight,
   type RevisionMismatch,
@@ -53,8 +54,9 @@ import {
   type EventFeedPage,
   Inbox,
   type LabelledEscalation,
+  NamespaceUsage,
   ProbeStore,
-  type ProjectNamespaces,
+  ProjectNamespaces,
   ProjectViews,
   type RulingCommand,
   type RulingRefusal,
@@ -70,7 +72,7 @@ import type {
   PackTooLarge,
   WorkspaceHeadMoved,
 } from "../ports/index.ts";
-import { projectNamespace } from "../verification/index.ts";
+import { haltedActions, projectNamespace } from "../verification/index.ts";
 import {
   type CommitParentRefused,
   type CommittedChange,
@@ -153,14 +155,35 @@ export const declareChange: (
   input,
 ) => Changes.use((changes) => changes.declare(principal, input));
 
+/**
+ * Submits a change, unless the namespace of the token's project has its
+ * verification spend stopped: a verification there runs nothing and bounces
+ * every change, so the submission is refused before the change is reached,
+ * with what its owner does next. A project with no place is left to the
+ * change's own answer.
+ */
 export const submitChange: (
   principal: AgentToken,
   input: SubmitInput,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
-  Changes
-> = (principal, input) => Changes.use((changes) => changes.submit(principal, input));
+  | NamespaceHalted
+  | ChangeNotFound
+  | LeaseStale
+  | ChangeStateRefused
+  | CommitNotInWorkspace
+  | IdempotencyConflict,
+  Changes | ProjectNamespaces | NamespaceUsage
+> = Effect.fn("coordination/submitChange")(function* (principal: AgentToken, input: SubmitInput) {
+  const place = yield* ProjectNamespaces.use((places) => places.byId(principal.projectId));
+  if (Option.isSome(place)) {
+    const { namespace } = place.value;
+    const settings = yield* NamespaceUsage.use((usage) => usage.settings(namespace));
+    if (settings.halted)
+      return yield* new NamespaceHalted({ namespace, nextActions: haltedActions(namespace) });
+  }
+  return yield* Changes.use((changes) => changes.submit(principal, input));
+});
 
 /** Takes over a change whose lease lapsed. The Change DO checks the lapse and the caller's project. */
 export const adoptChange: (
