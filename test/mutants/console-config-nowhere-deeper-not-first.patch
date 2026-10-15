@@ -2,14 +2,19 @@
 # kills: console.nowhere-first
 # why: the config runs the Worker first for `/admin` but not under it, so the page answers there 200
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index 33142cef..26635dff 100644
+index e52d0a3e..f5ce5f22 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
-@@ -40,7 +40,6 @@
+@@ -40,12 +40,10 @@
        "/install",
        "/install/*",
        "/admin",
 -      "/admin/*",
        "/favicon.ico",
        "/sitemap.xml",
+       // A project's pages, for the card a crawler reads (src/worker/cards.ts); the build's own files
+       // are under /assets and stay the assets' alone.
+-      "/*/*",
+       "!/assets/*",
      ],
+   },

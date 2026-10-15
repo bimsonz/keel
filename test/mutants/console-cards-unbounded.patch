@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/cards.test.ts -t "cards.fallback"
+# kills: cards.fallback
+# why: a slow Keel holds a crawler's page as long as Keel takes, where the site's card was due at the bound
+diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
+index 574ff574..0b1017f3 100644
+--- a/apps/console/src/worker/cards.ts
++++ b/apps/console/src/worker/cards.ts
+@@ -107,7 +107,7 @@ export async function readCard(
+       .then(async (response): Promise<unknown> => (response.ok ? response.json() : null))
+       .catch(() => null),
+     new Promise<"late">((resolve) => {
+-      timer = setTimeout(() => resolve("late"), waitMs);
++      timer = setTimeout(() => resolve("late"), waitMs * 1000);
+     }),
+   ]);
+   clearTimeout(timer);

@@ -43,6 +43,10 @@
       "/admin/*",
       "/favicon.ico",
       "/sitemap.xml",
+      // A project's pages, for the card a crawler reads (src/worker/cards.ts); the build's own files
+      // are under /assets and stay the assets' alone.
+      "/*/*",
+      "!/assets/*",
     ],
   },
   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

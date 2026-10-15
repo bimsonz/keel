@@ -9,6 +9,10 @@ import { describe, expect, it } from "vitest";
 
 const CONSOLE = "https://keel-console.localhost";
 
+/** A card's tag's content, by the attribute and value it is found by, in served HTML. */
+const card = (html: string, attribute: string, value: string): string | undefined =>
+  new RegExp(`<meta ${attribute}="${value}" content="([^"]*)"`).exec(html)?.[1];
+
 describe("the console's Worker", () => {
   it("answers /healthz itself", async () => {
     const response = await SELF.fetch(`${CONSOLE}/healthz`);
@@ -43,6 +47,37 @@ describe("the console's Worker", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(await response.text()).toContain('<div id="root"');
+  });
+
+  it("[console.cards] gives a crawler a project's card in the page's own tags, and anyone else the site's", async () => {
+    const tagged = async (path: string, agent: string): Promise<string> =>
+      (await SELF.fetch(`${CONSOLE}${path}`, { headers: { "user-agent": agent } })).text();
+
+    const shared = await tagged("/keel/keel/changes", "Twitterbot/1.0");
+    expect(card(shared, "property", "og:title")).toBe("keel/keel");
+    expect(card(shared, "name", "twitter:title")).toBe("keel/keel");
+    expect(card(shared, "property", "og:url")).toBe(`${CONSOLE}/keel/keel/changes`);
+    expect(card(shared, "property", "og:image")).toBe(`${CONSOLE}/og.png`);
+    expect(card(shared, "name", "twitter:card")).toBe("summary_large_image");
+    expect(shared).toContain("<title>keel/keel</title>");
+    expect(shared).toContain('<div id="root"');
+
+    // A person, the root, and a project Keel shows nobody all have the site's card, as the page was built.
+    for (const [path, agent] of [
+      ["/keel/keel", "Mozilla/5.0 (Macintosh) Chrome/141.0"],
+      ["/", "Twitterbot/1.0"],
+      ["/acme/secret", "Twitterbot/1.0"],
+    ] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- one after another
+      const html = await tagged(path, agent);
+      expect([path, card(html, "property", "og:title")]).toEqual([path, "Keel"]);
+      expect([path, card(html, "property", "og:image")]).toEqual([
+        path,
+        "https://keel.town/og.png",
+      ]);
+    }
+    const image = await SELF.fetch(`${CONSOLE}/og.png`);
+    expect([image.status, image.headers.get("content-type")]).toEqual([200, "image/png"]);
   });
 
   it("[console.no-credential] is bound to its own files and to Keel's Worker, and holds no secret", () => {

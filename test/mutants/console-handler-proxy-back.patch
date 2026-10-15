@@ -2,11 +2,11 @@
 # kills: handler.no-proxy
 # why: the Worker reads Keel for whoever asks it to: a proxy is back
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 2dd9da1a..a95756ff 100644
+index f5065739..dddd42c9 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -108,6 +108,9 @@ export function createConsole(): Console {
-       const { pathname } = new URL(request.url);
+@@ -123,6 +123,9 @@ export function createConsole(cards: Cards = {}): Console {
+       const { origin, pathname } = new URL(request.url);
        if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
        if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
 +      const { search } = new URL(request.url);

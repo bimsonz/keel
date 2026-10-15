@@ -2,12 +2,12 @@
 # kills: handler.keel-paths
 # why: Keel's own paths are the page, so a site with no routes answers its API, its MCP endpoint and its front door with HTML
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 2dd9da1a..d5b2c194 100644
+index f5065739..d6850c0a 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -107,7 +107,7 @@ export function createConsole(): Console {
+@@ -122,7 +122,7 @@ export function createConsole(cards: Cards = {}): Console {
      async fetch(request, env) {
-       const { pathname } = new URL(request.url);
+       const { origin, pathname } = new URL(request.url);
        if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
 -      if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
 +      if (GIT.test(pathname)) return env.KEEL.fetch(request);

@@ -2,10 +2,10 @@
 # kills: console.not-found
 # why: a not-found answer carries the root's own headers, its link to Keel's API catalogue among them
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 2dd9da1a..708cd09e 100644
+index f5065739..00fbb3c6 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -113,9 +113,7 @@ export function createConsole(): Console {
+@@ -128,9 +128,7 @@ export function createConsole(cards: Cards = {}): Console {
          const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
          return new Response(page.body, {
            status: 404,
@@ -15,4 +15,4 @@ index 2dd9da1a..708cd09e 100644
 +          headers: page.headers,
          });
        }
-       return env.ASSETS.fetch(request);
+       // A crawler on a project's page is given the project's card (cards.ts); a person's request never waits

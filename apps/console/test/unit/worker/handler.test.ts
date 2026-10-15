@@ -52,11 +52,21 @@ async function watchingFetch(what: () => Promise<void>): Promise<string[]> {
   return asked;
 }
 
+/** A glob of the config, as a pattern: its `*` matches any run of characters, a `/` among them. */
+const globOf = (glob: string): RegExp =>
+  new RegExp(
+    `^${glob
+      .split("*")
+      .map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`))
+      .join(".*")}$`,
+  );
+
 /**
- * The paths the Worker's config runs it first for, as the platform reads them:
- * each a glob whose `*` matches any run of characters, a `/` among them.
+ * Whether the Worker's config runs it first for a path, as the platform reads the list: each a glob whose `*`
+ * matches any run of characters, a `/` among them, and one that begins with `!` keeping a path from it, whatever
+ * else matches.
  */
-function runFirst(): RegExp[] {
+function runFirst(): (path: string) => boolean {
   const errors: ParseError[] = [];
   const config: unknown = parse(
     readFileSync(join(import.meta.dirname, "../../../wrangler.jsonc"), "utf8"),
@@ -71,15 +81,10 @@ function runFirst(): RegExp[] {
       ? assets.run_worker_first
       : undefined;
   if (!Array.isArray(first)) throw new Error("run_worker_first is not a list of paths");
-  return first.map(
-    (glob) =>
-      new RegExp(
-        `^${String(glob)
-          .split("*")
-          .map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, String.raw`\$&`))
-          .join(".*")}$`,
-      ),
-  );
+  const globs = first.map(String);
+  const kept = globs.filter((glob) => glob.startsWith("!")).map((glob) => globOf(glob.slice(1)));
+  const run = globs.filter((glob) => !glob.startsWith("!")).map(globOf);
+  return (path) => run.some((glob) => glob.test(path)) && !kept.some((glob) => glob.test(path));
 }
 
 describe("the console's Worker", () => {
@@ -221,9 +226,8 @@ describe("the console's Worker", () => {
 
   // Where nothing is run first, the assets answer a path that is no file with the page, and the
   // Worker's code never runs: seen on keel.town, where every clone address answered HTML.
-  it("[console.git-first] the Worker's config runs it first for every path it hands to Keel, and for no place in the page", () => {
-    const first = runFirst();
-    const firstFor = (path: string) => first.some((glob) => glob.test(path));
+  it("[console.git-first] the Worker's config runs it first for every path it hands to Keel, and not for the root, a namespace or the build's files", () => {
+    const firstFor = runFirst();
     for (const path of [
       "/acme/forge.git/info/refs",
       "/acme/forge.git/git-upload-pack",
@@ -231,15 +235,21 @@ describe("the console's Worker", () => {
       "/a.b/c-d_e.git/info/refs",
     ])
       expect([path, firstFor(path)]).toEqual([path, true]);
+    for (const path of ["/", "/acme", "/acme.git", "/assets/index.js", "/assets/og-a1b2.css"])
+      expect([path, firstFor(path)]).toEqual([path, false]);
+  });
+
+  // A crawler runs no script: a project's card is in the served page's tags, which only the Worker can set.
+  it("[console.cards-first] the Worker's config runs it first for a project's pages, for their card, and never for the build's files", () => {
+    const firstFor = runFirst();
     for (const path of [
-      "/",
-      "/acme",
       "/acme/forge",
-      "/acme/forge.git",
+      "/acme/forge/changes",
       "/acme/forge/blob/trunk/src/index.ts",
-      "/acme/forge.git/blob/trunk/README.md",
-      "/assets/index.js",
+      "/keel/keel/mission-control",
     ])
+      expect([path, firstFor(path)]).toEqual([path, true]);
+    for (const path of ["/assets/index-Dv8YgwGD.js", "/og.png", "/robots.txt"])
       expect([path, firstFor(path)]).toEqual([path, false]);
   });
 
@@ -286,8 +296,7 @@ describe("the console's Worker", () => {
   it("[console.nowhere-first] the Worker's config runs it first for every path nothing here answers, and for no handle that begins like one", () => {
     // The reserved first segments with no page, no file and none of Keel's paths here.
     expect(NOWHERE).toEqual(["api", "auth", "logout", "install", "admin", "favicon.ico"]);
-    const first = runFirst();
-    const firstFor = (path: string) => first.some((glob) => glob.test(path));
+    const firstFor = runFirst();
     for (const segment of NOWHERE)
       for (const path of segment.includes(".")
         ? [`/${segment}`]
@@ -308,8 +317,7 @@ describe("the console's Worker", () => {
 
   // A site with no routes has only this Worker at its door: Keel's own paths must reach its code.
   it("[console.keel-first] the Worker's config runs it first for each of Keel's own paths, and for no handle that begins like one", () => {
-    const first = runFirst();
-    const firstFor = (path: string) => first.some((glob) => glob.test(path));
+    const firstFor = runFirst();
     for (const path of [
       "/v1/whoami",
       "/v1/auth/sign-in/passkey",
@@ -321,7 +329,9 @@ describe("the console's Worker", () => {
       "/.well-known/oauth-authorization-server",
     ])
       expect([path, firstFor(path)]).toEqual([path, true]);
-    for (const path of ["/v1", "/v12/whoami", "/mcpx", "/starter", "/llms.txtx", "/.well-known"])
+    // A handle that only begins like one of Keel's words is a place in the page: one segment is never run first,
+    // and a deeper one is the page's (handler.ts hands nothing but Keel's own paths to Keel).
+    for (const path of ["/v1", "/mcpx", "/starter", "/llms.txtx", "/.well-known"])
       expect([path, firstFor(path)]).toEqual([path, false]);
   });
 });

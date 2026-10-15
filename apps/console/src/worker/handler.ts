@@ -11,9 +11,11 @@
 //
 // The page reads Keel itself, on its own origin under /v1, as whoever is
 // signed in: the session is a cookie Keel set, which the browser sends and no
-// script can read. So this Worker holds no credential and reads nothing of
-// Keel for anyone. What it passes on goes to Keel untouched: nothing is added
-// to the request, and Keel decides it as it decides a request from anywhere.
+// script can read. So this Worker holds no credential, and reads Keel for
+// nobody's sake but a crawler's: a project's card, as anyone may read it, with
+// nothing of the crawler's request (cards.ts). What it passes on goes to Keel
+// untouched: nothing is added to the request, and Keel decides it as it
+// decides a request from anywhere.
 //
 // A clone address is passed on everywhere, because no route can name it (a
 // route's wildcard is only ever its tail). Keel's own paths are passed on
@@ -22,6 +24,7 @@
 // routes exist they take those paths first, and this Worker never sees them.
 
 import type { ReservedSegment } from "../contract/keel/index.ts";
+import { type Card, type CardCache, isCrawler, placeOf, readCard } from "./cards.ts";
 
 /** Something that answers requests: the assets binding. */
 export interface Fetcher {
@@ -102,10 +105,22 @@ export interface Console {
   fetch(request: Request, env: Env): Promise<Response>;
 }
 
-export function createConsole(): Console {
+/** The first segments that name no project: Keel's reserved words. */
+const RESERVED: ReadonlySet<string> = new Set(Object.keys(ANSWERS));
+
+/**
+ * What a project's card needs of the Workers runtime, which `index.ts` gives and a test of this handler need not:
+ * where a card is kept between crawlers, and how the served page's tags are rewritten to it.
+ */
+export interface Cards {
+  cache?: CardCache;
+  retag?: (page: Response, card: Card, url: string, image: string) => Response;
+}
+
+export function createConsole(cards: Cards = {}): Console {
   return {
     async fetch(request, env) {
-      const { pathname } = new URL(request.url);
+      const { origin, pathname } = new URL(request.url);
       if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
       if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
       if (nowhere(pathname)) {
@@ -118,7 +133,21 @@ export function createConsole(): Console {
           },
         });
       }
-      return env.ASSETS.fetch(request);
+      // A crawler on a project's page is given the project's card (cards.ts); a person's request never waits
+      // on Keel for it.
+      const place =
+        cards.retag !== undefined &&
+        request.method === "GET" &&
+        isCrawler(request.headers.get("user-agent"))
+          ? placeOf(pathname, RESERVED)
+          : null;
+      if (place === null || cards.retag === undefined) return env.ASSETS.fetch(request);
+      const [page, card] = await Promise.all([
+        env.ASSETS.fetch(request),
+        readCard(env.KEEL, origin, place, cards.cache),
+      ]);
+      if (card === null || !page.ok) return page;
+      return cards.retag(page, card, `${origin}${pathname}`, `${origin}/og.png`);
     },
   };
 }

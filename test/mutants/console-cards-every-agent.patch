@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/cards.test.ts -t "cards.crawler-only"
+# kills: cards.crawler-only
+# why: every person's page load waits on a read of Keel for a card only a crawler reads
+diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
+index 574ff574..2114bfd5 100644
+--- a/apps/console/src/worker/cards.ts
++++ b/apps/console/src/worker/cards.ts
+@@ -15,7 +15,7 @@ const CRAWLERS =
+ 
+ /** Whether a request is a crawler's, by what it says it is. */
+ export function isCrawler(userAgent: string | null): boolean {
+-  return userAgent !== null && CRAWLERS.test(userAgent);
++  return true;
+ }
+ 
+ /** The site's own card, as the built page carries it. */

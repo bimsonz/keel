@@ -41,6 +41,8 @@
       "/admin/*",
       "/favicon.ico",
       "/sitemap.xml",
+      "/*/*",
+      "!/assets/*",
     ],
   },
   // Keel's Worker: on an account with no zone this Worker is the site's only door, and it hands

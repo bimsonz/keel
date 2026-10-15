@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project 'pool:console' -t "console.cards"
+# kills: console.cards
+# why: a crawler on a project's page is given the site's card, read Keel or not, so a shared project shows as Keel alone
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index f5065739..99f971f4 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -147,7 +147,7 @@ export function createConsole(cards: Cards = {}): Console {
+         readCard(env.KEEL, origin, place, cards.cache),
+       ]);
+       if (card === null || !page.ok) return page;
+-      return cards.retag(page, card, `${origin}${pathname}`, `${origin}/og.png`);
++      return page;
+     },
+   };
+ }
