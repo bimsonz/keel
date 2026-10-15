@@ -22,6 +22,8 @@ export const RecordVerdictCommand = Schema.Struct({
   failingTests: Schema.Array(Schema.String),
   /** On a bounce, the remedy KeelVerify read from the evidence, for the lane's VerdictIssued. Absent otherwise. */
   nextActions: Schema.optionalKey(Schema.Array(NextAction)),
+  /** A park resting only on steps the verifier could not run: counted toward no member's infra limit. Absent otherwise. */
+  unrun: Schema.optionalKey(Schema.Literal(true)),
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 

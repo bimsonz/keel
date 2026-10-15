@@ -2,10 +2,10 @@
 # kills: verify.bounce-remedy
 # why: A bounce carries no remedy, so the agent gets only the generic default
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index de8177d2..0ff7aaa1 100644
+index c4c1c28a..3da63215 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -220,10 +220,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -291,10 +291,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
        ...(more > 0 ? [`and ${more} more failing`] : []),
      ],
      failingTests,
@@ -14,6 +14,6 @@ index de8177d2..0ff7aaa1 100644
 -        ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
 -        : [],
 +    nextActions: [],
-   };
-   return settled;
- });
+     ...(unrunOnly(decided.success.outcome, decided.success.evidence, reports)
+       ? { unrun: true }
+       : {}),

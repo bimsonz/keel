@@ -20,7 +20,7 @@ import {
   commutation,
   type Footprints,
   interpretLeaveOneOut,
-  MAX_BATCH,
+  landedPerVerification,
   planBatches,
   proofIdOf,
   type QueuedChange,
@@ -309,28 +309,34 @@ const opposed = (a: QueuedChange, b: QueuedChange): boolean =>
   a.effects.some((x) => b.effects.some((y) => contradicts(x, y)));
 
 describe("belief-aware batching", () => {
-  it("[batching.size-formula] N = clamp(ln 0.8 / ln(1 − p), 1, 16), so a batch of N passes with probability at least 0.8", () => {
+  it("[batching.size-formula] N is the size in 1..queued that lands the most changes per verification at failure rate p, the smallest of any tie, with nothing else bounding it", () => {
     fc.assert(
       fc.property(
         fc.double({ min: 0, max: 1, noNaN: true }),
-        fc.double({ min: 0, max: 1, noNaN: true }),
-        (p, q) => {
-          const n = batchSize(p);
-          const ok = Number.isInteger(n) && n >= 1 && n <= MAX_BATCH;
-          const monotone = p > q || batchSize(p) >= batchSize(q);
-          const reliable = n === 1 || p === 0 || (1 - p) ** n >= 0.8 - 1e-12;
-          return ok && monotone && reliable;
+        fc.integer({ min: 0, max: 64 }),
+        (p, queued) => {
+          const n = batchSize(p, queued);
+          const sizes = Array.from({ length: Math.max(1, queued) }, (_, i) => i + 1);
+          const ok = Number.isInteger(n) && n >= 1 && n <= Math.max(1, queued);
+          const best =
+            p === 0 || p === 1
+              ? true
+              : sizes.every((m) =>
+                  m < n
+                    ? landedPerVerification(p, m) < landedPerVerification(p, n)
+                    : landedPerVerification(p, m) <= landedPerVerification(p, n),
+                );
+          return ok && best;
         },
       ),
     );
-    expect([
-      batchSize(0),
-      batchSize(5e-324),
-      batchSize(0.01),
-      batchSize(0.2),
-      batchSize(1),
-      batchSize(Number.NaN),
-    ]).toEqual([16, 16, 16, 1, 1, 1]);
+    // Changes landed per verification, a failed batch of several re-running each member alone.
+    expect(landedPerVerification(0.1, 1)).toBeCloseTo(0.9, 12);
+    expect(landedPerVerification(0.1, 4)).toBeCloseTo(3.6 / (1 + (1 - 0.9 ** 4) * 4), 12);
+    expect(
+      [0, 5e-324, 0.01, 0.05, 0.1, 0.15, 0.3, 0.5, 1, Number.NaN].map((p) => batchSize(p, 24)),
+    ).toEqual([24, 24, 11, 5, 4, 3, 3, 1, 1, 1]);
+    expect([batchSize(0, 0), batchSize(0, 3), batchSize(0.05, 2)]).toEqual([1, 3, 2]);
   });
 
   it("[batching.no-suspected-pair] a batch never holds two changes with an open suspected conflict", () => {
@@ -396,7 +402,7 @@ describe("belief-aware batching", () => {
         const placed = batches.flat();
         return (
           batches.length <= 4 &&
-          batches.every((b) => b.length >= 1 && b.length <= batchSize(p)) &&
+          batches.every((b) => b.length >= 1 && b.length <= batchSize(p, queue.length)) &&
           new Set(placed).size === placed.length &&
           placed.every((c) => queue.some((q) => q.id === c))
         );
@@ -424,7 +430,7 @@ describe("belief-aware batching", () => {
           batches.some(
             (b) =>
               !c.risky &&
-              b.length < batchSize(p) &&
+              b.length < batchSize(p, queue.length) &&
               b.every(
                 (m) =>
                   !byId.get(m)!.risky &&

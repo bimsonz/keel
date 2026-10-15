@@ -1162,9 +1162,33 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.box-infra] a composition MergeBox refuses for its own sake is held and blamed on infra, never the change, and the third in a row bounces the change to submit again unchanged",
+    "[lane.box-capacity] a composition MergeBox refuses for want of room is held on infra and counted toward no limit: the change is never bounced for it",
     () => {
       const w = world({ refuseCompose: [change(1)], refuseReason: "box-unavailable" });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const rounds = Array.from({ length: INFRA_ROUNDS + 1 }, (_, i) => i);
+        for (let round = 0; round < rounds.length; round++) {
+          expect(yield* stepped(LANE)).toBe("idle");
+          const failed = (yield* payloads("BatchFailed")).at(-1);
+          yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+        }
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual(
+          rounds.map(() => "infra"),
+        );
+        expect((yield* payloads("VerdictIssued")).map((p) => p["outcome"])).toEqual(
+          rounds.map(() => "hold"),
+        );
+        expect(laneOf(yield* EntityStore, LANE)?.infra).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.box-infra] a composition MergeBox refuses for its own sake is held and blamed on infra, never the change, and the third in a row bounces the change to submit again unchanged",
+    () => {
+      const w = world({ refuseCompose: [change(1)], refuseReason: "box-failed" });
       return Effect.gen(function* () {
         yield* w.seeded;
         yield* queue(w, change(1));
@@ -1179,7 +1203,7 @@ describe("the Lane", () => {
           "infra",
           change(1),
         ]);
-        const refusal = "composition-refused: box-unavailable";
+        const refusal = "composition-refused: box-failed";
         const issued = yield* payloads("VerdictIssued");
         expect(issued[0]).toMatchObject({
           outcome: "hold",
@@ -2204,11 +2228,11 @@ const requeuedFor = (id: ChangeId, batchId: BatchId, reason: string) =>
     }),
   );
 
-/** A lane whose latest member outcomes are `passes` passes, then `fails` failures. */
-const laneWithOutcomes = (fails: number, passes = 0) => ({
+/** A lane with `queued` changes waiting, whose latest member outcomes are `passes` passes, then `fails` failures. */
+const laneWithOutcomes = (fails: number, passes = 0, queued = 24) => ({
   laneId: LANE,
   projectId: PROJECT,
-  queue: [],
+  queue: Array.from({ length: queued }, (_, i) => change(i + 1)),
   advances: [],
   infra: [],
   outcomes: [
@@ -2218,11 +2242,16 @@ const laneWithOutcomes = (fails: number, passes = 0) => ({
 });
 
 describe("the Lane's batches", () => {
-  it("[c41.size] a lane forms up to the project's maxBatchSize, fewer as its members' recent failure rate rises", () => {
+  it("[c41.size] a lane forms the batch that lands the most of its queue per verification at its members' recent failure rate, within the project's maxBatchSize", () => {
     const lane = laneWithOutcomes;
-    expect([0, 1, 2, 3].map((fails) => laneBatchSize(lane(fails), 16))).toEqual([16, 4, 2, 1]);
+    // p = 0, 0.05, 0.1, 0.15 and 0.2 over twenty outcomes.
+    expect([0, 1, 2, 3, 4].map((fails) => laneBatchSize(lane(fails), 64))).toEqual([
+      24, 5, 4, 3, 3,
+    ]);
     expect([1, 8, 16].map((max) => laneBatchSize(lane(0), max))).toEqual([1, 8, 16]);
     expect(laneBatchSize(lane(1), 2)).toBe(2);
+    // No more than the queue holds.
+    expect([0, 1].map((fails) => laneBatchSize(lane(fails, 0, 3), 64))).toEqual([3, 3]);
     // Only the latest twenty outcomes count: a failure twenty passes ago no longer shrinks the batch.
     expect(failureRate(lane(1, 0))).toBe(1 / OUTCOME_WINDOW);
   });
@@ -2430,6 +2459,31 @@ describe("the Lane's batches", () => {
   );
 
   it.effect(
+    "[c41.unrun-uncounted] a park on steps the verifier could not run (no box, rate-limited) counts toward no member's infra limit: a batch of two re-forms whole, however many times it parks",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        const two = [1, 2].map(change);
+        for (const id of two) yield* queue(w, id);
+        for (let round = 0; round <= INFRA_ROUNDS; round++) {
+          const v = yield* toVerifying(w);
+          expect(yield* membersInFlight).toEqual(two);
+          yield* recordVerdict(LANE, {
+            ...verdict(v.batchId, v.candidateId, v.instanceId, "park"),
+            unrun: true,
+          });
+          expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("infra");
+          for (const id of two.toReversed()) yield* requeuedFor(id, v.batchId, "infra-failure");
+        }
+        const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.infra).toEqual([]);
+        expect(lane?.alone ?? []).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[c41.runs-alone] a change requeued after its members clashed runs alone, and the batch formed behind another head leaves it out",
     () => {
       const w = world({ maxBatchSize: 4 });
@@ -2460,8 +2514,8 @@ describe("the Lane's batches", () => {
         expect(laneOf(yield* EntityStore, LANE)?.outcomes).toEqual(["fail"]);
         for (const n of [2, 3, 4, 5, 6, 7]) yield* queue(w, change(n));
         yield* toVerifying(w);
-        // One failure in twenty: batchSize(0.05) is 4.
-        expect(yield* membersInFlight).toEqual([2, 3, 4, 5].map(change));
+        // One failure in twenty: of six queued, a batch of five lands the most per verification.
+        expect(yield* membersInFlight).toEqual([2, 3, 4, 5, 6].map(change));
       }).pipe(Effect.provide(w.layer));
     },
   );

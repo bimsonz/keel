@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "c41.size"
+# kills: c41.size
+# why: the size is chosen over the project's bound, not over what is queued, so a short queue is sized as a long one
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index e48f8594..b6841061 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -287,7 +287,7 @@ export const failureRate = (lane: Lane): number =>
+  * project's `maxBatchSize`.
+  */
+ export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
+-  batchSize(failureRate(lane), Math.min(maxBatchSize, lane.queue.length));
++  batchSize(failureRate(lane), maxBatchSize);
+ 
+ /** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+ const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>

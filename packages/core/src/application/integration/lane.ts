@@ -281,9 +281,13 @@ export const OUTCOME_WINDOW = 20;
 export const failureRate = (lane: Lane): number =>
   (lane.outcomes ?? []).filter((outcome) => outcome === "fail").length / OUTCOME_WINDOW;
 
-/** The largest batch the lane forms next: the project's `maxBatchSize`, shrunk by its recent failure rate (`batchSize`). */
+/**
+ * The largest batch the lane forms next: the size that lands the most of its
+ * queue per verification at its recent failure rate (`batchSize`), within the
+ * project's `maxBatchSize`.
+ */
 export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
-  Math.max(1, Math.min(maxBatchSize, batchSize(failureRate(lane))));
+  batchSize(failureRate(lane), Math.min(maxBatchSize, lane.queue.length));
 
 /** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
 const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>
@@ -802,7 +806,8 @@ type IssuedId = Extract<CandidateCommand, { readonly _tag: "RefuseBundle" }>["ve
  * Change DO requeues the members and the verdict holds them, waiting, until
  * a batch of one is failed that way the INFRA_FAILURE_LIMIT-th time in a
  * row: then the change bounces, told to submit again once the
- * infrastructure is back.
+ * infrastructure is back. A refusal for want of `capacity` is counted toward
+ * no limit.
  */
 const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
   lane: Lane,
@@ -811,11 +816,12 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
   refuse: (verdictId: IssuedId, attribution: ChangeId | "infra") => CandidateCommand,
   refusal: string,
   wait: string,
+  capacity = false,
 ) {
   const verdictId = yield* (yield* Ids).next("vrd");
   let exhausted: string | undefined;
   yield* onBatch(lane.laneId, batch.id, cause, (_, now) => {
-    const infra = infraBlame(now, batch, refusal);
+    const infra = capacity ? uncounted(now) : infraBlame(now, batch, refusal);
     exhausted = infra.exhausted;
     return {
       moves: [
@@ -938,6 +944,7 @@ const holdForBox = (lane: Lane, batch: Batch, refused: CompositionRefused) =>
     (verdictId, attribution) => ({ _tag: "RefuseComposition", verdictId, attribution }),
     refusalEvidence(refused),
     "MergeBox could not compose the batch, through no fault of the change: Keel puts it back in the queue",
+    refused.reason === "box-unavailable",
   );
 
 /** A composition refused for the batch's sake: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
@@ -1707,8 +1714,11 @@ interface Issued {
 /** What a verdict is issued from: KeelVerify's own, or the Lane's for an instance that will send none. */
 type Verdict = Pick<
   BatchVerdict,
-  "verdictId" | "outcome" | "planHash" | "evidence" | "failingTests" | "nextActions"
+  "verdictId" | "outcome" | "planHash" | "evidence" | "failingTests" | "nextActions" | "unrun"
 >;
+
+/** A failure of the infrastructure's capacity (no box, rate-limited): the members are requeued and nothing is counted, since it says nothing about any of them. */
+const uncounted = (lane: Lane): ReturnType<typeof infraBlame> => ({ attribution: "infra", lane });
 
 const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
   const cleared = withoutInfra(lane, batch.members);
@@ -1739,12 +1749,11 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
         : cleared,
     };
   }
-  // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row.
-  const infra = infraBlame(
-    lane,
-    batch,
-    `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`,
-  );
+  // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row, unless no step could run.
+  const infra =
+    verdict.outcome === "park" && verdict.unrun === true
+      ? uncounted(lane)
+      : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`);
   return infra.exhausted === undefined
     ? {
         outcome: verdict.outcome,

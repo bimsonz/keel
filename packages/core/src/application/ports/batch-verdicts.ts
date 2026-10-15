@@ -31,6 +31,12 @@ export interface BatchVerdict {
   readonly failingTests: readonly string[];
   /** On a bounce, what the change's agent can do about it: the lane copies them into its VerdictIssued. */
   readonly nextActions?: readonly NextAction[];
+  /**
+   * Set on a park that rests only on steps the verifier could not run for
+   * want of capacity (rate-limited): it says nothing about the change, so the lane
+   * counts it toward no member's infra limit and runs no member alone for it.
+   */
+  readonly unrun?: true;
 }
 
 /**

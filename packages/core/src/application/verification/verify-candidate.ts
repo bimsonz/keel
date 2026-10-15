@@ -73,8 +73,38 @@ export const SettledVerdict = Schema.Struct({
   failingTests: Schema.Array(Schema.String),
   /** On a bounce, the remedy: fix what failed, push, and submit again. Empty otherwise. */
   nextActions: Schema.Array(NextAction),
+  /** A park that rests only on steps the verifier could not run (`unrunOnly`). */
+  unrun: Schema.optionalKey(Schema.Literal(true)),
 });
 export type SettledVerdict = typeof SettledVerdict.Type;
+
+/**
+ * Why a verifier could not run a step at all for want of capacity: rate-limited.
+ * Not `unavailable`, which a step no runner takes also reports (a fault of
+ * Keel's, which must not be requeued for ever), nor a timeout, malformed
+ * output or a truncated run, which may be the change's.
+ */
+const UNRUN: ReadonlySet<string> = new Set(["rate-limited"]);
+
+/**
+ * Whether a park rests only on steps the verifier could not run: every
+ * escalation is an abstain, and every report of its step failed as `UNRUN`.
+ */
+const unrunOnly = (
+  outcome: SettledVerdict["outcome"],
+  evidence: readonly StepResult[],
+  reports: readonly StepReport[],
+): boolean =>
+  outcome === "park" &&
+  evidence.length > 0 &&
+  evidence.every((r) => {
+    const own = reports.filter((report) => report.stepId === r.stepId);
+    return (
+      r.outcome === "abstain" &&
+      own.length > 0 &&
+      own.every((report) => report.failure !== undefined && UNRUN.has(report.failure))
+    );
+  });
 
 /** How many failures (tests, type errors and guards) a verdict cites by name. */
 export const CITED_FAILURES = 20;
@@ -270,6 +300,9 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
       decided.success.outcome === "bounce"
         ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
         : [],
+    ...(unrunOnly(decided.success.outcome, decided.success.evidence, reports)
+      ? { unrun: true }
+      : {}),
   };
   return settled;
 });
@@ -293,5 +326,6 @@ export const recordBatchVerdict = Effect.fn("verification/recordBatchVerdict")(f
     evidence: input.settled.evidence,
     failingTests: input.settled.failingTests,
     ...(input.settled.nextActions.length === 0 ? {} : { nextActions: input.settled.nextActions }),
+    ...(input.settled.unrun === true ? { unrun: true } : {}),
   });
 });

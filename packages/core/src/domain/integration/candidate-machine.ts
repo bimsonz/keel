@@ -12,7 +12,7 @@ import {
   type Tier,
   type VerdictId,
 } from "../kernel/index.ts";
-import { type Batch, type CandidateState, MAX_BATCH } from "./batch.ts";
+import { type Batch, type CandidateState } from "./batch.ts";
 import { CandidateStateRefused, InvalidBatch, ResultFenced } from "./errors.ts";
 import {
   type BatchAttribution,
@@ -138,14 +138,8 @@ const refuse = (
   );
 
 const form = (batchId: BatchId, command: Extract<CandidateCommand, { _tag: "Form" }>): Decision => {
-  if (command.members.length === 0 || command.members.length > MAX_BATCH) {
-    return Result.fail(
-      new InvalidBatch({
-        batchId,
-        reason: `a batch holds 1 to ${MAX_BATCH} changes, not ${command.members.length}`,
-      }),
-    );
-  }
+  if (command.members.length === 0)
+    return Result.fail(new InvalidBatch({ batchId, reason: "a batch holds at least one change" }));
   if (new Set(command.members).size !== command.members.length)
     return Result.fail(new InvalidBatch({ batchId, reason: "a change appears twice" }));
   return Result.succeed([

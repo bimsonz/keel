@@ -30,6 +30,7 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
               evidence: verdict.evidence,
               failingTests: verdict.failingTests,
               ...(verdict.nextActions === undefined ? {} : { nextActions: verdict.nextActions }),
+              ...(verdict.unrun === true ? { unrun: true } : {}),
             }),
           ),
         ).pipe(

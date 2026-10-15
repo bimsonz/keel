@@ -95,7 +95,59 @@ const settle = (es: readonly (readonly [Ending, ContentHash])[]) => {
   return { exit, logged, reports };
 };
 
+/** Settles `reports` against the plan, with no evidence stored. */
+const settled = (reports: readonly StepReport[]) =>
+  Effect.runSync(
+    settleVerdict(NAMESPACE, PLAN, reports).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          Layer.succeed(
+            EvidenceStore,
+            EvidenceStore.of({
+              put: () => Effect.die("settling stores nothing"),
+              get: (_namespace, hash) => Effect.fail(new EvidenceMissing({ hash })),
+            }),
+          ),
+          Layer.succeed(
+            Ids,
+            Ids.of({
+              next: (prefix) => Effect.succeed(makeId(prefix, "01JZ8PT2C4E6G8J0M2N4Q6S8V0")),
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+
+/** Each step of the plan as `ending` says: its outcome and, for an abstain, why it could not be judged. */
+const reportsOf = (ending: (stepIndex: number) => Pick<StepReport, "outcome" | "failure">) =>
+  PLAN.steps.map((step, i): StepReport => ({
+    stepId: step.id,
+    evidenceClass: "proof",
+    tier: step.tier,
+    durationMs: 1,
+    ...ending(i),
+  }));
+
 describe("settling a verdict", () => {
+  it("[d21.unrun] a park on steps the verifier could not run for want of capacity (rate-limited) says so for the lane; one that may be Keel's fault or the change's (unavailable, a timeout, malformed output) does not, nor does any other outcome", () => {
+    const limited = { outcome: "abstain", failure: "rate-limited" } as const;
+    expect(settled(reportsOf(() => limited))).toMatchObject({ outcome: "park", unrun: true });
+    // A step that passed is not what the park rests on.
+    expect(settled(reportsOf((i) => (i === 0 ? { outcome: "pass" } : limited)))).toMatchObject({
+      outcome: "park",
+      unrun: true,
+    });
+    for (const failure of ["unavailable", "timeout", "schema", "truncated"] as const) {
+      const one = settled(reportsOf((i) => (i === 0 ? { outcome: "abstain", failure } : limited)));
+      expect(one.outcome).toBe("park");
+      expect(one.unrun).toBeUndefined();
+    }
+    const bounced = settled(reportsOf((i) => (i === 0 ? { outcome: "fail" } : limited)));
+    expect(bounced.outcome).toBe("bounce");
+    expect(bounced.unrun).toBeUndefined();
+  });
+
   it("[d21.evidence-missing-red] a fail whose evidence is not stored still bounces, citing it as missing, and logs an ops error", () => {
     fc.assert(
       fc.property(endings, (es) => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.size-formula
+# why: a batch is capped at 16 again, so a queue that keeps passing waits on a bound nothing chose
+diff --git a/packages/core/src/domain/integration/batch.ts b/packages/core/src/domain/integration/batch.ts
+index dead17ab..7f3e85ed 100644
+--- a/packages/core/src/domain/integration/batch.ts
++++ b/packages/core/src/domain/integration/batch.ts
+@@ -64,7 +64,7 @@ export const landedPerVerification = (p: number, n: number): number =>
+  * lands any, and an unknown rate (NaN) compares as no gain: both stay at one.
+  */
+ export function batchSize(failureRate: number, queued: number): number {
+-  const most = Math.max(1, Math.floor(queued));
++  const most = Math.min(16, Math.max(1, Math.floor(queued)));
+   let best = 1;
+   let landed = landedPerVerification(failureRate, 1);
+   for (let n = 2; n <= most; n++) {

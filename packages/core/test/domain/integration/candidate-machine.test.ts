@@ -317,7 +317,7 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
   if (before === undefined) {
     if (command._tag !== "Form") return "refused";
     const n = command.members.length;
-    return n >= 1 && n <= 16 && new Set(command.members).size === n ? "forming" : "refused";
+    return n >= 1 && new Set(command.members).size === n ? "forming" : "refused";
   }
   const fresh = (c: { readonly attempt: number; readonly chainEpoch: number }) =>
     c.attempt === before.attempt && c.chainEpoch === before.chainEpoch;

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.size-formula
+# why: the size ignores what a failed batch costs to re-run alone, so any failure rate forms the whole queue
+diff --git a/packages/core/src/domain/integration/batch.ts b/packages/core/src/domain/integration/batch.ts
+index 3b85a3d6..e924e357 100644
+--- a/packages/core/src/domain/integration/batch.ts
++++ b/packages/core/src/domain/integration/batch.ts
+@@ -54,7 +54,7 @@ export type Batch = typeof Batch.Type;
+  * over one. `expm1` and `log1p` keep tiny rates exact.
+  */
+ export const landedPerVerification = (p: number, n: number): number =>
+-  n <= 1 ? 1 - p : (n * (1 - p)) / (1 - Math.expm1(n * Math.log1p(-p)) * n);
++  n * (1 - p);
+ 
+ /**
+  * Batch size from the recent failure rate: the `n` in 1..`queued` that lands

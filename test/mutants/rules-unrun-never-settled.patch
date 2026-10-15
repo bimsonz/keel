@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/settle-verdict.test.ts
+# kills: d21.unrun
+# why: KeelVerify never says a park was for want of capacity, so the lane counts every one
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index c4c1c28a..b24d005d 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -295,7 +295,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+       decided.success.outcome === "bounce"
+         ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
+         : [],
+-    ...(unrunOnly(decided.success.outcome, decided.success.evidence, reports)
++    ...(unrunOnly(decided.success.outcome, [], reports)
+       ? { unrun: true }
+       : {}),
+   };

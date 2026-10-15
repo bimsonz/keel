@@ -46,20 +46,35 @@ export const Batch = Schema.Struct({
 });
 export type Batch = typeof Batch.Type;
 
-/** The largest batch a lane forms. */
-export const MAX_BATCH = 16;
+/**
+ * How many changes a batch of `n` lands per verification when each member
+ * fails on its own with probability `p`, and a failed batch of several runs
+ * every member alone next (a failure no one is blamed for): it lands n(1 − p)
+ * over 1 + (1 − (1 − p)^n)·n verifications, and a batch of one lands 1 − p
+ * over one. `expm1` and `log1p` keep tiny rates exact.
+ */
+export const landedPerVerification = (p: number, n: number): number =>
+  n <= 1 ? 1 - p : (n * (1 - p)) / (1 - Math.expm1(n * Math.log1p(-p)) * n);
 
 /**
- * Batch size from the recent failure rate: N = clamp(ln 0.8 / ln(1 − p), 1, 16),
- * the largest batch that still passes whole with probability 0.8. An unknown
- * rate (NaN) is treated as the worst case. `log1p` keeps tiny rates exact:
- * `1 − p` would round to 1 and divide by zero.
+ * Batch size from the recent failure rate: the `n` in 1..`queued` that lands
+ * the most changes per verification (`landedPerVerification`), the smallest
+ * of any tie. Nothing else bounds it: with no failures each size lands more
+ * than the last, so it is the whole queue. Where every change fails no size
+ * lands any, and an unknown rate (NaN) compares as no gain: both stay at one.
  */
-export function batchSize(failureRate: number): number {
-  if (Number.isNaN(failureRate) || failureRate >= 1) return 1;
-  if (failureRate <= 0) return MAX_BATCH;
-  const n = Math.floor(Math.log(0.8) / Math.log1p(-failureRate));
-  return Math.min(MAX_BATCH, Math.max(1, n));
+export function batchSize(failureRate: number, queued: number): number {
+  const most = Math.max(1, Math.floor(queued));
+  let best = 1;
+  let landed = landedPerVerification(failureRate, 1);
+  for (let n = 2; n <= most; n++) {
+    const each = landedPerVerification(failureRate, n);
+    if (each > landed) {
+      best = n;
+      landed = each;
+    }
+  }
+  return best;
 }
 
 export const PromotionState = Schema.Literals([
