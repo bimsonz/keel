@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-recheck.once
+# why: a question asked about again is never marked, so its raiser is asked at every run
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 49ca878b..f584b1c8 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -577,6 +577,5 @@ export const recheckQuestions = Effect.fn("coordination/recheckQuestions")(funct
+   const raisers = yield* QuestionRaisers;
+   for (const question of yield* questionsToRecheck) {
+     const asked = yield* Effect.exit(raisers.recheck(question.raisedBy, question.conflictId));
+-    if (Exit.isSuccess(asked)) store.put(RECHECKED, question.escalationId, true);
+   }
+ });

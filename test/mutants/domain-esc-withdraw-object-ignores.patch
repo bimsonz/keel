@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-withdraw.real
+# why: the namespace object answers a withdrawal and commits nothing
+diff --git a/apps/keel/src/adapters/driving/do/namespace.ts b/apps/keel/src/adapters/driving/do/namespace.ts
+index 51c4bfba..29186ae2 100644
+--- a/apps/keel/src/adapters/driving/do/namespace.ts
++++ b/apps/keel/src/adapters/driving/do/namespace.ts
+@@ -104,7 +104,7 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
+   async withdraw(command: typeof WithdrawCommand.Encoded) {
+     const answer = await this.answer(
+       NamespaceCodecs.withdraw,
+-      decoded(WithdrawCommand, command).pipe(Effect.flatMap(withdrawEscalation)),
++      decoded(WithdrawCommand, command).pipe(Effect.asVoid),
+     );
+     await this.armWidenings();
+     return answer;

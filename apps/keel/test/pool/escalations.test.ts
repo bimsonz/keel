@@ -5,7 +5,7 @@
 // serves the question and the decision; and each party's Change DO parks and
 // resumes through the real fan-out. The ruling is given through the
 // `Escalations` port's own adapter, not through its doorway operation.
-import { runInDurableObject } from "cloudflare:test";
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
   conflictIdOf,
@@ -15,6 +15,8 @@ import {
   escalationIdOf,
   namespaceAddress,
   PREMISE_HOLDS,
+  questionsToRecheck,
+  SUBJECT_HELD,
 } from "@keeltown/core/application/coordination";
 import { MAINTAINERS_AFTER_MS } from "@keeltown/core/application/memory";
 import { Proposition } from "@keeltown/core/domain/coordination";
@@ -26,7 +28,13 @@ import {
   makeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { Escalations, EventOutbox, ProbeLedger, PROJECTOR } from "@keeltown/core/ports";
+import {
+  EntityStore,
+  Escalations,
+  EventOutbox,
+  ProbeLedger,
+  PROJECTOR,
+} from "@keeltown/core/ports";
 import { makeManualClock } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -648,7 +656,138 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       escalation: { state: "open", category: "unprovable-conflict" },
     });
   });
+
+  it("[esc-withdraw.real] once both changes of a conflict put to a person have withdrawn, the namespace's object hears it through the fan-out and withdraws the question, and the Projector's view says so", async () => {
+    await using probes = await inertProbe();
+    const { a, b, stateOf, withdraw } = await escalatedPair(probes);
+    expect(await stateOf()).toBe("open");
+
+    await withdraw(a);
+    expect(await stateOf()).toBe("open");
+    await withdraw(b);
+    await vi.waitFor(async () => expect(await stateOf()).toBe("withdrawn"), WAIT);
+  });
+
+  it("[esc-recheck.orphan] a question left open by a subject that never withdrew it, with both its changes gone, is withdrawn on the namespace object's next run", async () => {
+    await using probes = await inertProbe();
+    const { projectId, a, b, escalationId, stateOf } = await escalatedPair(probes);
+    await leftUnowed(projectId, [a.changeId, b.changeId]);
+    expect(await stateOf()).toBe("open");
+
+    await nextRun();
+    await vi.waitFor(async () => expect(await stateOf()).toBe("withdrawn"), WAIT);
+    expect(await toRecheck(escalationId)).toBe(false);
+  });
+
+  it("[esc-recheck.live] a question one of whose changes is still held stays open when its raiser is asked again; [esc-recheck.once] and its raiser is never asked again", async () => {
+    await using probes = await inertProbe();
+    const { projectId, a, b, escalationId, stateOf } = await escalatedPair(probes);
+    await leftUnowed(projectId, [a.changeId]);
+
+    await nextRun();
+    await vi.waitFor(async () => expect(await toRecheck(escalationId)).toBe(false), WAIT);
+    expect(await stateOf()).toBe("open");
+
+    // Its last change leaves unseen, as before subjects withdrew their own: the asked question is not asked again.
+    await leftUnowed(projectId, [b.changeId]);
+    await nextRun();
+    expect(await stateOf()).toBe("open");
+  });
 });
+
+/**
+ * Two real changes whose conflict's probe could not decide it, so the subject
+ * put it to a person on the pool org's namespace object: the question is open.
+ */
+async function escalatedPair(probes: Awaited<ReturnType<typeof inertProbe>>) {
+  const projectId = makeId("prj", ulid());
+  const [a, b] = [
+    await changeUnderTest(projectId, "project"),
+    await changeUnderTest(projectId, "project"),
+  ];
+  const sponsor = await seedUser(uniqueHandle("holder"), { role: "member" });
+  await seedAgent({ id: a.agentId, projectId, sponsor: sponsor.userId });
+  await seedAgent({ id: b.agentId, projectId });
+  ok(await a.declare(`declare-${a.changeId}`, { premises: [relied] }));
+  await drainOutbox(a.stub);
+  ok(await b.declare(`declare-${b.changeId}`, { declaredEffects: [cached] }));
+  await drainOutbox(b.stub);
+  const conflictId = conflictIdOf(projectId, {
+    premise: { holder: a.changeId, proposition: relied },
+    effect: { changeId: b.changeId, proposition: cached },
+  });
+  await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), WAIT);
+  const escalationId = escalationIdOf(conflictId);
+  ok(
+    await Effect.runPromise(
+      Effect.exit(
+        ProbeLedger.use((ledger) =>
+          ledger.probeDraftFailed(
+            { projectId, key: LEAF },
+            { conflictId, attempts: 3, reason: "abstained" },
+          ),
+        ).pipe(
+          Effect.provide(
+            ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
+          ),
+        ),
+      ),
+    ),
+  );
+  await drainOutbox(subjectOf(projectId));
+  const ns = namespaceObject(namespaceAddress(POOL_ORG));
+  await drainOutbox(ns);
+  const stateOf = async () =>
+    ok(await escalations((port) => port.get(escalationId))).escalation.state;
+  /** The change withdraws, and its end reaches the subject and the namespace's object. */
+  const withdraw = async (c: ChangeUnderTest) => {
+    ok(
+      decodeExit(
+        ChangeCodecs.abandon,
+        await c.stub.abandon({
+          authority: { _tag: "Lease", leaseId: (await c.current()).lease.id, agentId: c.agentId },
+          idempotencyKey: `abandon-${c.changeId}`,
+        }),
+      ),
+    );
+    await drainOutbox(c.stub);
+    await drainOutbox(ns);
+  };
+  return { projectId, a, b, escalationId, stateOf, withdraw };
+}
+
+/**
+ * The subject as one was left before subjects withdrew their own questions:
+ * these changes are gone from it, and it owes nothing.
+ */
+const leftUnowed = (projectId: ProjectId, changeIds: readonly string[]) =>
+  runInDurableObject(subjectOf(projectId), (instance: SubjectDO) =>
+    instance["runtime"].runPromise(
+      Effect.map(EntityStore, (store) => {
+        for (const changeId of changeIds) store.remove(SUBJECT_HELD, changeId);
+      }),
+    ),
+  );
+
+/** The pool org's namespace object starts again, as after a deploy, and runs whatever it armed. */
+async function nextRun() {
+  const stub = env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(POOL_ORG)));
+  await evictDurableObject(stub);
+  await runDurableObjectAlarm(stub);
+  await drainOutbox(namespaceObject(namespaceAddress(POOL_ORG)));
+}
+
+/** Whether the pool org's namespace object still has to ask this question's raiser about it again. */
+const toRecheck = (escalationId: EscalationId) =>
+  runInDurableObject(
+    env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(POOL_ORG))),
+    (instance: NamespaceDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(questionsToRecheck, (owed) =>
+          owed.some((question) => question.escalationId === escalationId),
+        ),
+      ),
+  );
 
 type NamespaceStub = ReturnType<typeof namespaceObject>;
 

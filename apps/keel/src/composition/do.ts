@@ -17,6 +17,7 @@ import {
   type SponsorRequests,
   type ProjectAgents,
   type PlanStore,
+  type QuestionRaisers,
   ProjectNamespaces,
   type Projects,
   type StagingWriter,
@@ -61,6 +62,7 @@ import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-ver
 import { TIER2_GATE } from "../adapters/driving/do/boxgate-leases.ts";
 import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
+import { QuestionRaisersRpc } from "../adapters/driven/do-rpc/question-raisers.ts";
 import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
@@ -106,14 +108,19 @@ export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
 
 /**
  * The namespace object's driven adapters beyond the backbone: the rows of its
- * agents that the request gate reads, and the rows of the agents invited to
- * one of its projects, which it reads for who is asked first.
+ * agents that the request gate reads, the rows of the agents invited to one
+ * of its projects, which it reads for who is asked first, and the subjects
+ * that raised its questions, which it asks to check them again.
  */
-export type NamespaceServices = NamespaceAgents | ProjectAgents;
+export type NamespaceServices = NamespaceAgents | ProjectAgents | QuestionRaisers;
 
 /** The namespace object writes its agents' D1 rows inline, so an acceptance or a removal binds the agent's next request. */
 export function namespaceServices(env: Env): Layer.Layer<NamespaceServices> {
-  return Layer.mergeAll(NamespaceAgentsD1(env.DB), ProjectAgentsD1(env.DB));
+  return Layer.mergeAll(
+    NamespaceAgentsD1(env.DB),
+    ProjectAgentsD1(env.DB),
+    QuestionRaisersRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
+  );
 }
 
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */

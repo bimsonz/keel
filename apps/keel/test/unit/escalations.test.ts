@@ -417,6 +417,13 @@ function raisedOn(
     deadline: () => Effect.runSync(memory.widen(namespace, escalationId)),
     owed: () => Effect.runSync(memory.owed(namespace)),
     log: () => memory.log(namespace, { kind: "escalation", id: escalationId }),
+    /** Its raiser takes it back, as the subject does once its conflict's changes have all left. */
+    withdraw: (reason: string) =>
+      Effect.runSync(
+        HumanGate.use((gate) => gate.withdraw({ namespace, escalationId, reason })).pipe(
+          Effect.provide(memory.layer),
+        ),
+      ),
     rule: (by: UserId) =>
       Effect.runSync(
         Escalations.use((escalations) =>
@@ -786,5 +793,60 @@ describe("the Projector's fold of escalations", () => {
       project,
       escalation: { state: "open", raisedAt: 5_000 },
     });
+  });
+});
+
+describe("an escalation its raiser withdraws", () => {
+  it("[esc-withdraw.once] is withdrawn once while open: in its project, concerning whom its raising did, with the reason; it then widens to nobody and takes no ruling", () => {
+    const memory = makeEscalationsMemory();
+    const sponsor = nextId("usr");
+    const e = raisedOn(memory, sponsor);
+    const reason = "every change it was about has ended or left authz.session: chg_a, chg_b";
+
+    e.withdraw(reason);
+    e.withdraw(reason);
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWithdrawn"]);
+    expect(e.log()[1]).toMatchObject({
+      project: e.project,
+      payload: { _tag: "EscalationWithdrawn", escalationId: e.escalationId, reason },
+      affected: [e.about, { kind: "org", id: e.namespace }, { kind: "user", id: sponsor }],
+    });
+    expect(e.view().escalation.state).toBe("withdrawn");
+    expect(e.owed()).toEqual([]);
+    memory.clock.advance(MAINTAINERS_AFTER_MS);
+    e.deadline();
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWithdrawn"]);
+    const refused = Effect.runSync(
+      Effect.flip(
+        Escalations.use((escalations) =>
+          escalations.rule({
+            escalationId: e.escalationId,
+            option: EFFECT_STANDS,
+            by: sponsor,
+            idempotencyKey: "rule-1",
+          }),
+        ),
+      ).pipe(Effect.provide(memory.layer)),
+    );
+    expect(refused._tag).toBe("EscalationStateRefused");
+    expect(types(e.log())).toEqual(["EscalationRaised", "EscalationWithdrawn"]);
+  });
+
+  it("[esc-withdraw.answered] one already ruled stays ruled, and one never raised commits nothing", () => {
+    const memory = makeEscalationsMemory();
+    const e = raisedOn(memory, nextId("usr"));
+    e.rule(nextId("usr"));
+    e.withdraw("every change it was about has ended");
+    expect(types(e.log())).toEqual(["EscalationRaised", "RulingGiven"]);
+    expect(e.view().escalation.state).toBe("ruled");
+
+    const namespace = nextId("org");
+    const never = escalationIdOf(nextId("cfl"));
+    Effect.runSync(
+      HumanGate.use((gate) =>
+        gate.withdraw({ namespace, escalationId: never, reason: "nothing left" }),
+      ).pipe(Effect.provide(memory.layer)),
+    );
+    expect(memory.log(namespace, { kind: "escalation", id: never })).toEqual([]);
   });
 });

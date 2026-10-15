@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-withdraw.real, esc-recheck.live
+# why: a question is withdrawn as soon as one change of its conflict has gone, while the other is still waiting on it
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 6e6e7673..6a8005b7 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -67,7 +67,7 @@ export function oweWithdrawal(store: Store, key: SubjectKey, conflict: Conflict)
+   if (
+     conflict.state === "escalated" &&
+     conflict.escalationId !== undefined &&
+-    parties.every((party) => store.get(SUBJECT_HELD, party) === undefined)
++    parties.some((party) => store.get(SUBJECT_HELD, party) === undefined)
+   )
+     store.put(
+       WITHDRAWAL_OWED,

@@ -3,6 +3,7 @@ import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
   byAgent,
   ConflictId,
+  EscalationId,
   type EventEnvelope,
   type Instant,
   type ProjectId,
@@ -43,7 +44,7 @@ import {
   storedConflict,
   viewOf,
 } from "./probe-ledger.ts";
-import { holderAgent, type SubjectReaction } from "./subject.ts";
+import { holderAgent, oweWithdrawal, type SubjectReaction, WITHDRAWAL_OWED } from "./subject.ts";
 
 /** Whether the conflict's probe ended unprovable and its settle waits on an escalation. */
 const awaitsEscalation = ({ conflict, probe }: ConflictView, now: Instant): boolean => {
@@ -290,3 +291,44 @@ export function hearDecision(
       }
     : { entity: conflictRef(conflictId), drafts: resolved.success, project: projectId };
 }
+
+/**
+ * What the Subject DO runs once a delivery has committed: each question it
+ * owes its namespace's object a withdrawal of (every change of its conflict
+ * has left the subject) is withdrawn there, and then no longer owed. A
+ * withdrawal that fails stays owed for the next delivery. A project that
+ * belongs to no namespace raised nothing, so owes nothing.
+ */
+export const withdrawOwed = Effect.fn("coordination/withdrawOwed")(function* (at: SubjectRef) {
+  const store = yield* EntityStore;
+  const owed = store.list(WITHDRAWAL_OWED);
+  if (owed.length === 0) return;
+  const place = yield* (yield* ProjectNamespaces).byId(at.projectId);
+  for (const { id, value } of owed) {
+    const escalationId = Schema.decodeUnknownSync(EscalationId)(id);
+    if (Option.isSome(place))
+      yield* (yield* HumanGate).withdraw({
+        namespace: place.value.namespace,
+        escalationId,
+        reason: Schema.decodeUnknownSync(Schema.String)(value),
+      });
+    store.remove(WITHDRAWAL_OWED, id);
+  }
+});
+
+/**
+ * Its namespace's object asks this subject to check a question again, as it
+ * does once for each raised before subjects withdrew their own: a conflict
+ * put to a person none of whose changes is held here any more owes its
+ * withdrawal, which is then paid. A conflict still with a change here, or one
+ * this subject does not host, owes nothing.
+ */
+export const recheckQuestion = Effect.fn("coordination/recheckQuestion")(function* (
+  at: SubjectRef,
+  conflictId: ConflictId,
+) {
+  const store = yield* EntityStore;
+  const conflict = storedConflict(store, conflictId);
+  if (conflict !== undefined) oweWithdrawal(store, at.key, conflict);
+  yield* withdrawOwed(at);
+});

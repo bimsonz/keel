@@ -2,9 +2,12 @@ import {
   escalationRecord,
   giveRuling,
   namespaceAt,
+  questionsToRecheck,
   raiseEscalation,
+  recheckQuestions,
   wideningsOwed,
   widenEscalation,
+  withdrawEscalation,
 } from "@keeltown/core/application/coordination";
 import {
   credentialRecords,
@@ -27,6 +30,7 @@ import {
   RemoveCredentialCommand,
   RuleCommand,
   SealedSecret,
+  WithdrawCommand,
 } from "../../../rpc/index.ts";
 import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith } from "./keel-object.ts";
@@ -37,6 +41,8 @@ const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
 /** The deadline at which an escalation's maintainers are asked too, by its reason. */
 const WIDENS = /^escalation (esc_[0-9A-Z]+) widens$/;
 const wideningDeadline = (escalationId: EscalationId) => `escalation ${escalationId} widens`;
+/** The deadline at which the object asks its questions' raisers to check them again. */
+const RECHECK = "questions recheck";
 
 /**
  * A namespace's object (`ns:<id>`): what belongs to whoever owns a project,
@@ -53,6 +59,8 @@ const wideningDeadline = (escalationId: EscalationId) => `escalation ${escalatio
 export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements NamespaceRpc {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, namespaceServices(env));
+    // A question raised before subjects withdrew their own is asked about again on the object's next run.
+    void ctx.blockConcurrencyWhile(() => this.armRecheck());
   }
 
   async inviteAgent(command: typeof InviteAgentCommand.Encoded) {
@@ -94,6 +102,15 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
       decoded(RaiseCommand, command).pipe(
         Effect.flatMap((request) => raiseEscalation({ ...request, namespace })),
       ),
+    );
+    await this.armWidenings();
+    return answer;
+  }
+
+  async withdraw(command: typeof WithdrawCommand.Encoded) {
+    const answer = await this.answer(
+      NamespaceCodecs.withdraw,
+      decoded(WithdrawCommand, command).pipe(Effect.flatMap(withdrawEscalation)),
     );
     await this.armWidenings();
     return answer;
@@ -152,14 +169,29 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
     );
   }
 
-  /** An escalation's thirty minutes are up: its maintainers are asked too, if it is still open. */
+  /**
+   * An escalation's thirty minutes are up: its maintainers are asked too, if
+   * it is still open. Or the recheck is due: each question still to recheck
+   * has its raiser asked to check it again.
+   */
   protected override async onDeadline(request: StartedAlarm): Promise<void> {
+    if (request.reason === RECHECK) return this.runtime.runPromise(recheckQuestions());
     const escalationId = WIDENS.exec(request.reason)?.[1];
     if (escalationId === undefined) return super.onDeadline(request);
     await this.runtime.runPromise(
       decoded(EscalationId, escalationId).pipe(Effect.flatMap(widenEscalation)),
     );
     await this.armWidenings();
+  }
+
+  /** Arms the recheck at once while a question is still to be asked about again; one that failed is asked on the next run. */
+  private async armRecheck(): Promise<void> {
+    const owed = await this.runtime.runPromiseExit(questionsToRecheck);
+    // Run in the constructor: a store it cannot read must not reset the object, so the recheck waits for a run that can.
+    if (owed._tag === "Failure")
+      console.error(`${this.ctx.id.name}: reading the questions to recheck failed`);
+    else if (owed.value.length > 0)
+      await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: RECHECK, at: Date.now() });
   }
 
   /**

@@ -28,6 +28,7 @@ export * from "./deployer.ts";
 export * from "./deployments.ts";
 export * from "./deps-builder.ts";
 export * from "./enrolments.ts";
+export * from "./question-raisers.ts";
 export * from "./sponsorships.ts";
 export * from "./invitations.ts";
 export * from "./escalations.ts";

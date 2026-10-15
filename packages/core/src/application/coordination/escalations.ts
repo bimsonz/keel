@@ -1,9 +1,9 @@
-import { Effect, Option, Result, Schema } from "effect";
+import { Effect, Exit, Option, Result, Schema } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
   type ChangeId,
-  type ConflictId,
+  ConflictId,
   DecisionId,
   type EntityRef,
   EscalationId,
@@ -41,6 +41,7 @@ import {
   EscalationRecord,
   HumanGate,
   ProjectAgents,
+  QuestionRaisers,
   type RaiseRequest,
   type RulingCommand,
   type RulingRefusal,
@@ -261,6 +262,8 @@ const DECISION = "decision";
 const RAISE = "raise";
 /** The one cause an escalation is widened under: a deadline that fires again is that commit again. */
 const WIDEN = "widen";
+/** The one cause an escalation is withdrawn under: its raiser asking again is that commit again. */
+const WITHDRAW = "withdraw";
 /**
  * The widenings the object still owes, by escalation id: when each falls due.
  * Written in the raise's own transaction and removed by the ruling's and the
@@ -268,6 +271,12 @@ const WIDEN = "widen";
  * object's alarm is kept level with these rows.
  */
 const WIDENING = "escalation-widening";
+/**
+ * The questions whose raisers the object has asked to check them again, by
+ * escalation id: each is asked once, and a question raised from now on is
+ * withdrawn by its raiser unasked.
+ */
+const RECHECKED = "escalation-rechecked";
 
 /** What the object that raised an escalation hears of it: the decision its ruling recorded. */
 export const ESCALATION_TELLS = ["DecisionRecorded"] as const;
@@ -548,4 +557,94 @@ export const widenEscalation = Effect.fn("coordination/widenEscalation")(functio
     });
   };
   yield* commit({ entity, cause: WIDEN, ...(project === undefined ? {} : { project }) }, widen);
+});
+
+/**
+ * Its raiser withdraws an escalation of this namespace: nothing is left to
+ * rule on, since every change it was about has gone. EscalationWithdrawn on
+ * `escalation:<id>`, in its project and concerning whom its raising did, with
+ * the widening it owed dropped, in one transaction. Once, and only while it is
+ * open: one already ruled or withdrawn, or never raised, commits nothing.
+ */
+export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(function* (request: {
+  readonly escalationId: EscalationId;
+  readonly reason: string;
+}) {
+  const { escalationId, reason } = request;
+  const entity = escalationRef(escalationId);
+  const project = storedRow(yield* EntityStore, escalationId)?.project;
+  const withdraw = (tx: Transaction): Result.Result<Transition<undefined>> => {
+    const nothing = Result.succeed({ drafts: [], value: undefined });
+    const row = storedRow(tx.store, escalationId);
+    if (row === undefined) return nothing;
+    const withdrawn = decideEscalation(
+      row.escalation,
+      { _tag: "Withdraw", reason },
+      { now: tx.at, escalationId },
+    );
+    // Refused only once answered or withdrawn: it stands as it is.
+    if (Result.isFailure(withdrawn)) return nothing;
+    let escalation = row.escalation;
+    for (const payload of withdrawn.success)
+      escalation = evolveEscalation(escalation, { at: tx.at, payload });
+    tx.store.put(ESCALATION, escalationId, asStored(encodeRow({ ...row, escalation })));
+    // Withdrawn, it widens to nobody: what is owed stays level with the escalation, as a ruling leaves it.
+    tx.store.remove(WIDENING, escalationId);
+    return Result.succeed({
+      drafts: withdrawn.success.map((payload): EventDraft => ({
+        payload: payloadOf(encodeEscalationEvent(payload)),
+        affected: concerning(row),
+      })),
+      value: undefined,
+    });
+  };
+  yield* commit(
+    { entity, cause: WITHDRAW, ...(project === undefined ? {} : { project }) },
+    withdraw,
+  );
+});
+
+/** An open question a subject raised about a conflict, whose raiser the object has not yet asked to check it again. */
+export interface QuestionToRecheck {
+  readonly escalationId: EscalationId;
+  readonly raisedBy: string;
+  readonly conflictId: ConflictId;
+}
+
+const isConflictId = Schema.is(ConflictId);
+
+/**
+ * The questions this namespace's object has still to ask their raisers to
+ * check again: the open ones a subject raised about a conflict, not yet
+ * rechecked. A question raised before subjects withdrew their own is open
+ * for ever unless its raiser looks again.
+ */
+export const questionsToRecheck: Effect.Effect<readonly QuestionToRecheck[], never, EntityStore> =
+  Effect.map(EntityStore, (store) =>
+    store.list(ESCALATION).flatMap(({ id, value }): readonly QuestionToRecheck[] => {
+      const row = decodeRow(value);
+      const conflictId = row.escalation.about.id;
+      return row.escalation.state === "open" &&
+        row.raisedBy.startsWith("subj:") &&
+        row.escalation.about.kind === "conflict" &&
+        isConflictId(conflictId) &&
+        store.get(RECHECKED, id) === undefined
+        ? [{ escalationId: row.escalation.id, raisedBy: row.raisedBy, conflictId }]
+        : [];
+    }),
+  );
+
+/**
+ * Asks the raiser of each question still to recheck to check it again, and
+ * marks each one asked, so none is asked twice. A raiser with nothing left to
+ * rule on withdraws its question. One that fails is left unmarked, and the
+ * object's next run asks it again.
+ */
+export const recheckQuestions = Effect.fn("coordination/recheckQuestions")(function* () {
+  const store = yield* EntityStore;
+  const raisers = yield* QuestionRaisers;
+  for (const question of yield* questionsToRecheck) {
+    const asked = yield* Effect.exit(raisers.recheck(question.raisedBy, question.conflictId));
+    if (Exit.isSuccess(asked)) store.put(RECHECKED, question.escalationId, true);
+  }
 });

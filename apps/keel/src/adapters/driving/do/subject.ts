@@ -6,7 +6,9 @@ import {
   probeDrafted,
   probeDraftFailedAt,
   probeRunFailedAt,
+  recheckQuestion,
   resolveConflict,
+  withdrawOwed,
   worldCheckRan,
 } from "@keeltown/core/application/coordination";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
@@ -70,6 +72,14 @@ export class SubjectDO extends KeelObjectWith<SubjectServices> implements Subjec
     return reaction;
   }
 
+  /** After a delivery commits: the questions whose conflicts' changes have all left are withdrawn from the namespace's object. */
+  protected override async received(): Promise<void> {
+    const exit = await this.runtime.runPromiseExit(withdrawOwed(subjectOf(this.ctx.id.name)));
+    // What failed stays owed, and the next delivery tries it again.
+    if (exit._tag === "Failure")
+      console.error(`${this.ctx.id.name}: withdrawing a question failed`);
+  }
+
   async conflict(conflictId: string) {
     return this.answer(
       SubjectCodecs.conflict,
@@ -102,6 +112,14 @@ export class SubjectDO extends KeelObjectWith<SubjectServices> implements Subjec
       decoded(ProbeDraftFailedCommand, command).pipe(
         Effect.flatMap((failed) => probeDraftFailedAt(at, failed)),
       ),
+    );
+  }
+
+  async recheckQuestion(conflictId: string) {
+    const at = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.recheckQuestion,
+      decoded(ConflictId, conflictId).pipe(Effect.flatMap((id) => recheckQuestion(at, id))),
     );
   }
 

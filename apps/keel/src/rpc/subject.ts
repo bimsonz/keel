@@ -99,6 +99,7 @@ export const SubjectCodecs = {
   probeRunFailed: exitCodec(ConflictView, LedgerRefusal),
   probeCellRan: exitCodec(ConflictView, LedgerRefusal),
   worldCheckRan: exitCodec(ConflictView, LedgerRefusal),
+  recheckQuestion: exitCodec(Schema.Void, Schema.Never),
 };
 
 /**
@@ -117,4 +118,6 @@ export interface SubjectRpc extends EventReceiverRpc {
   probeRunFailed(conflictId: string): Promise<ExitJson>;
   probeCellRan(command: typeof ProbeCellRanCommand.Encoded): Promise<ExitJson>;
   worldCheckRan(command: typeof WorldCheckRanCommand.Encoded): Promise<ExitJson>;
+  /** Its namespace's object asks it to check a conflict's question again: one with no change left here is withdrawn. */
+  recheckQuestion(conflictId: string): Promise<ExitJson>;
 }

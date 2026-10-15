@@ -5,6 +5,7 @@ import {
   raiseEscalation,
   wideningsOwed,
   widenEscalation,
+  withdrawEscalation,
 } from "@keeltown/core/application/coordination";
 import {
   escalationView,
@@ -13,7 +14,13 @@ import {
   recordFeed,
 } from "@keeltown/core/application/memory";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
-import type { EntityRef, EscalationId, EventEnvelope, NamespaceId } from "@keeltown/core/kernel";
+import type {
+  ConflictId,
+  EntityRef,
+  EscalationId,
+  EventEnvelope,
+  NamespaceId,
+} from "@keeltown/core/kernel";
 import {
   type Clock,
   type EntityStore,
@@ -21,6 +28,7 @@ import {
   type EventOutbox,
   HumanGate,
   type ProjectAgents,
+  QuestionRaisers,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { makeEventOutboxMemory, makeManualClock, type ManualClock } from "./event-outbox.ts";
@@ -83,6 +91,10 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
         on(request.namespace, raiseEscalation(request)).pipe(
           Effect.tap(() => Effect.sync(() => project(request.namespace, request.escalationId))),
         ),
+      withdraw: (request) =>
+        on(request.namespace, withdrawEscalation(request)).pipe(
+          Effect.tap(() => Effect.sync(() => project(request.namespace, request.escalationId))),
+        ),
     }),
   );
   const escalations = Layer.succeed(
@@ -124,3 +136,20 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
   };
 }
 export type EscalationsMemory = ReturnType<typeof makeEscalationsMemory>;
+
+/** `QuestionRaisers` in memory: each recheck it was asked, in order. It withdraws nothing itself. */
+export function makeQuestionRaisersMemory() {
+  const asked: { readonly raisedBy: string; readonly conflictId: ConflictId }[] = [];
+  return {
+    asked,
+    layer: Layer.succeed(
+      QuestionRaisers,
+      QuestionRaisers.of({
+        recheck: (raisedBy, conflictId) =>
+          Effect.sync(() => {
+            asked.push({ raisedBy, conflictId });
+          }),
+      }),
+    ),
+  };
+}

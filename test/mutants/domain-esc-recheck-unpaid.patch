@@ -1,0 +1,13 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-recheck.orphan
+# why: a rechecked subject owes the withdrawal and never pays it until a change's end reaches it
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index dea7860a..021e7d5e 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -330,5 +330,4 @@ export const recheckQuestion = Effect.fn("coordination/recheckQuestion")(functio
+   const store = yield* EntityStore;
+   const conflict = storedConflict(store, conflictId);
+   if (conflict !== undefined) oweWithdrawal(store, at.key, conflict);
+-  yield* withdrawOwed(at);
+ });

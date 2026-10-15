@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: esc-withdraw.once
+# why: the withdrawal does not say why the question was taken back
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 90f44aa0..3f0dff2b 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -504,7 +504,7 @@ export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(f
+     if (row === undefined) return nothing;
+     const withdrawn = decideEscalation(
+       row.escalation,
+-      { _tag: "Withdraw", reason },
++      { _tag: "Withdraw", reason: "withdrawn" },
+       { now: tx.at, escalationId },
+     );
+     // Refused only once answered or withdrawn: it stands as it is.

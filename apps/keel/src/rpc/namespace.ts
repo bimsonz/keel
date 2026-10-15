@@ -67,6 +67,12 @@ export const RaiseCommand = Schema.Struct({
   }),
 });
 
+/** Its raiser takes a question back (core's `WithdrawRequest`, the namespace being the object's own). */
+export const WithdrawCommand = Schema.Struct({
+  escalationId: EscalationId,
+  reason: Schema.String,
+});
+
 /** A person's answer (core's `RulingCommand`). */
 export const RuleCommand = Schema.Struct({
   escalationId: EscalationId,
@@ -147,6 +153,7 @@ export const NamespaceCodecs = {
   acceptInvitation: invitationMove,
   endInvitation: invitationMove,
   raise: exitCodec(EscalationRecord, InvalidEscalation),
+  withdraw: exitCodec(Schema.Void, Schema.Never),
   rule: exitCodec(
     EscalationRecord,
     Schema.Union([
@@ -172,6 +179,8 @@ export const NamespaceCodecs = {
 export interface NamespaceRpc extends EventReceiverRpc {
   /** Raises an escalation once: the same id again answers it as first raised. */
   raise(command: typeof RaiseCommand.Encoded): Promise<ExitJson>;
+  /** Its raiser withdraws an escalation that is still open: nothing is left to rule on. */
+  withdraw(command: typeof WithdrawCommand.Encoded): Promise<ExitJson>;
   /** A person's ruling, with the decision it records. Once per escalation, idempotent by key. */
   rule(command: typeof RuleCommand.Encoded): Promise<ExitJson>;
   /** An escalation of this namespace as it stands. */

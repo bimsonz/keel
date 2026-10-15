@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-recheck.orphan
+# why: the namespace object never arms the recheck, so a question left open before stays open
+diff --git a/apps/keel/src/adapters/driving/do/namespace.ts b/apps/keel/src/adapters/driving/do/namespace.ts
+index f771c113..8bd0a7fa 100644
+--- a/apps/keel/src/adapters/driving/do/namespace.ts
++++ b/apps/keel/src/adapters/driving/do/namespace.ts
+@@ -190,7 +190,7 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
+     // Run in the constructor: a store it cannot read must not reset the object, so the recheck waits for a run that can.
+     if (owed._tag === "Failure")
+       console.error(`${this.ctx.id.name}: reading the questions to recheck failed`);
+-    else if (owed.value.length > 0)
++    else if (owed.value.length < 0)
+       await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: RECHECK, at: Date.now() });
+   }
+ 

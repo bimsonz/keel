@@ -31,15 +31,25 @@ export interface RaiseRequest {
   readonly ask: EscalationAsk;
 }
 
+/** A question its raiser takes back: nothing is left to rule on. */
+export interface WithdrawRequest {
+  readonly namespace: NamespaceId;
+  readonly escalationId: EscalationId;
+  /** Why, in Keel's words: it is the EscalationWithdrawn's reason. */
+  readonly reason: string;
+}
+
 /**
  * Puts a question to a person. Nothing waits on the answer: the object that
  * raised it hears the ruling's decision as an event, and holds meanwhile.
  * Raising the same escalation again answers it as it stands and asks nobody
- * twice.
+ * twice. Its raiser withdraws it when nothing is left to rule on; a question
+ * already answered or withdrawn is left as it is.
  */
 export class HumanGate extends Context.Service<
   HumanGate,
   {
     readonly raise: (request: RaiseRequest) => Effect.Effect<EscalationRecord, InvalidEscalation>;
+    readonly withdraw: (request: WithdrawRequest) => Effect.Effect<void>;
   }
 >()("keel/HumanGate") {}

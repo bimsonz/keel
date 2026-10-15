@@ -73,6 +73,10 @@ export const storedConflict = (store: Store, conflictId: ConflictId): Conflict |
   return value === undefined ? undefined : decodeConflict(value);
 };
 
+/** Every conflict this subject hosts, in id order. */
+export const conflictsHere = (store: Store): readonly Conflict[] =>
+  store.list(CONFLICT).map((row) => decodeConflict(row.value));
+
 const storedProbe = (store: Store, probeId: string): Probe | undefined => {
   const value = store.get(PROBE, probeId);
   return value === undefined ? undefined : decodeProbe(value);

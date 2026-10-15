@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: esc-withdraw.real
+# why: an owed withdrawal is dropped without asking the namespace object
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 8bf91249..ba7c3417 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -306,7 +306,7 @@ export const withdrawOwed = Effect.fn("coordination/withdrawOwed")(function* (at
+   const place = yield* (yield* ProjectNamespaces).byId(at.projectId);
+   for (const { id, value } of owed) {
+     const escalationId = Schema.decodeUnknownSync(EscalationId)(id);
+-    if (Option.isSome(place))
++    if (Option.isNone(place))
+       yield* (yield* HumanGate).withdraw({
+         namespace: place.value.namespace,
+         escalationId,

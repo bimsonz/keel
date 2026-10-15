@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: esc-withdraw.once
+# why: a withdrawn question still owes its widening, so it is put to the maintainers after it was taken back
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 90f44aa0..fc331124 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -514,7 +514,6 @@ export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(f
+       escalation = evolveEscalation(escalation, { at: tx.at, payload });
+     tx.store.put(ESCALATION, escalationId, asStored(encodeRow({ ...row, escalation })));
+     // Withdrawn, it widens to nobody: what is owed stays level with the escalation, as a ruling leaves it.
+-    tx.store.remove(WIDENING, escalationId);
+     return Result.succeed({
+       drafts: withdrawn.success.map((payload): EventDraft => ({
+         payload: payloadOf(encodeEscalationEvent(payload)),

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: esc-withdraw.once
+# why: the withdrawal concerns nobody its raising did, so no inbox or list that showed the question hears it end
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 90f44aa0..13d7ea01 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -518,7 +518,7 @@ export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(f
+     return Result.succeed({
+       drafts: withdrawn.success.map((payload): EventDraft => ({
+         payload: payloadOf(encodeEscalationEvent(payload)),
+-        affected: concerning(row),
++        affected: [],
+       })),
+       value: undefined,
+     });

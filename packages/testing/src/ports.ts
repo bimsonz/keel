@@ -49,7 +49,7 @@ import {
 import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
 import { makeProbeChangesMemory, makeWorldChecksMemory } from "./memory/probe-changes.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
-import { makeEscalationsMemory } from "./memory/escalations.ts";
+import { makeEscalationsMemory, makeQuestionRaisersMemory } from "./memory/escalations.ts";
 import { makeProbeLedgerMemory } from "./memory/probe-ledger.ts";
 import {
   describeNoopWorldsContract,
@@ -814,6 +814,10 @@ export const PORTS = {
   CredentialStore: port(
     () => delivery.makeCredentialStoreMemory().layer,
     describeCredentialStoreContract,
+  ),
+  QuestionRaisers: port(
+    () => makeQuestionRaisersMemory().layer,
+    pending("QuestionRaisers", ["recheck"]),
   ),
   Background: port(() => storage.makeBackgroundMemory().layer, pending("Background", ["run"])),
   Metrics: port(() => storage.makeMetricsMemory().layer, pending("Metrics", ["count", "observe"])),

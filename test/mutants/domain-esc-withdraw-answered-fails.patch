@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: esc-withdraw.answered
+# why: withdrawing a question already answered fails its raiser, which then owes it for ever
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 90f44aa0..e74545fa 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -508,7 +508,7 @@ export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(f
+       { now: tx.at, escalationId },
+     );
+     // Refused only once answered or withdrawn: it stands as it is.
+-    if (Result.isFailure(withdrawn)) return nothing;
++    if (Result.isFailure(withdrawn)) throw withdrawn.failure;
+     let escalation = row.escalation;
+     for (const payload of withdrawn.success)
+       escalation = evolveEscalation(escalation, { at: tx.at, payload });

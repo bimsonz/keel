@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: esc-withdraw.answered
+# why: withdrawing a question never raised is a defect instead of nothing
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 90f44aa0..21c70fa4 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -501,7 +501,7 @@ export const withdrawEscalation = Effect.fn("coordination/withdrawEscalation")(f
+   const withdraw = (tx: Transaction): Result.Result<Transition<undefined>> => {
+     const nothing = Result.succeed({ drafts: [], value: undefined });
+     const row = storedRow(tx.store, escalationId);
+-    if (row === undefined) return nothing;
++    if (row === undefined) throw new Error("no such escalation");
+     const withdrawn = decideEscalation(
+       row.escalation,
+       { _tag: "Withdraw", reason },

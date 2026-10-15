@@ -2,14 +2,14 @@
 # kills: t35.widened-real
 # why: a deadline that came early is not armed again, so the widening it still owes never comes due
 diff --git a/apps/keel/src/adapters/driving/do/namespace.ts b/apps/keel/src/adapters/driving/do/namespace.ts
-index bc30b88d..193188c7 100644
+index f771c113..903d3eef 100644
 --- a/apps/keel/src/adapters/driving/do/namespace.ts
 +++ b/apps/keel/src/adapters/driving/do/namespace.ts
-@@ -69,7 +69,6 @@ export class NamespaceDO extends KeelObject implements NamespaceRpc {
+@@ -181,7 +181,6 @@ export class NamespaceDO extends KeelObjectWith<NamespaceServices> implements Na
      await this.runtime.runPromise(
        decoded(EscalationId, escalationId).pipe(Effect.flatMap(widenEscalation)),
      );
 -    await this.armWidenings();
    }
  
-   /**
+   /** Arms the recheck at once while a question is still to be asked about again; one that failed is asked on the next run. */

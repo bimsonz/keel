@@ -22,9 +22,12 @@ import {
   type EventEnvelope,
   type ProjectId,
 } from "../../domain/kernel/index.ts";
+import type { Conflict } from "../../domain/verification/index.ts";
 import type { EntityStore, EventDraft, Stored, Transaction } from "../ports/index.ts";
 import { CHANGE_ENDS } from "./change.ts";
 import { subjectIdOf } from "./hashed-id.ts";
+import { changeParties } from "./party-conflicts.ts";
+import { conflictsHere } from "./probe-ledger.ts";
 import {
   anchorPairs,
   falloutPairs,
@@ -47,6 +50,31 @@ export const SUBJECT_HELD = "subject-held";
 export const SUBJECT_MINTED = "subject-minted";
 /** Each held change's agent, who hears the change's PremiseSuspected: by change id. */
 export const HOLDER_AGENT = "holder-agent";
+/**
+ * The questions this subject owes its namespace's object a withdrawal of, by
+ * escalation id, with the reason: written as the last change of a conflict
+ * with a person leaves the subject, removed once the object has it.
+ */
+export const WITHDRAWAL_OWED = "escalation-withdrawal-owed";
+
+/**
+ * Owes the namespace's object a withdrawal of a conflict's question once no
+ * change of the conflict is held at this subject any more: nothing is left to
+ * rule on. A conflict not put to a person owes nothing.
+ */
+export function oweWithdrawal(store: Store, key: SubjectKey, conflict: Conflict): void {
+  const parties = changeParties(conflict.parties);
+  if (
+    conflict.state === "escalated" &&
+    conflict.escalationId !== undefined &&
+    parties.every((party) => store.get(SUBJECT_HELD, party) === undefined)
+  )
+    store.put(
+      WITHDRAWAL_OWED,
+      conflict.escalationId,
+      `every change it was about has ended or left ${key}: ${parties.toSorted().join(", ")}`,
+    );
+}
 
 /**
  * What a change's agent hears from a subject, on its subscription scoped to
@@ -217,6 +245,10 @@ export function hearSubject(
         if (agent !== undefined)
           tx.outbox.unsubscribe(`agent:${agent}`, HOLDER_HEARS, changeRef(changeId));
         store.remove(HOLDER_AGENT, changeId);
+        // A question about a conflict none of whose changes is still here has nothing left to rule on.
+        for (const conflict of conflictsHere(store))
+          if (changeParties(conflict.parties).includes(changeId))
+            oweWithdrawal(store, key, conflict);
       }
       return { drafts: [] };
   }
