@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.rename-one-side
+# kills: merge.rename-one-side
+# why: a directory one side empties into another is not refused when the other side adds under it, so GitCore leaves the file where git would move it
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index 6a28ed3e..2e08081c 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -359,7 +359,7 @@ async function guardRenames(
+       if (other.some((c) => c.path === from || c.path === to)) return true;
+       const dir = dirOf(from);
+       if (dir === dirOf(to) || !other.some((c) => c.path.startsWith(`${dir}/`))) return false;
+-      return !(await holds(r, tree, dir));
++      return false;
+     };
+     for (const d of deleted) {
+       for (const a of added) {

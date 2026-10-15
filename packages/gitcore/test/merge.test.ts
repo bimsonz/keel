@@ -235,3 +235,60 @@ describe("mergeCommits", { timeout: PROPERTY_TIMEOUT }, () => {
     DEADLINE_MS,
   );
 });
+
+/** Two files at the root of every side-by-side case: `a` is picked as 0, `b` as 1. */
+const TWO_FILES: History["base"] = [
+  { path: "a.ts", lines: [0, 1, 2, 3, 4, 5] },
+  { path: "b.ts", lines: [6, 7, 8, 9, 10, 11] },
+];
+const sides = (ours: History["ours"], theirs: History["theirs"]): History => ({
+  base: TWO_FILES,
+  shared: [],
+  ours,
+  theirs,
+  crissCross: null,
+});
+/** Theirs moves `a.ts` to `c.ts` with one line changed: a rename git would find. */
+const RENAMED: History["theirs"] = [{ k: "nearRename", pick: 0, to: "c.ts", at: 1, line: 3 }];
+
+describe("mergeCommits, a side at a time", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[merge.rename-one-side] a rename the other side never touched merges as git's delete and add; one whose old path the other side changed is refused", async () => {
+    const quiet = emptyTally();
+    await differential(sides([{ k: "edit", pick: 1, at: 2, line: 5 }], RENAMED), quiet);
+    expect(quiet).toMatchObject({ identical: 1, refused: 0 });
+    const touched = emptyTally();
+    await differential(sides([{ k: "edit", pick: 0, at: 2, line: 5 }], RENAMED), touched);
+    expect(touched).toMatchObject({ identical: 0, refused: 1 });
+    // Theirs empties d/ into e/, and ours adds a file under d/: git may move it after the directory.
+    const moved = emptyTally();
+    await differential(
+      {
+        base: [
+          { path: "b.ts", lines: [6, 7, 8, 9, 10, 11] },
+          { path: "d/a.ts", lines: [0, 1, 2, 3, 4, 5] },
+        ],
+        shared: [],
+        ours: [{ k: "add", path: "d/z.ts", lines: [12, 13, 14, 15] }],
+        theirs: [{ k: "nearRename", pick: 1, to: "e/a.ts", at: 1, line: 3 }],
+        crissCross: null,
+      },
+      moved,
+    );
+    expect(moved.byReason).toEqual({ "rename-similar": 1 });
+  });
+
+  it("[merge.guard-one-side] a mode change only one side made merges as git's, taking that side; one on a path both sides changed is still refused", async () => {
+    const one = emptyTally();
+    await differential(
+      sides([{ k: "chmod", pick: 1 }], [{ k: "edit", pick: 0, at: 1, line: 7 }]),
+      one,
+    );
+    expect(one).toMatchObject({ identical: 1, refused: 0 });
+    const both = emptyTally();
+    await differential(
+      sides([{ k: "chmod", pick: 1 }], [{ k: "edit", pick: 1, at: 1, line: 7 }]),
+      both,
+    );
+    expect(both.byReason).toEqual({ "mode-change": 1 });
+  });
+});

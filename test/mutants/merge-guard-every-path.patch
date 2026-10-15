@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.guard-one-side
+# kills: merge.guard-one-side
+# why: a mode change, binary or symlink on one side alone is refused again, though git takes that side
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index 6a28ed3e..a0f11735 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -492,7 +492,7 @@ export async function mergeTrees(
+   );
+   await guardChanges(
+     r,
+-    [...byOurs, ...byTheirs].filter((c) => byBoth.has(c.path)),
++    [...byOurs, ...byTheirs],
+   );
+   const out = new Map<string, GitObject>();
+   const tree = await mergeTree(r, base, ours, theirs, "", out);

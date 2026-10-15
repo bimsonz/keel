@@ -196,15 +196,21 @@ async function listFiles(
   tree: string,
   prefix: string,
 ): Promise<[string, TreeEntry][]> {
-  const out: [string, TreeEntry][] = [];
-  for (const e of await r.readTree(tree)) {
-    if (isTree(e)) out.push(...(await listFiles(r, e.oid, join(prefix, e.name))));
-    else out.push([join(prefix, e.name), e]);
-  }
-  return out;
+  // Subtrees are read side by side; the files come back in the tree's order.
+  const each = await Promise.all(
+    (await r.readTree(tree)).map(async (e): Promise<[string, TreeEntry][]> =>
+      isTree(e) ? listFiles(r, e.oid, join(prefix, e.name)) : [[join(prefix, e.name), e]],
+    ),
+  );
+  return each.flat();
 }
 
-/** Files that differ; subtrees whose ids match are skipped unread. */
+/**
+ * Files that differ; subtrees whose ids match are skipped unread. Both trees,
+ * and every subtree that differs, are read side by side: a diff costs about
+ * one round trip a level, not one a subtree. The files come back in the
+ * trees' order.
+ */
 async function changedFiles(
   r: ObjectReader,
   a: string | null,
@@ -212,34 +218,32 @@ async function changedFiles(
   prefix = "",
 ): Promise<FileChange[]> {
   if (a === b) return [];
-  const ea = await entries(r, a);
-  const eb = await entries(r, b);
-  const out: FileChange[] = [];
-  for (const name of new Set([...ea.keys(), ...eb.keys()])) {
-    const x = ea.get(name) ?? null;
-    const y = eb.get(name) ?? null;
-    if (same(x, y)) continue;
-    const path = join(prefix, name);
-    if (isTree(x) && isTree(y)) {
-      out.push(...(await changedFiles(r, x.oid, y.oid, path)));
-      continue;
-    }
-    const typeChange = x !== null && y !== null && isTree(x) !== isTree(y);
-    if (isTree(x)) {
-      for (const [p, e] of await listFiles(r, x.oid, path))
-        out.push({ path: p, before: e, after: null, typeChange });
-    }
-    if (isTree(y)) {
-      for (const [p, e] of await listFiles(r, y.oid, path))
-        out.push({ path: p, before: null, after: e, typeChange });
-    }
-    if (!isTree(x) || !isTree(y)) {
-      const before = isTree(x) ? null : x;
-      const after = isTree(y) ? null : y;
-      if (before !== null || after !== null) out.push({ path, before, after, typeChange });
-    }
-  }
-  return out;
+  const [ea, eb] = await Promise.all([entries(r, a), entries(r, b)]);
+  const each = await Promise.all(
+    [...new Set([...ea.keys(), ...eb.keys()])].map(async (name): Promise<FileChange[]> => {
+      const x = ea.get(name) ?? null;
+      const y = eb.get(name) ?? null;
+      if (same(x, y)) return [];
+      const path = join(prefix, name);
+      if (isTree(x) && isTree(y)) return changedFiles(r, x.oid, y.oid, path);
+      const typeChange = x !== null && y !== null && isTree(x) !== isTree(y);
+      const [gone, come] = await Promise.all([
+        isTree(x) ? listFiles(r, x.oid, path) : Promise.resolve([]),
+        isTree(y) ? listFiles(r, y.oid, path) : Promise.resolve([]),
+      ]);
+      const out: FileChange[] = [
+        ...gone.map(([p, e]) => ({ path: p, before: e, after: null, typeChange })),
+        ...come.map(([p, e]) => ({ path: p, before: null, after: e, typeChange })),
+      ];
+      if (!isTree(x) || !isTree(y)) {
+        const before = isTree(x) ? null : x;
+        const after = isTree(y) ? null : y;
+        if (before !== null || after !== null) out.push({ path, before, after, typeChange });
+      }
+      return out;
+    }),
+  );
+  return each.flat();
 }
 
 // ---------------------------------------------------------------- guards
@@ -295,35 +299,88 @@ async function guardChanges(r: ObjectReader, changes: readonly FileChange[]): Pr
     if (c.before !== null && c.after !== null && c.before.mode !== c.after.mode)
       throw new Refusal("mode-change", c.path);
   }
-  for (const c of changes) {
-    for (const e of [c.before, c.after]) {
-      if (e !== null && isBinary(await r.readBlob(e.oid))) throw new Refusal("binary", c.path);
+  // Read side by side, then judged in the changes' order, so the refusal names the same path.
+  const blobs = await Promise.all(
+    changes.map((c) =>
+      Promise.all(
+        [c.before, c.after].map((e) => (e === null ? Promise.resolve(null) : r.readBlob(e.oid))),
+      ),
+    ),
+  );
+  for (const [i, c] of changes.entries()) {
+    for (const blob of blobs[i] ?? []) {
+      if (blob !== null && isBinary(blob)) throw new Refusal("binary", c.path);
     }
   }
 }
 
+/** The parent directory of `path`, "" at the root. */
+const dirOf = (path: string): string => path.slice(0, Math.max(0, path.lastIndexOf("/")));
+
+/** Whether `tree` holds anything at `dir` ("" is the root itself). */
+async function holds(r: ObjectReader, tree: string, dir: string): Promise<boolean> {
+  let at: string | null = tree;
+  for (const name of dir === "" ? [] : dir.split("/")) {
+    if (at === null) return false;
+    const entry: TreeEntry | undefined = (await r.readTree(at)).find((e) => e.name === name);
+    at = isTree(entry) ? entry.oid : null;
+  }
+  return at !== null && (await r.readTree(at)).length > 0;
+}
+
+/**
+ * Refuses a rename git would follow differently from a plain delete and add.
+ * git detects renames on each side apart (a path one side deletes and the
+ * same side adds again, exactly or `threshold` similar), and a rename changes
+ * its result only where the other side changed the old path or the new one,
+ * or where the side moved a whole directory away (nothing is left at the old
+ * one) and the other side changed something under it. Anywhere else the
+ * rename is the delete and the add, which is what the merge already wrote.
+ */
 async function guardRenames(
   r: ObjectReader,
-  changes: readonly FileChange[],
+  sides: readonly {
+    readonly tree: string;
+    readonly changes: readonly FileChange[];
+    readonly other: readonly FileChange[];
+  }[],
   threshold: number,
 ): Promise<void> {
-  const deleted = changes.flatMap((c) =>
-    c.before !== null && c.after === null ? [{ path: c.path, entry: c.before }] : [],
-  );
-  const added = changes.flatMap((c) =>
-    c.before === null && c.after !== null ? [{ path: c.path, entry: c.after }] : [],
-  );
-  if (deleted.length === 0 || added.length === 0) return;
-  for (const d of deleted) {
-    for (const a of added) {
-      if (d.entry.oid === a.entry.oid) throw new Refusal("rename-exact", `${d.path} -> ${a.path}`);
+  for (const { tree, changes, other } of sides) {
+    // A gitlink names a commit of another repository, which nobody holds here: git never pairs one as a rename.
+    const deleted = changes.flatMap((c) =>
+      c.before !== null && c.after === null && c.before.mode !== MODE_GITLINK
+        ? [{ path: c.path, entry: c.before }]
+        : [],
+    );
+    const added = changes.flatMap((c) =>
+      c.before === null && c.after !== null && c.after.mode !== MODE_GITLINK
+        ? [{ path: c.path, entry: c.after }]
+        : [],
+    );
+    if (deleted.length === 0 || added.length === 0) continue;
+    /** Whether git would follow `from` to `to` into another result than the delete and the add. */
+    const matters = async (from: string, to: string): Promise<boolean> => {
+      if (other.some((c) => c.path === from || c.path === to)) return true;
+      const dir = dirOf(from);
+      if (dir === dirOf(to) || !other.some((c) => c.path.startsWith(`${dir}/`))) return false;
+      return !(await holds(r, tree, dir));
+    };
+    for (const d of deleted) {
+      for (const a of added) {
+        if (d.entry.oid === a.entry.oid && (await matters(d.path, a.path)))
+          throw new Refusal("rename-exact", `${d.path} -> ${a.path}`);
+      }
     }
-  }
-  for (const d of deleted) {
-    const source = await r.readBlob(d.entry.oid);
-    for (const a of added) {
-      if (similarity(source, await r.readBlob(a.entry.oid)) >= threshold)
-        throw new Refusal("rename-similar", `${d.path} -> ${a.path}`);
+    for (const d of deleted) {
+      const source = await r.readBlob(d.entry.oid);
+      for (const a of added) {
+        if (
+          (await matters(d.path, a.path)) &&
+          similarity(source, await r.readBlob(a.entry.oid)) >= threshold
+        )
+          throw new Refusal("rename-similar", `${d.path} -> ${a.path}`);
+      }
     }
   }
 }
@@ -430,14 +487,28 @@ export async function mergeTrees(
   options: MergeOptions = {},
 ): Promise<MergedTree> {
   const r = reader instanceof CachingReader ? reader : new CachingReader(reader);
-  const changes = [
-    ...(await changedFiles(r, base, ours)),
-    ...(await changedFiles(r, base, theirs)),
+  const [byOurs, byTheirs] = [
+    await changedFiles(r, base, ours),
+    await changedFiles(r, base, theirs),
   ];
-  await guardChanges(r, changes);
+  // A path one side alone changed merges as git's does, taking that side: only one both changed is guarded.
+  const byBoth = new Set(
+    byOurs.map((c) => c.path).filter((p) => byTheirs.some((c) => c.path === p)),
+  );
+  await guardChanges(
+    r,
+    [...byOurs, ...byTheirs].filter((c) => byBoth.has(c.path)),
+  );
   const out = new Map<string, GitObject>();
   const tree = await mergeTree(r, base, ours, theirs, "", out);
-  await guardRenames(r, changes, options.renameThreshold ?? 0.3);
+  await guardRenames(
+    r,
+    [
+      { tree: ours, changes: byOurs, other: byTheirs },
+      { tree: theirs, changes: byTheirs, other: byOurs },
+    ],
+    options.renameThreshold ?? 0.3,
+  );
   if (tree !== null) return { tree, newObjects: out };
   const empty = new Uint8Array(0);
   const oid = await hashObject("tree", empty);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.rename-one-side
+# kills: merge.rename-one-side
+# why: a rename is refused wherever it is, so a batch with a moved file composes in MergeBox's cold box though git's result is the plain delete and add
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index 6a28ed3e..fcda8eed 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -356,7 +356,7 @@ async function guardRenames(
+     if (deleted.length === 0 || added.length === 0) continue;
+     /** Whether git would follow `from` to `to` into another result than the delete and the add. */
+     const matters = async (from: string, to: string): Promise<boolean> => {
+-      if (other.some((c) => c.path === from || c.path === to)) return true;
++      return true;
+       const dir = dirOf(from);
+       if (dir === dirOf(to) || !other.some((c) => c.path.startsWith(`${dir}/`))) return false;
+       return !(await holds(r, tree, dir));

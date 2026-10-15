@@ -118,24 +118,29 @@ const refsUnder = (dir: string, prefix: string) =>
 describe("the MergeBox compose script", () => {
   it("[mergebox.script] composes a mode change and a similar rename with an edit, which GitCore refuses, as git's merge-tree does, chained and pushed to the scratch ref, sweeping a leftover", async () => {
     const w = world([
-      (t) => t.set("run.sh", file("#!/bin/sh\necho run\n", "100755")),
+      // The first changes run.sh's mode and the guide's first line.
       (t) => {
+        t.set("run.sh", file("#!/bin/sh\necho run\n", "100755"));
+        t.set("docs/guide.md", file(GUIDE.replace("line 0 of", "line zero of")));
+      },
+      // The second changes run.sh's content, and moves the guide with one more line at its end.
+      (t) => {
+        t.set("run.sh", file("#!/bin/sh\necho run\necho done\n"));
         t.delete("docs/guide.md");
         t.set("docs/manual.md", file(`${GUIDE}one more line\n`));
       },
     ]);
-    // What GitCore makes of the same batch: each is refused.
+    // GitCore composes the first and refuses the second on what the first changed; git merges both.
     const reader = new CatFileReader(w.workspaces);
-    for (const head of w.heads) {
-      const refused = await restack(
-        reader,
-        w.base,
-        [{ base: w.base, head, message: "m\n", trailers: [] }],
-        KEEL,
-      ).catch((e: unknown) => e);
-      expect(refused).toBeInstanceOf(MemberRefused);
-    }
+    const refused = await restack(
+      reader,
+      w.base,
+      w.heads.map((head) => ({ base: w.base, head, message: "m\n", trailers: [] })),
+      KEEL,
+    ).catch((e: unknown) => e);
     reader.close();
+    expect(refused).toBeInstanceOf(MemberRefused);
+    expect(refused).toMatchObject({ member: 1 });
     git(w.staging, ["update-ref", "refs/keel/box/c0", w.base]);
 
     const run = compose(w.staging, w.base, "refs/keel/box/c1", w.members);
