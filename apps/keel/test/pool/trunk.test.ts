@@ -26,6 +26,7 @@ import {
   RELAY_PACK_CAP_BYTES,
   RepoNotFound,
   Trunks,
+  TrunkWriter,
 } from "@keeltown/core/ports";
 import {
   freshNamespace,
@@ -47,7 +48,8 @@ import { Cause, Effect, Exit, Layer, ManagedRuntime, Option, Schema } from "effe
 import { ulid } from "ulid";
 import { TrunksRpc } from "../../src/adapters/driven/do-rpc/trunks.ts";
 import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
-import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
+import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { MIRROR_SYNC, type TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
 import { decodeExit, EventCodecs, TrunkCodecs } from "../../src/rpc/index.ts";
 import { drainAfter } from "./helpers.ts";
@@ -294,7 +296,10 @@ describe("the Trunk DO", () => {
  * its trunk is initialized: `placed` names that namespace and what its history
  * weighs, for a test that reads the namespace's count.
  */
-async function promoting(placed?: { readonly namespace: NamespaceId; readonly history: number }) {
+async function promoting(
+  placed?: { readonly namespace: NamespaceId; readonly history: number },
+  around: (writer: Layer.Layer<TrunkWriter>) => Layer.Layer<TrunkWriter> = (writer) => writer,
+) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const staging = projectRepos(projectId).staging;
@@ -320,7 +325,7 @@ async function promoting(placed?: { readonly namespace: NamespaceId; readonly hi
         Layer.mergeAll(
           backbone(state.storage),
           code.layer,
-          writer.layer,
+          around(writer.layer),
           places.layer,
           usage.layer,
         ),
@@ -646,6 +651,60 @@ describe("the Trunk DO's promotion", () => {
       reason: "pack-too-large",
     });
     expect(t.writer.head()).toBe(tip);
+  });
+
+  it("[trunk.do.mirror-hung] a mirror whose sync never answers holds no promotion: the batch armed with it is pushed first, and the sync fails at its bound and is armed again", async () => {
+    const calls: string[] = [];
+    // The memory writer, but its mirror sync never answers, as Artifacts' git did for 408 s on 15 Oct.
+    const hung = (writer: Layer.Layer<TrunkWriter>) =>
+      Layer.effect(
+        TrunkWriter,
+        Effect.gen(function* () {
+          const inner = yield* TrunkWriter;
+          return TrunkWriter.of({
+            ...inner,
+            push: (from, to, admit) => {
+              calls.push("push");
+              return inner.push(from, to, admit);
+            },
+            sync: () => {
+              calls.push("sync");
+              return Effect.never;
+            },
+          });
+        }),
+      ).pipe(Layer.provide(writer));
+    const warned = vi.spyOn(console, "warn");
+    const t = await promoting(undefined, hung);
+    await runInDurableObject(t.stub, (instance: TrunkDO) => {
+      Reflect.set(instance, "deadlineMs", 200);
+    });
+    const first = await t.composed(1, t.base);
+    const second = await t.composed(2, first);
+    // Both queued at once: the first's advance arms the mirror's sync and the second's debounce together.
+    await t.stub.receive([t.verified(1, t.base), t.verified(2, first)]);
+    await t.until(async () =>
+      expect(await t.status()).toEqual(
+        Exit.succeed({ head: second, promotion: "idle", origin: EMPTY }),
+      ),
+    );
+    await t.until(async () => expect(calls).toContain("sync"));
+    expect(calls.slice(0, calls.indexOf("sync"))).toEqual(["push", "push"]);
+    // The sync that hung failed at its bound, said so, and waits to be tried again. Workerd would
+    // cancel this hang by itself, as it cannot see a fetch still in flight: the bound is what speaks.
+    await t.until(async () =>
+      expect(warned.mock.calls.map((call) => call.join(" ")).join("\n")).toMatch(
+        /mirror sync failed 1x, next in \d+ ms: TimeoutError/,
+      ),
+    );
+    warned.mockRestore();
+    await t.until(async () =>
+      expect(
+        await runInDurableObject(t.stub, (_: TrunkDO, state) =>
+          armedAlarms(state.storage).map((armed) => armed.reason),
+        ),
+      ).toContain(MIRROR_SYNC),
+    );
   });
 
   it("[trunk.do.refused-quota] through the real object a project's history and each landing are counted into its namespace, and a batch over what is left is declined while a smaller one behind it lands", async () => {

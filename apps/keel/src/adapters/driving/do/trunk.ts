@@ -35,8 +35,12 @@ import {
 } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { BatchCancel, TrunkCodecs, type TrunkRpc } from "../../../rpc/trunk.ts";
-import { type TrunkServices, trunkServices } from "../../../composition/do.ts";
-import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
+import {
+  type DurableObjectServices,
+  type TrunkServices,
+  trunkServices,
+} from "../../../composition/do.ts";
+import { armedAlarms, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 const decodeCancel = Schema.decodeSync(BatchCancel);
@@ -49,6 +53,17 @@ export const MIRROR_SYNC = "mirror sync";
 export const TRUNK_DESTROY = "trunk destroy";
 /** An open sync from upstream whose move has still to land. */
 export const TRUNK_SYNC = "trunk sync";
+
+/**
+ * How long one of trunk's deadlines may run before it fails and is retried,
+ * logged, like any other failure. A git or Artifacts call that never answers
+ * ends here: on 15 Oct a mirror sync hung 408 s on Artifacts' git, and the
+ * promotion due behind it in the same alarm waited 20 minutes.
+ */
+export const TRUNK_DEADLINE_MS = 120_000;
+
+/** How long the mirror's sync steps aside for a promotion armed with it. */
+export const MIRROR_AFTER_PROMOTION_MS = 1_000;
 
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
 const decodeInstant = Schema.decodeUnknownEffect(InstantSchema);
@@ -88,6 +103,9 @@ const statusOf = (trunk: Trunk) => ({
 export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
   /** Consecutive failures per deadline, for its backoff; an evicted object starts again at 1 s. */
   private readonly failures = new Map<string, number>();
+
+  /** `TRUNK_DEADLINE_MS`; a pool test shortens it. */
+  private deadlineMs = TRUNK_DEADLINE_MS;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(
@@ -216,7 +234,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     const projectId = this.projectId;
     const { reason } = request;
     if (reason === TRUNK_DESTROY) {
-      const exit = await this.runtime.runPromiseExit(deleteProjectRepos(projectId));
+      const exit = await this.bounded(deleteProjectRepos(projectId));
       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
       if (exit.value.pending > 0)
         return this.retry(reason, `${exit.value.pending} repos still to delete`);
@@ -228,24 +246,45 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
         if (reason === TRUNK_DEBOUNCE) yield* flushTrunk(projectId);
         return yield* pushPromotion(projectId);
       });
-      const exit = await this.runtime.runPromiseExit(program);
+      const exit = await this.bounded(program);
       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
       this.failures.delete(reason);
       await this.afterPush(exit.value);
       return;
     }
     if (reason === TRUNK_SYNC) {
-      const exit = await this.runtime.runPromiseExit(finishUpstreamSync(projectId));
+      const exit = await this.bounded(finishUpstreamSync(projectId));
       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
       return this.afterSync();
     }
     if (reason === MIRROR_SYNC) {
-      const exit = await this.runtime.runPromiseExit(syncMirror(projectId));
+      // A promotion armed goes first: a mirror that does not answer never holds trunk up.
+      if (this.promotionArmed())
+        return scheduleAlarm(this.ctx.storage, {
+          kind: "deadline",
+          reason,
+          at: Date.now() + MIRROR_AFTER_PROMOTION_MS,
+        });
+      const exit = await this.bounded(syncMirror(projectId));
       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
       this.failures.delete(reason);
       return;
     }
     await super.onDeadline(request);
+  }
+
+  /** Runs one deadline's work, failing it once it has run `deadlineMs`. */
+  private bounded<A, E, R extends DurableObjectServices | TrunkServices>(
+    program: Effect.Effect<A, E, R>,
+  ) {
+    return this.runtime.runPromiseExit(program.pipe(Effect.timeout(this.deadlineMs)));
+  }
+
+  /** Whether trunk's debounce or a push to retry is armed, to run before the mirror's sync. */
+  private promotionArmed(): boolean {
+    return armedAlarms(this.ctx.storage).some(
+      (armed) => armed.reason === TRUNK_DEBOUNCE || armed.reason === TRUNK_PUSH,
+    );
   }
 
   /** What follows a push: the mirror after an advance, the same SHA again later, or a person told. */

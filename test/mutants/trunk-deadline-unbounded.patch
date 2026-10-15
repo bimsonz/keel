@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.mirror-hung"
+# kills: trunk.do.mirror-hung
+# why: a mirror sync that never answers holds the alarm for good, and nothing after it in trunk runs
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index 73730559..cc3e3df4 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -277,7 +277,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+   private bounded<A, E, R extends DurableObjectServices | TrunkServices>(
+     program: Effect.Effect<A, E, R>,
+   ) {
+-    return this.runtime.runPromiseExit(program.pipe(Effect.timeout(this.deadlineMs)));
++    return this.runtime.runPromiseExit(program);
+   }
+ 
+   /** Whether trunk's debounce or a push to retry is armed, to run before the mirror's sync. */

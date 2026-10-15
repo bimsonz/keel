@@ -2,12 +2,12 @@
 # kills: destroy.resumes
 # why: a deletion pass that leaves a repo behind is never tried again
 diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
-index cbfba98..b895afd 100644
+index 73730559..03afed3d 100644
 --- a/apps/keel/src/adapters/driving/do/trunk.ts
 +++ b/apps/keel/src/adapters/driving/do/trunk.ts
-@@ -136,8 +136,6 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+@@ -236,8 +236,6 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
      if (reason === TRUNK_DESTROY) {
-       const exit = await this.runtime.runPromiseExit(deleteProjectRepos(projectId));
+       const exit = await this.bounded(deleteProjectRepos(projectId));
        if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
 -      if (exit.value.pending > 0)
 -        return this.retry(reason, `${exit.value.pending} repos still to delete`);
