@@ -84,21 +84,43 @@ const agentClient = (project?: string) =>
 const own = agentClient();
 say(`agent signed up: invite ${account.handle} to ${path} with read and work`);
 
-// The owner's invitation, as the agent's list shows it.
+// The owner's invitation, as the agent's lists show it: to the project itself, or into its org, through which the
+// agent reaches the org's projects (an org's project settings offer no invitation of their own).
 let projectId: string | undefined;
 for (const deadline = Date.now() + 90 * 60_000; projectId === undefined;) {
   if (Date.now() > deadline) throw new Error(`no invitation to ${path} in 90 minutes`);
-  const asked = (await own.projectInvitations()).items.find(
+  const toProject = (await own.projectInvitations()).items.find(
     (item) => item.project.namespace === namespace && item.project.name === projectName,
   );
-  if (asked !== undefined) projectId = asked.project.id;
-  else await new Promise((r) => setTimeout(r, 10_000));
+  if (toProject !== undefined) {
+    const joined = await own.acceptProjectInvitation(toProject.project.id, {
+      idempotencyKey: key("accept"),
+    });
+    check(
+      joined.state === "joined",
+      `accepted the invitation to ${path} (${toProject.project.id}): ${joined.state}`,
+    );
+    projectId = toProject.project.id;
+    break;
+  }
+  const toOrg = (await own.invitations()).items.find((item) => item.namespace.handle === namespace);
+  if (toOrg !== undefined) {
+    if (toOrg.state !== "joined") {
+      const joined = await own.acceptInvitation(toOrg.namespace.handle, {
+        idempotencyKey: key("accept-org"),
+      });
+      check(
+        joined.state === "joined",
+        `accepted the invitation into ${namespace}: ${joined.state}`,
+      );
+    }
+    projectId = (await own.reachableProjects()).items.find(
+      (item) => item.project.namespace === namespace && item.project.name === projectName,
+    )?.project.id;
+    if (projectId !== undefined) break;
+  }
+  await new Promise((r) => setTimeout(r, 10_000));
 }
-const joined = await own.acceptProjectInvitation(projectId, { idempotencyKey: key("accept") });
-check(
-  joined.state === "joined",
-  `accepted the invitation to ${path} (${projectId}): ${joined.state}`,
-);
 const project = projectId;
 const client = agentClient(project);
 

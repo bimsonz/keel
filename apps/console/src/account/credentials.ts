@@ -19,45 +19,27 @@ export const CONNECT_OUTCOMES = [
 ] as const;
 export type ConnectOutcome = (typeof CONNECT_OUTCOMES)[number];
 
-/** What the settings say of each outcome, and whether it is good news. */
+/** What the settings say of each outcome, as a label, and whether it is good news. */
 export const CONNECT_SAID: Readonly<
   Record<ConnectOutcome, { readonly ok: boolean; readonly said: string }>
 > = {
-  connected: { ok: true, said: "Connected. Keel made its deploy token on the account you ticked." },
-  denied: { ok: false, said: "Cloudflare's consent was declined, so nothing was connected." },
-  expired: {
-    ok: false,
-    said: "That consent was for a Connect that has ended: it lasts ten minutes and is used once. Continue with Cloudflare again.",
-  },
-  accounts: {
-    ok: false,
-    said: "Tick exactly one account on Cloudflare's consent screen: a target deploys to one. Nothing was connected.",
-  },
-  refused: {
-    ok: false,
-    said: "Cloudflare refused Keel's request, so nothing was connected. Continue with Cloudflare again; if it is refused again, your role on the account may not let you make API tokens.",
-  },
-  unreachable: {
-    ok: false,
-    said: "Keel made its token, but it does not reach the account's Workers, so no target was set.",
-  },
-  "no-workers-dev": {
-    ok: false,
-    said: "The account has no workers.dev subdomain to serve previews from. Set one in Cloudflare's dashboard (Workers & Pages → your subdomain), then connect again: Keel's token is stored, so choose it below.",
-  },
-  full: {
-    ok: false,
-    said: "The project already has all the deploy targets it may. Remove one, then connect again.",
-  },
+  connected: { ok: true, said: "Connected" },
+  denied: { ok: false, said: "Not connected: consent declined" },
+  expired: { ok: false, said: "Not connected: consent expired, connect again" },
+  accounts: { ok: false, said: "Not connected: choose exactly one account" },
+  refused: { ok: false, said: "Not connected: refused by Cloudflare" },
+  unreachable: { ok: false, said: "Not connected: the token cannot reach the account's Workers" },
+  "no-workers-dev": { ok: false, said: "Not connected: the account has no workers.dev subdomain" },
+  full: { ok: false, said: "Not connected: the project has all the targets it may" },
 };
 
-/** The step of a Connect Cloudflare refused, as Keel's callback names it in `?step=`, in words. */
+/** The step of a Connect Cloudflare refused, as Keel's callback names it in `?step=`, as a label. */
 export const REFUSED_AT: Readonly<Record<string, string>> = {
-  exchange: "Cloudflare refused to exchange the consent for access",
-  accounts: "Cloudflare refused to say which account you ticked",
-  mint: "Cloudflare refused to let Keel make its token on the account",
-  unconfigured: "this instance has no OAuth client registered with Cloudflare",
-  check: "Cloudflare's answer to Keel's check of the account with its new token",
+  exchange: "at the code exchange",
+  accounts: "at the account read",
+  mint: "at the token",
+  unconfigured: "no OAuth client on this instance",
+  check: "at the account check",
 };
 
 /** Where a refused Connect stopped, in words, with Cloudflare's own error code, if the address names a step. */
