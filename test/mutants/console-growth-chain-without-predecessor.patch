@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.chain
+# why: a batch rests on an earlier batch none of whose changes it was formed on
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 092b70bc..376e3196 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -505,7 +505,7 @@ export function growthOf(
+       (other) =>
+         other.batch.id !== batch.id &&
+         other.batch.formedT < batch.formedT &&
+-        other.batch.members.some((id) => batch.predecessors.includes(id)),
++        other.batch.members.length > 0,
+     );
+     if (under !== undefined)
+       edges.push({

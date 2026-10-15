@@ -153,6 +153,25 @@ describe("forks joining a batch, and its checks", () => {
     expect(Math.abs(middle - between)).toBeLessThan((2 * Math.PI) / 28);
   });
 
+  it("[growth.chain] rests each batch formed on others in flight on the last of them alone, so a run of batches is one line", () => {
+    const hand = new Hand()
+      .queued(["chg_a", "chg_b", "chg_c", "chg_d"])
+      .at(10)
+      .form("bat_1", ["chg_a"])
+      .at(11)
+      .form("bat_2", ["chg_b"], { predecessors: ["chg_a"] })
+      .at(12)
+      .form("bat_3", ["chg_c"], { predecessors: ["chg_a", "chg_b"] })
+      .at(13)
+      .form("bat_4", ["chg_d"]);
+    const growth = growthOf(hand.world(), 14_000, "p", keptAfresh());
+    const chains = growth.edges
+      .filter((each) => each.kind === "chain")
+      .map((each) => `${each.source} > ${each.target}`)
+      .toSorted();
+    expect(chains).toEqual(["batch:bat_2 > batch:bat_1", "batch:bat_3 > batch:bat_2"]);
+  });
+
   it("[growth.checks] runs one check with its timer while the batch verifies, then draws each step the verdict names with what it came to, further out", () => {
     const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]).assemble("bat_1", 2);
     hand.at(12).verifying("bat_1");

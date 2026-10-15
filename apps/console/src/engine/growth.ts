@@ -37,7 +37,7 @@ export const SIZE = {
   agent: { w: 188, h: 24 },
   pile: { w: 148, h: 42 },
   batch: { w: 188, h: 64 },
-  check: { w: 150, h: 32 },
+  check: { w: 200, h: 32 },
   deploy: { w: 176, h: 46 },
 } as const;
 
@@ -500,21 +500,22 @@ export function growthOf(
         moving: going,
         fade,
       });
-    // A batch formed on another still in flight rests on it.
-    for (const other of ordered)
-      if (
+    // A batch formed on others still in flight rests on the last of them, so a run of batches reads as one line.
+    const under = ordered.findLast(
+      (other) =>
         other.batch.id !== batch.id &&
         other.batch.formedT < batch.formedT &&
-        other.batch.members.some((id) => batch.predecessors.includes(id))
-      )
-        edges.push({
-          id: `chain:${batch.id}:${other.batch.id}`,
-          kind: "chain",
-          source: node.id,
-          target: `batch:${other.batch.id}`,
-          moving: false,
-          fade,
-        });
+        other.batch.members.some((id) => batch.predecessors.includes(id)),
+    );
+    if (under !== undefined)
+      edges.push({
+        id: `chain:${batch.id}:${under.batch.id}`,
+        kind: "chain",
+        source: node.id,
+        target: `batch:${under.batch.id}`,
+        moving: false,
+        fade,
+      });
 
     // The checks: each step Keel started, as its step events tell it; where it told none, what the verdict said of
     // each step, or one running while the batch verifies.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.chain
+# why: a batch rests on the first batch in flight before it, not the last
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 092b70bc..4212533b 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -501,7 +501,7 @@ export function growthOf(
+         fade,
+       });
+     // A batch formed on others still in flight rests on the last of them, so a run of batches reads as one line.
+-    const under = ordered.findLast(
++    const under = ordered.find(
+       (other) =>
+         other.batch.id !== batch.id &&
+         other.batch.formedT < batch.formedT &&

@@ -2137,6 +2137,8 @@
 }
 :root .a-arch-wire[data-kind="chain"] {
   stroke-dasharray: 4 4;
+  stroke-width: 1;
+  stroke-opacity: 0.5;
 }
 :root .a-arch-wire[data-kind="land"] {
   stroke: var(--arch-pass);

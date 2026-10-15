@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.chain
+# why: a batch formed on another in flight draws no edge to it
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index 092b70bc..c8453f03 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -507,7 +507,7 @@ export function growthOf(
+         other.batch.formedT < batch.formedT &&
+         other.batch.members.some((id) => batch.predecessors.includes(id)),
+     );
+-    if (under !== undefined)
++    if (under === null)
+       edges.push({
+         id: `chain:${batch.id}:${under.batch.id}`,
+         kind: "chain",
