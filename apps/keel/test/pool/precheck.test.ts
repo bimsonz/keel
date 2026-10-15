@@ -485,6 +485,7 @@ describe("Precheck", () => {
       revision: 1,
       effects: [effect],
       derivationRef: answer.derivationRef,
+      paths: ["src/authz/sessions.ts"],
       // The neighbour's anchored function is in the edited file: the subject hears the edit itself too.
       touched: [{ subject: "authz.sessions", anchor: SESSION_OF }],
     });
@@ -518,6 +519,7 @@ describe("Precheck", () => {
       base,
       head,
       seeds: ["src/authz/sessions.ts"],
+      paths: ["src/authz/sessions.ts"],
       anchors: [{ subject: "authz.sessions", anchors: [SESSION_OF] }],
       readings: { base: read, head: read },
       effects: [effect],
@@ -611,6 +613,7 @@ describe("Precheck", () => {
       revision: 1,
       effects: [effect],
       derivationRef: answer.derivationRef,
+      paths: [PRICE_FILE],
       // The edit is also where the neighbour's premise is anchored; the effect there is fallout's to judge.
       touched: [{ subject: "bench.price", anchor: PRICE_IS_PURE.anchors?.[0] }],
     });
