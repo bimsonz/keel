@@ -7,6 +7,7 @@ import { decisionDetailOf, turnsOf } from "../engine/decisions.ts";
 import { decisionNamed } from "../engine/lists.ts";
 import { usePlayer, usePublicOnly, useSelected } from "../engine/react.tsx";
 import { Head } from "../views/Detail.tsx";
+import { Link } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
 import { ChangeLink, ConflictLink, EscalationLink, Said, SubjectLink } from "../views/links.tsx";
@@ -102,7 +103,13 @@ export function DecisionPage({ name }: { name: string }) {
       </Notice>
     );
   if (id === undefined || (answer !== undefined && "view" in answer && answer.view === null))
-    return <Notice title={`Decision ${name} not found`} />;
+    return (
+      <Notice title={`Decision ${name} not found`}>
+        <Link to={{ at: "decisions" }} className="a-link">
+          All decisions
+        </Link>
+      </Notice>
+    );
   if (answer !== undefined && "refused" in answer)
     return <Notice title={`Keel did not read decision ${name}`}>{answer.refused}</Notice>;
   if (detail === undefined)

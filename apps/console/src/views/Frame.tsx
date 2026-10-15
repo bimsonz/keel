@@ -136,9 +136,9 @@ export function Frame({
     <div className="a-root flex h-screen w-screen flex-col overflow-hidden bg-kumo-canvas text-base text-kumo-default">
       <SkipLink />
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
-        {/* On a narrow screen the row wraps: who is reading goes under where they are, and nothing is cut off. */}
-        <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-1.5 sm:px-6">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+        {/* On a narrow screen where they are wraps, and who is reading stays at the top right, as on a code host. */}
+        <div className="flex min-h-12 items-start justify-between gap-x-4 px-4 py-1.5 sm:px-6">
+          <div className="flex min-h-9 min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
             {/* A code host's frame: its mark home, then whose the project is and the project, each a link to its own page. */}
             <HomeLink named={project === ""} />
             {project !== "" && (
@@ -195,7 +195,7 @@ export function Frame({
               </span>
             )}
           </div>
-          <span className="flex items-center gap-4">
+          <span className="flex min-h-9 shrink-0 items-center gap-4">
             <Source source={source} />
             {reader !== undefined && (
               <ReaderMenu

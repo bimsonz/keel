@@ -51,8 +51,8 @@ import {
 } from "./account.ts";
 import { KEEL_QUICKSTART } from "../own.ts";
 import { NamespaceCredentials } from "./Credentials.tsx";
-import { JoinedAgents } from "./OrgAgents.tsx";
-import { People } from "./People.tsx";
+import { JoinedAgents, useListed } from "./OrgAgents.tsx";
+import { People, ROLE_LABEL } from "./People.tsx";
 import { Box, DangerZone, Rows, Setting } from "./rows.tsx";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 import { manages, mayDelete } from "./roles.ts";
@@ -259,25 +259,30 @@ function Person({ member }: { member: Member }) {
 
 function OrgFrame({
   page,
+  agents,
   tab,
   projects,
   children,
 }: {
   page: OrgPage;
+  agents: KeelOrgAgents;
   tab: NamespaceTab;
   projects: readonly ProjectView[] | undefined;
   children: ReactNode;
 }) {
   const { org } = page;
+  // People counts whom its list shows: the org's members, and the agents that have joined it.
+  const { listed } = useListed(agents, org.handle);
+  const joined = (listed ?? []).filter((agent) => agent.state === "joined").length;
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5 px-6 py-8">
       <header className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-3 text-[22px] font-semibold text-kumo-strong">
-          {org.name}
+        <div className="flex items-center gap-3">
+          <h1 className="text-[22px] font-semibold text-kumo-strong">{org.name}</h1>
           <span className="a-chip" data-tone="quiet">
-            {page.role}
+            {ROLE_LABEL[page.role]}
           </span>
-        </h1>
+        </div>
         <p className="a-mono text-sm text-kumo-subtle">{org.handle}</p>
       </header>
       {/* An org's credentials are its owners' alone, and its settings an owner's or a maintainer's: Keel says whose. */}
@@ -287,7 +292,7 @@ function OrgFrame({
         tabs={tabsOf({ kind: "org", own: false, role: page.role })}
         open={tab}
         counts={{
-          people: page.members.length,
+          people: page.members.length + joined,
           ...(projects === undefined ? {} : { projects: projects.length }),
         }}
       />
@@ -414,7 +419,7 @@ function Home({
           {page.members.map((member) => (
             <li key={member.id} className="flex items-center justify-between gap-3 text-sm">
               <Person member={member} />
-              <span className="text-kumo-subtle">{member.role}</span>
+              <span className="text-kumo-subtle">{ROLE_LABEL[member.role]}</span>
             </li>
           ))}
         </ul>
@@ -759,7 +764,7 @@ export function NamespacePages({
     );
   const open = tab === "orgs" ? "overview" : tab;
   return (
-    <OrgFrame page={held} tab={open} projects={projects}>
+    <OrgFrame page={held} agents={agents} tab={open} projects={projects}>
       {open === "overview" && <Home page={held} projects={projects} agents={agents} />}
       {open === "projects" && (
         <ProjectsPanel

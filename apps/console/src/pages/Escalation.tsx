@@ -2,9 +2,9 @@
 // read with its answer afterwards.
 
 import { useEffect } from "react";
-import { escalationNamed } from "../engine/lists.ts";
+import { PAGE, escalationNamed } from "../engine/lists.ts";
 import { usePlayer, usePublicOnly, useSelected } from "../engine/react.tsx";
-import { useWhere } from "../router.tsx";
+import { Link, useWhere } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Escalation } from "../views/Escalation.tsx";
 import { Column } from "../views/List.tsx";
@@ -39,7 +39,13 @@ export function EscalationPage({ name }: { name: string }) {
       </Column>
     );
   if (escalation === undefined) {
-    return <Notice title={`Question ${name} not found`} />;
+    return (
+      <Notice title={`Question ${name} not found`}>
+        <Link to={{ at: "escalations", filter: "open", shown: PAGE }} className="a-link">
+          All questions
+        </Link>
+      </Notice>
+    );
   }
   return (
     <Escalation

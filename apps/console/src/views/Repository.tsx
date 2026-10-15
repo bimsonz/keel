@@ -30,6 +30,7 @@ import { hrefOf } from "../places.ts";
 import { Link, useWhere } from "../router.tsx";
 import type { RepoNote } from "../contract/provisional.ts";
 import type { Mode } from "../theme/mode.ts";
+import { CloneMenu } from "./Clone.tsx";
 import { Notice } from "./Frame.tsx";
 import { ChangeLink } from "./links.tsx";
 import type { Within } from "./Markdown.tsx";
@@ -488,7 +489,7 @@ function Fork() {
   return (
     <a
       href={hrefOf({ at: "fork", namespace, project })}
-      className={`${buttonVariants({ variant: "secondary", size: "sm" })} ml-auto`}
+      className={buttonVariants({ variant: "secondary", size: "sm" })}
     >
       <GitForkIcon size={15} />
       Fork
@@ -573,7 +574,12 @@ export function Repository({
             </Link>
           )}
           {/* The project's own actions are on its home, as a code host has Fork on a repository's. */}
-          {address.view === "code" && address.path === "" && <Fork />}
+          {address.view === "code" && address.path === "" && (
+            <span className="ml-auto flex items-center gap-2">
+              <Fork />
+              <CloneMenu visibility={state.project.visibility} />
+            </span>
+          )}
         </header>
       )}
 

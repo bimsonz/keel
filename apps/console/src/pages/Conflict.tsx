@@ -1,11 +1,12 @@
 // One conflict.
 
 import { useEffect } from "react";
-import { conflictNamed } from "../engine/lists.ts";
+import { PAGE, conflictNamed } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected } from "../engine/react.tsx";
 import { conflictPageOf } from "../engine/select.ts";
 import type { ConflictTab } from "../route.ts";
 import type { Mode } from "../theme/mode.ts";
+import { Link } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Conflict } from "../views/Conflict.tsx";
 
@@ -25,7 +26,13 @@ export function ConflictPage({ name, tab, mode }: { name: string; tab: ConflictT
     if (probeId !== undefined) player.wantProbe(probeId);
   }, [player, probeId]);
   if (id === undefined) {
-    return <Notice title={`Conflict ${name} not found`} />;
+    return (
+      <Notice title={`Conflict ${name} not found`}>
+        <Link to={{ at: "conflicts", filter: "open", shown: PAGE }} className="a-link">
+          All conflicts
+        </Link>
+      </Notice>
+    );
   }
   // Every conflict Keel names has a page. The address was resolved a moment before the page was read.
   if (state === null) return null;

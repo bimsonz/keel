@@ -61,13 +61,14 @@ export interface SessionRow {
   userAgent: string;
   /** The session this page is asking with: it is ended by signing out, so it is offered no End. */
   current: boolean;
-  /** How it was signed in, and the day. */
+  /** How it was signed in, the day and the minute: Keel keeps that exactly, and it tells one session from another. */
   signedIn: string;
   /** The day it was last used. Keel writes a session's row once an hour while it is used, so no minute is claimed. */
   lastUsed: string;
 }
 
 const day = (iso: string): string => iso.slice(0, 10);
+const minute = (iso: string): string => iso.slice(11, 16);
 
 /** The list as Keel ordered it, the one used last first. No row is moved, left out or added. */
 export function rowsOf(sessions: readonly OwnSession[]): SessionRow[] {
@@ -76,7 +77,7 @@ export function rowsOf(sessions: readonly OwnSession[]): SessionRow[] {
     device: deviceOf(session.userAgent),
     userAgent: session.userAgent ?? "",
     current: session.current,
-    signedIn: `${SIGNED_IN[session.signedInBy]} on ${day(session.createdAt)}`,
+    signedIn: `${SIGNED_IN[session.signedInBy]} on ${day(session.createdAt)} at ${minute(session.createdAt)}`,
     lastUsed: day(session.lastUsedAt),
   }));
 }

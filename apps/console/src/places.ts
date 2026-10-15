@@ -239,3 +239,11 @@ export function sentFrom(
     place.at === "invite";
   return above && reader.handle === undefined ? hrefOf({ at: "signup" }, asked) : null;
 }
+
+/**
+ * The address git clones a project from: this Keel's own origin, the project's place and `.git`. Keel serves
+ * its trunk there to stock git, read-only.
+ */
+export function cloneAddress(origin: string, namespace: string, project: string): string {
+  return `${origin}/${encodeURIComponent(namespace)}/${encodeURIComponent(project)}.git`;
+}

@@ -548,7 +548,11 @@ export function HomePage({
   return (
     <div className="a-scroll h-full overflow-y-auto">
       <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-8 px-6 py-6 md:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-6" aria-label="Your projects and orgs">
+        {/* On a phone what waits for the reader comes first, and their projects and orgs after it. */}
+        <aside
+          className="order-last flex flex-col gap-6 md:order-none"
+          aria-label="Your projects and orgs"
+        >
           <section className="flex flex-col gap-2">
             <header className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-kumo-strong">Top projects</h2>

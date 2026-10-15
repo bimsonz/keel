@@ -50,7 +50,7 @@ import { Link, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { DoubtSaid, doubtKey } from "./Doubt.tsx";
-import { CHANGE_TONE } from "./List.tsx";
+import { CHANGE_STATE, CHANGE_TONE } from "./List.tsx";
 import {
   ChangeLink,
   ConflictLink,
@@ -198,7 +198,7 @@ function IntentRowLine({ row, self }: { row: IntentRow; self: boolean }) {
       </Table.Cell>
       <Table.Cell>
         <span className="a-chip" data-tone={CHANGE_TONE[row.state] ?? "quiet"}>
-          {row.state}
+          {CHANGE_STATE[row.state]}
         </span>
       </Table.Cell>
       <Table.Cell>
@@ -985,7 +985,7 @@ export function EarlyChange({
                     : (CHANGE_TONE[summary.state] ?? "quiet")
                 }
               >
-                {summary.state}
+                {CHANGE_STATE[summary.state]}
               </span>
             )}
           </>
@@ -1097,7 +1097,7 @@ export function Change({
                 }
               >
                 {waiting && <HandPalmIcon size={13} weight="fill" />}
-                {change.state}
+                {CHANGE_STATE[change.state]}
               </span>
             )}
             {change.unverified && <Unverified />}
@@ -1373,7 +1373,7 @@ export function Change({
                         {other.label}
                       </ChangeLink>
                       <span className="a-chip" data-tone={CHANGE_TONE[other.state] ?? "quiet"}>
-                        {other.state}
+                        {CHANGE_STATE[other.state]}
                       </span>
                       <span className="min-w-0 truncate text-kumo-subtle">“{other.goal}”</span>
                     </span>

@@ -62,7 +62,7 @@ describe("a person's own sessions", () => {
     expect(deviceOf("  ")).toBe("A device that named no browser");
   });
 
-  it("[sessions.rows] words each session by how Keel says it was signed in, a session with no way named plainly, in Keel's order", () => {
+  it("[sessions.rows] words each session by how Keel says it was signed in and when, to the minute, a session with no way named plainly, in Keel's order", () => {
     const rows = rowsOf([
       session({ id: "ses_1" }),
       session({ id: "ses_3", signedInBy: "other", userAgent: null, current: true }),
@@ -71,11 +71,11 @@ describe("a person's own sessions", () => {
       session({ id: "ses_5", signedInBy: "github" }),
     ]);
     expect(rows.map((row) => `${row.id} ${row.signedIn}`)).toEqual([
-      "ses_1 Signed in with a passkey on 2026-10-12",
-      "ses_3 Signed in on 2026-10-12",
-      "ses_2 Signed in from a terminal on 2026-10-12",
-      "ses_4 Signed in with an email code on 2026-10-12",
-      "ses_5 Signed in with GitHub on 2026-10-12",
+      "ses_1 Signed in with a passkey on 2026-10-12 at 09:15",
+      "ses_3 Signed in on 2026-10-12 at 09:15",
+      "ses_2 Signed in from a terminal on 2026-10-12 at 09:15",
+      "ses_4 Signed in with an email code on 2026-10-12 at 09:15",
+      "ses_5 Signed in with GitHub on 2026-10-12 at 09:15",
     ]);
     // Its last use is said to the day: Keel writes it once an hour, so no minute is claimed.
     expect(new Set(rows.map((row) => row.lastUsed))).toEqual(new Set(["2026-10-13"]));

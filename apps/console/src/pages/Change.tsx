@@ -3,11 +3,12 @@
 import { useEffect } from "react";
 import { shownAgent } from "../engine/audience.ts";
 import { changeDrawn } from "../engine/seed.ts";
-import { changeNamed } from "../engine/lists.ts";
+import { PAGE, changeNamed } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
 import { rulingWords } from "../engine/ruling.ts";
 import { changePageOf } from "../engine/select.ts";
 import type { ChangeTab } from "../route.ts";
+import { Link } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Change, EarlyChange } from "../views/Change.tsx";
 import { Notice } from "../views/Frame.tsx";
@@ -67,7 +68,14 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
       />
     );
   }
-  if (state === null) return <Notice title={`Change #${name} not found`} />;
+  if (state === null)
+    return (
+      <Notice title={`Change #${name} not found`}>
+        <Link to={{ at: "changes", filter: "open", shown: PAGE }} className="a-link">
+          All changes
+        </Link>
+      </Notice>
+    );
   return (
     <Change
       state={state}

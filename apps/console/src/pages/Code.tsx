@@ -13,7 +13,10 @@ import { type Browsing, type RepoAddress, headToRead, repositoryOf } from "../en
 import { type Route, TRUNK } from "../route.ts";
 import { Link, navigate, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
+import { CloneField } from "../views/Clone.tsx";
 import { Repository } from "../views/Repository.tsx";
+import { maintains } from "../engine/settings.ts";
+import { KEEL_QUICKSTART } from "../own.ts";
 
 type CodeRoute = Extract<Route, { at: "code" | "commits" | "commit" }>;
 
@@ -121,6 +124,39 @@ function Counted({ count, label, to }: { count: number; label: string; to: Route
       <b className="a-num font-semibold text-kumo-strong">{count.toLocaleString("en-US")}</b>
       {label}
     </Link>
+  );
+}
+
+/**
+ * On a project no change has been declared in yet, GitHub's Quick setup: where it is cloned from, and the way to
+ * its first change, which an agent makes. Whoever may invite an agent is offered that; anyone, the quickstart.
+ */
+function QuickSetup() {
+  const player = usePlayer();
+  const empty = useSelected((world, reading) => reading.loaded && world.changes.size === 0);
+  if (!empty) return null;
+  const { project } = player.source.descriptor;
+  return (
+    <section
+      aria-label="Quick setup"
+      className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-base p-4"
+    >
+      <h2 className="text-base font-semibold text-kumo-strong">Quick setup</h2>
+      <CloneField visibility={project?.visibility} />
+      <div className="flex flex-wrap items-center gap-2">
+        {project !== undefined && maintains(project) && (
+          <Link
+            to={{ at: "settings", section: "agents" }}
+            className={buttonVariants({ variant: "primary", size: "sm" })}
+          >
+            Invite an agent
+          </Link>
+        )}
+        <a href={KEEL_QUICKSTART} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+          Quickstart
+        </a>
+      </div>
+    </section>
   );
 }
 
@@ -285,7 +321,15 @@ export function CodePage({ route, mode }: { route: CodeRoute; mode: Mode }) {
       mode={mode}
       onToggle={toggle}
       {...(route.at === "code" && route.path === ""
-        ? { banner: <WaitingOnARuling />, aside: <About /> }
+        ? {
+            banner: (
+              <>
+                <WaitingOnARuling />
+                <QuickSetup />
+              </>
+            ),
+            aside: <About />,
+          }
         : route.at === "code" && found === "file"
           ? { banner: <WhyBar path={route.path} /> }
           : {})}

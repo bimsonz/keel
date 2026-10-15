@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hrefOf, nextOf, placeOf, sentFrom, titleOfPlace } from "../../src/places.ts";
+import { cloneAddress, hrefOf, nextOf, placeOf, sentFrom, titleOfPlace } from "../../src/places.ts";
 import { RESERVED_SEGMENTS } from "../../src/contract/keel/index.ts";
 import { parse } from "../../src/route.ts";
 
@@ -222,6 +222,17 @@ describe("what each page above every project is titled", () => {
     expect(titleOfPlace({ at: "org", org: "keel", tab: "members" })).toBe("Members · keel · Keel");
     expect(titleOfPlace({ at: "org", org: "keel", tab: "settings" })).toBe(
       "Settings · keel · Keel",
+    );
+  });
+});
+
+describe("where a project is cloned from", () => {
+  it("[clone.address] is this Keel's origin, the project's place and .git, as Keel serves its trunk to git", () => {
+    expect(cloneAddress("https://keel.town", "keel", "swarm")).toBe(
+      "https://keel.town/keel/swarm.git",
+    );
+    expect(cloneAddress("https://keel.town", "rv-walk-a", "review-scratch")).toBe(
+      "https://keel.town/rv-walk-a/review-scratch.git",
     );
   });
 });

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts -t "clone.address"
+# kills: clone.address
+# why: the Code button gives the project's page address, which git cannot clone
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index f5144d2e..b6be75eb 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -245,5 +245,5 @@ export function sentFrom(
+  * its trunk there to stock git, read-only.
+  */
+ export function cloneAddress(origin: string, namespace: string, project: string): string {
+-  return `${origin}/${encodeURIComponent(namespace)}/${encodeURIComponent(project)}.git`;
++  return `${origin}/${encodeURIComponent(namespace)}/${encodeURIComponent(project)}`;
+ }

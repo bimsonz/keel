@@ -137,6 +137,23 @@ export const CHANGE_TONE: Partial<Record<ChangeState, string>> = {
   bounced: "proven",
 };
 
+/** A change's state as its chip says it: Keel's own word, as a label. */
+export const CHANGE_STATE: Record<ChangeState, string> = {
+  declared: "Declared",
+  working: "Working",
+  submitted: "Submitted",
+  deriving: "Deriving",
+  drifted: "Drifted",
+  verifying: "Verifying",
+  queued: "Queued",
+  integrating: "Integrating",
+  landed: "Landed",
+  bounced: "Bounced",
+  parked: "Parked",
+  withdrawn: "Withdrawn",
+  superseded: "Superseded",
+};
+
 /** As everywhere in the console: a conflict a person is being asked about is proven, and reads so. */
 export const CONFLICT_TONE: Partial<Record<ConflictState, string>> = {
   suspected: "suspected",

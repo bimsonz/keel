@@ -2182,6 +2182,17 @@
   color: var(--mc-ink-quiet);
   font-size: 12px;
 }
+/* At a phone's width the minimap would cover much of the canvas, and the key would run under the tools. */
+@media (width < 48rem) {
+  :root .a-mc-minimap {
+    display: none;
+  }
+  :root .a-arch-legend {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    max-width: calc(100% - 160px);
+  }
+}
 :root .a-arch-legend span::before {
   display: inline-block;
   width: 8px;
