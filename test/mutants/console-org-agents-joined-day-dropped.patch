@@ -2,15 +2,15 @@
 # kills: org-agents.words
 # why: a row does not say the day Keel says the agent joined
 diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
-index 5773f376..283720d4 100644
+index 982b9a21..c8830f6b 100644
 --- a/apps/console/src/account/orgAgents.ts
 +++ b/apps/console/src/account/orgAgents.ts
 @@ -28,7 +28,7 @@ export function givenOf(agent: NamespaceAgent): string {
  export function standingOf(agent: NamespaceAgent): string {
-   if (agent.state === "invited") return "invited, not yet accepted";
-   if (agent.state === "ended") return "ended";
--  return agent.joinedAt === undefined ? "joined" : `joined ${agent.joinedAt.slice(0, 10)}`;
-+  return "joined";
+   if (agent.state === "invited") return "Pending";
+   if (agent.state === "ended") return "Ended";
+-  return agent.joinedAt === undefined ? "Joined" : `Joined ${agent.joinedAt.slice(0, 10)}`;
++  return "Joined";
  }
  
- /**
+ /** What a row says of an agent whose inviter has left: Keel lets it do nothing in the org until it is invited again. */

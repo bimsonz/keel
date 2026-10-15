@@ -2,15 +2,15 @@
 # kills: org-agents.whose
 # why: the inviter is looked for by a membership's id, which Keel's row never names
 diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
-index 5773f376..2eb92228 100644
+index 982b9a21..83648394 100644
 --- a/apps/console/src/account/orgAgents.ts
 +++ b/apps/console/src/account/orgAgents.ts
-@@ -38,7 +38,7 @@ export function standingOf(agent: NamespaceAgent): string {
+@@ -41,7 +41,7 @@ export const INVITER_GONE = "Inactive: inviter left the org";
   */
  export function inviterOf(agent: NamespaceAgent, members: readonly Member[]): string {
    if (agent.invitedBy === undefined) return "";
 -  const inviter = members.find((member) => member.userId === agent.invitedBy);
 +  const inviter = members.find((member) => member.id === agent.invitedBy);
-   if (inviter === undefined)
-     return "invited by someone who is no longer a member, so it cannot act here";
-   return inviter.you ? "invited by you" : `invited by ${inviter.handle ?? inviter.name}`;
+   if (inviter === undefined) return INVITER_GONE;
+   return inviter.you
+     ? "Invited by you"

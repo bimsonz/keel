@@ -424,13 +424,11 @@ describe("the agents in an org", () => {
       if (page === null || listed === undefined) throw new Error("no org, or no agent in it");
       return inviterOf(listed, page.members);
     };
-    expect(await said(grace)).toBe("invited by you");
-    expect(await said(ada)).toBe("invited by grace");
+    expect(await said(grace)).toBe("Invited by you");
+    expect(await said(ada)).toBe("Invited by @grace");
     // Keel keeps the row as it was when its inviter leaves, and its gate lets the agent do nothing there.
     await grace.account.leave(org);
-    expect(await said(ada)).toBe(
-      "invited by someone who is no longer a member, so it cannot act here",
-    );
+    expect(await said(ada)).toBe("Inactive: inviter left the org");
     expect(await grace.agents.listAgents("lovelace")).toEqual([
       {
         id: OTTER.id,
@@ -444,17 +442,17 @@ describe("the agents in an org", () => {
 
   it("[org-agents.words] says what an invitation gives, where it stands and what taking it out is called, each from Keel's own field", () => {
     expect(GRANTS.map((offered) => `${offered.label}: ${SCOPES[offered.grant].join(" ")}`)).toEqual(
-      ["Read and work: agent:read agent:work", "Read only: agent:read"],
+      ["Write: agent:read agent:work", "Read: agent:read"],
     );
-    expect(givenOf(row({ scopes: ["agent:read", "agent:work"] }))).toBe("reads and works");
-    expect(givenOf(row({ scopes: ["agent:read"] }))).toBe("reads");
+    expect(givenOf(row({ scopes: ["agent:read", "agent:work"] }))).toBe("Write");
+    expect(givenOf(row({ scopes: ["agent:read"] }))).toBe("Read");
     // Keel names no scopes to anyone but a member, and the row then says nothing of them.
     expect(givenOf(row())).toBe("");
-    expect(standingOf(row({ state: "invited" }))).toBe("invited, not yet accepted");
-    expect(standingOf(row({ joinedAt: "2026-10-13T19:00:00.000Z" }))).toBe("joined 2026-10-13");
-    expect(standingOf(row())).toBe("joined");
-    expect(standingOf(row({ state: "ended" }))).toBe("ended");
-    expect(removalOf(row({ state: "invited" }))).toBe("Withdraw");
+    expect(standingOf(row({ state: "invited" }))).toBe("Pending");
+    expect(standingOf(row({ joinedAt: "2026-10-13T19:00:00.000Z" }))).toBe("Joined 2026-10-13");
+    expect(standingOf(row())).toBe("Joined");
+    expect(standingOf(row({ state: "ended" }))).toBe("Ended");
+    expect(removalOf(row({ state: "invited" }))).toBe("Cancel invitation");
     expect(removalOf(row())).toBe("Remove");
     expect(
       joinedOf([
@@ -471,13 +469,11 @@ describe("the agents in an org", () => {
       member({ id: "mem_2", userId: "usr_grace", name: "Grace H" }),
       member({ id: "mem_3", userId: "usr_hedy", handle: "hedy", you: true }),
     ];
-    expect(inviterOf(row({ invitedBy: "usr_ada" }), members)).toBe("invited by ada");
-    expect(inviterOf(row({ invitedBy: "usr_grace" }), members)).toBe("invited by Grace H");
-    expect(inviterOf(row({ invitedBy: "usr_hedy" }), members)).toBe("invited by you");
+    expect(inviterOf(row({ invitedBy: "usr_ada" }), members)).toBe("Invited by @ada");
+    expect(inviterOf(row({ invitedBy: "usr_grace" }), members)).toBe("Invited by Grace H");
+    expect(inviterOf(row({ invitedBy: "usr_hedy" }), members)).toBe("Invited by you");
     // A membership's own id is not an account's: a row is never matched by it.
-    expect(inviterOf(row({ invitedBy: "mem_1" }), members)).toBe(
-      "invited by someone who is no longer a member, so it cannot act here",
-    );
+    expect(inviterOf(row({ invitedBy: "mem_1" }), members)).toBe("Inactive: inviter left the org");
     expect(inviterOf(row(), members)).toBe("");
   });
 

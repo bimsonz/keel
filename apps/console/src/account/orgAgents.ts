@@ -14,22 +14,25 @@ export const SCOPES: Record<Grant, readonly Scope[]> = {
 };
 
 export const GRANTS: readonly { grant: Grant; label: string }[] = [
-  { grant: "work", label: "Read and work" },
-  { grant: "read", label: "Read only" },
+  { grant: "work", label: "Write" },
+  { grant: "read", label: "Read" },
 ];
 
-/** What a row's invitation gives. Nothing where Keel named no scopes: it names them to the org's members alone. */
+/** A row's role: what its invitation gives. Nothing where Keel named no scopes: it names them to members alone. */
 export function givenOf(agent: NamespaceAgent): string {
   if (agent.scopes === undefined) return "";
-  return agent.scopes.includes("agent:work") ? "reads and works" : "reads";
+  return agent.scopes.includes("agent:work") ? "Write" : "Read";
 }
 
 /** Where an invitation stands, and from what day where Keel says when the agent joined. */
 export function standingOf(agent: NamespaceAgent): string {
-  if (agent.state === "invited") return "invited, not yet accepted";
-  if (agent.state === "ended") return "ended";
-  return agent.joinedAt === undefined ? "joined" : `joined ${agent.joinedAt.slice(0, 10)}`;
+  if (agent.state === "invited") return "Pending";
+  if (agent.state === "ended") return "Ended";
+  return agent.joinedAt === undefined ? "Joined" : `Joined ${agent.joinedAt.slice(0, 10)}`;
 }
+
+/** What a row says of an agent whose inviter has left: Keel lets it do nothing in the org until it is invited again. */
+export const INVITER_GONE = "Inactive: inviter left the org";
 
 /**
  * Who invited an agent, and so answers for it here: the member whose account Keel's row names. Keel's gate
@@ -39,9 +42,10 @@ export function standingOf(agent: NamespaceAgent): string {
 export function inviterOf(agent: NamespaceAgent, members: readonly Member[]): string {
   if (agent.invitedBy === undefined) return "";
   const inviter = members.find((member) => member.userId === agent.invitedBy);
-  if (inviter === undefined)
-    return "invited by someone who is no longer a member, so it cannot act here";
-  return inviter.you ? "invited by you" : `invited by ${inviter.handle ?? inviter.name}`;
+  if (inviter === undefined) return INVITER_GONE;
+  return inviter.you
+    ? "Invited by you"
+    : `Invited by ${inviter.handle === undefined ? inviter.name : `@${inviter.handle}`}`;
 }
 
 /** Keel takes a removal from the member who invited the agent, from a maintainer and from an owner. */
@@ -49,9 +53,9 @@ export function mayRemove(agent: NamespaceAgent, role: Role, readerId: string): 
   return manages(role) || agent.invitedBy === readerId;
 }
 
-/** What taking a row out is called: an invitation nobody answered is withdrawn, an agent that joined removed. */
-export function removalOf(agent: NamespaceAgent): "Remove" | "Withdraw" {
-  return agent.state === "invited" ? "Withdraw" : "Remove";
+/** What taking a row out is called: an invitation nobody answered is cancelled, an agent that joined removed. */
+export function removalOf(agent: NamespaceAgent): "Remove" | "Cancel invitation" {
+  return agent.state === "invited" ? "Cancel invitation" : "Remove";
 }
 
 /** The agents that have joined: all that anyone but a member is read, and all an org's home lists. */

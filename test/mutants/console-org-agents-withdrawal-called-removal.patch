@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
 # kills: org-agents.words
-# why: an agent that joined is said to be withdrawn, and an unanswered invitation removed
+# why: an agent that joined is offered Cancel invitation, and an unanswered invitation Remove
 diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
-index 5773f376..5382f12b 100644
+index 982b9a21..10d9d996 100644
 --- a/apps/console/src/account/orgAgents.ts
 +++ b/apps/console/src/account/orgAgents.ts
-@@ -51,7 +51,7 @@ export function mayRemove(agent: NamespaceAgent, role: Role, readerId: string):
+@@ -55,7 +55,7 @@ export function mayRemove(agent: NamespaceAgent, role: Role, readerId: string):
  
- /** What taking a row out is called: an invitation nobody answered is withdrawn, an agent that joined removed. */
- export function removalOf(agent: NamespaceAgent): "Remove" | "Withdraw" {
--  return agent.state === "invited" ? "Withdraw" : "Remove";
-+  return agent.state === "joined" ? "Withdraw" : "Remove";
+ /** What taking a row out is called: an invitation nobody answered is cancelled, an agent that joined removed. */
+ export function removalOf(agent: NamespaceAgent): "Remove" | "Cancel invitation" {
+-  return agent.state === "invited" ? "Cancel invitation" : "Remove";
++  return agent.state === "joined" ? "Cancel invitation" : "Remove";
  }
  
  /** The agents that have joined: all that anyone but a member is read, and all an org's home lists. */

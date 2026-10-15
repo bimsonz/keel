@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgAgents.test.ts
 # kills: org-agents.words
-# why: a row says an agent invited to read alone reads and works
+# why: a row gives an agent invited to read alone the role Write
 diff --git a/apps/console/src/account/orgAgents.ts b/apps/console/src/account/orgAgents.ts
-index 5773f376..e87cef18 100644
+index 982b9a21..225effa3 100644
 --- a/apps/console/src/account/orgAgents.ts
 +++ b/apps/console/src/account/orgAgents.ts
 @@ -21,7 +21,7 @@ export const GRANTS: readonly { grant: Grant; label: string }[] = [
- /** What a row's invitation gives. Nothing where Keel named no scopes: it names them to the org's members alone. */
+ /** A row's role: what its invitation gives. Nothing where Keel named no scopes: it names them to members alone. */
  export function givenOf(agent: NamespaceAgent): string {
    if (agent.scopes === undefined) return "";
--  return agent.scopes.includes("agent:work") ? "reads and works" : "reads";
-+  return agent.scopes.includes("agent:read") ? "reads and works" : "reads";
+-  return agent.scopes.includes("agent:work") ? "Write" : "Read";
++  return agent.scopes.includes("agent:read") ? "Write" : "Read";
  }
  
  /** Where an invitation stands, and from what day where Keel says when the agent joined. */

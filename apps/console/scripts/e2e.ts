@@ -48,6 +48,11 @@ const expectEqual = (what: string, actual: string, expected: string): void => {
   if (actual !== expected) failures.push(what);
 };
 const squash = (text: string): string => text.replaceAll(/\s+/g, " ").trim();
+/** A row's ⋯ menu, opened by its name, and one of its items chosen. */
+const fromMenu = async (shown: Page, menu: string, item: string): Promise<void> => {
+  await shown.getByRole("button", { name: menu }).click();
+  await shown.getByRole("menuitem", { name: item, exact: true }).click();
+};
 const statOn = async (page: Page, label: string): Promise<string> =>
   squash(
     await page
@@ -3294,14 +3299,18 @@ await grace.getByLabel("Handle").fill("grace");
 await grace.getByRole("button", { name: "Take this handle" }).click();
 await grace.waitForURL(`${built}/`);
 
-// Ada invites her by handle. Nobody types another person's address, and none is shown.
+// Ada invites her by handle, in the Invite member dialog. Nobody types another person's address, and none is shown.
 await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
-await person.getByLabel("Invite by handle").fill("nobody-here");
-await person.getByRole("button", { name: "Invite", exact: true }).click();
-await person.getByText('No one has the handle "nobody-here"').waitFor();
-await person.getByLabel("Invite by handle").fill("grace");
-await person.getByLabel("Role for the invitation").selectOption("maintainer");
-await person.getByRole("button", { name: "Invite", exact: true }).click();
+const memberDialog = person.getByRole("dialog", { name: "Invite member" });
+await person.getByRole("button", { name: "Invite member" }).click();
+await memberDialog.getByLabel("Handle or email").fill("nobody-here");
+await memberDialog.getByRole("button", { name: "Invite", exact: true }).click();
+await memberDialog.getByText('No one has the handle "nobody-here"').waitFor();
+await memberDialog.getByLabel("Handle or email").fill("@grace");
+await memberDialog.getByRole("combobox").selectOption("maintainer");
+await shot(person, "invite-member");
+await memberDialog.getByRole("button", { name: "Invite", exact: true }).click();
+await memberDialog.waitFor({ state: "detached" });
 const link = person.locator("[data-invitation-link]");
 await link.waitFor();
 const invitation = new URL(await link.innerText());
@@ -3310,10 +3319,11 @@ expectEqual(
   `${invitation.origin === built} ${/^\/invite\/[\w-]+$/.test(invitation.pathname)}`,
   "true true",
 );
+const pending = person.getByRole("list", { name: "Invitations not yet answered" });
 expectEqual(
-  "orgs: it is told by the handle it was made to, and no address is on the page",
-  `${squash(await person.getByRole("list", { name: "Invitations not yet answered" }).innerText()).startsWith("grace invited as maintainer")} ${String((await person.content()).includes("@example.com"))}`,
-  "true false",
+  "orgs: it is told by the handle it was made to, with its role, and no address is on the page",
+  `${await pending.getByText("@grace", { exact: true }).count()} ${squash(await pending.getByRole("listitem").innerText()).endsWith("Maintainer Copy link")} ${String((await person.content()).includes("@example.com"))}`,
+  "1 true false",
 );
 await shot(person, "members");
 
@@ -3377,11 +3387,11 @@ await Promise.all([
 await grace.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
 await grace.getByRole("list", { name: "Members of this org" }).waitFor();
 expectEqual(
-  "orgs: made a member, she is one, and is offered no way to invite or remove",
-  `${squash(await grace.getByRole("heading", { level: 1 }).innerText())} ${await grace.getByRole("button", { name: /^(Invite|Remove)$/ }).count()}`,
-  "Lovelace member 0",
+  "orgs: made a member, she is one, and is offered no way to invite a person or to remove one",
+  `${squash(await grace.getByRole("heading", { level: 1 }).innerText())} ${await grace.getByRole("button", { name: "Invite member" }).count()} ${await grace.getByRole("button", { name: "Actions for ada" }).count()}`,
+  "Lovelace member 0 0",
 );
-await members.getByRole("button", { name: "Remove" }).click();
+await fromMenu(person, "Actions for grace", "Remove");
 await person.waitForFunction(
   () => document.querySelectorAll('ul[aria-label="Members of this org"] > li').length === 1,
 );
@@ -3395,9 +3405,10 @@ expectEqual(
 
 // Ada invites her again, as an owner, and nobody answers in time. Keel says it has lapsed, and so does the page.
 const inviteAsOwner = async (): Promise<URL> => {
-  await person.getByLabel("Invite by handle").fill("grace");
-  await person.getByLabel("Role for the invitation").selectOption("owner");
-  await person.getByRole("button", { name: "Invite", exact: true }).click();
+  await person.getByRole("button", { name: "Invite member" }).click();
+  await memberDialog.getByLabel("Handle or email").fill("grace");
+  await memberDialog.getByRole("combobox").selectOption("owner");
+  await memberDialog.getByRole("button", { name: "Invite", exact: true }).click();
   await link.waitFor();
   return new URL(await link.innerText());
 };
@@ -3409,7 +3420,7 @@ expectEqual(
   await closedOf(grace),
   "This invitation has lapsed: This invitation has lapsed; ask the org for a new one",
 );
-await person.getByRole("button", { name: "Withdraw" }).click();
+await fromMenu(person, "Actions for the invitation to grace", "Cancel invitation");
 await link.waitFor({ state: "detached" });
 const asOwner = await inviteAsOwner();
 await grace.goto(asOwner.href, { waitUntil: "domcontentloaded" });
@@ -3419,12 +3430,11 @@ await grace.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
 // An org always has an owner. With two, each is offered a way out; the other owner takes hers first, and Ada's
 // page is behind. Keel refuses the only owner, and the page says so in Keel's words, with the way forward it gave.
 await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
-const leave = person.getByRole("button", { name: "Leave" });
-await leave.waitFor();
+await person.getByRole("button", { name: "Actions for ada" }).waitFor();
 await grace.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
-await grace.getByRole("button", { name: "Leave" }).click();
+await fromMenu(grace, "Actions for grace", "Leave");
 await grace.waitForURL(`${built}/settings`);
-await leave.click();
+await fromMenu(person, "Actions for ada", "Leave");
 await Promise.race([person.getByRole("alert").waitFor(), person.waitForURL(`${built}/settings`)]);
 const refusedToLeave = person.getByRole("alert");
 expectEqual(
@@ -5684,9 +5694,15 @@ await noether.getByLabel("Handle").fill("symmetry");
 await noether.getByRole("button", { name: "Make the org" }).click();
 await noether.getByRole("heading", { level: 1, name: /^Symmetry/ }).waitFor();
 await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
-await noether.getByLabel("Invite by handle").fill("franklin");
-await noether.getByLabel("Role for the invitation").selectOption("member");
-await noether.getByRole("button", { name: "Invite", exact: true }).click();
+await noether.getByRole("button", { name: "Invite member" }).click();
+await noether
+  .getByRole("dialog", { name: "Invite member" })
+  .getByLabel("Handle or email")
+  .fill("franklin");
+await noether
+  .getByRole("dialog", { name: "Invite member" })
+  .getByRole("button", { name: "Invite", exact: true })
+  .click();
 const joining = noether.locator("[data-invitation-link]");
 await joining.waitFor();
 await franklin.goto(new URL(await joining.innerText()).href, { waitUntil: "domcontentloaded" });
@@ -5726,34 +5742,37 @@ expectEqual(
   "Refused: role. Ask an owner: this needs that role | 0 buttons",
 );
 
+/** The org home's section of the agents that have joined it. */
 const orgAgentsOn = (shown: Page): Locator => shown.locator('main section[aria-label="Agents"]');
+/** On an org's People page, the agents' rows, in its members and its pending invitations: each has an Agent tag. */
 const orgAgentList = (shown: Page): Locator =>
-  orgAgentsOn(shown).getByRole("list", { name: "Agents of this org" });
+  shown
+    .getByRole("main")
+    .getByRole("listitem")
+    .filter({ has: shown.locator(".a-chip", { hasText: /^Agent$/ }) });
 const orgAgentRows = async (shown: Page): Promise<string[]> =>
-  (await orgAgentList(shown).getByRole("listitem").allInnerTexts()).map(squash);
+  (await orgAgentList(shown).allInnerTexts()).map(squash);
+/** Keel's refusal where agents are added: the open dialog, or else the page. */
+const refusalOn = async (shown: Page): Promise<string> => {
+  const dialog = shown.getByRole("dialog");
+  const alert = ((await dialog.count()) > 0 ? dialog : shown.getByRole("main")).getByRole("alert");
+  return (await alert.count()) === 0 ? "no refusal" : squash(await alert.first().innerText());
+};
 /** The page has come to say something of an agent, or to a refusal: whichever Keel's answer made it. */
 const answeredOn = async (shown: Page, row: string): Promise<void> => {
   await Promise.race([
     orgAgentList(shown).getByText(row).first().waitFor({ timeout: 10_000 }),
-    orgAgentsOn(shown).getByRole("alert").first().waitFor({ timeout: 10_000 }),
+    shown.getByRole("alert").first().waitFor({ timeout: 10_000 }),
   ]).catch(() => undefined);
 };
-/** Keel's refusal where agents are added: an org's members page, or a project's Collaborators. */
-const refusalOn = async (shown: Page): Promise<string> => {
-  const where = shown.locator(
-    'main section[aria-label="Agents"], main section[aria-label="Collaborators"]',
-  );
-  return (await where.getByRole("alert").count()) === 0
-    ? "no refusal"
-    : squash(await where.getByRole("alert").first().innerText());
-};
+/** Invite agent: the dialog opened where it is not yet, the agent's handle, its role, and Invite. */
 const inviteAgent = async (shown: Page, handle: string, grant?: string): Promise<void> => {
-  await orgAgentsOn(shown).getByLabel("The agent's handle").fill(handle);
-  if (grant !== undefined)
-    await orgAgentsOn(shown)
-      .getByLabel("What the agent may do here")
-      .selectOption({ label: grant });
-  await orgAgentsOn(shown).getByRole("button", { name: "Invite agent" }).click();
+  const dialog = shown.getByRole("dialog", { name: "Invite agent" });
+  if ((await dialog.count()) === 0)
+    await shown.getByRole("button", { name: "Invite agent" }).click();
+  await dialog.getByLabel("Agent handle or name").fill(handle);
+  if (grant !== undefined) await dialog.getByRole("combobox").selectOption({ label: grant });
+  await dialog.getByRole("button", { name: "Invite", exact: true }).click();
 };
 const lastInvitation = (): string =>
   hosting.calls.findLast((call) => call.method === "POST" && call.path.endsWith("/agents"))?.body ??
@@ -5762,8 +5781,10 @@ const lastInvitation = (): string =>
 // Any member invites: Franklin is a plain one, and sponsors Tidy Otter. What the row then says is what Keel answered.
 hosting.sponsors(OTTER.id, (await inviting.whose("franklin"))?.id ?? "");
 await franklin.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
-await orgAgentsOn(franklin).getByText("No agent has been invited into this org.").waitFor();
-const sponsoredFound = orgAgentsOn(franklin).getByRole("list", { name: "Agents you sponsor" });
+await franklin.getByRole("list", { name: "Members of this org" }).waitFor();
+await franklin.getByRole("button", { name: "Invite agent" }).click();
+const agentDialog = franklin.getByRole("dialog", { name: "Invite agent" });
+const sponsoredFound = agentDialog.getByRole("list", { name: "Agents you sponsor" });
 const offeredNow = async (): Promise<string> =>
   (await sponsoredFound.count()) === 0
     ? "nothing offered"
@@ -5774,33 +5795,36 @@ await sponsoredFound.waitFor({ timeout: 5000 }).catch(() => undefined);
 expectEqual(
   "org agents: with nothing typed, the agents the reader sponsors are offered to pick from, each by name and handle",
   await offeredNow(),
-  "Tidy Otter tidy-otter",
+  "Tidy Otter @tidy-otter",
 );
 if ((await sponsoredFound.count()) > 0)
   await sponsoredFound.getByRole("button", { name: /Tidy Otter/ }).click();
 expectEqual(
   "org agents: picking an offered agent puts its handle in the box, and offers nothing more under it",
-  `${await orgAgentsOn(franklin).getByLabel("The agent's handle").inputValue()} | ${await offeredNow()}`,
+  `${await agentDialog.getByLabel("Agent handle or name").inputValue()} | ${await offeredNow()}`,
   "tidy-otter | nothing offered",
 );
 // Typing part of its name finds it among the agents he sponsors, with its handle beside it, as a code host's
 // "Add people" finds someone by their name.
-await orgAgentsOn(franklin).getByLabel("The agent's handle").fill("tidy ot");
+await agentDialog.getByLabel("Agent handle or name").fill("tidy ot");
 await sponsoredFound.waitFor({ timeout: 5000 }).catch(() => undefined);
 expectEqual(
   "org agents: typing part of a sponsored agent's name finds it, its name and handle side by side",
   (await sponsoredFound.count()) === 0
     ? "nothing found"
     : (await sponsoredFound.getByRole("listitem").allInnerTexts()).map(squash).join(" | "),
-  "Tidy Otter tidy-otter",
+  "Tidy Otter @tidy-otter",
 );
-await inviteAgent(franklin, "Tidy Otter", "Read only");
+await shot(franklin, "invite-agent");
+await inviteAgent(franklin, "Tidy Otter", "Read");
 await answeredOn(franklin, "Tidy Otter");
 expectEqual(
-  "org agents: a plain member invites an agent he sponsors by its name, Keel is asked for its handle, to read alone, and the row says what Keel answered",
-  `${(await orgAgentRows(franklin)).join(" | ")} | ${lastInvitation()}`,
-  'Tidy Otter reads · invited, not yet accepted · invited by you Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+  "org agents: a plain member invites an agent he sponsors by its name, Keel is asked for its handle, to read alone, and its row, pending, says what Keel answered",
+  `${(await orgAgentRows(franklin)).join(" | ")} | ${await franklin.getByRole("list", { name: "Invitations not yet answered" }).getByText("Tidy Otter").count()} pending | ${lastInvitation()}`,
+  'Tidy Otter Agent @tidy-otter · Invited by you Read | 1 pending | {"agent":"tidy-otter","scopes":["agent:read"]}',
 );
+await franklin.getByRole("button", { name: "Invite agent" }).click();
+await agentDialog.waitFor();
 expectEqual(
   "org agents: an agent the org has invited is not offered again",
   await offeredNow(),
@@ -5808,14 +5832,22 @@ expectEqual(
 );
 // A handle no agent has, typed with a space either side of it: Keel is asked for the handle, and says so.
 await inviteAgent(franklin, " nobody-here ");
-await orgAgentsOn(franklin)
+await agentDialog
   .getByRole("alert")
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
+const nobodyRefused = await refusalOn(franklin);
+await shot(franklin, "invite-agent-refused");
+// The dialog stays open on a refusal, and holds the page behind it until it is closed.
+await franklin
+  .getByRole("dialog", { name: "Invite agent" })
+  .getByRole("button", { name: "Cancel" })
+  .click();
+await franklin.getByRole("dialog").waitFor({ state: "detached" });
 expectEqual(
   "org agents: a handle no agent has is refused in Keel's own sentence, and nobody is invited",
-  `${await refusalOn(franklin)} | ${(await orgAgentRows(franklin)).length} listed`,
+  `${nobodyRefused} | ${(await orgAgentRows(franklin)).length} listed`,
   "No agent has the handle nobody-here. | 1 listed",
 );
 
@@ -5825,31 +5857,42 @@ await answeredOn(noether, "Tidy Otter");
 await inviteAgent(noether, "unbroken-heron");
 await answeredOn(noether, UNBROKEN.name);
 const invitedBy = (rows: readonly string[]): string =>
-  rows.map((row) => /invited by \S+/.exec(row)?.[0] ?? "by nobody").join(" | ");
+  rows.map((row) => /Invited by \S+/.exec(row)?.[0] ?? "by nobody").join(" | ");
 expectEqual(
   "org agents: each row names the member who invited the agent: by handle, and as you where it is the reader",
   `${invitedBy(await orgAgentRows(noether))} | ${lastInvitation()}`,
-  'invited by franklin | invited by you | {"agent":"unbroken-heron","scopes":["agent:read","agent:work"]}',
+  'Invited by @franklin | Invited by you | {"agent":"unbroken-heron","scopes":["agent:read","agent:work"]}',
 );
-const removals = (shown: Page): Promise<string[]> =>
-  orgAgentList(shown)
-    .getByRole("button")
-    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") ?? ""));
+/** What each agent row's menu offers, opened and closed again: its items, and whose row it is. */
+const removals = async (shown: Page): Promise<string[]> => {
+  const said: string[] = [];
+  for (const menu of await orgAgentList(shown).getByRole("button").all()) {
+    const rowOf = (await menu.getAttribute("aria-label"))?.replace("Actions for ", "") ?? "";
+    await menu.click();
+    await shown.getByRole("menuitem").first().waitFor();
+    said.push(
+      `${(await shown.getByRole("menuitem").allInnerTexts()).map(squash).join("/")} ${rowOf}`,
+    );
+    await shown.keyboard.press("Escape");
+    await shown.getByRole("menu").waitFor({ state: "detached" });
+  }
+  return said;
+};
 await franklin.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
 await answeredOn(franklin, UNBROKEN.name);
 expectEqual(
   "org agents: a plain member is offered the removal of the agent they invited and of no other, an owner of each",
   `${(await removals(franklin)).join(", ")} | ${(await removals(noether)).length}`,
-  "Withdraw Tidy Otter | 2",
+  "Cancel invitation tidy-otter | 2",
 );
 // At a phone's width a name with nowhere to break wraps. A box that cannot grow keeps to the screen while its
 // words run out of it, so what is measured is where each piece of text is drawn, beside each box.
 await noether.setViewportSize({ width: 390, height: 844 });
 expectEqual(
-  "org agents: at a phone's width no word of the section, and no part of it, runs past the screen",
+  "org agents: at a phone's width no word of the page, and no part of it, runs past the screen",
   String(
     await noether.evaluate(() => {
-      const section = document.querySelector('main section[aria-label="Agents"]');
+      const section = document.querySelector("main");
       if (section === null) return "no section";
       const edges = [section, ...section.querySelectorAll("*")].map(
         (part) => part.getBoundingClientRect().right,
@@ -5876,8 +5919,8 @@ await answeredOn(noether, "Tidy Otter");
 await shot(noether, "org-agents");
 expectEqual(
   "org agents: an agent that accepted is said to have joined, its name goes to its own page, and its removal is called that",
-  `${String((await orgAgentRows(noether))[0]?.includes(`joined ${today}`))} | ${String(await orgAgentList(noether).getByRole("link", { name: "Tidy Otter" }).getAttribute("href"))} | ${(await removals(noether)).join(", ")}`,
-  `true | /tidy-otter | Remove Tidy Otter, Withdraw ${UNBROKEN.name}`,
+  `${String((await orgAgentRows(noether))[0]?.includes(`Joined ${today}`))} | ${String(await orgAgentList(noether).getByRole("link", { name: "Tidy Otter" }).getAttribute("href"))} | ${(await removals(noether)).join(", ")}`,
+  `true | /tidy-otter | Remove tidy-otter, Cancel invitation unbroken-heron`,
 );
 
 // The org's home lists the agents that have joined, to its members and to anyone: who each is, and nothing of
@@ -5911,7 +5954,7 @@ await onlooker.goto(`${built}/symmetry`, { waitUntil: "domcontentloaded" });
 expectEqual(
   "org agents: a visitor is listed the agents that have joined the org, each by who it is and linked to its page",
   await joinedOn(onlooker),
-  `Tidy Otter joined ${today} | /tidy-otter`,
+  `Tidy Otter Joined ${today} | /tidy-otter`,
 );
 // An agent's own page names the orgs it has joined, as its card does to anyone: each by its handle, linked to
 // the org, and nothing of an invitation nobody has answered or of who invited it.
@@ -5944,7 +5987,7 @@ await noether.goto(`${built}/symmetry`, { waitUntil: "domcontentloaded" });
 expectEqual(
   "org agents: a member's home of the org lists the ones that have joined, and no invitation nobody has answered",
   await joinedOn(noether),
-  `Tidy Otter joined ${today} | /tidy-otter`,
+  `Tidy Otter Joined ${today} | /tidy-otter`,
 );
 
 // Ten minutes on, Keel takes no removal from this sign-in: it says so and how to go on, and the page offers the
@@ -5952,16 +5995,16 @@ expectEqual(
 await inviting.age();
 await noether.goto(`${built}/orgs/symmetry/members`, { waitUntil: "domcontentloaded" });
 await answeredOn(noether, "Tidy Otter");
-const takeOut = orgAgentList(noether).getByRole("button", {
-  name: /^(Remove|Withdraw) Tidy Otter$/,
-});
-if ((await takeOut.count()) > 0) await takeOut.click();
-await orgAgentsOn(noether)
+await fromMenu(noether, "Actions for tidy-otter", "Remove");
+await noether
+  .getByRole("main")
   .getByRole("alert")
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
-const touchForAgents = orgAgentsOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
+const touchForAgents = noether
+  .getByRole("main")
+  .getByRole("button", { name: "Confirm with passkey" });
 expectEqual(
   "org agents: a removal from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and the agent is still there",
   `${await refusalOn(noether)} | ${await touchForAgents.count()} offered | ${(await orgAgentRows(noether)).length} listed`,
@@ -5977,7 +6020,7 @@ await orgAgentList(noether)
 expectEqual(
   "org agents: one touch signs in afresh and asks again what Keel refused, and the agent is out of the org",
   `${invitedBy(await orgAgentRows(noether))} | ${(await orgAgentRows(noether)).length} listed | ${await refusalOn(noether)}`,
-  "invited by you | 1 listed | no refusal",
+  "Invited by you | 1 listed | no refusal",
 );
 // An agent invited to one project of a person's own namespace, as a code host has a repository's collaborators.
 // The project is Noether's own here, and public, so anyone reads it. She is its owner; Franklin is nobody to it.
@@ -6025,7 +6068,7 @@ if ((await accessOn(noether).getByLabel("The agent's handle").count()) > 0) {
   await accessOn(noether).getByLabel("The agent's handle").fill("tidy-otter");
   await accessOn(noether)
     .getByLabel("What the agent may do on this project")
-    .selectOption({ label: "Read only" });
+    .selectOption({ label: "Read" });
   await accessOn(noether).getByRole("button", { name: "Add agent" }).click();
 }
 await Promise.race([
@@ -6036,14 +6079,14 @@ await shot(noether, "project-agents");
 expectEqual(
   "project agents: the owner invites an agent to her own project by its handle, to read alone, and the row says what Keel answered and nothing of who invited",
   `${(await invitedRows(noether)).join(" | ") || "nothing listed"} | ${lastProjectInvitation()}`,
-  'Tidy Otter agent reads · invited, not yet accepted Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+  'Tidy Otter agent Read · Pending Cancel invitation | {"agent":"tidy-otter","scopes":["agent:read"]}',
 );
 // The agent accepts, which is its own call. The project's settings then list who has access: its owner and the
 // agent, each in the same row, the agent marked as one.
 personal.joins(personal.project.id, OTTER.id);
 await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
 await invitedOn(noether)
-  .getByText(/joined/)
+  .getByText(/Joined/)
   .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
@@ -6054,7 +6097,7 @@ expectEqual(
     .getByRole("link")
     .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href") ?? "").join(" "))
     .catch(() => "no links")}`,
-  `noether owner | Tidy Otter agent reads · joined ${today} Remove | /noether /tidy-otter`,
+  `noether owner | Tidy Otter agent Read · Joined ${today} Remove | /noether /tidy-otter`,
 );
 // Ten minutes on, Keel takes no removal from this sign-in, and the page offers the passkey touch that answers it.
 await inviting.age();
@@ -6064,7 +6107,9 @@ await invitedOn(noether)
   .first()
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
-const takeOff = invitedOn(noether).getByRole("button", { name: /^(Remove|Withdraw) Tidy Otter$/ });
+const takeOff = invitedOn(noether).getByRole("button", {
+  name: /^(Remove|Cancel invitation) Tidy Otter$/,
+});
 if ((await takeOff.count()) > 0) await takeOff.click();
 await accessOn(noether)
   .getByRole("alert")

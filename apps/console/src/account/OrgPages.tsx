@@ -42,7 +42,6 @@ import type {
 import {
   type Account,
   type Closed,
-  type Invitation,
   type Invited,
   type Member,
   type Org,
@@ -51,9 +50,10 @@ import {
   nameOf,
 } from "./account.ts";
 import { NamespaceCredentials } from "./Credentials.tsx";
-import { JoinedAgents, OrgAgents } from "./OrgAgents.tsx";
-import { Card, HANDLE, Refusal, SELECT, go, useAsking } from "./parts.tsx";
-import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
+import { JoinedAgents } from "./OrgAgents.tsx";
+import { People } from "./People.tsx";
+import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
+import { manages, mayDelete } from "./roles.ts";
 import { type NamespaceTab, TAB_LABEL, tabHref, tabsOf } from "./namespaceTabs.ts";
 
 /** What a page calls a namespace that is not a person's. */
@@ -235,39 +235,6 @@ function useOrg(
   return { held, read };
 }
 
-function RoleSelect({
-  label,
-  value,
-  among,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: Role;
-  among: Role[];
-  disabled: boolean;
-  onChange: (role: Role) => void;
-}) {
-  return (
-    <select
-      aria-label={label}
-      className={SELECT}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => {
-        const chosen = ROLES.find((role) => role === event.target.value);
-        if (chosen !== undefined) onChange(chosen);
-      }}
-    >
-      {among.map((role) => (
-        <option key={role} value={role}>
-          {role}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 /** A person as a code host names one: by handle, with their name beside it. Never by an address. */
 function Person({ member }: { member: Member }) {
   return (
@@ -436,227 +403,6 @@ function Home({
         </a>
       </section>
       <JoinedAgents agents={agents} org={page.org.handle} />
-    </>
-  );
-}
-
-/** An invitation's own address, which whoever made it passes on: Keel sends no email yet. */
-function InvitationRow({
-  invitation,
-  cancel,
-}: {
-  invitation: Invitation;
-  cancel?: (() => void) | undefined;
-}) {
-  const link = `${window.location.origin}${hrefOf({ at: "invite", id: invitation.id })}`;
-  const [copied, setCopied] = useState(false);
-  return (
-    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-      <span className="flex items-baseline gap-2">
-        <span className="font-semibold text-kumo-strong">{invitation.to}</span>
-        <span className="text-kumo-subtle">invited as {invitation.role}</span>
-      </span>
-      <span className="flex items-center gap-3">
-        <code className="a-mono text-kumo-default" data-invitation-link>
-          {link}
-        </code>
-        <button
-          type="button"
-          className="a-link"
-          onClick={() => {
-            void navigator.clipboard.writeText(link).then(() => setCopied(true));
-          }}
-        >
-          {copied ? "Copied" : "Copy link"}
-        </button>
-        {cancel !== undefined && (
-          <button type="button" className="a-link" onClick={cancel}>
-            Withdraw
-          </button>
-        )}
-      </span>
-    </li>
-  );
-}
-
-function InviteForm({
-  account,
-  page,
-  done,
-}: {
-  account: Account;
-  page: OrgPage;
-  done: () => Promise<void>;
-}) {
-  const [by, setBy] = useState<"handle" | "email">("handle");
-  const [to, setTo] = useState("");
-  const [role, setRole] = useState<Role>("member");
-  const { busy, refused, ask } = useAsking();
-  const invite = (event: FormEvent) => {
-    event.preventDefault();
-    void ask(async () => {
-      const typed = to.trim();
-      await account.invite(page.org, by === "handle" ? { handle: typed } : { email: typed }, role);
-      setTo("");
-      await done();
-    });
-  };
-  return (
-    <form className="flex flex-col gap-2" onSubmit={invite}>
-      <div className="flex flex-wrap items-end gap-2">
-        <Input
-          label={by === "handle" ? "Invite by handle" : "Invite by email"}
-          name={by}
-          type={by === "handle" ? "text" : "email"}
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-          value={to}
-          onChange={(event) => setTo(event.target.value)}
-        />
-        <RoleSelect
-          label="Role for the invitation"
-          value={role}
-          among={givable(page.role)}
-          disabled={busy}
-          onChange={setRole}
-        />
-        <Button type="submit" variant="secondary" disabled={busy}>
-          Invite
-        </Button>
-      </div>
-      <button
-        type="button"
-        className="a-link self-start text-sm"
-        onClick={() => {
-          setBy(by === "handle" ? "email" : "handle");
-          setTo("");
-        }}
-      >
-        {by === "handle" ? "Invite by email instead" : "Invite by handle instead"}
-      </button>
-      <Refusal said={refused} />
-    </form>
-  );
-}
-
-function Members({
-  account,
-  agents,
-  sponsorship,
-  page,
-  who,
-  read,
-}: {
-  account: Account;
-  agents: KeelOrgAgents;
-  sponsorship: KeelSponsorship;
-  page: OrgPage;
-  who: Who;
-  read: () => Promise<void>;
-}) {
-  const { busy, refused, ask } = useAsking();
-  const { org } = page;
-  const offered = givable(page.role);
-  // An org is never left with no owner, so its only owner is offered no way out of it.
-  const lastOwner =
-    page.role === "owner" && page.members.filter((member) => member.role === "owner").length === 1;
-  const change = (what: () => Promise<void>) =>
-    void ask(async () => {
-      await what();
-      await read();
-    });
-  return (
-    <>
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Members">
-        <h2 className="a-h">Members</h2>
-        <ul className="flex flex-col gap-2" aria-label="Members of this org">
-          {page.members.map((member) => {
-            // Nobody changes their own role here, and only an owner changes an owner's.
-            const theirs = !member.you && offered.includes(member.role);
-            return (
-              <li key={member.id} className="flex items-center justify-between gap-3 text-sm">
-                <Person member={member} />
-                <span className="flex items-center gap-3">
-                  {theirs ? (
-                    <RoleSelect
-                      label={`Role of ${member.handle ?? member.name}`}
-                      value={member.role}
-                      among={offered}
-                      disabled={busy}
-                      onChange={(role) => change(() => account.setRole(org, member, role))}
-                    />
-                  ) : (
-                    <span className="text-kumo-subtle">{member.role}</span>
-                  )}
-                  {theirs && (
-                    <button
-                      type="button"
-                      className="a-link"
-                      disabled={busy}
-                      onClick={() => change(() => account.removeMember(org, member))}
-                    >
-                      Remove
-                    </button>
-                  )}
-                  {member.you && org.handle !== who.handle && !lastOwner && (
-                    <button
-                      type="button"
-                      className="a-link"
-                      disabled={busy}
-                      onClick={() =>
-                        void ask(async () => {
-                          await account.leave(org);
-                          go(hrefOf({ at: "settings" }));
-                        })
-                      }
-                    >
-                      Leave
-                    </button>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <Refusal said={refused} />
-      </section>
-      <section className="a-panel flex flex-col gap-3 p-4" aria-label="Invitations">
-        <h2 className="a-h">Invitations</h2>
-        {manages(page.role) ? (
-          <>
-            <p className="text-sm text-kumo-subtle">
-              Keel sends no email yet. An invitation has a link: pass it to the person it is for,
-              and it is theirs alone to accept.
-            </p>
-            <InviteForm account={account} page={page} done={read} />
-          </>
-        ) : (
-          <p className="text-sm text-kumo-subtle">An owner or a maintainer invites people.</p>
-        )}
-        {page.invitations.length > 0 && (
-          <ul className="flex flex-col gap-2" aria-label="Invitations not yet answered">
-            {page.invitations.map((invitation) => (
-              <InvitationRow
-                key={invitation.id}
-                invitation={invitation}
-                cancel={
-                  manages(page.role)
-                    ? () => change(() => account.cancelInvitation(invitation.id))
-                    : undefined
-                }
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-      <OrgAgents
-        account={account}
-        agents={agents}
-        sponsorship={sponsorship}
-        page={page}
-        who={who}
-      />
     </>
   );
 }
@@ -976,7 +722,7 @@ export function NamespacePages({
         />
       )}
       {open === "people" && (
-        <Members
+        <People
           account={account}
           agents={agents}
           sponsorship={sponsorship}
