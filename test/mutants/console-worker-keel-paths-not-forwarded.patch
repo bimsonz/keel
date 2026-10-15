@@ -2,7 +2,7 @@
 # kills: handler.keel-paths
 # why: Keel's own paths are the page, so a site with no routes answers its API, its MCP endpoint and its front door with HTML
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index f5065739..d6850c0a 100644
+index bdaf18e2..52c00cae 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
 @@ -122,7 +122,7 @@ export function createConsole(cards: Cards = {}): Console {
@@ -11,6 +11,6 @@ index f5065739..d6850c0a 100644
        if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
 -      if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
 +      if (GIT.test(pathname)) return env.KEEL.fetch(request);
-       if (nowhere(pathname)) {
-         // The built page draws its own not-found; the answer says so too, to whoever reads only its status.
-         const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
+       if (pathname.startsWith("/assets/")) {
+         // The build's files are named by their contents, so a page from before a deploy asks for some the new
+         // build has not. The assets' single-page fallback answers those with the page, which a script cannot run:

@@ -22,6 +22,8 @@
     // else is a file or the page.
     "run_worker_first": [
       "/healthz",
+      // A file of the build: one an older page asks for after a deploy is answered 404, not with the page.
+      "/assets/*",
       "/*.git/info/refs",
       "/*.git/git-upload-pack",
       "/*.git/git-receive-pack",
@@ -43,10 +45,8 @@
       "/admin/*",
       "/favicon.ico",
       "/sitemap.xml",
-      // A project's pages, for the card a crawler reads (src/worker/cards.ts); the build's own files
-      // are under /assets and stay the assets' alone.
+      // A project's pages, for the card a crawler reads (src/worker/cards.ts).
       "/*/*",
-      "!/assets/*",
     ],
   },
   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

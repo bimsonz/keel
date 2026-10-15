@@ -2,14 +2,14 @@
 # kills: console.nowhere-first
 # why: the sitemap never reaches the Worker, so the page answers it 200
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index e52d0a3e..9b48d2b5 100644
+index 2ff35c2e..e71c9185 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
-@@ -42,7 +42,6 @@
+@@ -44,7 +44,6 @@
        "/admin",
        "/admin/*",
        "/favicon.ico",
 -      "/sitemap.xml",
-       // A project's pages, for the card a crawler reads (src/worker/cards.ts); the build's own files
-       // are under /assets and stay the assets' alone.
+       // A project's pages, for the card a crawler reads (src/worker/cards.ts).
        "/*/*",
+     ],

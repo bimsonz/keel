@@ -226,7 +226,7 @@ describe("the console's Worker", () => {
 
   // Where nothing is run first, the assets answer a path that is no file with the page, and the
   // Worker's code never runs: seen on keel.town, where every clone address answered HTML.
-  it("[console.git-first] the Worker's config runs it first for every path it hands to Keel, and not for the root, a namespace or the build's files", () => {
+  it("[console.git-first] the Worker's config runs it first for every path it hands to Keel, and not for the root or a namespace", () => {
     const firstFor = runFirst();
     for (const path of [
       "/acme/forge.git/info/refs",
@@ -235,12 +235,12 @@ describe("the console's Worker", () => {
       "/a.b/c-d_e.git/info/refs",
     ])
       expect([path, firstFor(path)]).toEqual([path, true]);
-    for (const path of ["/", "/acme", "/acme.git", "/assets/index.js", "/assets/og-a1b2.css"])
+    for (const path of ["/", "/acme", "/acme.git"])
       expect([path, firstFor(path)]).toEqual([path, false]);
   });
 
   // A crawler runs no script: a project's card is in the served page's tags, which only the Worker can set.
-  it("[console.cards-first] the Worker's config runs it first for a project's pages, for their card, and never for the build's files", () => {
+  it("[console.cards-first] the Worker's config runs it first for a project's pages, for their card, and not for a file at the root", () => {
     const firstFor = runFirst();
     for (const path of [
       "/acme/forge",
@@ -249,8 +249,34 @@ describe("the console's Worker", () => {
       "/keel/keel/mission-control",
     ])
       expect([path, firstFor(path)]).toEqual([path, true]);
-    for (const path of ["/assets/index-Dv8YgwGD.js", "/og.png", "/robots.txt"])
+    for (const path of ["/og.png", "/robots.txt"])
       expect([path, firstFor(path)]).toEqual([path, false]);
+  });
+
+  // A page from before a deploy asks for a file the new build has not, and the assets' fallback answers it with the
+  // page, which a script cannot run.
+  it("[handler.stale-file] is run first for the build's files, answers 404 for one the assets do not have, and hands on one they have", async () => {
+    expect(runFirst()("/assets/MissionCanvas-a1b2c3.js")).toBe(true);
+    const env: Env = {
+      ASSETS: {
+        fetch: (request) =>
+          Promise.resolve(
+            new URL(request.url).pathname === "/assets/index-new.js"
+              ? new Response("export {}", { headers: { "content-type": "text/javascript" } })
+              : new Response("<!doctype html>", { headers: { "content-type": "text/html" } }),
+          ),
+      },
+      KEEL: { fetch: () => Promise.resolve(new Response(null, { status: 502 })) },
+    };
+    const mission = createConsole();
+    const gone = await mission.fetch(new Request(`${ORIGIN}/assets/MissionCanvas-old.js`), env);
+    const kept = await mission.fetch(new Request(`${ORIGIN}/assets/index-new.js`), env);
+    expect([
+      gone.status,
+      gone.headers.get("content-type"),
+      gone.headers.get("cache-control"),
+    ]).toEqual([404, "text/plain; charset=utf-8", "no-store"]);
+    expect([kept.status, await kept.text()]).toEqual([200, "export {}"]);
   });
 
   it("[handler.nowhere] answers 404 with the page for a path nothing here answers, and hands every other path on as before", async () => {

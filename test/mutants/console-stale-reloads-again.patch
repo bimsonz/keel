@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/staleBuild.test.ts
+# kills: stale.once
+# why: the page loads itself again for every missing file, in a loop
+diff --git a/apps/console/src/staleBuild.ts b/apps/console/src/staleBuild.ts
+index b64be9c6..1f590e78 100644
+--- a/apps/console/src/staleBuild.ts
++++ b/apps/console/src/staleBuild.ts
+@@ -18,7 +18,6 @@ export function reloadOnce(
+   try {
+     const kept = storage();
+     const last = Number(kept.getItem(STAMP) ?? Number.NEGATIVE_INFINITY);
+-    if (now - last < AGAIN_MS) return false;
+     kept.setItem(STAMP, String(now));
+   } catch {
+     return false;

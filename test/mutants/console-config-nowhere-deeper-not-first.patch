@@ -2,19 +2,18 @@
 # kills: console.nowhere-first
 # why: the config runs the Worker first for `/admin` but not under it, so the page answers there 200
 diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
-index e52d0a3e..f5ce5f22 100644
+index 2ff35c2e..7b4debae 100644
 --- a/apps/console/wrangler.jsonc
 +++ b/apps/console/wrangler.jsonc
-@@ -40,12 +40,10 @@
+@@ -42,11 +42,9 @@
        "/install",
        "/install/*",
        "/admin",
 -      "/admin/*",
        "/favicon.ico",
        "/sitemap.xml",
-       // A project's pages, for the card a crawler reads (src/worker/cards.ts); the build's own files
-       // are under /assets and stay the assets' alone.
+       // A project's pages, for the card a crawler reads (src/worker/cards.ts).
 -      "/*/*",
-       "!/assets/*",
      ],
    },
+   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

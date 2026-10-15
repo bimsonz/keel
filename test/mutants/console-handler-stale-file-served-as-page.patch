@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.stale-file
+# why: a build file the assets do not have is answered with the page
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index bdaf18e2..07c0aacc 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -123,7 +123,7 @@ export function createConsole(cards: Cards = {}): Console {
+       const { origin, pathname } = new URL(request.url);
+       if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
+       if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
+-      if (pathname.startsWith("/assets/")) {
++      if (pathname.startsWith("/nothing/")) {
+         // The build's files are named by their contents, so a page from before a deploy asks for some the new
+         // build has not. The assets' single-page fallback answers those with the page, which a script cannot run:
+         // the page would draw nothing. Not found lets it load itself again.

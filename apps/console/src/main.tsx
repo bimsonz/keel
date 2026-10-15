@@ -9,8 +9,21 @@ import { takeLink } from "./account/sponsorLink.ts";
 import { hrefOf, placeOf } from "./places.ts";
 import { readCache } from "./source/cache.ts";
 import { installPrefetch, prefetchAddress } from "./source/prefetch.ts";
+import { reloadOnce } from "./staleBuild.ts";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./styles.css";
+
+// A file of this build that a deploy has since removed: the page loads itself again, once, rather than draw nothing.
+window.addEventListener("vite:preloadError", (event) => {
+  if (
+    reloadOnce(
+      () => window.sessionStorage,
+      Date.now(),
+      () => window.location.reload(),
+    )
+  )
+    event.preventDefault();
+});
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("missing #root");

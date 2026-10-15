@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.stale-file
+# why: the Worker is not run first for the build's files, so the assets' fallback answers a missing one with the page
+diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
+index 2ff35c2e..81ccd356 100644
+--- a/apps/console/wrangler.jsonc
++++ b/apps/console/wrangler.jsonc
+@@ -23,7 +23,6 @@
+     "run_worker_first": [
+       "/healthz",
+       // A file of the build: one an older page asks for after a deploy is answered 404, not with the page.
+-      "/assets/*",
+       "/*.git/info/refs",
+       "/*.git/git-upload-pack",
+       "/*.git/git-receive-pack",
+@@ -46,7 +45,6 @@
+       "/favicon.ico",
+       "/sitemap.xml",
+       // A project's pages, for the card a crawler reads (src/worker/cards.ts).
+-      "/*/*",
+     ],
+   },
+   // Keel's Worker. A clone address (/<namespace>/<project>.git) is a path no route can name, and

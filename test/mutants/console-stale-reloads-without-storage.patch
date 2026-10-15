@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/staleBuild.test.ts
+# kills: stale.no-storage
+# why: the page loads itself again where it cannot keep when it last did
+diff --git a/apps/console/src/staleBuild.ts b/apps/console/src/staleBuild.ts
+index b64be9c6..b6a8cd97 100644
+--- a/apps/console/src/staleBuild.ts
++++ b/apps/console/src/staleBuild.ts
+@@ -21,7 +21,7 @@ export function reloadOnce(
+     if (now - last < AGAIN_MS) return false;
+     kept.setItem(STAMP, String(now));
+   } catch {
+-    return false;
++    // nothing kept
+   }
+   reload();
+   return true;

@@ -27,6 +27,24 @@ describe("the console's Worker", () => {
     expect(await response.text()).toContain('<div id="root"');
   });
 
+  it("[console.stale-file] answers 404, not the page, for a build file it does not have, asked for as a script, and serves one it has", async () => {
+    const page = await (await SELF.fetch(`${CONSOLE}/`)).text();
+    const entry = /\/assets\/index-[\w-]+\.js/.exec(page)?.[0] ?? "no entry script";
+    const asScript = { headers: { "sec-fetch-mode": "cors", "sec-fetch-dest": "script" } };
+    const gone = await SELF.fetch(`${CONSOLE}/assets/MissionCanvas-gone0000.js`, asScript);
+    const kept = await SELF.fetch(`${CONSOLE}${entry}`, asScript);
+    expect([gone.status, gone.headers.get("content-type"), await gone.text()]).toEqual([
+      404,
+      "text/plain; charset=utf-8",
+      "Not found",
+    ]);
+    expect([
+      kept.status,
+      kept.headers.get("content-type")?.includes("javascript"),
+      (await kept.text()).length > 0,
+    ]).toEqual([200, true, true]);
+  });
+
   it("[console.api-catalog] says at its root where Keel's catalogue of its API is, and on no other page", async () => {
     // RFC 9727: whoever is given only the address finds the catalogue from the root's own headers.
     const root = await SELF.fetch(`${CONSOLE}/`);

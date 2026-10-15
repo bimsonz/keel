@@ -123,6 +123,17 @@ export function createConsole(cards: Cards = {}): Console {
       const { origin, pathname } = new URL(request.url);
       if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
       if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
+      if (pathname.startsWith("/assets/")) {
+        // The build's files are named by their contents, so a page from before a deploy asks for some the new
+        // build has not. The assets' single-page fallback answers those with the page, which a script cannot run:
+        // the page would draw nothing. Not found lets it load itself again.
+        const file = await env.ASSETS.fetch(request);
+        if (!(file.headers.get("content-type") ?? "").startsWith("text/html")) return file;
+        return new Response("Not found", {
+          status: 404,
+          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
       if (nowhere(pathname)) {
         // The built page draws its own not-found; the answer says so too, to whoever reads only its status.
         const page = await env.ASSETS.fetch(new Request(new URL("/", request.url)));
