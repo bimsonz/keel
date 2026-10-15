@@ -277,6 +277,48 @@ export class Hand {
     return this;
   }
 
+  /** A step of the batch's plan started, as Keel commits it while the step runs; `world` only in a conflict's matrix. */
+  stepStarted(batchId: string, stepId: string, world?: "trunk" | "A" | "B" | "AB"): this {
+    this.b.emit({
+      type: "VerificationStepStarted",
+      entity: { kind: "candidate", id: `cnd_${batchId}` },
+      payload: {
+        batchId,
+        candidateId: `cnd_${batchId}`,
+        stepId,
+        kind: "deterministic",
+        tier: { tier: 2, reason: "box" },
+        ...(world === undefined ? {} : { world }),
+      },
+    });
+    return this;
+  }
+
+  /** What a step came to, with the runner's own duration. */
+  stepFinished(
+    batchId: string,
+    stepId: string,
+    outcome: "pass" | "fail" | "escalate" | "annotate" | "abstain",
+    durationMs: number,
+    given: { failure?: "timeout" | "unavailable"; world?: "trunk" | "A" | "B" | "AB" } = {},
+  ): this {
+    this.b.emit({
+      type: "VerificationStepFinished",
+      entity: { kind: "candidate", id: `cnd_${batchId}` },
+      payload: {
+        batchId,
+        candidateId: `cnd_${batchId}`,
+        stepId,
+        outcome,
+        evidenceClass: "proof",
+        tier: { tier: 2, reason: "box" },
+        durationMs,
+        ...given,
+      },
+    });
+    return this;
+  }
+
   verdict(verdictId: string, subject: string, evidence: string[]): this {
     this.b.emit({
       type: "VerdictIssued",

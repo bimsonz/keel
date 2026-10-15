@@ -2,10 +2,10 @@
 # kills: growth.bounce
 # why: a bounce is drawn from the batch, not from the check that failed
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..7e008ac6 100644
+index ece58765..c8e51924 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -591,7 +591,7 @@ export function growthOf(
+@@ -599,7 +599,7 @@ export function growthOf(
          (each) =>
            each.id === `fork:${id}` || (each.kind === "agent" && each.id.startsWith(`agent:${id}:`)),
        );

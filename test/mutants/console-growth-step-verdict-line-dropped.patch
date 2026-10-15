@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps-verdict
+# why: a started step does not carry the verdict's line for it
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..c9f361c1 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -671,7 +671,6 @@ function stepChecksOf(
+     const { finished } = step;
+     if (finished !== undefined) {
+       const line =
+-        said.get(step.id)?.line ??
+         (finished.failure === undefined
+           ? undefined
+           : `${step.id}: ${finished.outcome}, ${finished.failure}`);

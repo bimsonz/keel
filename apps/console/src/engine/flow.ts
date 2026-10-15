@@ -44,6 +44,20 @@ export type BatchEnd =
   | "declined"
   | "landed";
 
+type StepFinished = Extract<AnyEvent, { type: "VerificationStepFinished" }>["payload"];
+
+/** One step of a batch's verification, as Keel's step events tell it: started, then what it came to. */
+export interface FlowStep {
+  id: string;
+  startedT: number;
+  finished?: {
+    t: number;
+    outcome: StepFinished["outcome"];
+    durationMs: number;
+    failure?: StepFinished["failure"];
+  };
+}
+
 export interface FlowBatch {
   id: string;
   laneId: string;
@@ -58,6 +72,8 @@ export interface FlowBatch {
   assembled?: { t: number; tier: number; composer: string };
   /** When its verification started, by `VerificationStarted`. */
   verifyingT?: number;
+  /** Its steps in the order they started, by `VerificationStepStarted` and `VerificationStepFinished`. */
+  steps: FlowStep[];
   ended?: {
     t: number;
     how: BatchEnd;
@@ -180,6 +196,7 @@ export class Flow {
           attempt: event.payload.attempt,
           chainEpoch: event.payload.chainEpoch,
           formedT: t,
+          steps: [],
         });
         break;
       }
@@ -192,6 +209,30 @@ export class Flow {
       case "VerificationStarted": {
         const batch = this.#batch(event.payload.batchId);
         if (batch !== undefined) batch.verifyingT = t;
+        break;
+      }
+      // A step of a conflict's world matrix names its world; a batch's own steps name none.
+      case "VerificationStepStarted": {
+        const batch = this.#batch(event.payload.batchId);
+        if (batch === undefined || event.payload.world !== undefined) break;
+        if (!batch.steps.some((step) => step.id === event.payload.stepId))
+          batch.steps.push({ id: event.payload.stepId, startedT: t });
+        break;
+      }
+      case "VerificationStepFinished": {
+        const batch = this.#batch(event.payload.batchId);
+        if (batch === undefined || event.payload.world !== undefined) break;
+        let step = batch.steps.find((each) => each.id === event.payload.stepId);
+        if (step === undefined) {
+          step = { id: event.payload.stepId, startedT: t };
+          batch.steps.push(step);
+        }
+        step.finished = {
+          t,
+          outcome: event.payload.outcome,
+          durationMs: event.payload.durationMs,
+          ...(event.payload.failure === undefined ? {} : { failure: event.payload.failure }),
+        };
         break;
       }
       case "BatchVerified": {

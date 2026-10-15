@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps
+# why: a batch's step events are not drawn
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..eb126d1c 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -521,7 +521,7 @@ export function growthOf(
+     const verdict =
+       batch.ended?.verdictId === undefined ? undefined : world.verdicts.get(batch.ended.verdictId);
+     const steps: Omit<CheckNode, keyof Placed | "kind">[] =
+-      batch.steps.length > 0
++      batch.steps.length < 0
+         ? stepChecksOf(batch, verdict, why)
+         : verdict !== undefined
+           ? checksOf(verdict)

@@ -2112,6 +2112,9 @@
 :root .a-arch-check[data-result="escalate"] svg {
   color: var(--arch-wait);
 }
+:root .a-arch-check[data-result="stopped"] svg {
+  color: var(--arch-wait);
+}
 :root .a-arch-check[data-result="running"] {
   border-color: var(--mc-move);
 }

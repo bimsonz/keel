@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.steps
+# why: what a step came to is not kept
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index b41cdbff..ea93a013 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -229,7 +229,7 @@ export class Flow {
+         }
+         step.finished = {
+           t,
+-          outcome: event.payload.outcome,
++          outcome: "pass",
+           durationMs: event.payload.durationMs,
+           ...(event.payload.failure === undefined ? {} : { failure: event.payload.failure }),
+         };

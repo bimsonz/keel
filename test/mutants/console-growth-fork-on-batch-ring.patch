@@ -2,10 +2,10 @@
 # kills: growth.fork
 # why: a fork is drawn on the batches' ring
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..0777db47 100644
+index ece58765..53f833f9 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -328,7 +328,7 @@ export function growthOf(
+@@ -333,7 +333,7 @@ export function growthOf(
      forkAngle.set(change.id, angle);
      const entry = world.changes.get(change.id);
      const fade = Math.max(0, Math.min(1, fadeOf(change)));

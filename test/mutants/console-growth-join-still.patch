@@ -2,10 +2,10 @@
 # kills: growth.join
 # why: a batch in flight is drawn with nothing moving into it
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..3e001b1b 100644
+index ece58765..6686eafd 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -476,7 +476,7 @@ export function growthOf(
+@@ -481,7 +481,7 @@ export function growthOf(
        ...(why === undefined ? {} : { why }),
      };
      nodes.push(node);

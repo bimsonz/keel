@@ -2,10 +2,10 @@
 # kills: growth.kept
 # why: every place is given out afresh at each reading, so placed forks move
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..19e8f892 100644
+index ece58765..f3d63081 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -295,7 +295,7 @@ export function growthOf(
+@@ -300,7 +300,7 @@ export function growthOf(
      change.stage === "bounced" && now - change.since > SETTLED_MS;
    for (const id of kept.fork.keys()) {
      const change = standing.find((each) => each.id === id);

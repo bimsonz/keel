@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.steps
+# why: why a step abstained with no judgement is dropped
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index b41cdbff..b0a93b4c 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -231,7 +231,6 @@ export class Flow {
+           t,
+           outcome: event.payload.outcome,
+           durationMs: event.payload.durationMs,
+-          ...(event.payload.failure === undefined ? {} : { failure: event.payload.failure }),
+         };
+         break;
+       }

@@ -2,10 +2,10 @@
 # kills: growth.revised
 # why: a revised change keeps the batch it bounced out of
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..b182c179 100644
+index ece58765..ebeea93a 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -411,7 +411,7 @@ export function growthOf(
+@@ -416,7 +416,7 @@ export function growthOf(
      { batch: FlowBatch; forks: string[]; piles: Set<PileStage> }
    >();
    for (const change of standing) {

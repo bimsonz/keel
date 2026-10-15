@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.steps
+# why: a step of a conflict's world is counted as the batch's
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index b41cdbff..902d8a1b 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -214,7 +214,7 @@ export class Flow {
+       // A step of a conflict's world matrix names its world; a batch's own steps name none.
+       case "VerificationStepStarted": {
+         const batch = this.#batch(event.payload.batchId);
+-        if (batch === undefined || event.payload.world !== undefined) break;
++        if (batch === undefined) break;
+         if (!batch.steps.some((step) => step.id === event.payload.stepId))
+           batch.steps.push({ id: event.payload.stepId, startedT: t });
+         break;

@@ -39,6 +39,7 @@ import {
   RobotIcon,
   RocketLaunchIcon,
   StackIcon,
+  StopCircleIcon,
   WarningCircleIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
@@ -247,6 +248,7 @@ const CHECK_ICON = {
   pass: <CheckCircleIcon size={14} weight="fill" aria-hidden />,
   fail: <XCircleIcon size={14} weight="fill" aria-hidden />,
   running: <CircleNotchIcon size={14} aria-hidden className="a-arch-spin" />,
+  stopped: <StopCircleIcon size={14} aria-hidden />,
   abstain: <MinusCircleIcon size={14} aria-hidden />,
   escalate: <WarningCircleIcon size={14} weight="fill" aria-hidden />,
   annotate: <MinusCircleIcon size={14} aria-hidden />,
@@ -260,8 +262,12 @@ function CheckChip({ data }: NodeProps<FlowNode<CheckNode, "check">>) {
       <Ends />
       {CHECK_ICON[node.result]}
       <span className="a-mono truncate">{node.name}</span>
-      {node.since !== undefined && (
-        <span className="a-arch-time a-num">{elapsed(now - node.since)}</span>
+      {node.took !== undefined ? (
+        <span className="a-arch-time a-num">{elapsed(node.took)}</span>
+      ) : (
+        node.since !== undefined && (
+          <span className="a-arch-time a-num">{elapsed(now - node.since)}</span>
+        )
       )}
     </div>
   );

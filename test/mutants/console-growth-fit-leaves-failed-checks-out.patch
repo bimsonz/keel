@@ -2,10 +2,10 @@
 # kills: growth.fit-failed
 # why: the view leaves a failed batch's checks out of its fit
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..6b749d49 100644
+index ece58765..c5c01c97 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -625,7 +625,7 @@ export function growthOf(
+@@ -633,7 +633,7 @@ export function growthOf(
  function inFocus(node: GrowthNode, failed: ReadonlySet<string>): boolean {
    if (node.kind === "deploy") return false;
    if (node.kind !== "check") return true;

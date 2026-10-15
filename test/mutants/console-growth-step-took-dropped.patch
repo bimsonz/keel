@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps
+# why: a finished step does not say how long the runner took
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..d0b8da4e 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -678,7 +678,6 @@ function stepChecksOf(
+       return {
+         name: step.id,
+         result: finished.outcome,
+-        took: finished.durationMs,
+         ...(line === undefined ? {} : { line }),
+       };
+     }

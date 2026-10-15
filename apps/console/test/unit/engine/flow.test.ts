@@ -244,9 +244,30 @@ describe("the batches Keel forms, and how each ended", () => {
       formedT: 3000,
       assembled: { t: 4000, tier: 2, composer: "mergebox" },
       verifyingT: 6000,
+      steps: [],
     });
     expect(batchIn(world, "bat_1")).toMatchObject({ predecessors: [], formedT: 2000 });
     expect(batchIn(world, "bat_1")).not.toHaveProperty("ended");
+  });
+
+  it("[flow.steps] keeps a batch's steps in the order Keel started them, each once, with what each came to, and none of a conflict's worlds", () => {
+    const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]);
+    hand
+      .at(12)
+      .verifying("bat_1")
+      .stepStarted("bat_1", "keel.check")
+      .stepStarted("bat_1", "keel.test");
+    hand.at(13).stepStarted("bat_1", "keel.check").stepStarted("bat_1", "js-ts.suite", "AB");
+    hand.at(20).stepFinished("bat_1", "keel.test", "abstain", 0, { failure: "timeout" });
+    hand.stepFinished("bat_1", "js-ts.suite", "fail", 9, { world: "AB" });
+    expect(batchIn(hand.world(), "bat_1")?.steps).toEqual([
+      { id: "keel.check", startedT: 12_000 },
+      {
+        id: "keel.test",
+        startedT: 12_000,
+        finished: { t: 20_000, outcome: "abstain", durationMs: 0, failure: "timeout" },
+      },
+    ]);
   });
 
   it("[flow.batch-end] ends a batch by the event that ended it, with what that event says", () => {

@@ -2,10 +2,10 @@
 # kills: growth.runs
 # why: every change is counted as a run of its own
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..49f9faa3 100644
+index ece58765..f6885967 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -610,7 +610,7 @@ export function growthOf(
+@@ -618,7 +618,7 @@ export function growthOf(
    const runs = new Set<string>();
    for (const change of standing) {
      const run = world.changes.get(change.id)?.run;

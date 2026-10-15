@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps-stopped
+# why: a step left unfinished when its batch ended is drawn running
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..577d450c 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -682,7 +682,7 @@ function stepChecksOf(
+         ...(line === undefined ? {} : { line }),
+       };
+     }
+-    if (batch.ended !== undefined)
++    if (batch.ended === null)
+       return { name: step.id, result: "stopped", ...(why === undefined ? {} : { line: why }) };
+     return { name: step.id, result: "running", since: step.startedT };
+   });

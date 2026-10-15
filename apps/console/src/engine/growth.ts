@@ -99,9 +99,14 @@ export interface BatchNode extends Placed {
 export interface CheckNode extends Placed {
   kind: "check";
   name: string;
-  /** What the step came to, or running while its batch verifies and Keel has not said. */
-  result: CanvasStep["result"] | "running";
+  /**
+   * What the step came to, or running while its batch verifies and Keel has not said, or stopped where the batch
+   * ended with the step started and not finished.
+   */
+  result: CanvasStep["result"] | "running" | "stopped";
   since?: number;
+  /** How long the runner took over a finished step, in its own figure. */
+  took?: number;
   line?: string;
 }
 export interface DeployNode extends Placed {
@@ -511,15 +516,18 @@ export function growthOf(
           fade,
         });
 
-    // The checks: what the verdict said of each step, or one running while the batch verifies.
+    // The checks: each step Keel started, as its step events tell it; where it told none, what the verdict said of
+    // each step, or one running while the batch verifies.
     const verdict =
       batch.ended?.verdictId === undefined ? undefined : world.verdicts.get(batch.ended.verdictId);
     const steps: Omit<CheckNode, keyof Placed | "kind">[] =
-      verdict !== undefined
-        ? checksOf(verdict)
-        : batch.verifyingT !== undefined && batch.ended === undefined
-          ? [{ name: "Checks", result: "running", since: batch.verifyingT }]
-          : [];
+      batch.steps.length > 0
+        ? stepChecksOf(batch, verdict, why)
+        : verdict !== undefined
+          ? checksOf(verdict)
+          : batch.verifyingT !== undefined && batch.ended === undefined
+            ? [{ name: "Checks", result: "running", since: batch.verifyingT }]
+            : [];
     const checkIds: string[] = [];
     const span = steps.length - 1;
     const step = checkStep(angle);
@@ -644,6 +652,45 @@ function checksOf(verdict: {
   return [
     { name: first.split(":")[0] ?? first, result: "fail", line: verdict.evidence.join("\n") },
   ];
+}
+
+/**
+ * The checks of a batch Keel told step by step: each step it started, running from its start until it finished,
+ * then what it came to and how long the runner took. A step still unfinished when the batch ended is stopped by
+ * that end, in its words. A step the verdict names that never started is drawn from the verdict.
+ */
+function stepChecksOf(
+  batch: FlowBatch,
+  verdict: { evidence: readonly string[] } | undefined,
+  why: string | undefined,
+): Omit<CheckNode, keyof Placed | "kind">[] {
+  const said = new Map(
+    (verdict === undefined ? [] : stepsOf(verdict.evidence)).map((step) => [step.name, step]),
+  );
+  const checks = batch.steps.map((step): Omit<CheckNode, keyof Placed | "kind"> => {
+    const { finished } = step;
+    if (finished !== undefined) {
+      const line =
+        said.get(step.id)?.line ??
+        (finished.failure === undefined
+          ? undefined
+          : `${step.id}: ${finished.outcome}, ${finished.failure}`);
+      return {
+        name: step.id,
+        result: finished.outcome,
+        took: finished.durationMs,
+        ...(line === undefined ? {} : { line }),
+      };
+    }
+    if (batch.ended !== undefined)
+      return { name: step.id, result: "stopped", ...(why === undefined ? {} : { line: why }) };
+    return { name: step.id, result: "running", since: step.startedT };
+  });
+  const started = new Set(batch.steps.map((step) => step.id));
+  for (const step of said.values())
+    if (step.result !== "said" && !started.has(step.name))
+      checks.push({ name: step.name, result: step.result, line: step.line });
+  return checks;
 }
 
 /** How far apart a batch's checks are on their ring at this angle: enough that their chips do not touch. */

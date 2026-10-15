@@ -178,6 +178,70 @@ describe("forks joining a batch, and its checks", () => {
     expect(overlap(checks[0]!, checks[1]!)).toBe(false);
   });
 
+  it("[growth.steps] draws each step Keel started, running with its timer from its start, then what it came to and how long the runner took, in place of the one running check", () => {
+    const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]).assemble("bat_1", 2);
+    hand.at(12).verifying("bat_1").at(13).stepStarted("bat_1", "keel.check");
+    hand.at(15).stepStarted("bat_1", "keel.test");
+    const running = checksOf(growthOf(hand.world(), 30_000, "p", keptAfresh()), "bat_1");
+    expect(running.map((check) => [check.name, check.result, check.since])).toEqual([
+      ["keel.check", "running", 13_000],
+      ["keel.test", "running", 15_000],
+    ]);
+    hand.at(20).stepFinished("bat_1", "keel.check", "pass", 6_400);
+    const growth = growthOf(hand.world(), 30_000, "p", keptAfresh());
+    const checks = checksOf(growth, "bat_1");
+    expect(checks).toMatchObject([
+      { name: "keel.check", result: "pass", took: 6_400 },
+      { name: "keel.test", result: "running", since: 15_000 },
+    ]);
+    expect(edge(growth, "test", "batch:bat_1", "check:bat_1:keel.check")?.moving).toBe(false);
+    expect(edge(growth, "test", "batch:bat_1", "check:bat_1:keel.test")?.moving).toBe(true);
+  });
+
+  it("[growth.steps-stopped] draws a step still running when its batch ended as stopped, in the words of that end", () => {
+    const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]).assemble("bat_1", 2);
+    hand
+      .at(12)
+      .verifying("bat_1")
+      .stepStarted("bat_1", "keel.check")
+      .stepStarted("bat_1", "keel.test");
+    hand.at(20).stepFinished("bat_1", "keel.check", "fail", 7_000);
+    hand.at(21).failed("bat_1", "chg_a");
+    const growth = growthOf(hand.world(), 22_000, "p", keptAfresh());
+    const why = batchOf(growth, "bat_1")?.why;
+    expect(why).toBeDefined();
+    expect(checksOf(growth, "bat_1")).toMatchObject([
+      { name: "keel.check", result: "fail", took: 7_000 },
+      { name: "keel.test", result: "stopped", line: why },
+    ]);
+  });
+
+  it("[growth.steps-verdict] gives a started step the verdict's line for it, and draws from the verdict a step it names that never started", () => {
+    const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]).assemble("bat_1", 2);
+    hand.at(12).verifying("bat_1").stepStarted("bat_1", "keel.check");
+    hand.at(20).stepFinished("bat_1", "keel.check", "pass", 5_000);
+    hand
+      .at(40)
+      .verdict("vrd_bat_1", "bat_1", [
+        "keel.check: pass (proof, tier 2: …) evidence sha256:1",
+        "keel.test: fail (proof, tier 2: …) evidence sha256:2",
+      ]);
+    hand.failed("bat_1", "chg_a");
+    const checks = checksOf(growthOf(hand.world(), 41_000, "p", keptAfresh()), "bat_1");
+    expect(checks).toMatchObject([
+      {
+        name: "keel.check",
+        result: "pass",
+        line: "keel.check: pass (proof, tier 2: …) evidence sha256:1",
+      },
+      {
+        name: "keel.test",
+        result: "fail",
+        line: "keel.test: fail (proof, tier 2: …) evidence sha256:2",
+      },
+    ]);
+  });
+
   it("[growth.composed] draws a verdict that names no step, as when Keel could not compose the batch, as one failed check in Keel's words", () => {
     const hand = new Hand().queued(["chg_a"]).at(10).form("bat_1", ["chg_a"]);
     hand

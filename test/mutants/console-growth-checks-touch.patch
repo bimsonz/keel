@@ -2,10 +2,10 @@
 # kills: growth.checks
 # why: a batch's checks are drawn on top of one another
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..285462cf 100644
+index ece58765..27fd9b61 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -651,7 +651,7 @@ function checkStep(angle: number): number {
+@@ -698,7 +698,7 @@ function checkStep(angle: number): number {
    const dx = Math.abs(STRETCH * RING.check * Math.sin(angle));
    const dy = Math.abs(RING.check * Math.cos(angle));
    return Math.min(

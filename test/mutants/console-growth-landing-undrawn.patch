@@ -2,10 +2,10 @@
 # kills: growth.land
 # why: a landing is not drawn back into the project
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..8242e744 100644
+index ece58765..158a5771 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -569,7 +569,7 @@ export function growthOf(
+@@ -577,7 +577,7 @@ export function growthOf(
      }
  
      // Landed: back into the project.

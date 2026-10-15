@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps-stopped
+# why: a stopped step does not say what stopped it
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..02ab25de 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -683,7 +683,7 @@ function stepChecksOf(
+       };
+     }
+     if (batch.ended !== undefined)
+-      return { name: step.id, result: "stopped", ...(why === undefined ? {} : { line: why }) };
++      return { name: step.id, result: "stopped", ...{} };
+     return { name: step.id, result: "running", since: step.startedT };
+   });
+   const started = new Set(batch.steps.map((step) => step.id));

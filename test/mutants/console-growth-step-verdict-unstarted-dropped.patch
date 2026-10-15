@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.steps-verdict
+# why: a step the verdict names that never started is not drawn
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ece58765..3332360a 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -689,7 +689,6 @@ function stepChecksOf(
+   const started = new Set(batch.steps.map((step) => step.id));
+   for (const step of said.values())
+     if (step.result !== "said" && !started.has(step.name))
+-      checks.push({ name: step.name, result: step.result, line: step.line });
+   return checks;
+ }
+ 

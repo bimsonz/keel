@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/flow.test.ts
+# kills: flow.steps
+# why: a step started twice is kept twice
+diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
+index b41cdbff..2ea0ac3c 100644
+--- a/apps/console/src/engine/flow.ts
++++ b/apps/console/src/engine/flow.ts
+@@ -215,7 +215,7 @@ export class Flow {
+       case "VerificationStepStarted": {
+         const batch = this.#batch(event.payload.batchId);
+         if (batch === undefined || event.payload.world !== undefined) break;
+-        if (!batch.steps.some((step) => step.id === event.payload.stepId))
++        if (batch.steps.length >= 0)
+           batch.steps.push({ id: event.payload.stepId, startedT: t });
+         break;
+       }

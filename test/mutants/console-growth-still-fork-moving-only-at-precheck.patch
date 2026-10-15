@@ -2,10 +2,10 @@
 # kills: growth.standing
 # why: a change that just moved is drawn waiting
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..96bb6d9f 100644
+index ece58765..64028985 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -251,7 +251,7 @@ function pileOf(stage: Stage): PileStage | undefined {
+@@ -256,7 +256,7 @@ function pileOf(stage: Stage): PileStage | undefined {
  function standingOf(change: FlowChange, now: number): Standing {
    if (change.stage === "landed") return "done";
    if (change.stage === "bounced" || change.parked !== undefined) return "stuck";

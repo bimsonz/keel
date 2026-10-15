@@ -2,10 +2,10 @@
 # kills: growth.escalated
 # why: a fork parked on a question is not marked so
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index dc823e3d..e56ebf80 100644
+index ece58765..b290439c 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -340,7 +340,7 @@ export function growthOf(
+@@ -345,7 +345,7 @@ export function growthOf(
        since: change.since,
        standing: standingOf(change, now),
        ...(change.parked !== undefined && entry?.escalationId !== undefined
