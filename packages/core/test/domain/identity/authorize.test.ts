@@ -1943,6 +1943,9 @@ describe("authorize: a namespace by its kind", () => {
 
   it("[authz.sponsor-own-namespace] in an agent's own namespace, where no person holds a role, the sponsor Keel asks sees what it is asked and answers it, of a private project too, and gains nothing else there; in an org a sponsor answers only as a member", () => {
     const PROJECT_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) === "Project");
+    const ASKED_OF_A_SPONSOR = PROJECT_ACTIONS.filter((a) =>
+      ["sponsorOrMaintain", "sponsorOrMaintainAsUser", "readMembersOrSponsor"].includes(needOf(a)),
+    );
     let answered = 0;
     fc.assert(
       fc.property(
@@ -1951,7 +1954,23 @@ describe("authorize: a namespace by its kind", () => {
         fc.option(fc.constantFrom(...USERS), { nil: undefined }),
         fc.constantFrom("private", "public"),
         rare(6),
-        (drawn, action, sponsor, visibility, suspended) => {
+        fc.constantFrom(...ASKED_OF_A_SPONSOR),
+        (drawn, action, sponsor, visibility, suspended, question) => {
+          // Every run opens with the sponsor itself, signed in and in good standing, asking what Keel asks a
+          // sponsor: drawn freely, a sponsor meets that in about one run in a hundred, and a run that never
+          // answers checks nothing of the answer. What follows is drawn freely.
+          const self: UserPrincipal = { ...drawn, suspended: false, handle: drawn.handle ?? "ada" };
+          const theirs = project(PRJ_1, visibility, {
+            namespace: BOT,
+            personOwned: false,
+            sponsor: self.userId,
+          });
+          if (
+            outcome(decide(self, question, theirs)) !==
+            (needOf(question) === "readMembersOrSponsor" ? "ok:members" : "ok:")
+          )
+            return false;
+          answered++;
           const bare = project(PRJ_1, visibility, {
             namespace: BOT,
             personOwned: false,
