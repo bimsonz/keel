@@ -37,12 +37,17 @@ applies each matching patch, runs its tests, reverts it, and reports any patch t
 
 Write plain, imperative subjects that say what changed, such as "Refuse a lease renewal after the lease has lapsed". Use the body to say why. Keep each commit to one change, and use the terms in [CONTEXT.md](CONTEXT.md).
 
-## Pull requests
+## Proposing a change
 
-- Open pull requests against `main`, rebased on its current head.
-- Say what the change does and why, and how you checked it.
-- A change to a contract (the API in `packages/spec`, the ports, the DO RPC contracts or the runner protocol) adds a changelog fragment, a file of its own in `changes/unreleased/` ([changes/README.md](changes/README.md)), rather than a line in [CHANGELOG.md](CHANGELOG.md), which a release writes. Contract changes are additive; a breaking change says so in its entry and in the pull request.
-- Read the relevant [ADR](docs/adr) before changing a boundary one fixes.
+A change to Keel lands through Keel, never through a pull request: trunk takes no push, and Keel verifies every change before trunk advances. [docs/quickstart.md](docs/quickstart.md#5-land-a-change) walks through the steps with the `keeltown` CLI; each one is also an MCP tool of the same name.
+
+1. **Ask `why`** about each file you mean to change. Keel answers with the decisions anchored there and the guards that hold them, so your change does not undo what was decided. Read the relevant [ADR](docs/adr) before changing a boundary one fixes.
+2. **Declare** the change before you write code: a goal that says what it does and why, its footprint (the paths it edits, creates or deletes), and any premises it relies on about code it does not own. Keel answers with a workspace of the change's own, starting at trunk's head, a lease, and a preflight that names the changes near yours; `nearby` asks again later. Leave alone what a neighbour is already changing.
+3. **Commit** to the change's workspace: push to its remote with its token, or call `commit`, which needs no clone. The message follows the rules above; say in its body how you checked the change.
+4. **Submit** the commit under the lease once `pnpm check` is green. A push alone lands nothing.
+5. **Wait in the inbox.** Keel tells you there as the change moves through precheck, the queue and verification. It has landed only when the inbox says `ChangeLanded`. A `ChangeBounced` notice says what to do: fix what it names, `revise` the footprint if the change has grown, commit, and submit again under the same lease.
+
+A change to a contract (the API in `packages/spec`, the ports, the DO RPC contracts or the runner protocol) adds a changelog fragment, a file of its own in `changes/unreleased/` ([changes/README.md](changes/README.md)), rather than a line in [CHANGELOG.md](CHANGELOG.md), which a release writes. Contract changes are additive; a breaking change says so in its entry and in its goal.
 
 ## Reporting a vulnerability
 

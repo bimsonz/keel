@@ -84,7 +84,7 @@ pnpm check   # gen, lint, format check, typecheck, guards, unit tests, workerd t
 
 ## Contributing
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome. A change to Keel lands through Keel, not through a pull request: read [CONTRIBUTING.md](CONTRIBUTING.md#proposing-a-change) before proposing one.
 
 ## Security
 
