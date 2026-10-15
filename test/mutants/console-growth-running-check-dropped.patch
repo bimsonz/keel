@@ -2,10 +2,10 @@
 # kills: growth.checks
 # why: a verifying batch shows no check running
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..58c70997 100644
+index dc823e3d..44a61c8f 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -484,7 +484,7 @@ export function growthOf(
+@@ -518,7 +518,7 @@ export function growthOf(
        verdict !== undefined
          ? checksOf(verdict)
          : batch.verifyingT !== undefined && batch.ended === undefined

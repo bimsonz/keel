@@ -2,10 +2,10 @@
 # kills: growth.deploy
 # why: a preview Keel deployed is not drawn
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..00073226 100644
+index dc823e3d..d2edfbae 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -513,7 +513,7 @@ export function growthOf(
+@@ -547,7 +547,7 @@ export function growthOf(
        .map((id) => world.changes.get(id)?.preview)
        .find((each) => each !== undefined);
      let last = node.id;

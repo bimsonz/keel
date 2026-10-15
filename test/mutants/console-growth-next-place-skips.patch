@@ -2,10 +2,10 @@
 # kills: growth.kept
 # why: forks declared one after another are not drawn side by side
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..fd73b05a 100644
+index dc823e3d..907845f0 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -281,7 +281,7 @@ export function growthOf(
+@@ -312,7 +312,7 @@ export function growthOf(
      while (taken.has(slot)) slot = (slot + 1) % FORK_SLOTS;
      kept.fork.set(change.id, slot);
      taken.add(slot);

@@ -2,10 +2,10 @@
 # kills: growth.pile
 # why: a pile counts one whatever it holds
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..49832056 100644
+index dc823e3d..4c70e985 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -358,7 +358,7 @@ export function growthOf(
+@@ -392,7 +392,7 @@ export function growthOf(
        fade: 1,
        kind: "pile",
        stage,

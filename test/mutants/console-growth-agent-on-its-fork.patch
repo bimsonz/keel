@@ -2,10 +2,10 @@
 # kills: growth.fork
 # why: an agent is drawn on top of its fork
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..1ef319e2 100644
+index dc823e3d..962a58cb 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -329,7 +329,7 @@ export function growthOf(
+@@ -363,7 +363,7 @@ export function growthOf(
        const outward = { x: centre.x >= 0 ? 1 : -1, y: centre.y >= 0 ? 1 : -1 };
        const agentCentre = {
          x: centre.x + (outward.x * (SIZE.fork.w - SIZE.agent.w)) / 2,

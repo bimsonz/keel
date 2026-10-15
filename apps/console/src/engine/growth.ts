@@ -18,6 +18,8 @@ import type { World } from "./world.ts";
 export const DISSOLVE_MS = 30_000;
 /** A change that moved this recently is moving. */
 export const MOVING_MS = 90_000;
+/** A bounce left this long without a revision has settled: its fork is counted in the bounced pile, its batch not drawn. */
+export const SETTLED_MS = 10 * 60_000;
 /** Forks drawn one by one round the project. */
 export const FORK_SLOTS = 16;
 /** Places for batches on their ring. */
@@ -32,7 +34,7 @@ export const RING = { pile: 175, fork: 340, batch: 600, check: 820, deploy: 1040
 export const SIZE = {
   project: { w: 280, h: 108 },
   fork: { w: 196, h: 64 },
-  agent: { w: 124, h: 24 },
+  agent: { w: 188, h: 24 },
   pile: { w: 148, h: 42 },
   batch: { w: 188, h: 64 },
   check: { w: 150, h: 32 },
@@ -68,6 +70,8 @@ export interface ForkNode extends Placed {
   standing: Standing;
   /** Why it bounced or is parked, in Keel's words. */
   why?: string;
+  /** Whether it is parked on a question put to a person. */
+  escalated?: boolean;
 }
 export interface AgentNode extends Placed {
   kind: "agent";
@@ -138,7 +142,30 @@ export interface GrowthEdge {
 export interface Growth {
   nodes: GrowthNode[];
   edges: GrowthEdge[];
-  bounds: { x: number; y: number; width: number; height: number };
+  bounds: Bounds;
+  /** What the view is fitted to: everything but the checks and deploys, which may sit at its edge. */
+  focus: Bounds;
+  /** The runs named by the changes drawn or piled: one account's many runs are as many agents at work. */
+  runs: number;
+}
+
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The box round some nodes. */
+function boundsOf(nodes: readonly GrowthNode[]): Bounds {
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const node of nodes) {
+    x0 = Math.min(x0, node.x);
+    y0 = Math.min(y0, node.y);
+    x1 = Math.max(x1, node.x + node.w);
+    y1 = Math.max(y1, node.y + node.h);
+  }
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
 /** Where each fork and batch was put, kept across readings so that nothing placed moves. */
@@ -264,12 +291,16 @@ export function growthOf(
     (change) => change.stage !== "gone" && fadeOf(change) > 0,
   );
   // Forks placed before keep their place while they stand; the rest are given the free places, most urgent first.
-  for (const id of kept.fork.keys())
-    if (!standing.some((change) => change.id === id)) kept.fork.delete(id);
+  const settled = (change: FlowChange): boolean =>
+    change.stage === "bounced" && now - change.since > SETTLED_MS;
+  for (const id of kept.fork.keys()) {
+    const change = standing.find((each) => each.id === id);
+    if (change === undefined || settled(change)) kept.fork.delete(id);
+  }
   const taken = new Set(kept.fork.values());
   const waiting = standing
     // A landed fork not placed before (the page opened as it landed) takes a place only if one is free.
-    .filter((change) => !kept.fork.has(change.id))
+    .filter((change) => !kept.fork.has(change.id) && !settled(change))
     .toSorted(
       (a, b) =>
         URGENCY[a.stage] - URGENCY[b.stage] ||
@@ -308,6 +339,9 @@ export function growthOf(
       stage: change.stage,
       since: change.since,
       standing: standingOf(change, now),
+      ...(change.parked !== undefined && entry?.escalationId !== undefined
+        ? { escalated: true }
+        : {}),
       ...(change.parked !== undefined
         ? { why: change.parked.reason }
         : entry?.bounce?.reasons[0] !== undefined && change.stage === "bounced"
@@ -389,10 +423,10 @@ export function growthOf(
       piles: new Set<PileStage>(),
     };
     if (forkAngle.has(change.id)) seen.forks.push(change.id);
-    else {
-      // One not drawn on its own came from the queue's pile, if the queue has one.
+    // A batch in flight with a member not drawn on its own is drawn, joined from the queue's pile where there is one.
+    else if (change.stage === "batch") {
       if (piled.has("queue")) seen.piles.add("queue");
-    }
+    } else continue;
     drawnBatches.set(batch.id, seen);
   }
   for (const id of kept.batch.keys()) if (!drawnBatches.has(id)) kept.batch.delete(id);
@@ -570,14 +604,28 @@ export function growthOf(
     }
   }
 
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const node of nodes) {
-    x0 = Math.min(x0, node.x);
-    y0 = Math.min(y0, node.y);
-    x1 = Math.max(x1, node.x + node.w);
-    y1 = Math.max(y1, node.y + node.h);
+  const failed = new Set(
+    nodes.flatMap((node) => (node.kind === "batch" && node.state === "red" ? [node.batchId] : [])),
+  );
+  const runs = new Set<string>();
+  for (const change of standing) {
+    const run = world.changes.get(change.id)?.run;
+    if (run !== undefined) runs.add(run.id);
   }
-  return { nodes, edges, bounds: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };
+  return {
+    nodes,
+    edges,
+    bounds: boundsOf(nodes),
+    focus: boundsOf(nodes.filter((node) => inFocus(node, failed))),
+    runs: runs.size,
+  };
+}
+
+/** Whether the view fits a node: all but deploys and checks, save the checks of a batch that failed. */
+function inFocus(node: GrowthNode, failed: ReadonlySet<string>): boolean {
+  if (node.kind === "deploy") return false;
+  if (node.kind !== "check") return true;
+  return [...failed].some((batchId) => node.id.startsWith(`check:${batchId}:`));
 }
 
 /**

@@ -9,7 +9,7 @@ import { type Reference, piecesOf, referencesIn } from "../engine/references.ts"
 import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { ChangeTab, ConflictTab } from "../route.ts";
 import { hrefOf } from "../places.ts";
-import { Link } from "../router.tsx";
+import { Link, useWhere } from "../router.tsx";
 
 const NamesContext = createContext<Names | null>(null);
 
@@ -31,6 +31,13 @@ function useNames(): Names {
 type Anchor = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "children"> & {
   children: ReactNode;
 };
+
+/** The address of a change's page, by the change's id, for a move made other than by a link. */
+export function useChangeAddress(): (id: string) => string {
+  const names = useNames();
+  const { to } = useWhere();
+  return (id) => to({ at: "change", name: names.changes.get(id) ?? id, tab: "overview" });
+}
 
 export function ChangeLink({
   id,

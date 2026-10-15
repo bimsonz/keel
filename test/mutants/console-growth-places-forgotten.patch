@@ -2,15 +2,15 @@
 # kills: growth.kept
 # why: every place is given out afresh at each reading, so placed forks move
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..dc6bd76d 100644
+index dc823e3d..19e8f892 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -265,7 +265,7 @@ export function growthOf(
-   );
-   // Forks placed before keep their place while they stand; the rest are given the free places, most urgent first.
-   for (const id of kept.fork.keys())
--    if (!standing.some((change) => change.id === id)) kept.fork.delete(id);
+@@ -295,7 +295,7 @@ export function growthOf(
+     change.stage === "bounced" && now - change.since > SETTLED_MS;
+   for (const id of kept.fork.keys()) {
+     const change = standing.find((each) => each.id === id);
+-    if (change === undefined || settled(change)) kept.fork.delete(id);
 +    kept.fork.delete(id);
+   }
    const taken = new Set(kept.fork.values());
    const waiting = standing
-     // A landed fork not placed before (the page opened as it landed) takes a place only if one is free.

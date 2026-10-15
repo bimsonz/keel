@@ -2,11 +2,11 @@
 # kills: growth.pile
 # why: places go first come, so a batched fork can be left in a pile
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..9141f1e1 100644
+index dc823e3d..f25be272 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -272,7 +272,7 @@ export function growthOf(
-     .filter((change) => !kept.fork.has(change.id))
+@@ -303,7 +303,7 @@ export function growthOf(
+     .filter((change) => !kept.fork.has(change.id) && !settled(change))
      .toSorted(
        (a, b) =>
 -        URGENCY[a.stage] - URGENCY[b.stage] ||

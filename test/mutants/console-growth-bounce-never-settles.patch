@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.settled
+# why: a bounce left unrevised for hours keeps its fork, failed batch and checks drawn
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index dc823e3d..f8894dc6 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -292,7 +292,7 @@ export function growthOf(
+   );
+   // Forks placed before keep their place while they stand; the rest are given the free places, most urgent first.
+   const settled = (change: FlowChange): boolean =>
+-    change.stage === "bounced" && now - change.since > SETTLED_MS;
++    false;
+   for (const id of kept.fork.keys()) {
+     const change = standing.find((each) => each.id === id);
+     if (change === undefined || settled(change)) kept.fork.delete(id);

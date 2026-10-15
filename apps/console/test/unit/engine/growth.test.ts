@@ -10,6 +10,7 @@ import {
   type GrowthNode,
   type PileNode,
   RING,
+  SETTLED_MS,
   growthOf,
   keptAfresh,
 } from "../../../src/engine/growth.ts";
@@ -60,6 +61,15 @@ describe("the project in the centre", () => {
 });
 
 describe("a fork for each change, with its agent", () => {
+  it("[growth.runs] counts the runs the drawn changes name, each once, so one account's many runs read as many agents", () => {
+    const hand = new Hand()
+      .runOf("agt_1", { id: "run_1", label: "a" })
+      .declare("chg_a")
+      .declare("chg_b");
+    hand.runOf("agt_1", { id: "run_2", label: "b" }).declare("chg_c");
+    expect(growthOf(hand.world(), 1000, "p", keptAfresh()).runs).toBe(2);
+  });
+
   it("[growth.fork] puts a declared change on the fork ring with an edge out to it from the project, and its agent beside it, named, with its run, joined to it", () => {
     const hand = new Hand()
       .enrol("agt_1", "Ada")
@@ -92,6 +102,14 @@ describe("a fork for each change, with its agent", () => {
     expect(forkOf(growthOf(hand.world(), 1000, "p", keptAfresh()), "chg_a")?.standing).toBe(
       "moving",
     );
+  });
+
+  it("[growth.escalated] marks a fork parked on a question put to a person, and no fork parked for another reason", () => {
+    const hand = new Hand().queued(["chg_a", "chg_b"]);
+    hand.park("chg_a", "awaiting-ruling", "esc_1").park("chg_b", "lease-lapsed");
+    const growth = growthOf(hand.world(), 1_000, "p", keptAfresh());
+    expect(forkOf(growth, "chg_a")?.escalated).toBe(true);
+    expect(forkOf(growth, "chg_b")?.escalated).toBeUndefined();
   });
 
   it("[growth.kept] never moves a fork once placed, as others are declared, land and dissolve; forks declared one after another sit side by side", () => {
@@ -261,6 +279,34 @@ describe("a bounce", () => {
     expect(batchOf(growth, "bat_1")?.state).toBe("red");
   });
 
+  it("[growth.fit-failed] fits the view to a failed batch's checks, so the bounce's arc starts inside the frame", () => {
+    const growth = growthOf(bounced().world(), 20_000 + DISSOLVE_MS * 4, "p", keptAfresh());
+    const { focus } = growth;
+    const checks = checksOf(growth, "bat_1");
+    expect(checks).toHaveLength(2);
+    for (const check of checks) {
+      expect(check.x).toBeGreaterThanOrEqual(focus.x);
+      expect(check.y).toBeGreaterThanOrEqual(focus.y);
+      expect(check.x + check.w).toBeLessThanOrEqual(focus.x + focus.width);
+      expect(check.y + check.h).toBeLessThanOrEqual(focus.y + focus.height);
+    }
+  });
+
+  it("[growth.settled] counts a bounce left unrevised past SETTLED_MS in the bounced pile, and draws neither its batch nor its checks", () => {
+    const hand = bounced();
+    const kept = keptAfresh();
+    expect(forkOf(growthOf(hand.world(), 30_000, "p", kept), "chg_a")).toBeDefined();
+    const growth = growthOf(hand.world(), 20_000 + SETTLED_MS + 1000, "p", kept);
+    expect(forkOf(growth, "chg_a")).toBeUndefined();
+    expect(growth.nodes.find((node) => node.kind === "pile")).toMatchObject({
+      stage: "bounced",
+      count: 1,
+    });
+    expect(batchOf(growth, "bat_1")).toBeUndefined();
+    expect(checksOf(growth, "bat_1")).toEqual([]);
+    expect(growth.edges.some((each) => each.kind === "fail")).toBe(false);
+  });
+
   it("[growth.revised] lets the bounce go once the change is revised: no red edge, no failed batch", () => {
     const hand = bounced();
     hand.at(40).revise("chg_a", 2);
@@ -306,6 +352,12 @@ describe("at scale", () => {
       expect(node.y).toBeGreaterThanOrEqual(y);
       expect(node.x + node.w).toBeLessThanOrEqual(x + width);
       expect(node.y + node.h).toBeLessThanOrEqual(y + height);
+    }
+    for (const node of growth.nodes.filter(
+      (each) => each.kind !== "check" && each.kind !== "deploy",
+    )) {
+      expect(node.x).toBeGreaterThanOrEqual(growth.focus.x);
+      expect(node.x + node.w).toBeLessThanOrEqual(growth.focus.x + growth.focus.width);
     }
     const cards = growth.nodes.filter((node) => node.kind !== "pile");
     for (const [index, a] of cards.entries())

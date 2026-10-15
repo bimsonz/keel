@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.escalated
+# why: a fork parked on a question is not marked so
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index dc823e3d..e56ebf80 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -340,7 +340,7 @@ export function growthOf(
+       since: change.since,
+       standing: standingOf(change, now),
+       ...(change.parked !== undefined && entry?.escalationId !== undefined
+-        ? { escalated: true }
++        ? {}
+         : {}),
+       ...(change.parked !== undefined
+         ? { why: change.parked.reason }

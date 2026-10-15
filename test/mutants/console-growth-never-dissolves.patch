@@ -2,10 +2,10 @@
 # kills: growth.land
 # why: a landed branch never fades
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..d7b8e696 100644
+index dc823e3d..72a43fca 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -259,7 +259,7 @@ export function growthOf(
+@@ -286,7 +286,7 @@ export function growthOf(
  
    // A fork stands while it is live, and a landed one while it dissolves.
    const fadeOf = (change: FlowChange): number =>

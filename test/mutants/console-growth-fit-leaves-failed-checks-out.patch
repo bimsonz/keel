@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.fit-failed
+# why: the view leaves a failed batch's checks out of its fit
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index dc823e3d..6b749d49 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -625,7 +625,7 @@ export function growthOf(
+ function inFocus(node: GrowthNode, failed: ReadonlySet<string>): boolean {
+   if (node.kind === "deploy") return false;
+   if (node.kind !== "check") return true;
+-  return [...failed].some((batchId) => node.id.startsWith(`check:${batchId}:`));
++  return false;
+ }
+ 
+ /**

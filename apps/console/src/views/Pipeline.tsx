@@ -1079,7 +1079,7 @@ function Inspector({
           {chosen.bounced !== undefined && <p className="a-mc-why">{chosen.bounced}</p>}
           {chosen.parked?.escalationId !== undefined && (
             <p>
-              <EscalationLink id={chosen.parked.escalationId}>Open escalation</EscalationLink>
+              <EscalationLink id={chosen.parked.escalationId}>Open question</EscalationLink>
             </p>
           )}
           <p>

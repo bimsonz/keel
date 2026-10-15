@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts
+# kills: growth.bounds
+# why: the view is fitted to the project alone
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index dc823e3d..24fe1afa 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -616,7 +616,7 @@ export function growthOf(
+     nodes,
+     edges,
+     bounds: boundsOf(nodes),
+-    focus: boundsOf(nodes.filter((node) => inFocus(node, failed))),
++    focus: boundsOf([project]),
+     runs: runs.size,
+   };
+ }

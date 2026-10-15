@@ -2,10 +2,10 @@
 # kills: growth.bounds
 # why: the bounds stop at a node's left edge
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..62be89d4 100644
+index dc823e3d..77f4a4d2 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -574,7 +574,7 @@ export function growthOf(
+@@ -162,7 +162,7 @@ function boundsOf(nodes: readonly GrowthNode[]): Bounds {
    for (const node of nodes) {
      x0 = Math.min(x0, node.x);
      y0 = Math.min(y0, node.y);
@@ -13,4 +13,4 @@ index a725af55..62be89d4 100644
 +    x1 = Math.max(x1, node.x);
      y1 = Math.max(y1, node.y + node.h);
    }
-   return { nodes, edges, bounds: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } };
+   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };

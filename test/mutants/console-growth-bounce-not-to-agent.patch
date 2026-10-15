@@ -2,10 +2,10 @@
 # kills: growth.bounce
 # why: a bounce runs back to the fork alone, not to its agent
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..721bf3f8 100644
+index dc823e3d..3be095b2 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -555,7 +555,7 @@ export function growthOf(
+@@ -589,7 +589,7 @@ export function growthOf(
        // To the fork and to the agents working on it: it is theirs to revise.
        const back = nodes.filter(
          (each) =>

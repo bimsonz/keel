@@ -2,10 +2,10 @@
 # kills: growth.composed
 # why: a verdict naming no step draws no check
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..90c868f2 100644
+index dc823e3d..e1a3b680 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -592,7 +592,7 @@ function checksOf(verdict: {
+@@ -640,7 +640,7 @@ function checksOf(verdict: {
    if (steps.length > 0)
      return steps.map((step) => ({ name: step.name, result: step.result, line: step.line }));
    const [first] = verdict.evidence;

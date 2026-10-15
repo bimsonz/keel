@@ -58,7 +58,8 @@ import type {
   ProjectNode,
 } from "../engine/growth.ts";
 import type { Mode } from "../theme/mode.ts";
-import { ChangeLink } from "./links.tsx";
+import { navigate } from "../router.tsx";
+import { ChangeLink, useChangeAddress } from "./links.tsx";
 
 const count = (value: number): string => value.toLocaleString("en-US");
 
@@ -169,7 +170,7 @@ function ForkCard({ data }: NodeProps<FlowNode<ForkNode, "fork">>) {
         <b className="a-mono">{node.label}</b>
         <span className="a-arch-state" data-standing={node.standing}>
           {node.standing === "stuck" && <WarningCircleIcon size={11} weight="fill" aria-hidden />}
-          {STAGE_WORD[node.stage]}
+          {node.escalated === true ? "Awaiting ruling" : STAGE_WORD[node.stage]}
         </span>
         <span className="a-arch-time a-num">{elapsed(now - node.since)}</span>
       </div>
@@ -177,6 +178,14 @@ function ForkCard({ data }: NodeProps<FlowNode<ForkNode, "fork">>) {
     </div>
   );
 }
+
+/** A long label by its end, where runs of one sweep differ, from a word's start where one is near: `…checkcolor-tests-007`. */
+const endOf = (label: string): string => {
+  if (label.length <= 24) return label;
+  const tail = label.slice(-23);
+  const word = tail.indexOf("-");
+  return `…${word >= 0 && word < 6 ? tail.slice(word + 1) : tail}`;
+};
 
 function AgentDot({ data }: NodeProps<FlowNode<AgentNode, "agent">>) {
   const { node } = data;
@@ -187,7 +196,8 @@ function AgentDot({ data }: NodeProps<FlowNode<AgentNode, "agent">>) {
     >
       <Ends />
       <RobotIcon size={13} aria-hidden />
-      <span className="truncate">{node.name}</span>
+      {/* The run where its token named one: one account's many runs are as many agents at work. */}
+      <span className="truncate">{node.run === undefined ? node.name : endOf(node.run)}</span>
     </div>
   );
 }
@@ -394,29 +404,37 @@ function flowOf(
       zIndex: node.kind === "project" ? 2 : 1,
     } satisfies Node;
   });
-  const edges: Edge[] = growth.edges.flatMap((edge) => {
-    const [a, b] = [boxes.get(edge.source), boxes.get(edge.target)];
-    if (a === undefined || b === undefined) return [];
-    const colour = ARROW[edge.kind];
-    return [
-      {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: "wire",
-        animated: edge.moving,
-        ...(colour === undefined
-          ? {}
-          : { markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: colour } }),
-        data: { kind: edge.kind, fade: edge.fade, ...sidesOf(a, b) },
-        selectable: false,
-        focusable: false,
-        zIndex: edge.kind === "fail" || edge.kind === "land" ? 3 : 0,
-      } satisfies WireEdge,
-    ];
-  });
+  const edges: Edge[] = growth.edges
+    .toSorted((a, b) => onTop(a) - onTop(b))
+    .flatMap((edge) => {
+      const [a, b] = [boxes.get(edge.source), boxes.get(edge.target)];
+      if (a === undefined || b === undefined) return [];
+      const colour = ARROW[edge.kind];
+      return [
+        {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: "wire",
+          animated: edge.moving,
+          ...(colour === undefined
+            ? {}
+            : {
+                markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: colour },
+              }),
+          data: { kind: edge.kind, fade: edge.fade, ...sidesOf(a, b) },
+          selectable: false,
+          focusable: false,
+          zIndex: 0,
+        } satisfies WireEdge,
+      ];
+    });
   return { nodes, edges };
 }
+
+/** A landing and a bounce are drawn over the other edges, and every edge under the cards. */
+const onTop = (edge: Growth["edges"][number]): number =>
+  edge.kind === "fail" || edge.kind === "land" ? 1 : 0;
 
 export interface MissionCanvasProps {
   canvas: Canvas;
@@ -430,6 +448,7 @@ export interface MissionCanvasProps {
 
 export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: MissionCanvasProps) {
   const [chosen, setChosen] = useState<string | undefined>();
+  const changeAddress = useChangeAddress();
   const frame = useRef<HTMLDivElement>(null);
   const flow = useRef<ReactFlowInstance | null>(null);
   const fitted = useRef(false);
@@ -442,13 +461,13 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
   // The diagram's bounds to the nearest card or so outward, so the view is fitted again when it grows by one and
   // not at every reading.
   const STEP = 60;
-  const left = Math.floor(growth.bounds.x / STEP) * STEP;
-  const top = Math.floor(growth.bounds.y / STEP) * STEP;
-  const right = Math.ceil((growth.bounds.x + growth.bounds.width) / STEP) * STEP;
-  const bottom = Math.ceil((growth.bounds.y + growth.bounds.height) / STEP) * STEP;
+  const left = Math.floor(growth.focus.x / STEP) * STEP;
+  const top = Math.floor(growth.focus.y / STEP) * STEP;
+  const right = Math.ceil((growth.focus.x + growth.focus.width) / STEP) * STEP;
+  const bottom = Math.ceil((growth.focus.y + growth.focus.height) / STEP) * STEP;
   const bounds = useRef({ x: left, y: top, width: right - left, height: bottom - top });
   const fit = useCallback((duration: number): void => {
-    void flow.current?.fitBounds(bounds.current, { padding: 0.06, duration });
+    void flow.current?.fitBounds(bounds.current, { padding: 0.02, duration });
   }, []);
   useEffect(() => {
     bounds.current = { x: left, y: top, width: right - left, height: bottom - top };
@@ -494,7 +513,7 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
 
   return (
     <div ref={frame} className="a-mc a-arch" data-full={isFull || undefined}>
-      <Header canvas={canvas} live={live} />
+      <Header canvas={canvas} runs={growth.runs} live={live} />
       <div className="a-mc-stage">
         <ReactFlow
           nodes={nodes}
@@ -504,11 +523,15 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
           colorMode={mode}
           onInit={(instance) => {
             flow.current = instance;
+            // The diagram may have been drawn whole before the view was ready to be fitted.
+            if (follow.current) requestAnimationFrame(() => fit(0));
           }}
           onNodeClick={(_, node) => {
             // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a node's type names its data
             const data = node.data as Data<GrowthNode>;
-            if (data.node.kind === "fork") setChosen(data.node.changeId);
+            if (data.node.kind === "fork" && data.node.escalated === true)
+              navigate(changeAddress(data.node.changeId));
+            else if (data.node.kind === "fork") setChosen(data.node.changeId);
             else if (data.node.kind === "batch") setChosen(data.node.batchId);
           }}
           onPaneClick={() => setChosen(undefined)}
@@ -532,7 +555,7 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
               follow.current = true;
               fit(300);
             }}
-            fitViewOptions={{ padding: 0.06 }}
+            fitViewOptions={{ padding: 0.02 }}
             aria-label="Zoom and fit"
           />
           <MiniMap
@@ -580,7 +603,7 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
 
 // ── The header and the inspector ──────────────────────────────────────────
 
-function Header({ canvas, live }: { canvas: Canvas; live: boolean }) {
+function Header({ canvas, runs, live }: { canvas: Canvas; runs: number; live: boolean }) {
   const { answers, counts } = canvas;
   const rate = answers.perMinute.toLocaleString("en-US", { maximumFractionDigits: 1 });
   return (
@@ -591,9 +614,18 @@ function Header({ canvas, live }: { canvas: Canvas; live: boolean }) {
       </p>
       <dl className="a-mc-answers">
         <div>
-          <dt>Green advances</dt>
+          <dt>
+            {answers.advances > 0 && answers.unverified === answers.advances
+              ? "Advances"
+              : "Green advances"}
+          </dt>
           <dd className="a-num">
-            {answers.advances === 0 ? "—" : `${count(answers.green)} of ${count(answers.advances)}`}
+            {answers.advances === 0
+              ? "—"
+              : // Where Keel verified no advance, none is green: say so, not "0 of n".
+                answers.unverified === answers.advances
+                ? `Unverified ${count(answers.unverified)}`
+                : `${count(answers.green)} of ${count(answers.advances)}`}
           </dd>
         </div>
         <div>
@@ -614,8 +646,9 @@ function Header({ canvas, live }: { canvas: Canvas; live: boolean }) {
         </div>
       </dl>
       <p className="a-mc-counts a-num">
-        Agents {count(counts.agents)} · Live {count(canvas.live)} · Batches {count(counts.batches)}{" "}
-        · Landed {count(counts.landed)}
+        Agents {count(counts.agents)}
+        {runs > counts.agents ? ` · Runs ${count(runs)}` : ""} · Live {count(canvas.live)} · Batches{" "}
+        {count(counts.batches)} · Landed {count(counts.landed)}
       </p>
     </div>
   );

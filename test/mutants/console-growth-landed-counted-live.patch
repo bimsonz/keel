@@ -2,10 +2,10 @@
 # kills: growth.centre
 # why: a landed change is counted live
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index a725af55..782a7f11 100644
+index dc823e3d..f552cb34 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -243,7 +243,7 @@ export function growthOf(
+@@ -270,7 +270,7 @@ export function growthOf(
    const head = flow.commits[0];
    let live = 0;
    for (const change of flow.changes.values())
