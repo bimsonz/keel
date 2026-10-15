@@ -122,6 +122,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).submit(
             encodeSubmit({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               commitSha: input.commitSha,
@@ -149,6 +150,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).rebase(
             encodeRebase({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               idempotencyKey: input.idempotencyKey,
@@ -211,6 +213,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).revise(
             encodeRevise({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               ifMatchRevision: input.ifMatchRevision,
@@ -230,6 +233,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).rely(
             encodeRely({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               premise: input.premise,
@@ -242,6 +246,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).distinguish(
             encodeDistinguish({
               agentId: principal.agentId,
+              projectId: principal.projectId,
               ...(principal.run === undefined ? {} : { run: principal.run }),
               leaseId: input.lease,
               decisionId: input.decisionId,

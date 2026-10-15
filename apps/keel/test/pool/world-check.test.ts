@@ -88,6 +88,7 @@ async function submittedChange(precheck: Awaited<ReturnType<typeof inertPrecheck
       ChangeCodecs.submit,
       await c.stub.submit({
         agentId: c.agentId,
+        projectId: c.projectId,
         leaseId: (await c.current()).lease.id,
         commitSha,
         idempotencyKey: "submit-1",

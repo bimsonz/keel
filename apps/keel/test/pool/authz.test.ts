@@ -5,6 +5,7 @@
 // creation run over in-memory code and projects.
 import { env } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
+import { LEASE_TTL_MS, Proposition } from "@keeltown/core/domain/coordination";
 import {
   type EventEnvelope,
   EventEnvelope as Envelope,
@@ -17,7 +18,8 @@ import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { changeUnderTest, ok } from "./change-harness.ts";
+import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { changeUnderTest, ok, refusal } from "./change-harness.ts";
 import {
   BASE,
   establishProject,
@@ -480,5 +482,160 @@ describe("[authz.create-project] creating a project in an org", () => {
     // An org that does not exist reads as missing.
     const nowhere = await create(via, user.token, uniqueHandle("lost"), uniqueHandle("no-org"));
     expect([nowhere.status, nowhere.body["code"]]).toEqual([404, "resource.not_found"]);
+  });
+});
+
+/** A move on a change under a lease, over REST, as an agent sends one. */
+async function move(
+  token: string,
+  path: string,
+  lease: string | undefined,
+  key: string,
+  options: { readonly ifMatch?: string; readonly body?: object } = {},
+) {
+  const response = await worker(`${BASE}/v1${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      ...(lease === undefined ? {} : { "keel-lease": lease }),
+      "idempotency-key": key,
+      ...(options.ifMatch === undefined ? {} : { "if-match": options.ifMatch }),
+      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+    },
+    ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+  });
+  const body = await response.json<Record<string, unknown>>();
+  return { status: response.status, code: body["code"], lease: Object(body["result"]).lease?.id };
+}
+
+const PER_SESSION = Schema.encodeSync(Proposition)(
+  Schema.decodeUnknownSync(Proposition)({
+    subject: "authz.permission-evaluation",
+    predicate: "freshness",
+    relation: "is",
+    value: "per-session",
+  }),
+);
+
+describe("[authz.lease-foreign] a change's lease moves it only from the change's own project", () => {
+  it("[authz.lease-foreign] an agent of another org holding a change's id and lease is answered not found on revise, rely, rebase and submit, over REST and MCP, and the change is untouched; its own project's agents move it, after an adoption too", async () => {
+    const projectId = makeId("prj", ulid());
+    const c = await changeUnderTest(projectId, "project");
+    const declared = ok(await c.declare("declare-1")).change.lease.id;
+    const sha = await c.push();
+    const ofProject = await seedAgent({ projectId });
+    const colleague = await tokenFor(ofProject);
+    const foreigner = await tokenFor(await seedForeignAgent());
+    // A refusal that renewed the lease would move its time: the clock moves first, so one would show.
+    c.clock.advance(60_000);
+
+    /** Every move the foreigner can make under `lease`, each as [status, code]. */
+    const foreign = async (lease: string, revision: number, round: string) => {
+      const ifMatch = `"${revision}"`;
+      const moves = await Promise.all([
+        move(foreigner, `/changes/${c.changeId}/revisions`, lease, `${round}-revise-key`, {
+          ifMatch,
+          body: { goal: "Rewritten by an agent of another org" },
+        }),
+        move(foreigner, `/changes/${c.changeId}/premises`, lease, `${round}-rely-key`, {
+          body: { premise: PER_SESSION },
+        }),
+        move(foreigner, `/changes/${c.changeId}/rebase`, lease, `${round}-rebase-key`),
+        move(foreigner, "/submissions", lease, `${round}-submit-key`, {
+          body: { changeId: c.changeId, commitSha: sha },
+        }),
+      ]);
+      const viaTool = await tool(foreigner, "revise", {
+        changeId: c.changeId,
+        "keel-lease": lease,
+        "idempotency-key": `${round}-revise-mcp`,
+        "if-match": String(revision),
+        goal: "Rewritten by an agent of another org",
+      });
+      return [
+        ...moves.map((answer) => [answer.status, answer.code]),
+        [Object(viaTool.body).status, Object(viaTool.body).code],
+      ];
+    };
+    const NOT_FOUND = Array.from({ length: 5 }, () => [404, "change.not_found"]);
+
+    const before = { log: await c.log(), change: await c.current() };
+    const first = await foreign(declared, 1, "f1");
+    // The change's own object refuses another project too, for the one move no doorway reaches it with.
+    const distinguished = decodeExit(
+      ChangeCodecs.distinguish,
+      await c.stub.distinguish({
+        agentId: c.agentId,
+        projectId: makeId("prj", ulid()),
+        leaseId: declared,
+        decisionId: makeId("dec", ulid()),
+        distinction: "A decision of this change's project does not govern it",
+        idempotencyKey: "f1-distinguish-key",
+      }),
+    );
+    const untouched = { log: await c.log(), change: await c.current() };
+
+    // An agent of the change's own project moves it under the lease, and after adopting it.
+    const revised = await move(
+      colleague,
+      `/changes/${c.changeId}/revisions`,
+      declared,
+      "c-revise-key",
+      {
+        ifMatch: '"1"',
+        body: { goal: "Cache permission lookups per request, in the colleague's words" },
+      },
+    );
+    c.clock.advance(LEASE_TTL_MS);
+    const adopted = await move(colleague, `/changes/${c.changeId}/adopt`, undefined, "c-adopt-key");
+    const second = await foreign(String(adopted.lease), 2, "f2");
+    const after = await c.current();
+    const lease = String(adopted.lease);
+    const relied = await move(colleague, `/changes/${c.changeId}/premises`, lease, "c-rely-key", {
+      body: { premise: PER_SESSION },
+    });
+    const ownDistinction = decodeExit(
+      ChangeCodecs.distinguish,
+      await c.stub.distinguish({
+        agentId: ofProject.agent.id,
+        projectId,
+        leaseId: lease,
+        decisionId: makeId("dec", ulid()),
+        distinction: "A decision of another subject does not govern it",
+        idempotencyKey: "c-distinguish-key",
+      }),
+    );
+    // Trunk moves on, so the change's own project rebases it onto trunk's head, then submits it.
+    const trunk = projectRepos(projectId).trunk;
+    c.trunks.heads.set(
+      projectId,
+      await Effect.runPromise(
+        Effect.gen(function* () {
+          yield* (yield* CodeHost).create(trunk);
+          return yield* c.code.fixture.commit(trunk, "refs/heads/main", {
+            "README.md": "landed\n",
+          });
+        }).pipe(Effect.provide(c.code.layer)),
+      ),
+    );
+    const rebased = await move(colleague, `/changes/${c.changeId}/rebase`, lease, "c-rebase-key");
+    const submitted = await move(colleague, "/submissions", lease, "c-submit-key", {
+      body: { changeId: c.changeId, commitSha: sha },
+    });
+
+    expect(first).toEqual(NOT_FOUND);
+    expect(refusal(distinguished)).toContain("ChangeNotFound");
+    expect(untouched).toEqual(before);
+    expect([revised.status, adopted.status]).toEqual([200, 200]);
+    expect(second).toEqual(NOT_FOUND);
+    expect(after.intent.goal).toBe(
+      "Cache permission lookups per request, in the colleague's words",
+    );
+    expect([relied.status, refusal(ownDistinction), rebased.status, submitted.status]).toEqual([
+      200,
+      "success",
+      200,
+      202,
+    ]);
   });
 });

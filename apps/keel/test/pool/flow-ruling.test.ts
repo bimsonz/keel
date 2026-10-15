@@ -48,7 +48,13 @@ async function deriving(c: ChangeUnderTest) {
   ok(
     decodeExit(
       ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId: lease, commitSha, idempotencyKey: "s-1" }),
+      await c.stub.submit({
+        agentId: c.agentId,
+        projectId: c.projectId,
+        leaseId: lease,
+        commitSha,
+        idempotencyKey: "s-1",
+      }),
     ),
   );
   ok(
@@ -187,6 +193,7 @@ describe("a change to how Keel verifies, on the real Change and namespace object
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: declared.change.lease.id,
           commitSha,
           idempotencyKey: "s-1",
@@ -239,6 +246,7 @@ describe("a change to how Keel verifies, on the real Change and namespace object
           ChangeCodecs.submit,
           await c.stub.submit({
             agentId: c.agentId,
+            projectId: c.projectId,
             leaseId: lease,
             commitSha,
             idempotencyKey: key,

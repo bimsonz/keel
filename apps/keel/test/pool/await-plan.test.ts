@@ -37,6 +37,7 @@ async function submitted(c: ChangeUnderTest, key: string, commitSha?: string) {
       ChangeCodecs.submit,
       await c.stub.submit({
         agentId: c.agentId,
+        projectId: c.projectId,
         leaseId: lease,
         commitSha: sha,
         idempotencyKey: key,

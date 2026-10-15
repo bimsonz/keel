@@ -2,13 +2,13 @@
 # kills: run.commands
 # why: the Change object's rely command has no run to carry, so the run the isolate sent is dropped at the object's door
 diff --git a/apps/keel/src/rpc/change.ts b/apps/keel/src/rpc/change.ts
-index d4b52369..91599b18 100644
+index c465f01f..1e0a874e 100644
 --- a/apps/keel/src/rpc/change.ts
 +++ b/apps/keel/src/rpc/change.ts
-@@ -105,8 +105,6 @@ export type ReviseCommand = typeof ReviseCommand.Type;
- /** Add one premise to a change under its lease. */
- export const RelyCommand = Schema.Struct({
+@@ -185,8 +185,6 @@ export const RelyCommand = Schema.Struct({
    agentId: AgentId,
+   /** The caller's project, from its token: a change of another project reads as not found. */
+   projectId: ProjectId,
 -  /** The run of the agent that asks, when its token names one. */
 -  run: Schema.optional(RunRef),
    leaseId: LeaseId,

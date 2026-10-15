@@ -33,7 +33,13 @@ async function submitted(c: ChangeUnderTest, key: string) {
   return ok(
     decodeExit(
       ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId: lease, commitSha, idempotencyKey: key }),
+      await c.stub.submit({
+        agentId: c.agentId,
+        projectId: c.projectId,
+        leaseId: lease,
+        commitSha,
+        idempotencyKey: key,
+      }),
     ),
   );
 }

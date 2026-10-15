@@ -1,0 +1,3 @@
+### Fixed
+
+- **A change's lease moves it only from the change's own project.** `revise`, `rely`, `rebase` and `submit` (and a precedent's distinction under `resolve`) were decided on the caller's own project and then checked only the lease, whose id is on the change's feed: an agent working in any project could move another project's change with its id and lease. The Change's object now takes the caller's project from its token with each of them and answers a change of another project `404 change.not_found`, as it would one that does not exist, before it reads, replays or commits anything, and without renewing the lease.

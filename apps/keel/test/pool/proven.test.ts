@@ -115,7 +115,13 @@ async function deriving(c: ChangeUnderTest) {
   ok(
     decodeExit(
       ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId: lease, commitSha, idempotencyKey: "s-1" }),
+      await c.stub.submit({
+        agentId: c.agentId,
+        projectId: c.projectId,
+        leaseId: lease,
+        commitSha,
+        idempotencyKey: "s-1",
+      }),
     ),
   );
   ok(

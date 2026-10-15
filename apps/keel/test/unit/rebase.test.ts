@@ -105,6 +105,7 @@ const declared = Effect.gen(function* () {
 
 const rebasing = (leaseId: LeaseId, idempotencyKey = "rebase-1") => ({
   agentId,
+  projectId: sampleProjectId,
   leaseId,
   idempotencyKey,
 });
@@ -216,6 +217,7 @@ describe("rebase", () => {
             changeId,
             Schema.decodeUnknownSync(SubmitCommand)({
               agentId,
+              projectId: sampleProjectId,
               leaseId: lease,
               commitSha: work,
               idempotencyKey: "submit-1",
@@ -248,6 +250,7 @@ describe("rebase", () => {
             changeId,
             Schema.decodeUnknownSync(SubmitCommand)({
               agentId,
+              projectId: sampleProjectId,
               leaseId: lease,
               commitSha: work,
               idempotencyKey: "submit-1",

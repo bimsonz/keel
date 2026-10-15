@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/authz.test.ts
+# kills: authz.lease-foreign
+# why: a revision checks only the lease, so an agent of another project rewrites the change's intent with the id and lease from its feed
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b02643f9..c9cecccc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1076,7 +1076,6 @@ const reviseCall: (
+   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
+ > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
+   const store = yield* EntityStore;
+-  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
+   const projectId = heldWorkspace(store, changeId)?.projectId;
+   const revision: Omit<IntentRevision, "revision"> = {
+     ...(command.goal === undefined ? {} : { goal: command.goal }),

@@ -125,6 +125,7 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
 
         yield* revise(A, {
           agentId: declared.change.agentId,
+          projectId: sampleProjectId,
           leaseId: declared.change.lease.id,
           ifMatchRevision: 1,
           premisesAdded: [],
@@ -134,6 +135,7 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         });
         yield* rely(A, {
           agentId: declared.change.agentId,
+          projectId: sampleProjectId,
           leaseId: declared.change.lease.id,
           premise: proposition({
             subject: "billing.invoices.totals",
@@ -239,6 +241,7 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         const before = (yield* logOf(A).pipe(Effect.provide(a))).length;
         yield* revise(A, {
           agentId: declaredA.change.agentId,
+          projectId: sampleProjectId,
           leaseId: declaredA.change.lease.id,
           ifMatchRevision: 1,
           premisesAdded: [fastChecks],
@@ -267,6 +270,7 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         const held = (yield* logOf(A).pipe(Effect.provide(a))).length;
         yield* revise(A, {
           agentId: declaredA.change.agentId,
+          projectId: sampleProjectId,
           leaseId: declaredA.change.lease.id,
           ifMatchRevision: 2,
           goal: "owners can revoke collaborators at once",

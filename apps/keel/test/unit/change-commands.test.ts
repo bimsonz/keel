@@ -29,6 +29,7 @@ describe("the Change RPC commands", () => {
     expect(() =>
       Schema.decodeUnknownSync(SubmitCommand)({
         agentId: declare.agentId,
+        projectId: declare.projectId,
         commitSha: "a".repeat(40),
         idempotencyKey: "submit-0001",
       }),

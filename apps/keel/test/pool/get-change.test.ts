@@ -103,6 +103,7 @@ describe("[b12.get-change] a change by id, from its own DO", () => {
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease,
           commitSha,
           idempotencyKey: "submit-1",
@@ -145,6 +146,7 @@ describe("[b12.held-lease] the lease, read back by the agent holding it", () => 
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease.id,
           commitSha,
           idempotencyKey: "submit-1",

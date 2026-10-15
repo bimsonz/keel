@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/authz.test.ts
+# kills: authz.lease-foreign
+# why: a submission checks only the lease, so an agent of another project sends the change's pushed head to verification and trunk
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b02643f9..6c98c635 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1297,8 +1297,6 @@ const submitCall: (
+   ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
+   Clock | EntityStore | EventOutbox | CodeHost
+ > = Effect.fn("coordination/submit")(function* (changeId: ChangeId, command: SubmitChange) {
+-  if (!ownProject(yield* EntityStore, changeId, command.projectId))
+-    return yield* notFound(changeId);
+   const held = heldWorkspace(yield* EntityStore, changeId);
+   // A live change's own workspace repo always exists: its absence is a defect, never the agent's fault.
+   const inWorkspace =

@@ -67,9 +67,11 @@ export const DeclareCommand = Schema.Struct({
 });
 export type DeclareCommand = typeof DeclareCommand.Type;
 
-/** Submit a commit for a change. The lease is authorised in the DO alone; the key is the commit's cause. */
+/** Submit a commit for a change. The DO authorises the lease and the caller's project; the key is the commit's cause. */
 export const SubmitCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   leaseId: LeaseId,
@@ -81,6 +83,8 @@ export type SubmitCommand = typeof SubmitCommand.Type;
 /** Move a change onto trunk's head under its lease, after a textual bounce. */
 export const RebaseCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   leaseId: LeaseId,
@@ -161,6 +165,8 @@ export const ObjectNotFound = Schema.TaggedStruct("ObjectNotFound", {
 /** Revise a change's intent under its lease. `ifMatchRevision` is the revision the caller last read (If-Match). */
 export const ReviseCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   leaseId: LeaseId,
@@ -177,6 +183,8 @@ export type ReviseCommand = typeof ReviseCommand.Type;
 /** Add one premise to a change under its lease. */
 export const RelyCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   leaseId: LeaseId,
@@ -188,6 +196,8 @@ export type RelyCommand = typeof RelyCommand.Type;
 /** Record why a decision does not govern the change, under its lease. */
 export const DistinguishCommand = Schema.Struct({
   agentId: AgentId,
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  projectId: ProjectId,
   /** The run of the agent that asks, when its token names one. */
   run: Schema.optional(RunRef),
   leaseId: LeaseId,

@@ -76,6 +76,7 @@ describe("no self-loops", () => {
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease,
           commitSha: sha,
           idempotencyKey: "submit-1",

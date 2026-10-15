@@ -125,6 +125,7 @@ describe("[b21.revise-preflight] a revision's preflight reads the intent it leav
       expect(before.preflight.contradictions).toEqual([]);
       const revised = yield* revise(B, {
         agentId: agentB,
+        projectId: sampleProjectId,
         leaseId: before.change.lease.id,
         ifMatchRevision: 1,
         premisesAdded: [],
@@ -187,6 +188,7 @@ describe("[b21.canonical] an ordering written from either event is compared and 
         expect(before.preflight.contradictions).toEqual([]);
         const relied = yield* rely(B, {
           agentId: agentB,
+          projectId: sampleProjectId,
           leaseId: before.change.lease.id,
           premise: migrateBeforeDeploy,
           idempotencyKey: "rely-b",

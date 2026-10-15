@@ -115,7 +115,13 @@ async function deriving(c: ChangeUnderTest, intent: Parameters<ChangeUnderTest["
   ok(
     decodeExit(
       ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId: lease, commitSha, idempotencyKey: "s-1" }),
+      await c.stub.submit({
+        agentId: c.agentId,
+        projectId: c.projectId,
+        leaseId: lease,
+        commitSha,
+        idempotencyKey: "s-1",
+      }),
     ),
   );
   ok(
@@ -535,6 +541,7 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       ChangeCodecs.distinguish,
       await a.stub.distinguish({
         agentId: a.agentId,
+        projectId: a.projectId,
         leaseId: makeId("lse", ulid()),
         decisionId,
         distinction: distinction.note,
@@ -591,6 +598,7 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
         ChangeCodecs.rely,
         await c.stub.rely({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: declared.change.lease.id,
           premise: elsewhere,
           idempotencyKey: "rely-c",

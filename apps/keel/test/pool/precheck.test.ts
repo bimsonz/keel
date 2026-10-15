@@ -113,6 +113,7 @@ async function pushed(premises: readonly Proposition[] = [], on?: ChangeUnderTes
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease,
           commitSha,
           idempotencyKey: "s-1",
@@ -455,6 +456,7 @@ describe("Precheck", () => {
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease,
           commitSha: head,
           idempotencyKey: "s-1",
@@ -609,6 +611,7 @@ describe("Precheck", () => {
         ChangeCodecs.submit,
         await c.stub.submit({
           agentId: c.agentId,
+          projectId: c.projectId,
           leaseId: lease,
           commitSha: head,
           idempotencyKey: "s-1",

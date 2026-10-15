@@ -67,6 +67,7 @@ const revise = async (c: ChangeUnderTest, leaseId: string, revision: number, key
     ChangeCodecs.revise,
     await c.stub.revise({
       agentId: c.agentId,
+      projectId: c.projectId,
       leaseId,
       ifMatchRevision: revision,
       goal: `Revised from ${revision}`,
@@ -79,7 +80,13 @@ const revise = async (c: ChangeUnderTest, leaseId: string, revision: number, key
 const submit = async (c: ChangeUnderTest, leaseId: string, commitSha: string, key: string) =>
   decodeExit(
     ChangeCodecs.submit,
-    await c.stub.submit({ agentId: c.agentId, leaseId, commitSha, idempotencyKey: key }),
+    await c.stub.submit({
+      agentId: c.agentId,
+      projectId: c.projectId,
+      leaseId,
+      commitSha,
+      idempotencyKey: key,
+    }),
   );
 
 const adopt = async (c: ChangeUnderTest, agentId: string, key: string) =>

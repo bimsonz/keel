@@ -287,6 +287,8 @@ export interface DeclaredChange {
 
 export interface ReviseChange {
   readonly agentId: AgentId;
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  readonly projectId: ProjectId;
   /** The run of the agent that asks, when its token names one. */
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
@@ -307,6 +309,8 @@ export interface RevisedChange {
 /** Add one premise under the lease: a revision of one, and a subscription to its subject. */
 export interface RelyChange {
   readonly agentId: AgentId;
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  readonly projectId: ProjectId;
   /** The run of the agent that asks, when its token names one. */
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
@@ -321,6 +325,8 @@ export interface NearbyChange {
 
 export interface SubmitChange {
   readonly agentId: AgentId;
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  readonly projectId: ProjectId;
   /** The run of the agent that asks, when its token names one. */
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
@@ -352,6 +358,8 @@ export interface AbandonChange {
 /** A distinction from a precedent, made under the change's lease. */
 export interface DistinguishPrecedent {
   readonly agentId: AgentId;
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  readonly projectId: ProjectId;
   /** The run of the agent that makes it, when its token names one. */
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
@@ -364,6 +372,8 @@ export interface DistinguishPrecedent {
 
 export interface RebaseChange {
   readonly agentId: AgentId;
+  /** The caller's project, from its token: a change of another project reads as not found. */
+  readonly projectId: ProjectId;
   /** The run of the agent that asks, when its token names one. */
   readonly run?: RunRef | undefined;
   readonly leaseId: LeaseId;
@@ -505,6 +515,19 @@ const inProject = (store: Store, changeId: ChangeId): { readonly project?: Proje
   const project = heldWorkspace(store, changeId)?.projectId;
   return project === undefined ? {} : { project };
 };
+
+/**
+ * Whether a call under a change's lease comes from the change's own project,
+ * as its workspace row records it at declare. The lease alone proves nothing:
+ * its id is on the change's public feed. A call from another project reads the
+ * change as not found, before anything is read, replayed or committed.
+ */
+const ownProject = (store: Store, changeId: ChangeId, projectId: ProjectId): boolean =>
+  heldWorkspace(store, changeId)?.projectId === projectId;
+
+/** A command as its fingerprint reads it: the caller's project decides who may call, not what was asked. */
+const askedOf = <C extends { readonly projectId: ProjectId }>({ projectId: _caller, ...rest }: C) =>
+  rest;
 
 const decodePreflight = Schema.decodeUnknownSync(Preflight);
 
@@ -1053,6 +1076,7 @@ const reviseCall: (
   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
   const store = yield* EntityStore;
+  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
   const projectId = heldWorkspace(store, changeId)?.projectId;
   const revision: Omit<IntentRevision, "revision"> = {
     ...(command.goal === undefined ? {} : { goal: command.goal }),
@@ -1070,7 +1094,7 @@ const reviseCall: (
     {
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
-      fingerprint: fingerprintOf("revise", command),
+      fingerprint: fingerprintOf("revise", askedOf(command)),
       ...byAgent(command.agentId, command.run),
       ...inProject(yield* EntityStore, changeId),
     },
@@ -1138,6 +1162,7 @@ const relyCall: (
   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/rely")(function* (changeId: ChangeId, command: RelyChange) {
   const store = yield* EntityStore;
+  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
   const projectId = heldWorkspace(store, changeId)?.projectId;
   const relying = { premisesAdded: [command.premise], premisesRetracted: [] };
   for (let read = 1; ; read++) {
@@ -1150,7 +1175,7 @@ const relyCall: (
         {
           entity: changeRef(changeId),
           cause: command.idempotencyKey,
-          fingerprint: fingerprintOf("rely", command),
+          fingerprint: fingerprintOf("rely", askedOf(command)),
           ...byAgent(command.agentId, command.run),
           ...inProject(yield* EntityStore, changeId),
         },
@@ -1272,6 +1297,8 @@ const submitCall: (
   ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
   Clock | EntityStore | EventOutbox | CodeHost
 > = Effect.fn("coordination/submit")(function* (changeId: ChangeId, command: SubmitChange) {
+  if (!ownProject(yield* EntityStore, changeId, command.projectId))
+    return yield* notFound(changeId);
   const held = heldWorkspace(yield* EntityStore, changeId);
   // A live change's own workspace repo always exists: its absence is a defect, never the agent's fault.
   const inWorkspace =
@@ -1282,7 +1309,7 @@ const submitCall: (
     {
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
-      fingerprint: fingerprintOf("submit", command),
+      fingerprint: fingerprintOf("submit", askedOf(command)),
       ...byAgent(command.agentId, command.run),
       ...(held === undefined ? {} : { project: held.projectId }),
     },
@@ -1387,11 +1414,13 @@ const distinguishCall: (
   changeId: ChangeId,
   command: DistinguishPrecedent,
 ) {
+  if (!ownProject(yield* EntityStore, changeId, command.projectId))
+    return yield* notFound(changeId);
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
-      fingerprint: fingerprintOf("distinguish", command),
+      fingerprint: fingerprintOf("distinguish", askedOf(command)),
       ...byAgent(command.agentId, command.run),
       ...inProject(yield* EntityStore, changeId),
     },
@@ -1510,7 +1539,9 @@ const rebaseCall: (
   | PackTooLarge,
   Clock | EntityStore | EventOutbox | Trunks | WorkspaceRebaser
 > = Effect.fn("coordination/rebase")(function* (changeId: ChangeId, command: RebaseChange) {
-  const fingerprint = fingerprintOf("rebase", command);
+  if (!ownProject(yield* EntityStore, changeId, command.projectId))
+    return yield* notFound(changeId);
+  const fingerprint = fingerprintOf("rebase", askedOf(command));
   const answer = (change: Change): Effect.Effect<RebasedChange, ChangeStateRefused> =>
     change.baseSha === undefined
       ? refused(change, "rebase")

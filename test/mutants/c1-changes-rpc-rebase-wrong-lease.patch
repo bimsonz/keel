@@ -2,12 +2,12 @@
 # kills: rebase.rest
 # why: The RPC adapter sends something other than the caller's Keel-Lease as the lease, so every rebase over REST and MCP is refused as stale
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 2759aeb7..5ce461b6 100644
+index 6639932a..1a61a36c 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -146,7 +146,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
-             encodeRebase({
+@@ -152,7 +152,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
                agentId: principal.agentId,
+               projectId: principal.projectId,
                ...(principal.run === undefined ? {} : { run: principal.run }),
 -              leaseId: input.lease,
 +              leaseId: input.changeId,

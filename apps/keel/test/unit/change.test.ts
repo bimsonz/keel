@@ -108,6 +108,7 @@ const declaring = (overrides: Record<string, unknown> = {}) =>
 const revising = (leaseId: string, ifMatchRevision: number, key: string) =>
   Schema.decodeUnknownSync(ReviseCommand)({
     agentId,
+    projectId: sampleProjectId,
     leaseId,
     ifMatchRevision,
     goal: `Revision after ${ifMatchRevision}`,
@@ -117,7 +118,13 @@ const revising = (leaseId: string, ifMatchRevision: number, key: string) =>
   });
 
 const submitting = (leaseId: string, commitSha: string, key: string) =>
-  Schema.decodeUnknownSync(SubmitCommand)({ agentId, leaseId, commitSha, idempotencyKey: key });
+  Schema.decodeUnknownSync(SubmitCommand)({
+    agentId,
+    projectId: sampleProjectId,
+    leaseId,
+    commitSha,
+    idempotencyKey: key,
+  });
 
 /** Pushes a commit to the change's workspace, as the agent would. */
 const pushToWorkspace = Effect.gen(function* () {
@@ -476,6 +483,7 @@ describe("leases", () => {
         clock.advance(60_000);
         const distinguished = yield* distinguish(changeId, {
           agentId: agent,
+          projectId: sampleProjectId,
           leaseId,
           decisionId: makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
           distinction: "this change reads the cache the decision does not govern",
@@ -1647,6 +1655,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(SubmitCommand)({
             agentId,
+            projectId: sampleProjectId,
             run: RUN,
             leaseId: lease.id,
             commitSha: sha,
@@ -1690,6 +1699,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(ReviseCommand)({
             agentId,
+            projectId: sampleProjectId,
             run: RUN,
             leaseId,
             ifMatchRevision: 1,
@@ -1703,6 +1713,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(RelyCommand)({
             agentId,
+            projectId: sampleProjectId,
             run: RUN,
             leaseId,
             premise: {
@@ -1719,6 +1730,7 @@ describe("the run an agent's command names", () => {
           changeId,
           Schema.decodeUnknownSync(SubmitCommand)({
             agentId,
+            projectId: sampleProjectId,
             run: RUN,
             leaseId,
             commitSha: sha,
@@ -1865,6 +1877,7 @@ describe("a rely racing a revise", () => {
           changeId,
           Schema.decodeUnknownSync(RelyCommand)({
             agentId,
+            projectId: sampleProjectId,
             leaseId,
             premise: {
               subject: "migrate",

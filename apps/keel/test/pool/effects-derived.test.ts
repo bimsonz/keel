@@ -110,7 +110,13 @@ const submitted = async (
   ok(
     decodeExit(
       ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId, commitSha, idempotencyKey }),
+      await c.stub.submit({
+        agentId: c.agentId,
+        projectId: c.projectId,
+        leaseId,
+        commitSha,
+        idempotencyKey,
+      }),
     ),
   );
 const submit = async (c: ChangeUnderTest, leaseId: string, idempotencyKey: string) =>

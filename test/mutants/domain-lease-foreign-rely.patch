@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/authz.test.ts
+# kills: authz.lease-foreign
+# why: a premise is added under the lease alone, so an agent of another project relies the change on what it chooses
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b02643f9..da1fe935 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1162,7 +1162,6 @@ const relyCall: (
+   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
+ > = Effect.fn("coordination/rely")(function* (changeId: ChangeId, command: RelyChange) {
+   const store = yield* EntityStore;
+-  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
+   const projectId = heldWorkspace(store, changeId)?.projectId;
+   const relying = { premisesAdded: [command.premise], premisesRetracted: [] };
+   for (let read = 1; ; read++) {

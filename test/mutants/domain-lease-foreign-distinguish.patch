@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/authz.test.ts
+# kills: authz.lease-foreign
+# why: the change's own object takes a distinction under the lease from any project, with only the doorway in front of it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b02643f9..e7f70d2b 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1414,8 +1414,6 @@ const distinguishCall: (
+   changeId: ChangeId,
+   command: DistinguishPrecedent,
+ ) {
+-  if (!ownProject(yield* EntityStore, changeId, command.projectId))
+-    return yield* notFound(changeId);
+   const committed = yield* commit(
+     {
+       entity: changeRef(changeId),

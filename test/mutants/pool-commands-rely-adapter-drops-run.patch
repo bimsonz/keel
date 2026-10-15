@@ -2,13 +2,13 @@
 # kills: run.pool-commands
 # why: the isolate sends a rely to the Change object without the token's run, so a rely through the Worker is committed under no run
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 2759aeb7..72b7c0b1 100644
+index 6639932a..9602252b 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -180,7 +180,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
-           objects.change(input.changeId).rely(
+@@ -234,7 +234,6 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
              encodeRely({
                agentId: principal.agentId,
+               projectId: principal.projectId,
 -              ...(principal.run === undefined ? {} : { run: principal.run }),
                leaseId: input.lease,
                premise: input.premise,

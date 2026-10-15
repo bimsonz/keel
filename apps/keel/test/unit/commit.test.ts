@@ -174,6 +174,7 @@ describe("commit", () => {
             changeId,
             Schema.decodeUnknownSync(SubmitCommand)({
               agentId,
+              projectId: sampleProjectId,
               leaseId: lease,
               commitSha: made.commit.commitSha,
               idempotencyKey: "submit-1",
@@ -286,6 +287,7 @@ describe("commit", () => {
             changeId,
             Schema.decodeUnknownSync(SubmitCommand)({
               agentId,
+              projectId: sampleProjectId,
               leaseId: lease,
               commitSha: made.commit.commitSha,
               idempotencyKey: "submit-1",

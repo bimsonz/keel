@@ -2,13 +2,13 @@
 # kills: run.commands
 # why: a revision commits under the agent with no run, so one command of a lane's work is told apart from no other lane's
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index c37e2d09..663a8788 100644
+index b02643f9..078768f3 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -826,7 +826,7 @@ export const revise: (
+@@ -1095,7 +1095,7 @@ const reviseCall: (
        entity: changeRef(changeId),
        cause: command.idempotencyKey,
-       fingerprint: fingerprintOf("revise", command),
+       fingerprint: fingerprintOf("revise", askedOf(command)),
 -      ...byAgent(command.agentId, command.run),
 +      ...byAgent(command.agentId, undefined),
        ...inProject(yield* EntityStore, changeId),

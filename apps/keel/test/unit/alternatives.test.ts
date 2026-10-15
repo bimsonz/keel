@@ -153,6 +153,7 @@ function world() {
       const exit = yield* Effect.exit(
         revise(changeId, {
           agentId: agentOf(i),
+          projectId: sampleProjectId,
           leaseId: held.leaseId,
           ifMatchRevision: held.revision,
           premisesAdded: [],

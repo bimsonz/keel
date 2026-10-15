@@ -263,6 +263,7 @@ describe("Changes over Durable Object RPC", () => {
           name: changeId,
           command: {
             agentId,
+            projectId: principal.projectId,
             leaseId: lease,
             commitSha: "a".repeat(40),
             idempotencyKey: "submit-1",
