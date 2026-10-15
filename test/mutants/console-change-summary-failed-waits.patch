@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t change.summary-failed
+# kills: change.summary-failed
+# why: where Keel's read model refuses, the page waits for the whole log rather than drawing the change as the log is read
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 819efd39..d82b4a0c 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -85,7 +85,7 @@ export function changeDrawn(
+   if (player.loaded || !player.live)
+     return inWorld || player.loaded ? { by: "log" } : { by: "waiting" };
+   if (summary === undefined) return { by: "waiting" };
+-  if (summary === null) return inWorld ? { by: "log" } : { by: "waiting" };
++  if (summary === null) return { by: "waiting" };
+   return inWorld && player.readThrough(summary.updatedAt)
+     ? { by: "log" }
+     : { by: "early", summary };

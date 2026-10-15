@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t change.no-stale
+# kills: change.no-stale
+# why: a change's page is drawn from the log as soon as the log holds the change, so an old change reads as queued until the fold reaches its landing
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 819efd39..af87c57f 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -86,7 +86,7 @@ export function changeDrawn(
+     return inWorld || player.loaded ? { by: "log" } : { by: "waiting" };
+   if (summary === undefined) return { by: "waiting" };
+   if (summary === null) return inWorld ? { by: "log" } : { by: "waiting" };
+-  return inWorld && player.readThrough(summary.updatedAt)
++  return inWorld
+     ? { by: "log" }
+     : { by: "early", summary };
+ }

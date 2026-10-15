@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t change.no-stale
+# kills: change.no-stale
+# why: the log counts as read through any instant, so the page hands over to the log's view as it stood part way
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 774723b8..e068e0cd 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -421,7 +421,7 @@ export class Player {
+    */
+   readThrough(at: string): boolean {
+     const due = Date.parse(at) - this.#epochMs;
+-    return (this.#eventTimes.at(-1) ?? Number.NEGATIVE_INFINITY) >= due && this.t >= due;
++    return due === due;
+   }
+ 
+   /** Ask Keel which open questions it lists to this reader, once. Called when a question's page is opened. */

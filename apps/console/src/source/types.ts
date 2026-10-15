@@ -95,6 +95,12 @@ export interface KeelEventSource {
    * read behind it. Keel's own source answers it; a fixture has none.
    */
   readSnapshot?(signal?: AbortSignal): Promise<Keel.FeedSnapshot>;
+  /**
+   * One change by its number, from Keel's read model of the project's changes: where it stands now, in one read,
+   * while the log is read behind it. Null where Keel numbers none so. Keel's own source answers it; a fixture
+   * has none.
+   */
+  readChange?(number: number, signal?: AbortSignal): Promise<Keel.ChangeSummary | null>;
 }
 
 /** Keel's diff of a change: the files its commit alters against the trunk it was made on. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t change.early-status
+# kills: change.early-status
+# why: the read model is asked from the change's own number, so its page starts at the change below and answers none by that number
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 43a61a33..c61791b5 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -595,7 +595,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+       const input: Changes_listChangesInput = {
+         project: project.id,
+         limit: 1,
+-        cursor: String(number + 1),
++        cursor: String(number),
+       };
+       const response = await read(`/v1/changes${queryOf({ ...input })}`, signal);
+       if (!response.ok) throw await refusalOf(response);

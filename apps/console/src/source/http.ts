@@ -21,6 +21,9 @@ import type {
   AgentCard,
   AgentProfile,
   Agents_approveSponsorInput,
+  ChangeSummary,
+  ChangeSummaryPage,
+  Changes_listChangesInput,
   CloudflareConnect,
   Credentials,
   Delivery_beginCloudflareConnectInput,
@@ -586,6 +589,18 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       const response = await read(`/v1/events/snapshot${queryOf({ ...input })}`, signal);
       if (!response.ok) throw await refusalOf(response);
       return answered<FeedSnapshot>(response);
+    },
+    async readChange(number: number, signal?: AbortSignal): Promise<ChangeSummary | null> {
+      // Keel's list runs newest first, and its cursor is the number below which a page starts.
+      const input: Changes_listChangesInput = {
+        project: project.id,
+        limit: 1,
+        cursor: String(number + 1),
+      };
+      const response = await read(`/v1/changes${queryOf({ ...input })}`, signal);
+      if (!response.ok) throw await refusalOf(response);
+      const [first] = (await answered<ChangeSummaryPage>(response)).items;
+      return first?.number === number ? first : null;
     },
     readObservations: (asked = {}) =>
       Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" }),

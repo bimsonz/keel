@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t change.early-status
+# kills: change.early-status
+# why: the early page draws the change's head and tabs and no status box, so where it stands is a pill and nothing more
+diff --git a/apps/console/src/views/Change.tsx b/apps/console/src/views/Change.tsx
+index 30eac905..e8d0ed81 100644
+--- a/apps/console/src/views/Change.tsx
++++ b/apps/console/src/views/Change.tsx
+@@ -1030,7 +1030,6 @@ export function EarlyChange({
+         main={
+           <>
+             <section className="a-merge" aria-label="Status">
+-              <EarlyStatus summary={summary} />
+               <Row tone="quiet" icon={<ClockIcon size={20} weight="bold" />} title="Checks">
+                 <Loading rows={2} />
+               </Row>

@@ -4,7 +4,13 @@
 // tail. The story never runs past a question nobody has answered.
 
 import type { AnyEvent } from "../contract/events.ts";
-import type { AgentCard, Lattice, ProbeSource, VerdictView } from "../contract/keel/index.ts";
+import type {
+  AgentCard,
+  ChangeSummary,
+  Lattice,
+  ProbeSource,
+  VerdictView,
+} from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
 import type {
   KeelAgents,
@@ -48,6 +54,8 @@ export class Player {
   readonly diffs = new Map<string, ChangeDiff>();
   /** Keel's public card of each agent asked for, by its id: null where Keel knows none by that id. */
   readonly cards = new Map<string, AgentCard | null>();
+  /** Keel's read model of each change asked for by its number while the log is read: null where it has none. */
+  readonly summaries = new Map<number, ChangeSummary | null>();
   /** What Keel was asked for beside the log and would not give, by the id of the thing it was asked about. */
   readonly refused = new Set<string>();
   readonly verdicts = new Map<string, VerdictView>();
@@ -387,6 +395,33 @@ export class Player {
         this.cards.set(agentId, await find(agentId));
       });
     }
+  }
+
+  /**
+   * Ask Keel where one change stands now, by its number, once: what its page draws while the log is read. Only
+   * Keel's own source has it; a fixture's page is drawn from its log.
+   */
+  wantSummary(number: number): void {
+    const read = this.source.readChange?.bind(this.source);
+    if (read === undefined || !this.live) return;
+    const asked = `summary:${number}`;
+    if (this.#requested.has(asked)) return;
+    this.#requested.add(asked);
+    void this.#fetch(
+      async () => {
+        this.summaries.set(number, await read(number));
+      },
+      () => this.summaries.set(number, null),
+    );
+  }
+
+  /**
+   * Whether the log as folded so far holds every entry up to the instant `at`: it has been read past it and
+   * the playhead stands at or beyond it.
+   */
+  readThrough(at: string): boolean {
+    const due = Date.parse(at) - this.#epochMs;
+    return (this.#eventTimes.at(-1) ?? Number.NEGATIVE_INFINITY) >= due && this.t >= due;
   }
 
   /** Ask Keel which open questions it lists to this reader, once. Called when a question's page is opened. */

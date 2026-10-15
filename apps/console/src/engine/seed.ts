@@ -3,7 +3,7 @@
 // after page, so a page of changes draws at once. The log is folded into its own world as it is read, beside
 // this one; once the log is read this one is put away, and nothing is ever folded into it.
 
-import type { FeedSnapshot } from "../contract/keel/index.ts";
+import type { ChangeSummary, FeedSnapshot } from "../contract/keel/index.ts";
 import type { Route } from "../route.ts";
 import { World } from "./world.ts";
 
@@ -61,4 +61,32 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
     });
   }
   return world;
+}
+
+/**
+ * How a change's page is drawn: from the log once it is read, and while it is read, from the log only once the
+ * fold has reached the change's latest entry as Keel's read model knows it (`updatedAt`). Before then the
+ * page is drawn early, from that read model, rather than as the log stood part way, which can say a landed
+ * change is queued. It waits while Keel is asked, and draws from the log as read where Keel has no answer
+ * (a fixture, or a read that failed).
+ */
+export function changeDrawn(
+  player: {
+    readonly loaded: boolean;
+    readonly live: boolean;
+    readThrough(at: string): boolean;
+  },
+  inWorld: boolean,
+  summary: ChangeSummary | null | undefined,
+):
+  | { readonly by: "log" }
+  | { readonly by: "early"; readonly summary: ChangeSummary }
+  | { readonly by: "waiting" } {
+  if (player.loaded || !player.live)
+    return inWorld || player.loaded ? { by: "log" } : { by: "waiting" };
+  if (summary === undefined) return { by: "waiting" };
+  if (summary === null) return inWorld ? { by: "log" } : { by: "waiting" };
+  return inWorld && player.readThrough(summary.updatedAt)
+    ? { by: "log" }
+    : { by: "early", summary };
 }

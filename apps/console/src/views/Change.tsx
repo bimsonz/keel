@@ -1,4 +1,4 @@
-import { Table, buttonVariants } from "@cloudflare/kumo";
+import { SkeletonLine, Table, buttonVariants } from "@cloudflare/kumo";
 import {
   CheckCircleIcon,
   CircleNotchIcon,
@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { FilesChanged } from "./FilesChanged.tsx";
+import type { ChangeSummary } from "../contract/keel/index.ts";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
 import type {
   ChangePageState,
@@ -22,6 +23,7 @@ import type {
   PlanStepRow,
   RulingBounce,
   ChangeBounce,
+  ShownClass,
 } from "../domain/state.ts";
 import {
   type Checks,
@@ -870,6 +872,175 @@ function FootprintLine({ entry }: { entry: ChangePageState["intent"]["footprint"
         <span className="a-mono text-kumo-subtle">{entry.symbol}</span>
       )}
     </li>
+  );
+}
+
+/** Where a change's page has rows only the log holds, while it is read: skeleton rows, labelled for a reader. */
+function Loading({ rows }: { rows: number }) {
+  return (
+    <div className="flex flex-col gap-2 py-1" aria-busy="true">
+      <span className="sr-only">Loading…</span>
+      {Array.from({ length: rows }, (_, row) => (
+        <SkeletonLine key={row} minWidth={40} maxWidth={90} />
+      ))}
+    </div>
+  );
+}
+
+/** Where a change stands while the log is read, from Keel's read model alone: the status box's lead row, worded as `Status` words it. */
+function EarlyStatus({ summary }: { summary: ChangeSummary }) {
+  const { state } = summary;
+  if (state === "landed")
+    return (
+      <Row
+        lead
+        tone="landed"
+        icon={<GitMergeIcon size={20} weight="bold" />}
+        title={WAITING_ON.landed.title}
+      />
+    );
+  if (state === "bounced")
+    return (
+      <Row
+        lead
+        tone="fail"
+        icon={<XCircleIcon size={20} weight="fill" />}
+        title={WAITING_ON.bounced.title}
+      >
+        <p className="text-base text-kumo-default">{WAITING_ON.bounced.said}</p>
+      </Row>
+    );
+  if (state === "withdrawn" || state === "superseded")
+    return (
+      <Row
+        lead
+        tone="closed"
+        icon={<MinusCircleIcon size={20} weight="bold" />}
+        title={WAITING_ON[state].title}
+      >
+        <p className="text-base text-kumo-default">{WAITING_ON[state].said}</p>
+      </Row>
+    );
+  // A change parked because its agent's lease lapsed waits on its agent: no person is asked anything.
+  const lapsed = state === "parked" && summary.parkReason === "lease-lapsed";
+  const asking = state === "parked" && !lapsed;
+  const waiting = lapsed
+    ? { title: "Waiting on its agent", said: "Lease lapsed" }
+    : WAITING_ON[state];
+  return (
+    <Row
+      lead
+      tone={asking ? "person" : "quiet"}
+      icon={
+        state === "verifying" || state === "integrating" ? (
+          <CircleNotchIcon size={20} weight="bold" className="a-spin" />
+        ) : asking ? (
+          <HandPalmIcon size={20} weight="fill" />
+        ) : (
+          <ClockIcon size={20} weight="bold" />
+        )
+      }
+      title={waiting.title}
+    >
+      <p className="text-base text-kumo-default">{waiting.said}</p>
+    </Row>
+  );
+}
+
+/** The states in which a change has a commit pushed: before them its agent is still writing it. */
+const UNPUSHED: ReadonlySet<ChangeState> = new Set(["declared", "working"]);
+
+/**
+ * A change's page while the project's log is read and has not reached the change's latest entry: its head,
+ * tabs and status box from Keel's read model of the project's changes, and skeleton rows for what only the log
+ * holds. The log's own page takes its place once the fold has read that far.
+ */
+export function EarlyChange({
+  summary,
+  agent,
+  tab,
+}: {
+  summary: ChangeSummary;
+  /** The agent that holds it, as its card names it. */
+  agent: { readonly label: string; readonly class: ShownClass; readonly handle?: string };
+  tab: ChangeTab;
+}) {
+  const { route } = useWhere();
+  const name = route.at === "change" ? route.name : String(summary.number);
+  const pill = pillOf(summary.state);
+  return (
+    <Detail>
+      <Head
+        title={summary.goal}
+        label={`#${summary.number}`}
+        state={
+          <>
+            <StatePill state={summary.state} />
+            {pill === "open" && (
+              <span
+                className="a-chip"
+                data-tone={
+                  summary.parkReason === "lease-lapsed"
+                    ? "quiet"
+                    : (CHANGE_TONE[summary.state] ?? "quiet")
+                }
+              >
+                {summary.state}
+              </span>
+            )}
+          </>
+        }
+        meta={
+          <>
+            <span className="flex flex-wrap items-center gap-x-1.5 text-kumo-default">
+              <HolderLink
+                held={agent.handle === undefined ? {} : { handle: agent.handle }}
+                className="a-link-quiet font-semibold text-kumo-strong"
+              >
+                <AgentTag label={agent.label} agentClass={agent.class} />
+              </HolderLink>
+              {pill === "landed"
+                ? "landed 1 commit into trunk"
+                : pill === "closed"
+                  ? summary.state === "withdrawn"
+                    ? "withdrew this change"
+                    : "had this change superseded"
+                  : UNPUSHED.has(summary.state)
+                    ? "wants to land a change into trunk"
+                    : "wants to land 1 commit into trunk"}
+            </span>
+            <span>
+              declared{" "}
+              <time className="a-num text-kumo-default">{dateTime(summary.declaredAt)}</time>
+            </span>
+            {summary.revision > 1 && <span>revision {summary.revision}</span>}
+          </>
+        }
+      />
+      <SubTabs
+        label="Change"
+        active={tab === "alternatives" ? "overview" : tab}
+        tabs={[
+          { id: "overview", label: "Conversation", to: { at: "change", name, tab: "overview" } },
+          { id: "checks", label: "Checks", to: { at: "change", name, tab: "checks" } },
+          { id: "files", label: "Files changed", to: { at: "change", name, tab: "files" } },
+        ]}
+      />
+      <Split
+        main={
+          <>
+            <section className="a-merge" aria-label="Status">
+              <EarlyStatus summary={summary} />
+              <Row tone="quiet" icon={<ClockIcon size={20} weight="bold" />} title="Checks">
+                <Loading rows={2} />
+              </Row>
+            </section>
+            <Loading rows={4} />
+          </>
+        }
+        side={<Loading rows={5} />}
+      />
+    </Detail>
   );
 }
 

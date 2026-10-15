@@ -11,7 +11,10 @@ import { ChangesPage } from "../../../src/pages/Changes.tsx";
 import { WhereProvider } from "../../../src/router.tsx";
 import { NamesProvider } from "../../../src/views/links.tsx";
 import { createHttpSource } from "../../../src/source/http.ts";
+import { ChangePage } from "../../../src/pages/Change.tsx";
 import { generateS1 } from "../../fixtures/mock/s1.ts";
+
+type S1Log = ReturnType<typeof generateS1>;
 
 const ORIGIN = "https://keel.example";
 
@@ -25,7 +28,15 @@ const PAGE = 20;
  * answers it, each queued. What is held (the log, the log after its first page, or the snapshot) is answered
  * once released; with no snapshot, Keel has none to give.
  */
-function heldKeel(held: "log" | "log after its first page" | "snapshot" | "no snapshot") {
+function heldKeel(
+  held: "log" | "log after its first page" | "snapshot" | "no snapshot",
+  /** What Keel's read model of the project's changes says of each: its state and last update, or a refusal. */
+  read: {
+    readonly state?: string;
+    readonly updatedAt?: (log: S1Log) => string;
+    readonly status?: number;
+  } = {},
+) {
   const log = generateS1(42, "invalidate");
   const created = log.events.find((event) => event.type === "ProjectCreated");
   const declarations = log.events.flatMap((event) =>
@@ -89,6 +100,26 @@ function heldKeel(held: "log" | "log after its first page" | "snapshot" | "no sn
         }));
       return Response.json({ items, nextCursor: String(start + items.length) });
     }
+    if (url.pathname === "/v1/changes" && url.searchParams.get("project") === project.id) {
+      if (read.status !== undefined) return Response.json({}, { status: read.status });
+      const number = Number(url.searchParams.get("cursor")) - 1;
+      const each = declarations[number - 1];
+      if (each === undefined) return Response.json({ items: [] });
+      return Response.json({
+        items: [
+          {
+            changeId: each.payload.changeId,
+            number,
+            state: read.state ?? "queued",
+            agentId: each.payload.agentId,
+            goal: each.payload.goal,
+            revision: 1,
+            declaredAt: each.at,
+            updatedAt: read.updatedAt?.(log) ?? each.at,
+          },
+        ],
+      });
+    }
     if (url.pathname === "/v1/lattices") return Response.json({ items: [] });
     return Response.json({}, { status: 404 });
   };
@@ -101,6 +132,41 @@ function heldKeel(held: "log" | "log after its first page" | "snapshot" | "no sn
     goal: declared.payload.goal,
     declared: declarations.length,
   };
+}
+
+/** The first change's page, its conversation, as the console draws it for this player. */
+function drawnChange(player: Player): string {
+  const page = createElement(ChangePage, { name: "1", tab: "overview", mode: "light" });
+  // A unit test draws with no JSX, and every provider's props name its children.
+  return renderToStaticMarkup(
+    createElement(ConsoleProvider, {
+      player,
+      // oxlint-disable-next-line react/no-children-prop
+      children: createElement(WhereProvider, {
+        namespace: "acme",
+        project: "demo",
+        route: { at: "change", name: "1", tab: "overview" },
+        // oxlint-disable-next-line react/no-children-prop
+        children: createElement(NamesProvider, { children: page }),
+      }),
+    }),
+  );
+}
+
+/** A player of the stand-in's project, loading, with Keel asked where the first change stands. */
+async function readingFirst(keel: ReturnType<typeof heldKeel>) {
+  const player = new Player(
+    createHttpSource(keel.project, {
+      origin: ORIGIN,
+      fetch: keel.serve,
+      cache: null,
+      logPages: null,
+    }),
+  );
+  const loading = player.load();
+  player.wantSummary(1);
+  await vi.waitFor(() => expect(player.summaries.has(1)).toBe(true));
+  return { player, loading };
 }
 
 /** The open changes' page as the console draws it for this player. */
@@ -121,6 +187,76 @@ function drawnList(player: Player): string {
     }),
   );
 }
+
+describe("a change's page while its project's log is read", () => {
+  it("[change.early-status] the log held, the page draws the change's head, tabs and status box from Keel's read model, and skeleton rows for what only the log holds", async () => {
+    vi.stubGlobal("window", { location: { search: "" } });
+    const keel = heldKeel("log", { state: "queued" });
+    const { player, loading } = await readingFirst(keel);
+    const drawn = drawnChange(player);
+    expect(drawn).toContain(keel.goal);
+    expect(drawn).toContain("#1");
+    expect(drawn).toContain("Queued");
+    expect(drawn).toContain("Waiting for a batch");
+    expect(drawn).toContain("Checks");
+    expect(drawn).toContain("Loading…");
+
+    keel.release();
+    await loading;
+    // Read, the log's own page takes its place.
+    expect(drawnChange(player)).not.toContain("Loading…");
+    vi.unstubAllGlobals();
+  });
+
+  it("[change.no-stale] a change whose declaration is read and whose landing is not is drawn as Keel says it stands, not as the log stood part way", async () => {
+    vi.stubGlobal("window", { location: { search: "" } });
+    const keel = heldKeel("log after its first page", {
+      state: "landed",
+      updatedAt: (log) => log.events.at(-1)?.at ?? "",
+    });
+    const { player, loading } = await readingFirst(keel);
+    await vi.waitFor(() => expect(player.world.changes.has(keel.changeId)).toBe(true));
+    expect(player.world.changes.get(keel.changeId)?.state).not.toBe("landed");
+    const drawn = drawnChange(player);
+    expect(drawn).toContain("Landed on trunk");
+    expect(drawn).toContain("Loading…");
+
+    keel.release();
+    await loading;
+    vi.unstubAllGlobals();
+  });
+
+  it("[change.handover] once the fold has read the change's latest entry, the log's own page is drawn while the rest of the log is read", async () => {
+    vi.stubGlobal("window", { location: { search: "" } });
+    // Keel's read model says the change last moved when it was declared, which the log's first page holds.
+    const keel = heldKeel("log after its first page");
+    const { player, loading } = await readingFirst(keel);
+    await vi.waitFor(() => expect(player.world.changes.has(keel.changeId)).toBe(true));
+    expect(player.loaded).toBe(false);
+    const drawn = drawnChange(player);
+    expect(drawn).toContain(keel.goal);
+    expect(drawn).not.toContain("Loading…");
+
+    keel.release();
+    await loading;
+    vi.unstubAllGlobals();
+  });
+
+  it("[change.summary-failed] where Keel's read model refuses, the page is drawn from the log as it is read", async () => {
+    vi.stubGlobal("window", { location: { search: "" } });
+    const keel = heldKeel("log after its first page", { status: 500 });
+    const { player, loading } = await readingFirst(keel);
+    await vi.waitFor(() => expect(player.world.changes.has(keel.changeId)).toBe(true));
+    expect(player.summaries.get(1)).toBeNull();
+    const drawn = drawnChange(player);
+    expect(drawn).toContain(keel.goal);
+    expect(drawn).not.toContain("Loading…");
+
+    keel.release();
+    await loading;
+    vi.unstubAllGlobals();
+  });
+});
 
 describe("a project drawn while its log is read", () => {
   it("[seed.snapshot] a live project's changes are drawn from Keel's snapshot while the log is read, and the world folded from the log takes their place once it is", async () => {

@@ -1,53 +1,16 @@
 // One change.
 
-import { useEffect, useState } from "react";
-import type { ChangeSummary } from "../contract/keel/index.ts";
-import { useWhere } from "../router.tsx";
-import { readChangeByNumber } from "../source/changes.ts";
-import { Detail, Head } from "../views/Detail.tsx";
+import { useEffect } from "react";
+import { shownAgent } from "../engine/audience.ts";
+import { changeDrawn } from "../engine/seed.ts";
 import { changeNamed } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
 import { rulingWords } from "../engine/ruling.ts";
 import { changePageOf } from "../engine/select.ts";
 import type { ChangeTab } from "../route.ts";
 import type { Mode } from "../theme/mode.ts";
-import { Change, StatePill } from "../views/Change.tsx";
+import { Change, EarlyChange } from "../views/Change.tsx";
 import { Notice } from "../views/Frame.tsx";
-
-/** A change's page before the project's log brings it: its head, from Keel's list of the project's changes. */
-function EarlyChange({ name }: { name: string }) {
-  const player = usePlayer();
-  const { project } = useWhere();
-  const projectId = player.projects.named(project)?.id;
-  const [summary, setSummary] = useState<ChangeSummary | null>(null);
-  useEffect(() => {
-    const number = Number(name);
-    if (projectId === undefined || !Number.isInteger(number) || !player.live) return undefined;
-    const stop = new AbortController();
-    readChangeByNumber(projectId, number, stop.signal)
-      .then(setSummary)
-      .catch(() => setSummary(null));
-    return () => stop.abort();
-  }, [player, projectId, name]);
-  if (summary === null) return null;
-  return (
-    <Detail>
-      <Head
-        title={summary.goal}
-        label={`#${summary.number}`}
-        state={
-          <>
-            <StatePill state={summary.state} />
-            <span className="a-chip" data-tone="quiet">
-              {summary.state}
-            </span>
-          </>
-        }
-        meta={<span>Loading the conversation</span>}
-      />
-    </Detail>
-  );
-}
 
 export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; mode: Mode }) {
   const player = usePlayer();
@@ -80,9 +43,30 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
     },
     [escalationId],
   );
-  // While the log is still being read, a change not read yet is drawn from Keel's read model of the project's
-  // changes: its goal, its number and where it stands, with the rest to come.
-  if (state === null && !player.loaded) return <EarlyChange name={name} />;
+  // While the log is read, where the change stands now is asked of Keel's read model, and its holder's card.
+  const number = Number(name);
+  const reading = !player.loaded;
+  useEffect(() => {
+    if (reading && Number.isInteger(number)) player.wantSummary(number);
+  }, [player, reading, number]);
+  const summary = player.summaries.get(number);
+  const holder = summary?.agentId;
+  useEffect(() => {
+    if (holder !== undefined) player.wantCards([holder]);
+  }, [player, holder]);
+  const drawn = changeDrawn(player, state !== null, summary);
+  if (drawn.by === "waiting") return null;
+  if (drawn.by === "early") {
+    const card = player.cards.get(drawn.summary.agentId);
+    const agent = shownAgent(player.world.agents.get(drawn.summary.agentId), card);
+    return (
+      <EarlyChange
+        summary={drawn.summary}
+        agent={{ ...agent, ...(card?.handle === undefined ? {} : { handle: card.handle }) }}
+        tab={tab}
+      />
+    );
+  }
   if (state === null) return <Notice title={`Change #${name} not found`} />;
   return (
     <Change

@@ -1,0 +1,3 @@
+### Changed
+
+- **A change's page draws where the change stands at once, while its project's log is read** (console only; no route, event or contract). Its head, tabs and status box come from Keel's read model of the project's changes (`GET /v1/changes`, one read), with skeleton rows for what only the log holds: checks, verdicts, its footprint and the conversation. The log's own page takes over once the log has been read up to the change's latest entry, so an old change is never shown as the log stood part way (queued, when it has landed). Where Keel's read model refuses, the page is drawn as the log is read, as before.
