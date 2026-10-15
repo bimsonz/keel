@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.holders
+# kills: seed.holders
+# why: the holders of a list drawn from the snapshot are not asked for, so each row names an agent and no one until the log is read
+diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
+index 4e01ece6..20ec1d96 100644
+--- a/apps/console/src/engine/holder.ts
++++ b/apps/console/src/engine/holder.ts
+@@ -30,7 +30,7 @@ export function holdersShown(
+   shown: { readonly world: World; readonly seeded: World | null },
+   changeIds: readonly string[],
+ ): string[] {
+-  const seeded = shown.seeded === null ? [] : holdersOf(shown.seeded, changeIds);
++  const seeded: string[] = [];
+   return [...new Set([...holdersOf(shown.world, changeIds), ...seeded])];
+ }
+ 

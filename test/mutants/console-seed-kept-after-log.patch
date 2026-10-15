@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.snapshot
+# kills: seed.snapshot
+# why: the snapshot's world is kept once the log is read, so the list of changes goes on showing the head the snapshot read while the log moves on
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..598bbe5e 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -179,7 +179,6 @@ export class Player {
+     await this.#drain();
+     drained = true;
+     // The log is read, and its own world folded to its end: the snapshot's is put away.
+-    this.#seeded = null;
+     this.loaded = true;
+     this.#changed();
+   }

@@ -1,5 +1,5 @@
 import { publicOnly } from "./audience.ts";
-import { holdersOf } from "./holder.ts";
+import { holdersShown } from "./holder.ts";
 import {
   type ReactNode,
   createContext,
@@ -85,7 +85,7 @@ export function useHolderCards(changeIds: readonly string[]): void {
   const player = usePlayer();
   const shown = changeIds.join(" ");
   const asked = useSelected(
-    (world) => holdersOf(world, shown === "" ? [] : shown.split(" ")).join(" "),
+    (_world, from) => holdersShown(from, shown === "" ? [] : shown.split(" ")).join(" "),
     [shown],
   );
   useEffect(() => player.wantCards(asked === "" ? [] : asked.split(" ")), [player, asked]);

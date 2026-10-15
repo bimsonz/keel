@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.snapshot
+# kills: seed.snapshot
+# why: the list of changes waits for the whole log though the snapshot draws it in full
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 935f79f1..b9516049 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -24,7 +24,7 @@ export const drawable = (
+   player: { readonly loaded: boolean; readonly provisional: boolean },
+   at: Route["at"],
+ ): boolean =>
+-  player.loaded || (player.provisional && DRAWN_FROM_SNAPSHOT.has(at)) || AS_READ.has(at);
++  player.loaded || AS_READ.has(at);
+ 
+ /** A world of the snapshot's changes: each by its number, its holder, goal, state and revision, and when it was declared. */
+ export function provisionalWorld(snapshot: FeedSnapshot): World {

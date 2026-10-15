@@ -37,6 +37,8 @@ import type {
   EscalationView,
   EventPage,
   EventRecord,
+  FeedSnapshot,
+  Inbox_getSnapshotInput,
   Inbox_listEventsInput,
   LatticeSet,
   NamespaceAgent,
@@ -578,6 +580,13 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
   return {
     descriptor,
     readEvents: (asked = {}) => events(asked),
+    async readSnapshot(signal?: AbortSignal): Promise<FeedSnapshot> {
+      // The operation's own input: the project, whose changes and trunk Keel answers at its log's head.
+      const input: Inbox_getSnapshotInput = { project: project.id };
+      const response = await read(`/v1/events/snapshot${queryOf({ ...input })}`, signal);
+      if (!response.ok) throw await refusalOf(response);
+      return answered<FeedSnapshot>(response);
+    },
     readObservations: (asked = {}) =>
       Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" }),
     // What is read at one commit never changes; what is read at a branch, or at trunk's head, can.

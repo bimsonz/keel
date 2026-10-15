@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.snapshot
+# kills: seed.snapshot
+# why: the snapshot is read but never drawn, so a project's pages wait for the whole log as before
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..45f288c7 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -194,7 +194,6 @@ export class Player {
+     try {
+       const snapshot = await read();
+       if (!wanted()) return;
+-      this.#seeded = provisionalWorld(snapshot);
+       this.#changed();
+     } catch {
+       // No snapshot: the pages wait for the log, as they did before there was one.

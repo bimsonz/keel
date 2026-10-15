@@ -22,6 +22,18 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[] 
   return [...holders];
 }
 
+/**
+ * The agents that hold these changes in the worlds a page draws: the log's, and Keel's snapshot of its head while
+ * the list of changes is drawn from it, so a list drawn early names its holders too. Each once.
+ */
+export function holdersShown(
+  shown: { readonly world: World; readonly seeded: World | null },
+  changeIds: readonly string[],
+): string[] {
+  const seeded = shown.seeded === null ? [] : holdersOf(shown.seeded, changeIds);
+  return [...new Set([...holdersOf(shown.world, changeIds), ...seeded])];
+}
+
 export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {
   const handle = cards.get(change.agentId)?.handle;
   return {

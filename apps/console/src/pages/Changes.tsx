@@ -94,8 +94,10 @@ function Waiting({ state, parkedOn }: { state: ChangeState; parkedOn?: ParkReaso
 }
 
 export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: number }) {
+  // While the log is read, the list is drawn from Keel's snapshot of its head, where a world folded part way
+  // would show each change as it stood when its last entry read so far was written.
   const list = useSelected(
-    (world, from) => changesOf(world, filter, shown, from.cards),
+    (world, from) => changesOf(from.seeded ?? world, filter, shown, from.cards),
     [filter, shown],
   );
   useHolderCards(list.rows.map((row) => row.id));

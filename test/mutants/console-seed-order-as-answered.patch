@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.order
+# kills: seed.order
+# why: the snapshot's changes are put in the world in the order Keel answers them, newest first, so the list drawn from it runs oldest first until the log is read
+diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
+index 935f79f1..a131c919 100644
+--- a/apps/console/src/engine/seed.ts
++++ b/apps/console/src/engine/seed.ts
+@@ -32,7 +32,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
+   // A change's place on the story's clock, from the first change declared: the log's own epoch is not read yet.
+   const first = Math.min(...snapshot.changes.map((change) => Date.parse(change.declaredAt)));
+   // In the order the log declares them, as a world folded from it holds them: Keel answers newest first.
+-  for (const change of snapshot.changes.toSorted((a, b) => a.number - b.number)) {
++  for (const change of snapshot.changes) {
+     world.changes.set(change.changeId, {
+       id: change.changeId,
+       label: `#${change.number}`,

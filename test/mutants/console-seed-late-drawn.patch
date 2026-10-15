@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.late
+# kills: seed.late
+# why: a snapshot that comes after the log is read is drawn over the world folded from it
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..3d3c7f16 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -193,7 +193,6 @@ export class Player {
+     if (read === undefined || !this.live) return;
+     try {
+       const snapshot = await read();
+-      if (!wanted()) return;
+       this.#seeded = provisionalWorld(snapshot);
+       this.#changed();
+     } catch {

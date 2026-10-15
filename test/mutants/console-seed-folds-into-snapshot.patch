@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.apart
+# kills: seed.apart
+# why: the snapshot's world is the one the log folds into as it is read, so the log's entries land on changes the snapshot already holds, and a change's page shows the snapshot's
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..4bf30c31 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -195,6 +195,7 @@ export class Player {
+       const snapshot = await read();
+       if (!wanted()) return;
+       this.#seeded = provisionalWorld(snapshot);
++      this.world = this.#seeded;
+       this.#changed();
+     } catch {
+       // No snapshot: the pages wait for the log, as they did before there was one.

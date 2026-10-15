@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.late
+# kills: seed.late
+# why: the log is read only once the snapshot has come, so a slow snapshot holds the whole project
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..90fa18ac 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -175,7 +175,7 @@ export class Player {
+     });
+     // Keel's snapshot of the log's head comes in one read: its changes are drawn while the log is read behind them.
+     let drained = false;
+-    void this.#seed(() => !drained);
++    await this.#seed(() => !drained);
+     await this.#drain();
+     drained = true;
+     // The log is read, and its own world folded to its end: the snapshot's is put away.

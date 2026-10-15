@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.seek-back
+# kills: seed.seek-back
+# why: going back in time while the log is read keeps the snapshot of the head, so the list shows the head at a time before it
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 94067244..2cd8fc42 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -440,7 +440,6 @@ export class Player {
+   seek(t: number): void {
+     const target = Math.min(Math.max(0, t), this.horizon);
+     if (target < this.t) {
+-      this.#seeded = null;
+       this.world = new World();
+       this.unread = 0;
+       this.#nextEvent = 0;

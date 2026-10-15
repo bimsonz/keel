@@ -90,6 +90,11 @@ export interface KeelEventSource {
   readEvents(request?: ReadRequest): Promise<Page<AnyEvent>>;
   /** Timed facts that are not catalogue events. See contract/observations.ts. */
   readObservations(request?: ReadRequest): Promise<Page<Observation>>;
+  /**
+   * The project's changes and trunk at the head of its log, in one read: what a page draws while the log is
+   * read behind it. Keel's own source answers it; a fixture has none.
+   */
+  readSnapshot?(signal?: AbortSignal): Promise<Keel.FeedSnapshot>;
 }
 
 /** Keel's diff of a change: the files its commit alters against the trunk it was made on. */

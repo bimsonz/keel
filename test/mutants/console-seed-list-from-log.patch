@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/seed.test.ts -t seed.list
+# kills: seed.list
+# why: the list of changes is drawn from the log's world while the log is read, which holds each change as it stood when its last entry read so far was written
+diff --git a/apps/console/src/pages/Changes.tsx b/apps/console/src/pages/Changes.tsx
+index 36b80599..0e34069e 100644
+--- a/apps/console/src/pages/Changes.tsx
++++ b/apps/console/src/pages/Changes.tsx
+@@ -97,7 +97,7 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
+   // While the log is read, the list is drawn from Keel's snapshot of its head, where a world folded part way
+   // would show each change as it stood when its last entry read so far was written.
+   const list = useSelected(
+-    (world, from) => changesOf(from.seeded ?? world, filter, shown, from.cards),
++    (world, from) => changesOf(world, filter, shown, from.cards),
+     [filter, shown],
+   );
+   useHolderCards(list.rows.map((row) => row.id));

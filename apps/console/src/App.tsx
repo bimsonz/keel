@@ -5,6 +5,7 @@ import { openCounts } from "./engine/lists.ts";
 import { Player } from "./engine/player.ts";
 import { maintains } from "./engine/settings.ts";
 import { ConsoleProvider, usePlayer, useSelected, useWorldVersion } from "./engine/react.tsx";
+import { drawable } from "./engine/seed.ts";
 import { ChangePage } from "./pages/Change.tsx";
 import { ChangesPage } from "./pages/Changes.tsx";
 import { CodePage } from "./pages/Code.tsx";
@@ -218,8 +219,6 @@ function pageOf(route: Route, address: string): string {
 
 /** The places that need nothing of the project's log: its code, and its settings, which Keel is asked for. */
 const UNLOGGED: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit", "settings"]);
-/** The places drawn as the log is read: one change is drawn once its own entries are, not once the log's last is. */
-const AS_READ: ReadonlySet<Route["at"]> = new Set(["change"]);
 
 /** A project's pages, in its frame. */
 function Console({
@@ -249,9 +248,9 @@ function Console({
     href: href(project.namespace.handle, project.name, HOME, carriedParams()),
     note: project.visibility,
   }));
-  // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
-  const waiting =
-    !player.loaded && !UNLOGGED.has(route.at) && !AS_READ.has(route.at) && route.at !== "missing";
+  // A page read from the log has nothing to draw until the log has been read, or a snapshot of it that draws
+  // the page in full, unless it is drawn as the log is read. The code waits for none of it.
+  const waiting = !drawable(player, route.at) && !UNLOGGED.has(route.at) && route.at !== "missing";
   return (
     <WhereProvider
       namespace={found.namespace.handle}

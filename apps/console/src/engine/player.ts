@@ -21,6 +21,7 @@ import type {
 import type { KeelRepository } from "../source/repository.ts";
 import { Projects, type Visibility, projectOf } from "./projects.ts";
 import { RepositoryReader } from "./repository.ts";
+import { provisionalWorld } from "./seed.ts";
 import { World } from "./world.ts";
 
 export type ConsoleSource = KeelEventSource &
@@ -83,6 +84,8 @@ export class Player {
   #nextObservation = 0;
   /** The name of the project whose events are folded. Null folds none: the bare address is the instance's. */
   #scope: string | null = null;
+  /** Keel's snapshot of the log's head, drawn by the list of changes while the log is read. Nothing folds into it. */
+  #seeded: World | null = null;
   #listeners = new Set<Listener>();
   #timeListeners = new Set<Listener>();
   #requested = new Set<string>();
@@ -170,9 +173,32 @@ export class Player {
       for (const lattice of (await this.source.getLattices()).items)
         this.lattices.set(lattice.predicate, lattice);
     });
+    // Keel's snapshot of the log's head comes in one read: its changes are drawn while the log is read behind them.
+    let drained = false;
+    void this.#seed(() => !drained);
     await this.#drain();
+    drained = true;
+    // The log is read, and its own world folded to its end: the snapshot's is put away.
+    this.#seeded = null;
     this.loaded = true;
     this.#changed();
+  }
+
+  /**
+   * Draws a live project's snapshot while its log is read, if the snapshot comes while it is still wanted. The
+   * log is never held for it: a snapshot slower than the log is not drawn.
+   */
+  async #seed(wanted: () => boolean): Promise<void> {
+    const read = this.source.readSnapshot?.bind(this.source);
+    if (read === undefined || !this.live) return;
+    try {
+      const snapshot = await read();
+      if (!wanted()) return;
+      this.#seeded = provisionalWorld(snapshot);
+      this.#changed();
+    } catch {
+      // No snapshot: the pages wait for the log, as they did before there was one.
+    }
   }
 
   /**
@@ -224,6 +250,16 @@ export class Player {
       this.#events.push(event);
       this.#eventTimes.push(at);
     }
+  }
+
+  /** True while Keel's snapshot of the log's head is drawn, while the log is read. */
+  get provisional(): boolean {
+    return this.#seeded !== null;
+  }
+
+  /** The world of Keel's snapshot of the log's head while the log is read, or null once it is (seed.ts). */
+  get seeded(): World | null {
+    return this.#seeded;
   }
 
   /** True when the source is the real stream, which grows while we watch. */
@@ -404,6 +440,7 @@ export class Player {
   seek(t: number): void {
     const target = Math.min(Math.max(0, t), this.horizon);
     if (target < this.t) {
+      this.#seeded = null;
       this.world = new World();
       this.unread = 0;
       this.#nextEvent = 0;

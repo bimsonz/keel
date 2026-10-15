@@ -1,0 +1,3 @@
+### Changed
+
+- **The console draws a project's changes before its log is read** (console only; no route, event or contract). A live project's list of changes is drawn from Keel's snapshot of its log's head, read in one request, while the log is read page after page behind it and folded into its own world as it comes; once the log is read, the snapshot is put away and the list is drawn from the log. Nothing the log brings is folded into the snapshot, a change's page is still drawn as the log is read, every other page still waits for the log since it reads what only the log holds, and a snapshot slower than the log is not drawn at all.
