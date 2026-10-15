@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts apps/keel/test/pool/abandon.test.ts -t "authz.lease-holder|a11.abandon-stale"
+# kills: authz.lease-holder, a11.abandon-stale
+# why: an agent's withdrawal checks only the lease, so another agent of the project withdraws a change it does not hold
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..ebe45707 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1416,10 +1416,6 @@ const abandonCall: (
+   Clock | EntityStore | EventOutbox
+ > = Effect.fn("coordination/abandon")(function* (changeId: ChangeId, command: AbandonChange) {
+   const { authority } = command;
+-  if (authority._tag === "Lease") {
+-    const notHeld = holdingRefusal(yield* EntityStore, changeId, authority);
+-    if (notHeld !== undefined) return yield* notHeld;
+-  }
+   const asked =
+     authority._tag === "Lease" ? { ...command, authority: askedOf(authority) } : command;
+   const committed = yield* commit(

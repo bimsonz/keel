@@ -2,13 +2,13 @@
 # kills: wellknown.refuses
 # why: an agent is presented to the provider as a client that needs no authentication, so a request that names it and signs nothing is given its token
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 5a71018f..a72b76b6 100644
+index f9773c85..d7de3d78 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -100,7 +100,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
-         clientDiscoveryId: AGENT_DISCOVERY,
-         name: agent.name,
-         disabled: agent.state !== "active",
+@@ -105,7 +105,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
+         // Only a revoked agent is no client: a paused one is given a token, and the gate lets it
+         // read who it is and its inbox alone, so it hears when its sponsor unpauses it.
+         disabled: agent.state === "revoked",
 -        tokenEndpointAuthMethod: "private_key_jwt",
 +        tokenEndpointAuthMethod: "none",
          grantTypes: ["client_credentials"],

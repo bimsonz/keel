@@ -1,6 +1,6 @@
 import { Context, type Effect, type Option } from "effect";
 import type { Agent, AgentState } from "../../domain/identity/index.ts";
-import type { AgentId, UserId } from "../../domain/kernel/index.ts";
+import type { AgentId, Instant, ProjectId, RunId, UserId } from "../../domain/kernel/index.ts";
 
 /** A client credential as stored: never the secret itself, only its hash. */
 export interface StoredCredential {
@@ -68,5 +68,21 @@ export class AgentDirectory extends Context.Service<
     ) => Effect.Effect<void>;
     /** The agents a person sponsors, oldest first: what the person's own page lists. */
     readonly sponsoredBy: (userId: UserId) => Effect.Effect<readonly Agent[]>;
+    /** The project a run of the agent chose to work in, if it chose one. */
+    readonly runProject: (
+      agentId: AgentId,
+      runId: RunId,
+    ) => Effect.Effect<Option.Option<ProjectId>>;
+    /**
+     * Records that the run works in `projectId` from `at` on, in place of any
+     * project it chose before. Whether the agent may work there is the
+     * caller's to decide, and each request's gate decides it again.
+     */
+    readonly chooseProject: (
+      agentId: AgentId,
+      runId: RunId,
+      projectId: ProjectId,
+      at: Instant,
+    ) => Effect.Effect<void>;
   }
 >()("keel/AgentDirectory") {}

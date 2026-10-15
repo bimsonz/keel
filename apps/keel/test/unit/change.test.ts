@@ -105,9 +105,9 @@ const declaring = (overrides: Record<string, unknown> = {}) =>
     ...overrides,
   });
 
-const revising = (leaseId: string, ifMatchRevision: number, key: string) =>
+const revising = (leaseId: string, ifMatchRevision: number, key: string, by: string = agentId) =>
   Schema.decodeUnknownSync(ReviseCommand)({
-    agentId,
+    agentId: by,
     projectId: sampleProjectId,
     leaseId,
     ifMatchRevision,
@@ -117,9 +117,9 @@ const revising = (leaseId: string, ifMatchRevision: number, key: string) =>
     idempotencyKey: key,
   });
 
-const submitting = (leaseId: string, commitSha: string, key: string) =>
+const submitting = (leaseId: string, commitSha: string, key: string, by: string = agentId) =>
   Schema.decodeUnknownSync(SubmitCommand)({
-    agentId,
+    agentId: by,
     projectId: sampleProjectId,
     leaseId,
     commitSha,
@@ -259,7 +259,12 @@ describe("declare", () => {
         yield* abandon(
           changeId,
           Schema.decodeUnknownSync(AbandonCommand)({
-            authority: { _tag: "Lease", leaseId: declared.change.lease.id, agentId },
+            authority: {
+              _tag: "Lease",
+              leaseId: declared.change.lease.id,
+              agentId,
+              projectId: sampleProjectId,
+            },
             idempotencyKey: "abandon-1",
           }),
         );
@@ -314,7 +319,7 @@ describe("declare", () => {
 
 describe("leases", () => {
   it.effect(
-    "[b11.stale-lease] refuses the old token after adoption, with next actions, and authorises the new one",
+    "[b11.stale-lease] after adoption refuses the old agent as no longer holding the change, the old token as stale, and authorises the adopter's new one",
     () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
@@ -330,12 +335,19 @@ describe("leases", () => {
             idempotencyKey: "adopt-1",
           }),
         ).pipe(Effect.map((answer) => answer.change));
-        const stale = yield* Effect.exit(revise(changeId, revising(oldLease, 1, "revise-2")));
-        const fresh = yield* revise(changeId, revising(adopted.lease.id, 1, "revise-3"));
+        const formerHolder = yield* Effect.exit(
+          revise(changeId, revising(oldLease, 1, "revise-2")),
+        );
+        const stale = yield* Effect.exit(
+          revise(changeId, revising(oldLease, 1, "revise-4", adopterId)),
+        );
+        const fresh = yield* revise(changeId, revising(adopted.lease.id, 1, "revise-3", adopterId));
 
         expect(failureTag(lapsed)).toContain('"reason":"lapsed"');
         expect(adopted.lease.id).not.toBe(oldLease);
         expect(adopted.agentId).toBe(adopterId);
+        expect(failureTag(formerHolder)).toContain("ChangeHeldByOther");
+        expect(failureTag(formerHolder)).toContain(adopterId);
         expect(Exit.isFailure(stale) && JSON.stringify(stale.cause)).toContain("LeaseStale");
         expect(failureTag(stale)).toContain('"reason":"stale"');
         expect(failureTag(stale)).toContain("nextActions");
@@ -1232,7 +1244,7 @@ describe("the remedy a status read carries", () => {
             idempotencyKey: "adopt-1",
           }),
         );
-        yield* submit(changeId, submitting(adopted.change.lease.id, sha, "submit-2"));
+        yield* submit(changeId, submitting(adopted.change.lease.id, sha, "submit-2", adopterId));
         const resubmitted = yield* submissionStatus(changeId);
 
         const asked = refusing(1, "p-1");
@@ -1740,7 +1752,7 @@ describe("the run an agent's command names", () => {
         yield* abandon(
           changeId,
           Schema.decodeUnknownSync(AbandonCommand)({
-            authority: { _tag: "Lease", leaseId, agentId, run: RUN },
+            authority: { _tag: "Lease", leaseId, agentId, projectId: sampleProjectId, run: RUN },
             idempotencyKey: "abandon-1",
           }),
         );

@@ -1197,6 +1197,145 @@
         ]
       }
     },
+    "/agents/me/run/project": {
+      "put": {
+        "operationId": "Agents_useProject",
+        "summary": "Work in a project",
+        "description": "Work in this project from now on, in the run your token names. Keel keeps the choice: every token the run\nasks for without naming a project is for this one, so a client that cannot name a project still works in\nit. A token of the run that names no project is then refused (401) until the client asks for a new one,\nand a client that renews its token on a 401 does so by itself. A token request that names a project keeps\nits own. Choosing again moves the run; a token that already names the earlier project keeps it until it\nexpires. A project you cannot work in now is not found (404), and a token that names no run is refused\n(409 `run.required`): a choice is a run's.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunProjectEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Agents",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UseProjectRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
     "/agents/me/sponsor-request": {
       "post": {
         "operationId": "askSponsor",
@@ -2125,7 +2264,8 @@
           }
         },
         "tags": [
-          "Agents"
+          "Agents",
+          "mcp"
         ],
         "security": [
           {
@@ -4361,7 +4501,8 @@
           }
         },
         "tags": [
-          "Conflicts"
+          "Conflicts",
+          "mcp"
         ],
         "security": [
           {},
@@ -4793,7 +4934,8 @@
           }
         },
         "tags": [
-          "Memory"
+          "Memory",
+          "mcp"
         ],
         "security": [
           {},
@@ -4924,7 +5066,8 @@
           }
         },
         "tags": [
-          "Memory"
+          "Memory",
+          "mcp"
         ],
         "security": [
           {},
@@ -8849,7 +8992,8 @@
           }
         },
         "tags": [
-          "Repo"
+          "Repo",
+          "mcp"
         ],
         "security": [
           {},
@@ -11175,7 +11319,7 @@
       "post": {
         "operationId": "refreshWorkspaceToken",
         "summary": "Refresh a workspace token",
-        "description": "Your workspace token from `declare` or `adopt` is about to expire, or has: get a fresh\ntwo-hour write token for the same workspace. Only the change's own agent may, under the\nchange's current lease, while the change holds the workspace. Another agent's workspace, or\none Keel does not know, is 404 `workspace.not_found`; a stale or lapsed lease is 409\n`change.lease_stale`; a change that has ended is 409 `change.state_refused` (404 once its\nworkspace is collected). Each call mints a new token, and nothing else moves.",
+        "description": "Your workspace token from `declare` or `adopt` is about to expire, or has: get a fresh\ntwo-hour write token for the same workspace. Only the change's own agent may, under the\nchange's current lease, while the change holds the workspace. Another agent of the change's\nproject is 409 `change.held_by_other`, naming the holder; a workspace of another project, or\none Keel does not know, is 404 `workspace.not_found`; a stale or lapsed lease is 409\n`change.lease_stale`; a change that has ended is 409 `change.state_refused` (404 once its\nworkspace is collected). Each call mints a new token, and nothing else moves.",
         "parameters": [
           {
             "$ref": "#/components/parameters/WorkspacePath"
@@ -11344,7 +11488,7 @@
         "name": "keel-lease",
         "in": "header",
         "required": true,
-        "description": "The lease on the change, from `declare` or `adopt`. A stale lease is refused.",
+        "description": "The lease on the change, from `declare` or `adopt`. A stale lease is refused, and so is any\nagent but the one holding the change: another agent of its project is 409\n`change.held_by_other`, naming the holder and when its lease lapses.",
         "schema": {
           "$ref": "#/components/schemas/LeaseId"
         }
@@ -13039,7 +13183,6 @@
           "changeId",
           "previousAgentId",
           "agentId",
-          "leaseId",
           "briefRef"
         ],
         "properties": {
@@ -13067,7 +13210,12 @@
             "description": "The adopter's run, which holds the change from here; absent when the adopter's token named none."
           },
           "leaseId": {
-            "$ref": "#/components/schemas/LeaseId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseId"
+              }
+            ],
+            "description": "Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts."
           },
           "briefRef": {
             "type": "string"
@@ -17727,8 +17875,7 @@
           "revision",
           "goal",
           "footprint",
-          "premises",
-          "leaseId"
+          "premises"
         ],
         "properties": {
           "_tag": {
@@ -17780,7 +17927,12 @@
             }
           },
           "leaseId": {
-            "$ref": "#/components/schemas/LeaseId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseId"
+              }
+            ],
+            "description": "Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts."
           }
         },
         "additionalProperties": {
@@ -18559,7 +18711,6 @@
         "required": [
           "_tag",
           "changeId",
-          "leaseId",
           "renewedAt"
         ],
         "properties": {
@@ -18573,7 +18724,12 @@
             "$ref": "#/components/schemas/ChangeId"
           },
           "leaseId": {
-            "$ref": "#/components/schemas/LeaseId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseId"
+              }
+            ],
+            "description": "Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts."
           },
           "renewedAt": {
             "$ref": "#/components/schemas/Instant"
@@ -18587,8 +18743,7 @@
         "type": "object",
         "required": [
           "_tag",
-          "changeId",
-          "leaseId"
+          "changeId"
         ],
         "properties": {
           "_tag": {
@@ -18601,7 +18756,12 @@
             "$ref": "#/components/schemas/ChangeId"
           },
           "leaseId": {
-            "$ref": "#/components/schemas/LeaseId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeaseId"
+              }
+            ],
+            "description": "Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts."
           }
         },
         "additionalProperties": {
@@ -22677,6 +22837,7 @@
           "why.nothing_to_explain",
           "change.lease_stale",
           "change.lease_not_lapsed",
+          "change.held_by_other",
           "change.state_refused",
           "change.revision_mismatch",
           "change.commit_not_in_workspace",
@@ -22692,6 +22853,9 @@
           "repo.ref_not_found",
           "repo.path_not_found",
           "agent.state_refused",
+          "agent.left",
+          "run.required",
+          "run.no_project",
           "invitation.state_refused",
           "project.name_taken",
           "project.import_refused",
@@ -24384,6 +24548,76 @@
         "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
         "description": "What an agent calls one of its runs, such as `nightly-deps`: its own claim. Keel proves only that the run is the agent's."
       },
+      "RunProject": {
+        "type": "object",
+        "required": [
+          "project",
+          "run"
+        ],
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/ProjectRef"
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunRef"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The project a run works in: what every token of the run is for when its request names none."
+      },
+      "RunProjectEnvelope": {
+        "type": "object",
+        "required": [
+          "ok",
+          "summary",
+          "result",
+          "findings",
+          "next",
+          "notices",
+          "cost"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, written for the agent."
+          },
+          "result": {
+            "$ref": "#/components/schemas/RunProject"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "maxItems": 3
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CallCost"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
       "RunRef": {
         "type": "object",
         "required": [
@@ -25739,6 +25973,25 @@
           "not": {}
         },
         "description": "What a sync from upstream did."
+      },
+      "UseProjectRequest": {
+        "type": "object",
+        "required": [
+          "projectId"
+        ],
+        "properties": {
+          "projectId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "A project you can work in now: one `Agents_listReachableProjects` lists."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "UserId": {
         "type": "string",

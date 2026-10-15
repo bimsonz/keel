@@ -101,6 +101,8 @@ export function makeNamespaceAgentsMemory() {
       Effect.sync(() => rows.standing((invitation) => invitation.namespace === namespace)),
     ofAgent: (agentId) =>
       Effect.sync(() => rows.standing((invitation) => invitation.agentId === agentId)),
+    ended: (agentId, namespace) =>
+      Effect.sync(() => rows.held(rowKey(namespace, agentId))?.state === "ended"),
   });
   return { service, layer: Layer.succeed(NamespaceAgents, service) };
 }
@@ -137,6 +139,8 @@ export function makeProjectAgentsMemory() {
       Effect.sync(() => rows.standing((invitation) => invitation.projectId === projectId)),
     ofAgent: (agentId) =>
       Effect.sync(() => rows.standing((invitation) => invitation.agentId === agentId)),
+    ended: (agentId, projectId) =>
+      Effect.sync(() => rows.held(rowKey(projectId, agentId))?.state === "ended"),
   });
   return { service, layer: Layer.succeed(ProjectAgents, service) };
 }

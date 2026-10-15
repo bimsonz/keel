@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t "authz.lease-holder"
+# kills: authz.lease-holder
+# why: the doorway leaves the holder as its bare agent id, so a person reading the refusal cannot tell which of their agents holds the change
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 001c9e44..26d1445f 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -285,7 +285,6 @@ const namingHolder = <A, E, R>(
+                     new ChangeHeldByOther({
+                       changeId: error.changeId,
+                       holder: error.holder,
+-                      holderName: agent.handle ?? agent.name,
+                       ...(error.lapsesAt === undefined ? {} : { lapsesAt: error.lapsesAt }),
+                       nextActions: error.nextActions,
+                     }),

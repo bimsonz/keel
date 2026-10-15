@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t "refresher.contract.empty"
+# kills: refresher.contract.empty
+# why: an empty workspace refuses trunk's whole history as stale, so the memory adapter never stands for a fill
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index 61d02ee7..a2a738e7 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -589,7 +589,7 @@ export function makeWorkspaceRefresherMemory(
+             const target = code.repos.get(repoKey(workspace));
+             if (target === undefined)
+               return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
+-            if ((target.refs.get(MAIN) ?? null) !== from)
++            if (target.refs.get(MAIN) !== from)
+               return Effect.fail(new PushRejected({ reason: "stale" }));
+             // Behind where main is: a workspace is only ever moved forward.
+             if (from !== null && reaches(target, from, to))

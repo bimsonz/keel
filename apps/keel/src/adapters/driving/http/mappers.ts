@@ -185,9 +185,10 @@ function work(here: TokenProject | undefined) {
 
 /**
  * What `whoami` tells an agent that has joined an org or a project: where to
- * read the projects it can work in, each with the id a token names.
+ * read the projects it can work in, each with the id a token names, and, while
+ * its token names none, how its run chooses one to work in.
  */
-function reach({ joined }: Identity) {
+function reach({ joined }: Identity, here?: TokenProject) {
   return joined.namespaces + joined.projects === 0
     ? { next: [] }
     : {
@@ -197,6 +198,15 @@ function reach({ joined }: Identity) {
             title: "List the projects you can work in: each project's id is what a token names",
             operationId: "Agents_listReachableProjects",
           },
+          ...(here === undefined
+            ? [
+                {
+                  kind: "call" as const,
+                  title: "Work in one of them, by its id: your run's next token is for it",
+                  operationId: "Agents_useProject",
+                },
+              ]
+            : []),
         ],
       };
 }
@@ -229,7 +239,7 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult 
         ...waiting.next,
         ...sponsor.next,
         ...placed.next,
-        ...reach(identity).next,
+        ...reach(identity, here).next,
       ].slice(0, MAX_NEXT),
       notices: [],
       cost: {},

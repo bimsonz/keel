@@ -90,7 +90,11 @@ export class KeelProblem extends Error {
   }
 }
 
-/** The token endpoint refused the credentials (RFC 6749 § 5.2). */
+/**
+ * The token endpoint refused the credentials (RFC 6749 § 5.2). Its message is
+ * Keel's own description when it gave one, which says why in words; the
+ * protocol's code stays on `error`.
+ */
 export class KeelTokenError extends Error {
   override readonly name = "KeelTokenError";
   readonly error: string;
@@ -98,9 +102,7 @@ export class KeelTokenError extends Error {
   readonly description: string | undefined;
 
   constructor(error: string, status: number, description?: string) {
-    super(
-      `token exchange refused: ${error}${description === undefined ? "" : ` (${description})`}`,
-    );
+    super(description ?? `token exchange refused: ${error}`);
     this.error = error;
     this.status = status;
     this.description = description;

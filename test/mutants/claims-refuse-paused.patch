@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/run.test.ts -t token.standing
+# kills: token.standing
+# why: a paused agent is given no token, so it cannot read who it is or wait in its inbox to hear it was unpaused
+diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
+index 3b70e8d0..0047e39b 100644
+--- a/packages/core/src/domain/identity/run.ts
++++ b/packages/core/src/domain/identity/run.ts
+@@ -71,7 +71,7 @@ const asLabel = Schema.decodeUnknownOption(RunLabel);
+  */
+ export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunClaims, RunRefusal> {
+   // A paused agent is given a token: the gate lets it read who it is and its inbox, and nothing else.
+-  if (agent.state === "revoked")
++  if (agent.state !== "active")
+     return Result.fail(new AgentNotAdmitted({ agentId: agent.id, reason: agent.state }));
+   const { runKey } = request;
+   if (runKey !== undefined && agent.keys?.some((key) => key.jkt === runKey))

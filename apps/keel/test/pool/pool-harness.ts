@@ -34,7 +34,7 @@ export interface Followed {
   /** Trunk's head, as the project's Trunk DO would answer. Unset, it is the mirror's: no workspace is ever behind. */
   head: CommitSha | undefined;
   /** Each relay the pool asked for, in order. */
-  readonly relays: { workspace: string; from: string; to: string }[];
+  readonly relays: { workspace: string; from: string | null; to: string }[];
   /** While true, a relay waits before it answers. */
   held: boolean;
   /** While true, trunk waits before it answers for its head. */

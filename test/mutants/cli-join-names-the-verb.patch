@@ -2,15 +2,15 @@
 # kills: cli.join
 # why: `agent join keel` accepts an invitation into a namespace called `join`, never the org named
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 900fb7a1..1150964b 100644
+index f0841230..e599f22f 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -309,7 +309,7 @@ async function dispatch(
+@@ -336,7 +336,7 @@ async function dispatch(
            { lease: required(values.lease, "lease"), ...idempotent },
          );
        if (command[0] === "agent" && command[1] === "join" && command.length === 3)
 -        return client.acceptInvitation(required(command[2], "namespace"), idempotent);
 +        return client.acceptInvitation(required(command[1], "namespace"), idempotent);
+       if (command[0] === "agent" && command[1] === "use" && command.length === 3)
+         return client.useProject(required(command[2], "project"));
        if (command[0] === "nearby" && command.length === 2)
-         return client.nearby(required(command[1], "change"));
-       if (command[0] === "rebase" && command.length === 2)

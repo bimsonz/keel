@@ -1,16 +1,16 @@
 # expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/authz.test.ts
-# kills: authz.lease-foreign
-# why: a rebase checks only the lease, so an agent of another project moves the change's workspace onto trunk
+# kills: authz.lease-foreign, authz.lease-holder
+# why: a rebase checks only the lease, so an agent of another project, or another agent of its own, moves the change's workspace onto trunk
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index b02643f9..f701a65a 100644
+index 1209660e..1a320e4b 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1539,8 +1539,6 @@ const rebaseCall: (
+@@ -1603,8 +1603,6 @@ const rebaseCall: (
    | PackTooLarge,
    Clock | EntityStore | EventOutbox | Trunks | WorkspaceRebaser
  > = Effect.fn("coordination/rebase")(function* (changeId: ChangeId, command: RebaseChange) {
--  if (!ownProject(yield* EntityStore, changeId, command.projectId))
--    return yield* notFound(changeId);
+-  const notHeld = holdingRefusal(yield* EntityStore, changeId, command);
+-  if (notHeld !== undefined) return yield* notHeld;
    const fingerprint = fingerprintOf("rebase", askedOf(command));
    const answer = (change: Change): Effect.Effect<RebasedChange, ChangeStateRefused> =>
      change.baseSha === undefined

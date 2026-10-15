@@ -1,5 +1,6 @@
 import {
   Change,
+  ChangeHeldByOther,
   ChangeInOtherProject,
   ChangeNotFound,
   ChangeOrigin,
@@ -222,14 +223,16 @@ export const AwaitPlanCommand = AwaitSubmissionCommand;
 export type AwaitPlanCommand = typeof AwaitPlanCommand.Type;
 
 /**
- * Who may withdraw a change: the agent holding its lease, or a maintainer of
- * its project (a parked change, say), whom the doorway authorised. A
- * maintainer of another project is answered ChangeNotFound.
+ * Who may withdraw a change: the agent holding it, under its lease, or a
+ * maintainer of its project (a parked change, say), whom the doorway
+ * authorised. A maintainer of another project is answered ChangeNotFound.
  */
 export const WithdrawAuthority = Schema.Union([
   Schema.TaggedStruct("Lease", {
     leaseId: LeaseId,
     agentId: AgentId,
+    /** The agent's project, from its token: only the agent holding the change withdraws it under its lease. */
+    projectId: ProjectId,
     run: Schema.optional(RunRef),
   }),
   Schema.TaggedStruct("Maintainer", { by: UserId, projectId: ProjectId }),
@@ -377,6 +380,7 @@ const PrecheckRefusal = Schema.Union([ChangeNotFound, ChangeStateRefused]);
 // A reused Idempotency-Key with another body is IdempotencyConflict on every keyed call.
 const Mutation = Schema.Union([
   ChangeNotFound,
+  ChangeHeldByOther,
   LeaseStale,
   RevisionMismatch,
   ChangeStateRefused,
@@ -408,15 +412,25 @@ export const ChangeCodecs = {
   // A rely names no revision: RevisionMismatch belongs to revise alone.
   rely: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight }),
-    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, IdempotencyConflict]),
+    Schema.Union([
+      ChangeNotFound,
+      ChangeHeldByOther,
+      LeaseStale,
+      ChangeStateRefused,
+      IdempotencyConflict,
+    ]),
   ),
-  distinguish: exitCodec(Change, Schema.Union([ChangeNotFound, LeaseStale, IdempotencyConflict])),
+  distinguish: exitCodec(
+    Change,
+    Schema.Union([ChangeNotFound, ChangeHeldByOther, LeaseStale, IdempotencyConflict]),
+  ),
   nearby: exitCodec(Preflight, Schema.Union([ChangeNotFound, ChangeInOtherProject])),
   // Submit carries no revision: RevisionMismatch belongs to revise alone.
   submit: exitCodec(
     Change,
     Schema.Union([
       ChangeNotFound,
+      ChangeHeldByOther,
       LeaseStale,
       ChangeStateRefused,
       CommitNotInWorkspace,
@@ -426,7 +440,13 @@ export const ChangeCodecs = {
   // Nor does abandon.
   abandon: exitCodec(
     Change,
-    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, IdempotencyConflict]),
+    Schema.Union([
+      ChangeNotFound,
+      ChangeHeldByOther,
+      LeaseStale,
+      ChangeStateRefused,
+      IdempotencyConflict,
+    ]),
   ),
   // PushRejected: the workspace stayed busy or kept moving; PackTooLarge: trunk's new history is over the relay cap.
   rebase: exitCodec(
@@ -437,6 +457,7 @@ export const ChangeCodecs = {
     }),
     Schema.Union([
       ChangeNotFound,
+      ChangeHeldByOther,
       LeaseStale,
       ChangeStateRefused,
       IdempotencyConflict,
@@ -453,6 +474,7 @@ export const ChangeCodecs = {
     }),
     Schema.Union([
       ChangeNotFound,
+      ChangeHeldByOther,
       LeaseStale,
       ChangeStateRefused,
       IdempotencyConflict,
@@ -466,7 +488,7 @@ export const ChangeCodecs = {
   // The same workspace with a fresh token; an ended change never reaches the pool.
   refreshWorkspace: exitCodec(
     WorkspaceGrant,
-    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused]),
+    Schema.Union([ChangeNotFound, ChangeHeldByOther, LeaseStale, ChangeStateRefused]),
   ),
   // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(

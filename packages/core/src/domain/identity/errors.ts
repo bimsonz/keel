@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentId, NextAction, NamespaceId, ProjectId } from "../kernel/index.ts";
+import { AgentId, NextAction, NamespaceId, ProjectId, RunRef } from "../kernel/index.ts";
 import { AgentState } from "./agent.ts";
 
 /** No agent has this id. */
@@ -12,6 +12,15 @@ export class AgentNotAdmitted extends Schema.TaggedError<AgentNotAdmitted>()("Ag
   agentId: AgentId,
   reason: Schema.Literals(["suspended", "revoked", "stale-epoch"]),
 }) {}
+
+/**
+ * A token of a run that chose a project, and names none: it was minted before
+ * the choice. The client asks for a new token, which is for the run's project.
+ */
+export class TokenProjectStale extends Schema.TaggedError<TokenProjectStale>()(
+  "TokenProjectStale",
+  { agentId: AgentId, run: RunRef, projectId: ProjectId },
+) {}
 
 /**
  * The account this id names was made by another key, or the handle the key
@@ -144,6 +153,7 @@ export const RefusalReason = Schema.Literals([
   "agent-paused",
   "inviter-suspended",
   "inviter-left",
+  "read-only",
   "org-suspended",
   "foreign-project",
   "scope",

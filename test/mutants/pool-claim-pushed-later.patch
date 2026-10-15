@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.claim-overlap"
+# kills: pool.do.claim-overlap
+# why: each claim pushes the claim's deadline out, so while claims keep coming no pass settles a stranded slot
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 77dd7f62..4877b094 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -329,7 +329,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+    */
+   private async armNoLater(reason: string, at: number): Promise<void> {
+     const armed = armedAlarms(this.ctx.storage).find((alarm) => alarm.reason === reason);
+-    if (armed !== undefined && armed.at <= at) return;
+     await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason, at });
+   }
+ 

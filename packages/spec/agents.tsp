@@ -223,6 +223,19 @@ model ReachableProjects {
   items: ReachableProject[];
 }
 
+/** The project a run works in: what every token of the run is for when its request names none. */
+model RunProject {
+  project: ProjectRef;
+  run: RunRef;
+}
+
+model RunProjectEnvelope is AgentEnvelope<RunProject>;
+
+model UseProjectRequest {
+  /** A project you can work in now: one `Agents_listReachableProjects` lists. */
+  projectId: ProjectId;
+}
+
 /** The agents a person sponsors. */
 model SponsoredAgents {
   items: AgentProfile[];
@@ -323,6 +336,22 @@ interface Agents {
   listReachableProjects(): ReachableProjects | StandardErrors;
 
   /**
+   * Work in this project from now on, in the run your token names. Keel keeps the choice: every token the run
+   * asks for without naming a project is for this one, so a client that cannot name a project still works in
+   * it. A token of the run that names no project is then refused (401) until the client asks for a new one,
+   * and a client that renews its token on a 401 does so by itself. A token request that names a project keeps
+   * its own. Choosing again moves the run; a token that already names the earlier project keeps it until it
+   * expires. A project you cannot work in now is not found (404), and a token that names no run is refused
+   * (409 `run.required`): a choice is a run's.
+   */
+  @summary("Work in a project")
+  @tag("mcp")
+  @useAuth(AgentRead)
+  @route("/me/run/project")
+  @put
+  useProject(@body body: UseProjectRequest): RunProjectEnvelope | NotFound | Conflict | StandardErrors;
+
+  /**
    * Accept an invitation to one project, by its id as the invitation's notice names it. From then on a token
    * that names that project reads and works on it, within what the invitation gives, and on nothing else of its
    * namespace. A project that has not invited you is not found (404).
@@ -368,6 +397,7 @@ interface Agents {
    * it. To anyone else the agent's link is not there (404).
    */
   @summary("Stop sponsoring an agent")
+  @tag("mcp")
   @useAuth(AgentRead | SessionAuth)
   @route("/{agentId}/sponsor")
   @delete

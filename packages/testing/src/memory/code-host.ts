@@ -575,7 +575,7 @@ export function makeWorkspaceRefresherMemory(
 ) {
   const advanced: {
     readonly workspace: RepoRef;
-    readonly from: CommitSha;
+    readonly from: CommitSha | null;
     readonly to: CommitSha;
   }[] = [];
   return {
@@ -589,10 +589,10 @@ export function makeWorkspaceRefresherMemory(
             const target = code.repos.get(repoKey(workspace));
             if (target === undefined)
               return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
-            if (target.refs.get(MAIN) !== from)
+            if ((target.refs.get(MAIN) ?? null) !== from)
               return Effect.fail(new PushRejected({ reason: "stale" }));
             // Behind where main is: a workspace is only ever moved forward.
-            if (reaches(target, from, to))
+            if (from !== null && reaches(target, from, to))
               return Effect.fail(new PushRejected({ reason: "stale" }));
             const trunk = trunkOf(projectId);
             const source = code.repos.get(repoKey(trunk));

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/whoami-invitations.test.ts -t whoami.reach-next
+# kills: whoami.reach-next
+# why: whoami tells an agent whose token names a project to choose one, crowding out the steps it needs
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 78058bbd..aa5f3ef5 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -198,7 +198,7 @@ function reach({ joined }: Identity, here?: TokenProject) {
+             title: "List the projects you can work in: each project's id is what a token names",
+             operationId: "Agents_listReachableProjects",
+           },
+-          ...(here === undefined
++          ...(here === undefined || here !== undefined
+             ? [
+                 {
+                   kind: "call" as const,

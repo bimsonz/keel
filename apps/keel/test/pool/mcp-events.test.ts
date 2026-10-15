@@ -610,11 +610,12 @@ describe("MCP events", () => {
     expect(await waiting(agent.agentId)).toBe(0);
   });
 
-  it("[mcp.listen-standing] a paused agent's listen ends within one deadline, with the stream's last result", async () => {
+  it("[mcp.listen-standing] a paused agent's listen of its project's feed ends within one deadline, with the stream's last result", async () => {
     const agent = await mcpAgent();
     const stop = new AbortController();
     try {
-      const stream = await listen(agent.a, [INBOX], stop.signal);
+      // A paused agent still watches its inbox alone, so it hears when it is unpaused: its feed's watch is what ends.
+      const stream = await listen(agent.a, [INBOX, feedOf(agent.projectId)], stop.signal);
       await stream.next(5_000);
       await env.DB.prepare("UPDATE agents SET state = 'suspended' WHERE id = ?")
         .bind(agent.agentId)

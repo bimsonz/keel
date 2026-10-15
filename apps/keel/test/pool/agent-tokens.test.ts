@@ -245,16 +245,18 @@ describe("a token for an agent that holds only a key", () => {
     });
   });
 
-  it("[token.key-only] a suspended agent and a revoked one get no token", async () => {
-    for (const state of ["suspended", "revoked"] as const) {
-      const account = await newKey();
-      const agent = await seedKeyAgent(account, { state });
-      expect(
-        await refusal(await requestToken(agent.id, account, { runKey: await newKey() })),
-      ).toMatchObject({ error: "invalid_client" });
-    }
+  it("[token.key-only] a revoked agent gets no token; a paused one does, which reads only who it is and its inbox", async () => {
+    expect(await asked("revoked")).toMatchObject({ error: "invalid_client" });
+    expect(await asked("suspended")).toMatchObject({ status: 200 });
   });
 });
+
+/** What the token endpoint answers a key agent in `state` that asks for a token. */
+async function asked(state: "suspended" | "revoked") {
+  const account = await newKey();
+  const agent = await seedKeyAgent(account, { state });
+  return refusal(await requestToken(agent.id, account, { runKey: await newKey() }));
+}
 
 /** How many one-time ids Better Auth holds: signed token requests, and DPoP proofs. */
 const heldIds = async () => {

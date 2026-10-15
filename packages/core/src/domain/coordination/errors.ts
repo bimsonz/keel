@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  AgentId,
   ChangeId,
   ConflictId,
   EscalationId,
@@ -67,6 +68,25 @@ export class LeaseNotLapsed extends Schema.TaggedError<LeaseNotLapsed>()("LeaseN
   lapsesAt: Schema.optional(InstantSchema),
   nextActions: Schema.Array(NextAction),
 }) {}
+
+/**
+ * A call under a change's lease from an agent of the change's project that is
+ * not the change's agent. The lease is its holder's alone: another agent takes
+ * the change over by adopting it once the lease lapses. `lapsesAt` is when it
+ * lapses unless renewed, absent while Keel holds the change; `holderName` is
+ * the holder as people read it (its handle, or the name a person enrolled it
+ * by), filled in by the doorway, which can read the directory.
+ */
+export class ChangeHeldByOther extends Schema.TaggedError<ChangeHeldByOther>()(
+  "ChangeHeldByOther",
+  {
+    changeId: ChangeId,
+    holder: AgentId,
+    holderName: Schema.optional(Schema.String),
+    lapsesAt: Schema.optional(InstantSchema),
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
 
 /**
  * The change may not be queued, or stay queued, while a Proven conflict is

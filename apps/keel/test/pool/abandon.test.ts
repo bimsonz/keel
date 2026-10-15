@@ -256,15 +256,16 @@ describe("abandoning a change through the doorways", () => {
     expect(tools).toContain("abandon");
   });
 
-  it("[a11.abandon-stale] another agent's made-up lease, or the holder's after an adoption, is 409 change.lease_stale, and the change carries on", async () => {
+  it("[a11.abandon-stale] the holder's made-up lease is 409 change.lease_stale; another agent of the project, under the lease or as the former holder after an adoption, is 409 change.held_by_other; the change carries on", async () => {
     const { c, holder, projectId, lease } = await heldChange();
     const other = await seedAgent({ projectId });
     drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${other.agent.id}`)));
     const otherToken = await tokenFor(other);
 
-    const madeUp = await abandonRest(otherToken, c.changeId, "abandon-key-0003", {
+    const madeUp = await abandonRest(holder, c.changeId, "abandon-key-0003", {
       lease: makeId("lse", ulid()),
     });
+    const colleague = await abandonRest(otherToken, c.changeId, "abandon-key-0005", { lease });
     c.clock.advance(LEASE_TTL_MS);
     const adopted = await rest(otherToken, `/changes/${c.changeId}/adopt`, {
       method: "POST",
@@ -273,11 +274,10 @@ describe("abandoning a change through the doorways", () => {
     const old = await abandonRest(holder, c.changeId, "abandon-key-0004", { lease });
     const stored = await c.current();
 
-    expect(madeUp.status).toBe(409);
-    expect(madeUp.body.code).toBe("change.lease_stale");
+    expect([madeUp.status, madeUp.body.code]).toEqual([409, "change.lease_stale"]);
+    expect([colleague.status, colleague.body.code]).toEqual([409, "change.held_by_other"]);
     expect(adopted.status).toBe(200);
-    expect(old.status).toBe(409);
-    expect(old.body.code).toBe("change.lease_stale");
+    expect([old.status, old.body.code]).toEqual([409, "change.held_by_other"]);
     expect(stored.state).toBe("working");
     expect(stored.lease.id).toBe(adopted.body.result.lease.id);
   });

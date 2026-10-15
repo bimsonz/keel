@@ -901,11 +901,14 @@ describe("authorize", () => {
     );
   });
 
-  it("[authz.agent-paused] a paused agent has no rights and is refused everything, told that it is paused", () => {
+  it("[authz.agent-paused] a paused agent has no rights and is refused everything but whoami and its inbox, told that it is paused", () => {
+    const readsWhilePaused = new Set(["whoami", "inbox"]);
     fc.assert(
       fc.property(agentArb, requestArb, (a, { action, resource }) => {
         const paused = { ...a, paused: true };
         const result = decide(paused, action, resource);
+        if (readsWhilePaused.has(action))
+          return rightsOf(paused, resource).size === 0 && outcome(result) !== "403:agent-paused";
         return (
           rightsOf(paused, resource).size === 0 &&
           outcome(result) === "403:agent-paused" &&
@@ -920,7 +923,12 @@ describe("authorize", () => {
     expect(outcome(authorize(paused, "Lattices_listLattices", { _tag: "Instance" }))).toBe(
       "403:agent-paused",
     );
-    expect(outcome(authorize(paused, "whoami", { _tag: "Self" }))).toBe("403:agent-paused");
+    expect(outcome(authorize(paused, "whoami", { _tag: "Self" }))).toBe("ok:");
+    expect(outcome(authorize(paused, "inbox", { _tag: "Self" }))).toBe("ok:");
+    expect(outcome(authorize(paused, "askSponsor", { _tag: "Self" }))).toBe("403:agent-paused");
+    expect(outcome(authorize(paused, "Agents_listReachableProjects", { _tag: "Self" }))).toBe(
+      "403:agent-paused",
+    );
     expect(outcome(authorize(paused, "Repo_getTree", project(PRJ_3, "public")))).toBe(
       "403:agent-paused",
     );
@@ -1651,6 +1659,7 @@ describe("authorize: the rows an invitation is made, read and answered by", () =
     "Agents_acceptProjectInvitation: Self agent",
     "Agents_leaveProject: Self agent",
     "Agents_listReachableProjects: Self agent",
+    "Agents_useProject: Self agent",
   ];
   const rows = INVITATION_ROWS.map((row) => row.slice(0, row.indexOf(":"))).filter(isAction);
   const itsOwn = rows.filter((a) => kindOf(a) === "Self");
@@ -1660,11 +1669,11 @@ describe("authorize: the rows an invitation is made, read and answered by", () =
 
   it("[authz.invitation-rows] an invitation is made and ended by people and read, accepted and left by the agent it names: a person is refused the agent's rows, and an agent the org's two", () => {
     expect(rows.map((a) => `${a}: ${kindOf(a)} ${needOf(a)}`)).toEqual(INVITATION_ROWS);
-    expect(itsOwn).toHaveLength(7);
-    // These seven (the six an invitation is read, accepted and left by, and what the accepted ones reach) are every row that asks for an agent, and what a person reads of themselves still asks `self`.
+    expect(itsOwn).toHaveLength(8);
+    // These eight (the six an invitation is read, accepted and left by, what the accepted ones reach, and the run's choice among them) are every row that asks for an agent; what a person reads of themselves asks `self`, and the two a paused agent still reads ask `selfRead`.
     expect(ACTION_NAMES.filter((a) => needOf(a) === "agent").toSorted()).toEqual(itsOwn.toSorted());
-    expect(ACTION_NAMES.filter((a) => needOf(a) === "self").toSorted()).toEqual([
-      "askSponsor",
+    expect(ACTION_NAMES.filter((a) => needOf(a) === "self").toSorted()).toEqual(["askSponsor"]);
+    expect(ACTION_NAMES.filter((a) => needOf(a) === "selfRead").toSorted()).toEqual([
       "inbox",
       "whoami",
     ]);

@@ -12,7 +12,7 @@ import {
 import { openApiDocument } from "@keeltown/contracts";
 import type { Admitted } from "@keeltown/core/application/identity";
 import type { ServerContext, ToolDeps } from "../../../generated/mcp/mcp-runtime.gen.ts";
-import { registerTools } from "../../../generated/mcp/mcp.gen.ts";
+import { registerTools, TOOL_NAMES } from "../../../generated/mcp/mcp.gen.ts";
 import { type Caller, presentedToken } from "../http/caller.ts";
 import { gate, type GateDeps } from "../http/gate.ts";
 import type { Handlers } from "../http/handlers.ts";
@@ -129,6 +129,70 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
   };
 }
 
+const TOOLS: ReadonlySet<string> = new Set(TOOL_NAMES);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The next actions an agent here can take: one that names an operation is kept only when that operation is a tool. */
+export const toolActions = (actions: unknown): unknown =>
+  Array.isArray(actions)
+    ? actions.filter(
+        (action) =>
+          !isRecord(action) ||
+          typeof action["operationId"] !== "string" ||
+          TOOLS.has(action["operationId"]),
+      )
+    : actions;
+
+/** Each notice of a list, with only the next actions an agent here can take. */
+const toolNotices = (notices: unknown): unknown =>
+  Array.isArray(notices)
+    ? notices.map((notice) =>
+        isRecord(notice) && "nextActions" in notice
+          ? { ...notice, nextActions: toolActions(notice["nextActions"]) }
+          : notice,
+      )
+    : notices;
+
+/**
+ * An answer as this door gives it: every next action it names (an envelope's
+ * `next`, a refusal's `nextActions`, and those of each notice it carries, its
+ * inbox page's included) is one the agent can call here. REST names every
+ * operation; an MCP client has only the tools, and a next action it cannot
+ * take leaves it stuck.
+ */
+export function toolsOnly(body: unknown): unknown {
+  if (!isRecord(body)) return body;
+  const told: Record<string, unknown> = { ...body };
+  if ("next" in told) told["next"] = toolActions(told["next"]);
+  if ("nextActions" in told) told["nextActions"] = toolActions(told["nextActions"]);
+  if ("notices" in told) told["notices"] = toolNotices(told["notices"]);
+  if (isRecord(told["result"]) && "notices" in told["result"])
+    told["result"] = { ...told["result"], notices: toolNotices(told["result"]["notices"]) };
+  return told;
+}
+
+/** The handlers as the MCP door calls them: each tool's answer names only tools as next actions. */
+/* oxlint-disable typescript/no-unsafe-type-assertion -- the wrapper dispatches by tool name over the
+   handlers, each typed where it is declared: here each is one function answering `{ status, body }`,
+   and only the body's next actions are narrowed, so every answer keeps its own arm's shape. */
+export function onlyTools(handlers: Handlers): Handlers {
+  const told: Record<string, unknown> = { ...handlers };
+  for (const name of TOOL_NAMES) {
+    const handler = handlers[name] as (
+      caller: Caller,
+      input: unknown,
+    ) => Promise<{ readonly status: number; readonly body: unknown }>;
+    told[name] = async (caller: Caller, input: unknown) => {
+      const answered = await handler(caller, input);
+      return { ...answered, body: toolsOnly(answered.body) };
+    };
+  }
+  return told as Handlers;
+}
+/* oxlint-enable typescript/no-unsafe-type-assertion */
+
 /** A 401 in OAuth's shape, as the MCP SDK answers one, with the gate's challenge for this door. */
 function unauthenticated(challenge: string, detail: string): Response {
   const refused = bearerAuthChallengeResponse(new OAuthError(OAuthErrorCode.InvalidToken, detail));
@@ -151,6 +215,7 @@ export function makeMcpEndpoint(
   allowedHosts: readonly string[],
   reads: Omit<Watches, "admit">,
 ) {
+  const told = onlyTools(handlers);
   const factory = (context: McpRequestContext) => {
     const admitted = admittedOf(context.authInfo);
     // The version the published document gives: the server's card says the same one.
@@ -158,8 +223,8 @@ export function makeMcpEndpoint(
       { name: "keel", version: openApiDocument.info.version },
       { instructions: INSTRUCTIONS },
     );
-    registerTools(server, (call) => held(handlers, call), toolDeps(admitted));
-    registerResources(server, handlers, (signal) => callerOf(admitted, signal));
+    registerTools(server, (call) => held(told, call), toolDeps(admitted));
+    registerResources(server, told, (signal) => callerOf(admitted, signal));
     // Only the current revision listens; an earlier one has no way to watch a resource here.
     if (context.era === "modern")
       server.server.registerCapabilities({ resources: { subscribe: true } });
@@ -184,11 +249,15 @@ export function makeMcpEndpoint(
     const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
     // A token that could not be checked is the gate's own 503: a 401 here would tell a client its good token is bad.
     if (gated instanceof Response && gated.status === 503) return gated;
-    if (gated instanceof Response)
+    // The gate's own words say why, such as a token minted before its run chose a project.
+    if (gated instanceof Response) {
+      const said: unknown = await gated.json().catch(() => undefined);
+      const detail: unknown = Reflect.get(Object(said), "detail");
       return unauthenticated(
         gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),
-        "The token is not admitted",
+        typeof detail === "string" ? detail : "The token is not admitted",
       );
+    }
     const { principal } = gated.admitted;
     const authInfo: AuthInfo = {
       token: presented.token,

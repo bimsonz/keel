@@ -2,15 +2,15 @@
 # kills: run.inbox-for
 # why: an event that names its changes only in `affected` (a conflict put to a person or ruled on) is filed for every run, though one run holds the party
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index abf32f99..d59661c4 100644
+index 987db9a5..72cc23ab 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -273,7 +273,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
-   foldHeldLeases(store, agentId, event);
-   if (!notifies(agentId, event)) return;
-   const holder =
--    about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
-+    about === undefined ? undefined : (before ?? runHolding(store, about));
+@@ -279,7 +279,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+       ? (before ?? runHolding(store, about))
+       : event.entity.kind === "agent"
+         ? undefined
+-        : soleHolder(store, event);
++        : undefined;
    if (holder !== undefined && event.run?.id === holder) return;
    recordDelivery(store, event, holder);
  }

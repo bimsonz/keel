@@ -2,15 +2,15 @@
 # kills: pool.fresh-names
 # why: Repo names come from a per-refill counter, so a later refill reuses a name that may still be reserved
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 2f50536..cfe522b 100644
+index 991b8018..0a14fee1 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -208,7 +208,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
-     const id: WorkspaceId = yield* ids.next("wsp");
+@@ -404,7 +404,7 @@ const startSlot = (project: ProjectId, source: RepoName) =>
+     const id: WorkspaceId = yield* (yield* Ids).next("wsp");
      const slot: Slot = {
        id,
 -      repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
 +      repo: { namespace: source.namespace, name: `ws-${i}` },
        state: "forking",
-       since: now,
+       since: yield* (yield* Clock).now,
      };

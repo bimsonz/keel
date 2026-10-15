@@ -2,10 +2,10 @@
 # kills: signup.http
 # why: the MCP endpoint passes the gate at the API's door, so it takes a token issued for the API and refuses the one issued for it
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 0b221b80..d7ab5ccb 100644
+index 0ddfbc4a..77f62fca 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -76,7 +76,7 @@ export function makeMcpEndpoint(
+@@ -246,7 +246,7 @@ export function makeMcpEndpoint(
      const presented = presentedToken(request.headers.get("authorization") ?? "");
      if (presented === null)
        return unauthenticated(deps.challenge("mcp"), "A bearer token is required");
@@ -13,4 +13,4 @@ index 0b221b80..d7ab5ccb 100644
 +    const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false });
      // A token that could not be checked is the gate's own 503: a 401 here would tell a client its good token is bad.
      if (gated instanceof Response && gated.status === 503) return gated;
-     if (gated instanceof Response)
+     // The gate's own words say why, such as a token minted before its run chose a project.

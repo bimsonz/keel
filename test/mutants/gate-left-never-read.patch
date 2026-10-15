@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.invited
+# kills: gate.invited
+# why: an agent whose invitation ended is never marked as having left, so it is answered as a stranger is
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index a2dda811..b06d17cd 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -249,7 +249,7 @@ export const principalOf: (
+       const standing: AgentStanding = governs
+         ? { _tag: "Governs" }
+         : Option.isNone(invited)
+-          ? { _tag: "None", ...(left ? { left: true } : {}) }
++          ? { _tag: "None" }
+           : {
+               _tag: "Invited",
+               by: yield* Memberships.use((memberships) =>

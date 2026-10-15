@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fill-bounded"
+# kills: pool.fill-bounded
+# why: a relay of trunk that never answers holds the refill, and the pool's alarm, for good
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..76d6fb18 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -240,7 +240,7 @@ const fillOne = (project: ProjectId, repo: RepoName) =>
+     yield* (yield* WorkspaceRefresher).advance(project, repo, null, head);
+     const info = yield* host.info(repo);
+     return { remote: info.remote, baseSha: head };
+-  }).pipe(Effect.timeout(FILL_MS));
++  });
+ 
+ /** Forks `source` into a fresh repo and reads what a grant hands out. */
+ const forkOne = (source: RepoName, repo: RepoName) =>

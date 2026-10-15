@@ -2,11 +2,11 @@
 # kills: pool.project
 # why: WorkspaceForked carries no project, so project readers never see the pool fill
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 19f3916..92376cc 100644
+index 991b8018..368b07d8 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -241,7 +241,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
-     }
+@@ -432,7 +432,7 @@ const madeReady = (
+   Effect.gen(function* () {
      const at = yield* (yield* Clock).now;
      const forked = yield* commit(
 -      { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}`, project },

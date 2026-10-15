@@ -2,10 +2,10 @@
 # kills: whoami.sponsor-next
 # why: an agent with an invitation waiting is sent to find a sponsor first, though accepting the invitation is what lets it work
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index e292dc54..72d2a0ef 100644
+index 78058bbd..40909a45 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -226,8 +226,8 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+@@ -236,8 +236,8 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
        // An invitation accepted is what lets the agent work, so its read comes before the sponsor ask.
        next: [
          ...working.next,
@@ -13,5 +13,5 @@ index e292dc54..72d2a0ef 100644
          ...sponsor.next,
 +        ...waiting.next,
          ...placed.next,
-         ...reach(identity).next,
+         ...reach(identity, here).next,
        ].slice(0, MAX_NEXT),

@@ -2,15 +2,15 @@
 # kills: gate.challenge-none
 # why: a token Keel cannot take is answered with the exchange of a secret as its next action, so an agent that holds a key is sent to an endpoint it has nothing to give
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 4cc0f39a..895f3ec9 100644
+index c67b1eed..05d0a85e 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -152,7 +152,7 @@ function refusal(answer: GateRefusal, requestId: string): Response {
+@@ -154,7 +154,7 @@ function refusal(answer: GateRefusal, requestId: string): Response {
          ],
        });
      case "invalid":
 -      return problemResponse(401, "auth.invalid_token", requestId, { nextActions: arrival() });
 +      return problemResponse(401, "auth.invalid_token", requestId, { nextActions: [{ kind: "call", title: "Exchange your client credentials for a token", operationId: "Auth_exchangeToken" }] });
-     default: {
-       const unmapped: never = answer;
-       return unmapped;
+     case "stale-project":
+       return problemResponse(401, "auth.invalid_token", requestId, {
+         detail: staleProject(answer.run, answer.projectId),

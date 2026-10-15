@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.stale-project
+# kills: gate.stale-project
+# why: a token minted before its run chose a project is admitted naming none, so a client that cannot name a project never works in the one chosen
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index a2dda811..81ea2721 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -219,7 +219,7 @@ export const principalOf: (
+       const agent = yield* admit(claims);
+       const own: NamespaceId = agent.id;
+       const { projectId, run } = claims;
+-      if (projectId === undefined && run !== undefined) {
++      if (projectId === undefined && run !== undefined && run === null) {
+         const chosen = yield* AgentDirectory.use((directory) =>
+           directory.runProject(agent.id, run.id),
+         );

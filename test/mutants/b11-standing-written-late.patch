@@ -2,10 +2,10 @@
 # kills: b11.standing-inline
 # why: a move answers before the directory row holds it, leaving the row to the Projector's repair, so the agent's next request may still be admitted
 diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
-index 4b61f978..fba0756b 100644
+index ecf77f48..6e45cc1d 100644
 --- a/packages/core/src/application/identity/standing.ts
 +++ b/packages/core/src/application/identity/standing.ts
-@@ -199,11 +199,6 @@ export const changeStanding: (
+@@ -202,11 +202,6 @@ export const changeStanding: (
    );
    if (committed.duplicate && !committed.sameCommand)
      return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
@@ -14,6 +14,6 @@ index 4b61f978..fba0756b 100644
 -    const moved = standingOf(event);
 -    if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
 -  }
-   return withoutNamespace(
-     committed.duplicate ? decodeAgent((yield* EntityStore).get(AGENT, agentId)) : committed.value,
-   );
+   const store = yield* EntityStore;
+   if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
+   store.transaction(() => {

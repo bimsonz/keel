@@ -11,6 +11,7 @@ import {
   poolStatus,
   raisePoolTarget,
   refillPool,
+  refreshesStuck,
   refreshSlots,
   releaseWorkspace,
   STUCK_FORK_MS,
@@ -96,16 +97,15 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     );
     // Counted before the first await, so a claim ending meanwhile does not withdraw this one's deadline.
     this.claims += 1;
-    await scheduleAlarm(storage, {
-      kind: "deadline",
-      reason: POOL_CLAIM,
-      at: Date.now() + STUCK_REFRESH_MS + 1_000,
-    });
+    await this.armNoLater(POOL_CLAIM, Date.now() + STUCK_REFRESH_MS + 1_000);
     const answer = await this.answer(WorkspacePoolCodecs.grant, program).finally(() => {
       this.claims -= 1;
     });
     const status = await this.runtime.runPromise(poolStatus());
     if (this.claims === 0 && status.refreshing === 0) await cancelAlarm(storage, POOL_CLAIM);
+    // Slots left refreshing by a dead relay are read back by a pass, never by a declare: run one now.
+    if ((await this.runtime.runPromise(refreshesStuck())) > 0)
+      await this.armNoLater(POOL_REFRESH, Date.now());
     const collecting = armedAlarms(storage).some((armed) => armed.reason === POOL_COLLECT);
     if (status.collecting > 0 && !collecting) {
       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
@@ -245,6 +245,8 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
         });
       }
       if (report.ready > 0) {
+        // A pass that makes workspaces from trunk makes one at a time: while it gets somewhere, the next goes at once.
+        await this.refillIfShort();
         // The mirror it forked from can lag trunk: what it left ready may already be behind.
         const behind = await this.runtime.runPromiseExit(
           countBehind(this.project).pipe(Effect.provide(this.services)),
@@ -317,6 +319,18 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
       reason: POOL_REFRESH,
       at: Date.now() + delay,
     });
+  }
+
+  /**
+   * Arms `reason` for `at`, unless it is armed sooner already. A deadline
+   * re-armed later by every call never comes due while calls keep coming:
+   * on 15 Oct each declare pushed the claim's pass out by two minutes, and
+   * keel/keel's stranded slots were never read back.
+   */
+  private async armNoLater(reason: string, at: number): Promise<void> {
+    const armed = armedAlarms(this.ctx.storage).find((alarm) => alarm.reason === reason);
+    if (armed !== undefined && armed.at <= at) return;
+    await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason, at });
   }
 
   /**

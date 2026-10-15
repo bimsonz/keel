@@ -2,14 +2,14 @@
 # kills: pool.do.claim-at-head
 # why: a claim's deadline is never withdrawn, so every claim leaves an alarm armed for a pass with nothing to do
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index 2b6ddc3c..06c64b5e 100644
+index 77dd7f62..f47f2494 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -105,7 +105,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+@@ -102,7 +102,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
        this.claims -= 1;
      });
      const status = await this.runtime.runPromise(poolStatus());
 -    if (this.claims === 0 && status.refreshing === 0) await cancelAlarm(storage, POOL_CLAIM);
-     const collecting = armedAlarms(storage).some((armed) => armed.reason === POOL_COLLECT);
-     if (status.collecting > 0 && !collecting) {
-       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
+     // Slots left refreshing by a dead relay are read back by a pass, never by a declare: run one now.
+     if ((await this.runtime.runPromise(refreshesStuck())) > 0)
+       await this.armNoLater(POOL_REFRESH, Date.now());

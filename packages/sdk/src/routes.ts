@@ -58,6 +58,7 @@ export const ROUTES = {
   },
   Agents_listProjects: { method: "GET", path: "/agents/me/projects" },
   Agents_listReachableProjects: { method: "GET", path: "/agents/me/reachable-projects" },
+  Agents_useProject: { method: "PUT", path: "/agents/me/run/project" },
   Agents_acceptProjectInvitation: {
     method: "PUT",
     path: "/agents/me/projects/{projectId}",

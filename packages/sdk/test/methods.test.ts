@@ -53,6 +53,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Agents_leaveNamespace: (c) => c.leaveNamespace("an-org"),
   Agents_listProjects: (c) => c.projectInvitations(),
   Agents_listReachableProjects: (c) => c.reachableProjects(),
+  Agents_useProject: (c) => c.useProject("prj_1"),
   Agents_acceptProjectInvitation: (c) => c.acceptProjectInvitation("prj_1"),
   Agents_leaveProject: (c) => c.leaveProject("prj_1"),
   Projects_listAgents: (c) => c.projectAgents("prj_1"),

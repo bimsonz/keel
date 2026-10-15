@@ -2,10 +2,11 @@
 # kills: commit.key-reused
 # why: A key reused with other edits answers the first commit as if it were a retry
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..ad989bea 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1402,7 +1402,7 @@
-   if (!isOwnAgent(store, change, command)) return yield* notFound(changeId);
+@@ -1761,7 +1761,7 @@ const commitEditsCall: (
+   if (notHeld !== undefined) return yield* notHeld;
    const prior = madeCommit(store, changeId, command.idempotencyKey);
    if (prior !== undefined)
 -    return yield* prior.fingerprint === fingerprint ? answer(prior) : Effect.fail(conflict);

@@ -11,6 +11,7 @@ import {
   observePush,
   poolStatus,
   refillPool,
+  refreshesStuck,
   refreshSlots,
   RELAY_MS,
   RELAYS_KEPT,
@@ -85,7 +86,7 @@ function world(script: Relay[] = []) {
   const memory = makeWorkspaceRefresherMemory(code, () => TRUNK);
   let now = 1_700_000_000_000;
   /** Each relay asked for, in order. */
-  const relays: { workspace: string; from: CommitSha; to: CommitSha }[] = [];
+  const relays: { workspace: string; from: CommitSha | null; to: CommitSha }[] = [];
   /** The workspaces a relay is writing right now, the most there ever were at once, and whether two relays ever wrote one workspace at once. */
   const inFlight = new Set<string>();
   const seen = { peak: 0, doubled: false };
@@ -713,6 +714,22 @@ describe("WorkspacePool refresh", () => {
           ]);
           expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: head });
         }).pipe(Effect.provide(unmoved.layer));
+
+        // Its main cannot be read back: past its bound it is no workspace the pool can vouch for.
+        const blind = world(["hold-before"]);
+        yield* Effect.gen(function* () {
+          yield* blind.stock(1);
+          yield* blind.land(1);
+          const pass = yield* Effect.forkChild(refreshSlots(PROJECT));
+          yield* blind.held;
+          yield* Fiber.interrupt(pass);
+          blind.unreadable.add((yield* onlySlot).repo.name);
+          blind.advance(STUCK_REFRESH_MS + 1);
+          expect(yield* refreshesStuck()).toBe(1);
+          expect(yield* refreshSlots(PROJECT)).toMatchObject({ failed: 1 });
+          expect(yield* onlySlot).toMatchObject({ state: "collecting" });
+          expect(yield* refreshesStuck()).toBe(0);
+        }).pipe(Effect.provide(blind.layer));
 
         // Its main is somewhere the pool never put it.
         const strayed = world(["hold-before"]);

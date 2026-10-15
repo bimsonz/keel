@@ -53,6 +53,13 @@ const labelArb = fc
   .filter((text) => isLabel(text))
   .map((text) => label(text));
 
+/** Whether an agent in `state` is given a token's claims, or the refusal's tag. */
+const outcome = (state: "active" | "suspended" | "revoked") =>
+  Result.match(runClaims({ ...agent, state }, { runKey: RUN_KEY }), {
+    onSuccess: () => "granted",
+    onFailure: (error) => error._tag,
+  });
+
 describe("what a token says of its run", () => {
   it("[token.run] a labelled run keeps its id whatever key asks, and another label or another agent is another run", () => {
     fc.assert(
@@ -113,13 +120,9 @@ describe("what a token says of its run", () => {
     expect(refusal({ runKey: RUN_KEY })).toBe("granted");
   });
 
-  it("[token.standing] an agent that is not active is given no claims", () => {
-    for (const state of ["suspended", "revoked"] as const)
-      expect(
-        Result.match(runClaims({ ...agent, state }, { runKey: RUN_KEY }), {
-          onSuccess: () => "granted",
-          onFailure: (error) => error._tag,
-        }),
-      ).toBe("AgentNotAdmitted");
+  it("[token.standing] a revoked agent is given no claims, and a paused one is, to read who it is and its inbox", () => {
+    expect(outcome("revoked")).toBe("AgentNotAdmitted");
+    expect(outcome("suspended")).toBe("granted");
+    expect(outcome("active")).toBe("granted");
   });
 });

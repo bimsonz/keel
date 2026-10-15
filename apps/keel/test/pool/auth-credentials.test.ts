@@ -268,7 +268,7 @@ describe("no passwords at /v1/auth", () => {
       host: env.KEEL_HOST,
       sendOtp: async () => {},
       github: { clientId: "id", clientSecret: "secret" },
-      agents: { find: async () => undefined },
+      agents: { find: async () => undefined, runProject: async () => undefined },
       endSponsorships: async () => {},
     });
     const disabled: ReadonlySet<string> = new Set(DISABLED_PATHS);

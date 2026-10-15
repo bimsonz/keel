@@ -589,6 +589,14 @@ export class KeelClient {
     return this.call("Agents_listReachableProjects", {}, options);
   }
 
+  /**
+   * The run the calling agent's token names works in this project from now on: each token the run asks
+   * for without a project is for it.
+   */
+  useProject(projectId: string, options?: CallOptions): Promise<WireOutputs["Agents_useProject"]> {
+    return this.call("Agents_useProject", { projectId }, options);
+  }
+
   /** The calling agent accepts an invitation to one project, named by its id. */
   acceptProjectInvitation(
     projectId: string,

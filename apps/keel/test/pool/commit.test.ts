@@ -152,7 +152,7 @@ describe("committing to a change's workspace through the doorways", () => {
     expect(await headOf(c, declared.grant.repo)).toBe(first.result.commitSha);
   });
 
-  it("[commit.rest-own] another agent of the project, holding the lease, is 404 change.not_found, and nothing is written", async () => {
+  it("[commit.rest-own] another agent of the project, holding the lease, is 409 change.held_by_other, and nothing is written", async () => {
     const { c, declared, head, other } = await declaredWithWorkspace();
 
     const response = await commitRest(
@@ -164,8 +164,8 @@ describe("committing to a change's workspace through the doorways", () => {
     );
 
     expect([response.status, (await response.json<{ code: string }>()).code]).toEqual([
-      404,
-      "change.not_found",
+      409,
+      "change.held_by_other",
     ]);
     expect(c.writer.committed).toEqual([]);
   });
@@ -183,7 +183,7 @@ describe("committing to a change's workspace through the doorways", () => {
       decodeExit(
         ChangeCodecs.abandon,
         await c.stub.abandon({
-          authority: { _tag: "Lease", leaseId: lease, agentId: c.agentId },
+          authority: { _tag: "Lease", leaseId: lease, agentId: c.agentId, projectId: c.projectId },
           idempotencyKey: "abandon-1",
         }),
       ),

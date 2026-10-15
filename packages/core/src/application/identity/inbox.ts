@@ -252,6 +252,10 @@ export function detailOf(event: EventEnvelope): string | undefined {
       return "a person now sponsors you: your questions go to them, and they may pause you";
     case "AgentUnsponsored":
       return "nobody sponsors you now";
+    case "AgentSuspended":
+      return "your sponsor paused you: until they unpause you, Keel answers only whoami and your inbox";
+    case "AgentReinstated":
+      return "your sponsor unpaused you: your calls are taken again";
     case "SponsorRequested":
       return Option.match(decodeRequested(event.payload), {
         onNone: () => undefined,
@@ -284,6 +288,18 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
     return [
       { kind: "read", title: "Read who you are and who sponsors you", operationId: "whoami" },
     ];
+  if (event.type === "AgentSuspended")
+    return [
+      {
+        kind: "call",
+        title:
+          "Wait in your inbox, with the cursor this answer gave: Keel tells you the moment your sponsor unpauses you",
+        operationId: "inbox",
+        args: { wait: 600 },
+      },
+    ];
+  if (event.type === "AgentReinstated")
+    return [{ kind: "read", title: "Read who you are, then carry on", operationId: "whoami" }];
   if (event.type === "SponsorRequested")
     return Option.match(decodeRequested(event.payload), {
       onNone: () => undefined,

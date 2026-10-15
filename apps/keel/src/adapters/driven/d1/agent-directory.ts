@@ -1,5 +1,5 @@
 import { Agent, AgentKey } from "@keeltown/core/domain/identity";
-import { AgentId } from "@keeltown/core/kernel";
+import { AgentId, ProjectId } from "@keeltown/core/kernel";
 import { AgentDirectory, type StoredCredential } from "@keeltown/core/ports";
 import { Effect, Layer, Option, Schema } from "effect";
 
@@ -31,6 +31,7 @@ const KeyRow = Schema.Struct({
 
 const decodeAgent = Schema.decodeUnknownSync(Agent);
 const decodeAgentId = Schema.decodeUnknownSync(AgentId);
+const decodeProjectId = Schema.decodeUnknownSync(ProjectId);
 const decodeKeyRows = Schema.decodeUnknownSync(Schema.Array(KeyRow));
 const encodeKey = Schema.encodeSync(AgentKey);
 
@@ -178,6 +179,27 @@ export function AgentDirectoryD1(db: D1Database) {
             ),
           ),
         ),
+      runProject: (agentId, runId) =>
+        Effect.promise(() =>
+          db
+            .prepare("SELECT project_id FROM agent_run_projects WHERE agent_id = ? AND run_id = ?")
+            .bind(agentId, runId)
+            .first<{ readonly project_id: string }>(),
+        ).pipe(
+          Effect.map((row) =>
+            row === null ? Option.none() : Option.some(decodeProjectId(row.project_id)),
+          ),
+        ),
+      chooseProject: (agentId, runId, projectId, at) =>
+        Effect.promise(() =>
+          db
+            .prepare(
+              `INSERT INTO agent_run_projects (agent_id, run_id, project_id, chosen_at) VALUES (?, ?, ?, ?)
+               ON CONFLICT (agent_id, run_id) DO UPDATE SET project_id = excluded.project_id, chosen_at = excluded.chosen_at`,
+            )
+            .bind(agentId, runId, projectId, at)
+            .run(),
+        ).pipe(Effect.asVoid),
       // An agent's namespace, once placed, is never moved or cleared by a later write: its project never
       // moves, and an enrolment replayed by its key carries the namespace it was first made in, which
       // migration 0010 may since have re-homed. Its sponsor is never cleared by a record that lacks one.

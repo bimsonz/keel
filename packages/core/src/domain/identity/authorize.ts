@@ -28,6 +28,8 @@ import type {
 /**
  * What an action asks of its caller:
  * - `anyone`: no one is refused; `self`: any user or agent, on its own record;
+ *   `selfRead`: that, and a paused agent too: it reads who it is and its
+ *   inbox, and nothing else, so it hears when its sponsor unpauses it;
  *   `agent`: any agent, on its own record, and no person: an invitation is the
  *   agent's to read, accept and leave, and nobody answers it in its place;
  *   `account`: any user or agent; `user`: any user; `handle`: any user, even
@@ -57,6 +59,7 @@ import type {
 export type Need =
   | "anyone"
   | "self"
+  | "selfRead"
   | "agent"
   | "account"
   | "user"
@@ -106,8 +109,8 @@ export const SPEC_ACTIONS = {
   Auth_registerClient: rule("Instance", "anyone"),
   Lattices_listLattices: rule("Instance", "anyone"),
   SignIn_methods: rule("Instance", "anyone"),
-  whoami: rule("Self", "self"),
-  inbox: rule("Self", "self"),
+  whoami: rule("Self", "selfRead"),
+  inbox: rule("Self", "selfRead"),
   askSponsor: rule("Self", "self"),
   Users_me: rule("Self", "user"),
   // Approving is the person's own act: the code the agent showed them is what lets them, and
@@ -183,6 +186,7 @@ export const SPEC_ACTIONS = {
   Agents_leaveNamespace: rule("Self", "agent"),
   Agents_listProjects: rule("Self", "agent"),
   Agents_listReachableProjects: rule("Self", "agent"),
+  Agents_useProject: rule("Self", "agent"),
   Agents_acceptProjectInvitation: rule("Self", "agent"),
   Agents_leaveProject: rule("Self", "agent"),
   Operator_putSettings: rule("Project", "maintain"),
@@ -482,6 +486,10 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title:
       "Whoever answered for you in this namespace holds no role there now; ask someone who does to invite you",
   },
+  "read-only": {
+    kind: "escalate",
+    title: "Your invitation here gives Read: ask a member of this namespace to give you Write",
+  },
   "org-suspended": {
     kind: "escalate",
     title: "This namespace is suspended; ask whoever runs this Keel to reinstate it",
@@ -611,6 +619,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   switch (need) {
     case "anyone":
     case "self":
+    case "selfRead":
     case "account":
     case "user":
       return granted();
@@ -692,7 +701,8 @@ const whyNoWork = (
   switch (standing._tag) {
     case "Invited":
       if (standing.by.suspended) return "inviter-suspended";
-      return standing.by.role === undefined ? "inviter-left" : "scope";
+      if (standing.by.role === undefined) return "inviter-left";
+      return standing.readOnly === true ? "read-only" : "scope";
     case "Governs":
       return "scope";
     default:
@@ -716,10 +726,11 @@ const whyNoRule = (
     : "users-only";
 
 const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decision => {
-  if (principal.paused) return refused("agent-paused");
+  if (principal.paused) return need === "selfRead" ? granted() : refused("agent-paused");
   switch (need) {
     case "anyone":
     case "self":
+    case "selfRead":
     case "agent":
     case "account":
       return granted();

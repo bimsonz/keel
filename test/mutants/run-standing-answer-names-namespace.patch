@@ -2,17 +2,20 @@
 # kills: run.namespace-read
 # why: a suspension, reinstatement or revocation answers the agent's row whole, the namespace it was enrolled into with it
 diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
-index 4b61f978..1cc4d701 100644
+index ecf77f48..d2c9e429 100644
 --- a/packages/core/src/application/identity/standing.ts
 +++ b/packages/core/src/application/identity/standing.ts
-@@ -204,9 +204,7 @@ export const changeStanding: (
-     const moved = standingOf(event);
+@@ -208,11 +208,11 @@ export const changeStanding: (
      if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
    }
--  return withoutNamespace(
--    committed.duplicate ? decodeAgent((yield* EntityStore).get(AGENT, agentId)) : committed.value,
--  );
-+  return committed.duplicate ? decodeAgent((yield* EntityStore).get(AGENT, agentId)) : committed.value;
+   const store = yield* EntityStore;
+-  if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
++  if (committed.duplicate) return decodeAgent(store.get(AGENT, agentId));
+   store.transaction(() => {
+     for (const event of committed.events) hearEvent(store, agentId, event);
+   });
+-  return withoutNamespace(committed.value);
++  return committed.value;
  });
  
  /**

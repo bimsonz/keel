@@ -569,7 +569,7 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       decodeExit(
         ChangeCodecs.abandon,
         await b.stub.abandon({
-          authority: { _tag: "Lease", leaseId: leaseB, agentId: b.agentId },
+          authority: { _tag: "Lease", leaseId: leaseB, agentId: b.agentId, projectId: b.projectId },
           idempotencyKey: "withdraw-b",
         }),
       ),
@@ -755,7 +755,12 @@ async function escalatedPair(probes: Awaited<ReturnType<typeof inertProbe>>) {
       decodeExit(
         ChangeCodecs.abandon,
         await c.stub.abandon({
-          authority: { _tag: "Lease", leaseId: (await c.current()).lease.id, agentId: c.agentId },
+          authority: {
+            _tag: "Lease",
+            leaseId: (await c.current()).lease.id,
+            agentId: c.agentId,
+            projectId: c.projectId,
+          },
           idempotencyKey: `abandon-${c.changeId}`,
         }),
       ),

@@ -102,7 +102,7 @@ const abandon = async (c: ChangeUnderTest, leaseId: string, key: string) =>
   decodeExit(
     ChangeCodecs.abandon,
     await c.stub.abandon({
-      authority: { _tag: "Lease", leaseId, agentId: c.agentId },
+      authority: { _tag: "Lease", leaseId, agentId: c.agentId, projectId: c.projectId },
       idempotencyKey: key,
     }),
   );
@@ -256,7 +256,8 @@ describe("the Change DO over real RPC", () => {
     const c = await changeUnderTest();
     const declared = ok(await c.declare());
     c.clock.advance(LEASE_TTL_MS);
-    const adopted = ok(await adopt(c, makeId("agt", ulid()), "adopt-1"));
+    // Its own agent adopts it: another agent's adoption would leave it told who holds the change instead.
+    const adopted = ok(await adopt(c, c.agentId, "adopt-1"));
     const stale = await revise(c, declared.change.lease.id, 1, "revise-1");
 
     expect(adopted.lease.id).not.toBe(declared.change.lease.id);
@@ -309,7 +310,8 @@ describe("ten concurrent calls on one change", () => {
     expect([...revisions, ...submissions].filter((answer) => answer._tag === "Success")).toEqual(
       [],
     );
-    expect(refusal(await revise(c, oldLease, 1, "revise-late"))).toContain("LeaseStale");
+    // The winner is another agent, so the change's former agent is told who holds it now.
+    expect(refusal(await revise(c, oldLease, 1, "revise-late"))).toContain("ChangeHeldByOther");
   });
 });
 

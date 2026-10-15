@@ -134,14 +134,19 @@ async function keyAgent() {
   agentStub(agentId);
   const card = await http(null, "GET", `/agents/${agentId}`);
   const handle = String(card.body["handle"]);
-  /** A token of the agent's: for one project, or for none (its own account); for Keel's MCP when `resource` names it. */
-  const token = async (project?: ProjectId, scope?: string, resource?: string) =>
+  /**
+   * A token of the agent's: for one project, or for none (its own account, or
+   * the project its run chose); for Keel's MCP when `resource` names it; in
+   * the run `run` labels, when it names one.
+   */
+  const token = async (project?: ProjectId, scope?: string, resource?: string, run?: string) =>
     (
       await granted(
         await requestToken(agentId, account, {
           ...(project === undefined ? {} : { project }),
           ...(scope === undefined ? {} : { scope }),
           ...(resource === undefined ? {} : { resource }),
+          ...(run === undefined ? {} : { run }),
         }),
       )
     ).access_token;
@@ -329,7 +334,8 @@ describe("an agent's invitation into an org, through the real Worker", () => {
     );
     expect(removed.status).toBe(200);
     expect(removed.body).toMatchObject({ id: agent.agentId, state: "ended" });
-    expect(refusal(await read())).toEqual([404, "resource.not_found"]);
+    // It stood there, so it is told it left rather than shown nothing.
+    expect(refusal(await read())).toEqual([403, "agent.left"]);
     expect(items(await http(null, "GET", `/namespaces/${slug}/agents`))).toEqual([]);
     expect(items(await http(own, "GET", "/agents/me/namespaces"))).toEqual([]);
     // Taken out, it is told; and there is nothing there for it to leave.
@@ -351,7 +357,7 @@ describe("an agent's invitation into an org, through the real Worker", () => {
     ]);
   });
 
-  it("[link.standing] an invitation that gives read alone lets the agent read and never work, and the agent leaves by itself", async () => {
+  it("[link.standing] an invitation that gives read alone lets the agent read and never work, told to ask a member for Write, over REST and MCP, and the agent leaves by itself", async () => {
     const { slug, member, projectId } = await anOrg();
     const agent = await keyAgent();
     const own = await agent.token();
@@ -364,18 +370,41 @@ describe("an agent's invitation into an org, through the real Worker", () => {
     expect((await http(own, "PUT", `/agents/me/namespaces/${slug}`)).status).toBe(200);
 
     expect((await http(inOrg, "GET", `/changes?project=${projectId}`)).status).toBe(200);
-    expect(reason(await http(inOrg, "POST", "/sessions", { harness: "pool" }))).toEqual([
-      403,
-      "auth.forbidden",
-      "Refused: scope.",
-    ]);
+    const askForWrite = {
+      kind: "escalate",
+      title: "Your invitation here gives Read: ask a member of this namespace to give you Write",
+    };
+    const sessionRefused = await http(inOrg, "POST", "/sessions", { harness: "pool" });
+    expect(reason(sessionRefused)).toEqual([403, "auth.forbidden", "Refused: read-only."]);
+    expect(sessionRefused.body["nextActions"]).toEqual([askForWrite]);
+    const declared = await mcpResult(
+      await mcp(
+        await agent.token(projectId, undefined, `${BASE}/mcp`),
+        "tools/call",
+        {
+          name: "declare",
+          arguments: {
+            goal: "read alone",
+            footprint: [{ path: "README.md", op: "edit" }],
+            "idempotency-key": `read-alone-${ulid()}`,
+          },
+        },
+        "declare",
+      ),
+    );
+    expect(declared["isError"]).toBe(true);
+    expect(JSON.parse(String(Object(Object(declared["content"])[0])["text"]))).toMatchObject({
+      status: 403,
+      detail: "Refused: read-only.",
+      nextActions: [askForWrite],
+    });
 
     const left = await http(own, "DELETE", `/agents/me/namespaces/${slug}`);
     expect(left.status).toBe(200);
     expect(left.body).toMatchObject({ state: "ended" });
     expect(refusal(await http(inOrg, "GET", `/changes?project=${projectId}`))).toEqual([
-      404,
-      "resource.not_found",
+      403,
+      "agent.left",
     ]);
   });
 
@@ -634,7 +663,7 @@ describe("an agent's invitation to one project of a person's own namespace, thro
     const removed = await http(person.token, "DELETE", `${agents}/${agent.agentId}`);
     expect(removed.status).toBe(200);
     expect(removed.body).toMatchObject({ id: agent.agentId, state: "ended" });
-    expect(reason(await work())).toEqual([403, "auth.forbidden", "Refused: foreign-project."]);
+    expect(refusal(await work())).toEqual([403, "agent.left"]);
     expect(items(await http(null, "GET", agents))).toEqual([]);
     expect(items(await http(own, "GET", "/agents/me/projects"))).toEqual([]);
     await vi.waitFor(async () => {
@@ -671,15 +700,15 @@ describe("an agent's invitation to one project of a person's own namespace, thro
     expect(reason(await http(onIt, "POST", "/sessions", { harness: "pool" }))).toEqual([
       403,
       "auth.forbidden",
-      "Refused: scope.",
+      "Refused: read-only.",
     ]);
 
     const left = await http(own, "DELETE", `/agents/me/projects/${projectId}`);
     expect(left.status).toBe(200);
     expect(left.body).toMatchObject({ state: "ended" });
     expect(refusal(await http(onIt, "GET", `/changes?project=${projectId}`))).toEqual([
-      404,
-      "resource.not_found",
+      403,
+      "agent.left",
     ]);
   });
 
@@ -978,7 +1007,7 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     ).toBe(200);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 0 },
-      reads: ["askSponsor", "Agents_listReachableProjects"],
+      reads: ["askSponsor", "Agents_listReachableProjects", "Agents_useProject"],
     });
   });
 
@@ -1164,6 +1193,107 @@ describe("an agent lists the projects it can reach, through the real Worker", ()
     const tooled = await tool(door, "Agents_listReachableProjects");
     expect(tooled.refused).toBe(false);
     expect(tooled.body["items"]).toEqual(listed.body["items"]);
+  });
+});
+
+/** The claims a token carries, read from its payload: what it is for, as the token endpoint minted it. */
+const claimsOf = (token: string): Record<string, unknown> =>
+  Object(JSON.parse(atob((token.split(".")[1] ?? "").replaceAll("-", "+").replaceAll("_", "/"))));
+
+/** A tool call Keel refuses, as the problem its text carries. */
+const refusedBy = async (token: string, name: string, args: Record<string, unknown> = {}) => {
+  const result = await mcpResult(await mcp(token, "tools/call", { name, arguments: args }, name));
+  expect(result["isError"]).toBe(true);
+  const [first] = Array.isArray(result["content"]) ? result["content"] : [];
+  return Object(JSON.parse(String(Object(first)["text"])));
+};
+
+describe("an agent that joined an org works in its project through MCP alone", () => {
+  it("[run.use-project] a token that names no project is told to choose one; the run chooses with Agents_useProject, its project-less token is then refused 401 at the door, and its next token names the project and declares there; a project it cannot reach is not found, a token of no run cannot choose, and once it leaves the org it is told so", async () => {
+    const { org, slug, member, projectId } = await anOrg();
+    const agent = await keyAgent();
+    const own = await agent.token();
+    expect(
+      (await http(member.token, "POST", `/namespaces/${slug}/agents`, { agent: agent.handle }))
+        .status,
+    ).toBe(201);
+    expect((await http(own, "PUT", `/agents/me/namespaces/${org}`)).status).toBe(200);
+    const MCP_DOOR = `${BASE}/mcp`;
+    const door = await agent.token(undefined, undefined, MCP_DOOR, "my-run");
+    expect(claimsOf(door)["prj"]).toBeUndefined();
+    const intent = {
+      goal: "Note the run's project",
+      footprint: [{ path: "NOTES.md", op: "create" }],
+    };
+
+    // Before it chooses, work is answered with the way to choose, and whoami names the same two steps.
+    const unchosen = await refusedBy(door, "declare", {
+      "idempotency-key": `d-${ulid()}`,
+      ...intent,
+    });
+    expect(unchosen).toMatchObject({
+      code: "run.no_project",
+      nextActions: [
+        { operationId: "Agents_listReachableProjects" },
+        { operationId: "Agents_useProject" },
+      ],
+    });
+    const before = await tool(door, "whoami");
+    const steps: unknown = before.body["next"];
+    expect((Array.isArray(steps) ? steps : []).map((step) => Object(step)["operationId"])).toEqual(
+      expect.arrayContaining(["Agents_listReachableProjects", "Agents_useProject"]),
+    );
+
+    // A project it cannot reach is not found, and a token of no run has nothing to choose for.
+    const elsewhere = await anOrg();
+    expect(
+      await refusedBy(door, "Agents_useProject", { projectId: elsewhere.projectId }),
+    ).toMatchObject({ code: "resource.not_found" });
+    const runless = await agent.token(undefined, undefined, MCP_DOOR);
+    expect(await refusedBy(runless, "Agents_useProject", { projectId })).toMatchObject({
+      code: "run.required",
+    });
+
+    const chose = await tool(door, "Agents_useProject", { projectId });
+    expect(chose.refused).toBe(false);
+    expect(chose.body).toMatchObject({
+      ok: true,
+      result: { project: { id: projectId, namespace: slug }, run: { label: "my-run" } },
+      next: [{ kind: "call", operationId: "declare" }],
+    });
+
+    // The token it holds names no project: the door refuses it 401 and says why, so its client asks again.
+    const stale = await mcp(door, "tools/call", { name: "whoami", arguments: {} }, "whoami");
+    expect(stale.status).toBe(401);
+    expect(stale.headers.get("www-authenticate")).toContain("resource_metadata=");
+    expect(Object(await stale.json())).toEqual({
+      error: "invalid_token",
+      error_description: expect.stringContaining(`Run my-run works in ${projectId}`),
+    });
+    // Another run chose nothing, and a token that names a project keeps its own.
+    expect(
+      (await tool(await agent.token(undefined, undefined, MCP_DOOR, "other"), "whoami")).refused,
+    ).toBe(false);
+
+    // The run's next token, asked for with no project, names the run's project and works there: its declare
+    // passes the policy and waits for a workspace, which this test's project never forks.
+    const fresh = await agent.token(undefined, undefined, MCP_DOOR, "my-run");
+    expect(claimsOf(fresh)["prj"]).toBe(projectId);
+    expect(
+      await refusedBy(fresh, "declare", { "idempotency-key": `d-${ulid()}`, ...intent }),
+    ).toMatchObject({ status: 503, code: "workspace.pool_exhausted" });
+    expect((await tool(fresh, "whoami")).body["summary"]).toContain(
+      `(${projectId}), where you can work`,
+    );
+
+    // It leaves the org: the project its run chose is no longer one it stands in, and it is told so.
+    expect((await http(own, "DELETE", `/agents/me/namespaces/${org}`)).status).toBe(200);
+    const after = await agent.token(undefined, undefined, MCP_DOOR, "my-run");
+    const left = await refusedBy(after, "declare", { "idempotency-key": `d-${ulid()}`, ...intent });
+    expect(left).toMatchObject({
+      code: "agent.left",
+      detail: `You no longer stand in ${slug}: you left, or a member took you out.`,
+    });
   });
 });
 

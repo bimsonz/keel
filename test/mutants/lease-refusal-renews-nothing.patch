@@ -2,12 +2,12 @@
 # kills: b11.renew-on-refusal
 # why: a call that passed the lease check and was refused renews nothing, so an agent at work on a change can lose it
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 8a60214..145c194 100644
+index 1209660e..17d8116c 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -717,7 +717,7 @@ const renewingOnRefusal =
-       : Effect.tapError(call(changeId, command), (error) =>
-           error._tag === "LeaseStale" || error._tag === "ChangeNotFound"
+@@ -790,7 +790,7 @@ const renewingOnRefusal =
+           error._tag === "ChangeNotFound" ||
+           error._tag === "ChangeHeldByOther"
              ? Effect.void
 -            : renewHeld(changeId, leaseId),
 +            : Effect.void,

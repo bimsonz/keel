@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts -t run.paused-told
+# kills: run.paused-told
+# why: a pause and an unpause are never put in the agent's inbox, so a paused agent learns of it only from refusals
+diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
+index ecf77f48..76699819 100644
+--- a/packages/core/src/application/identity/standing.ts
++++ b/packages/core/src/application/identity/standing.ts
+@@ -210,7 +210,7 @@ export const changeStanding: (
+   const store = yield* EntityStore;
+   if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
+   store.transaction(() => {
+-    for (const event of committed.events) hearEvent(store, agentId, event);
++    for (const event of committed.events) void event;
+   });
+   return withoutNamespace(committed.value);
+ });

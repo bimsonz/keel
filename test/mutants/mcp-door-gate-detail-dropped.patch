@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t run.use-project
+# kills: run.use-project
+# why: the MCP door says only that a token is not admitted, so an MCP agent never reads that its run works in a project now
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 0ddfbc4a..8a507c92 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -255,7 +255,7 @@ export function makeMcpEndpoint(
+       const detail: unknown = Reflect.get(Object(said), "detail");
+       return unauthenticated(
+         gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),
+-        typeof detail === "string" ? detail : "The token is not admitted",
++        "The token is not admitted",
+       );
+     }
+     const { principal } = gated.admitted;

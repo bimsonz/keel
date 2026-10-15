@@ -2,10 +2,10 @@
 # kills: pool.claim-held
 # why: a holder asking again waits on trunk for a head its own workspace has no use for, and fails when trunk does not answer
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index c2c78b5d..c76c4699 100644
+index 6e42ca41..88dcdce8 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -115,6 +115,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+@@ -129,6 +129,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
    // Each pass grants, loses a ready slot to another grant, or tries one more: the loop ends. The bound catches a slot that can never be granted.
    for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
      if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
@@ -13,8 +13,8 @@ index c2c78b5d..c76c4699 100644
      const held = heldBy(store, holder);
      const slot = held === undefined ? undefined : slotOf(store, held);
      if (slot !== undefined) {
-@@ -137,7 +138,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
-       const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+@@ -165,7 +166,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+       );
        return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
      }
 -    const head = yield* trunks.head(project);

@@ -65,7 +65,12 @@ describe("abandonChange", () => {
         });
         expect(withdrawn.state).toBe("withdrawn");
         expect(sent.map((input) => input.authority)).toEqual([
-          { _tag: "Lease", leaseId: change.lease.id, agentId: token.agentId },
+          {
+            _tag: "Lease",
+            leaseId: change.lease.id,
+            agentId: token.agentId,
+            projectId: token.projectId,
+          },
         ]);
       }).pipe(Effect.provide(layer));
     },

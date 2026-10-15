@@ -2,9 +2,10 @@
 # kills: refresh.wire
 # why: refreshWorkspaceToken still answers the declared 503 service.not_implemented, so no agent can renew a workspace token
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 001c9e44..56d39e41 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -787,20 +787,7 @@
+@@ -1009,21 +1009,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
              ),
            );
          },
@@ -15,6 +16,7 @@ diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/ada
 -            caller,
 -            tokenOf(caller).pipe(
 -              Effect.flatMap((principal) => refreshWorkspaceToken(principal, decoded.success)),
+-              namingHolder,
 -              Effect.match({
 -                onSuccess: refreshedOk,
 -                onFailure: (error) => refreshError(caller, error),

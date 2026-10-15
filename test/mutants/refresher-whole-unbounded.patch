@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-refresher.test.ts -t "refresher.whole-bound"
+# kills: refresher.whole-bound
+# why: a relay of trunk's whole history is cut at the git deadline, which keel's own nearly reaches
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+index 86170a1f..0404c139 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+@@ -56,7 +56,7 @@ export const WorkspaceRefresherGitCore = (
+           Effect.gen(function* () {
+             if (from === to) return "unchanged" satisfies SyncOutcome;
+             // Trunk's whole history, into a workspace made empty, outlasts the git deadline: keel's took 101 s.
+-            const bound = from === null ? wholeMs : undefined;
++            const bound = undefined;
+             // The workspace first: one that is gone costs trunk no token.
+             const target = yield* remoteOf(workspace, "write", bound);
+             const source = yield* remoteOf(trunkOf(projectId), "read", bound).pipe(

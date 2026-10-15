@@ -14,6 +14,7 @@ import {
   Instant,
   OrgId,
   ProjectId,
+  RunId,
   UserId,
 } from "@keeltown/core/kernel";
 import { AgentDirectory, Clock, EntityStore, Ids, TokenIssuer } from "@keeltown/core/ports";
@@ -51,6 +52,12 @@ function freshUserId(): UserId {
     `usr_${[...bytes].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`,
   );
 }
+
+/** A fresh id body: 26 characters of Crockford's base 32. */
+const freshBody = () =>
+  [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
+const freshRunId = (): RunId => Schema.decodeUnknownSync(RunId)(`run_${freshBody()}`);
+const freshProjectId = (): ProjectId => Schema.decodeUnknownSync(ProjectId)(`prj_${freshBody()}`);
 
 const agentId = freshAgentId();
 
@@ -163,6 +170,24 @@ export function describeAgentDirectoryContract(
           Option.isNone(yield* directory.verifyCredential(`never-${id}`, "s3cret-value")),
         ).toBe(true);
       }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[agentdir.run-project] keeps the project each run chose, the latest choice alone",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const id = freshAgentId();
+          const [run, other] = [freshRunId(), freshRunId()];
+          const [first, second] = [freshProjectId(), freshProjectId()];
+          expect(Option.isNone(yield* directory.runProject(id, run))).toBe(true);
+          yield* directory.chooseProject(id, run, first, Instant(1_760_000_000_000));
+          expect(yield* directory.runProject(id, run)).toEqual(Option.some(first));
+          // Another run of the agent, and the same run's id under another agent, chose nothing.
+          expect(Option.isNone(yield* directory.runProject(id, other))).toBe(true);
+          expect(Option.isNone(yield* directory.runProject(freshAgentId(), run))).toBe(true);
+          yield* directory.chooseProject(id, run, second, Instant(1_760_000_001_000));
+          expect(yield* directory.runProject(id, run)).toEqual(Option.some(second));
+        }).pipe(Effect.provide(make())),
     );
     it.effect("finds nothing it was not given", () =>
       Effect.gen(function* () {

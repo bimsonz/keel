@@ -24,7 +24,15 @@ export type Door = "api" | "mcp";
 export type GateRefusal =
   | { readonly refused: "invalid" }
   | { readonly refused: "revoked" }
-  | { readonly refused: "unplaced"; readonly agentId: string };
+  | { readonly refused: "unplaced"; readonly agentId: string }
+  | { readonly refused: "stale-project"; readonly run: string; readonly projectId: string };
+
+/**
+ * What a token minted before its run chose a project is told: it names none, and
+ * the run works in one now. A new token, asked for without a project, names it.
+ */
+const staleProject = (run: string, projectId: string) =>
+  `Run ${run} works in ${projectId} now, and this token names no project: ask for a new token, which names it.`;
 
 /** The user a session names, with how and when that session was signed in. */
 export interface SessionUser {
@@ -147,6 +155,17 @@ function refusal(answer: GateRefusal, requestId: string): Response {
       });
     case "invalid":
       return problemResponse(401, "auth.invalid_token", requestId, { nextActions: arrival() });
+    case "stale-project":
+      return problemResponse(401, "auth.invalid_token", requestId, {
+        detail: staleProject(answer.run, answer.projectId),
+        nextActions: [
+          {
+            kind: "escalate",
+            title:
+              "Ask the token endpoint for a new token for this run, with no `project`: it is for the run's project. A client that renews its token on a 401 does so itself",
+          },
+        ],
+      });
     default: {
       const unmapped: never = answer;
       return unmapped;

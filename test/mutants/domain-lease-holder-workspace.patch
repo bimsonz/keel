@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t "authz.lease-holder"
+# kills: authz.lease-holder
+# why: a workspace's use checks only the lease and the state, so another agent of the project mints a fresh token for a workspace it does not hold
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..c3ed939c 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1687,8 +1687,6 @@ const mayUseWorkspace = (
+   HeldWorkspace,
+   ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused
+ > => {
+-  const notHeld = holdingRefusal(store, change.id, use);
+-  if (notHeld !== undefined) return Result.fail(notHeld);
+   const held = heldWorkspace(store, change.id);
+   if (TERMINAL.has(change.state)) return Result.fail(refused(change, use.command));
+   const lease = checkLease(change, use.leaseId, now);

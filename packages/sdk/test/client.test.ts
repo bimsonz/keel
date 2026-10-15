@@ -32,6 +32,17 @@ const limited = (extra: object, headers: Record<string, string>) =>
     .whoami()
     .catch((e: unknown) => e);
 
+/** What a call answers when the token endpoint refuses with `body`. */
+const refusedWith = (body: Record<string, string>) =>
+  createKeelClient({
+    baseUrl: "https://keel.test",
+    clientId: "client-a",
+    clientSecret: "wrong",
+    fetch: async () => Response.json(body, { status: 400 }),
+  })
+    .whoami()
+    .catch((e: unknown) => e);
+
 describe("the Keel client", () => {
   it("[sdk.token] exchanges once and reuses the token, then refreshes once on a 401 and retries under the same key", async () => {
     const keel = fakeKeel((request, call) =>
@@ -112,6 +123,16 @@ describe("the Keel client", () => {
     const error = await client.whoami().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(KeelTokenError);
     expect(error).toMatchObject({ error: "invalid_client", status: 401 });
+  });
+
+  it("[sdk.token-words] a refused token request says Keel's own words when Keel gave some, and the protocol's code when it gave none", async () => {
+    const described = "This agent's key was revoked: it is given no token.";
+    expect(
+      await refusedWith({ error: "invalid_client", error_description: described }),
+    ).toMatchObject({ message: described, error: "invalid_client", description: described });
+    expect(await refusedWith({ error: "invalid_client" })).toMatchObject({
+      message: "token exchange refused: invalid_client",
+    });
   });
 
   it("[sdk.token-429] reads a limited token exchange as rate limiting, with how long to wait, never as refused credentials", async () => {

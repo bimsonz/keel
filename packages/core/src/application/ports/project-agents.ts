@@ -43,7 +43,8 @@ export type ProjectAgentMove =
  * - `standing` answers only for an accepted invitation: a pending one and an
  *   ended one give nothing.
  * - `find` answers a row that stands, pending or accepted; `inProject` and
- *   `ofAgent` list those, oldest invitation first. An ended row is in none.
+ *   `ofAgent` list those, oldest invitation first. An ended row is in none:
+ *   only `ended` reads it, for the gate to tell an agent that stood there once.
  */
 export class ProjectAgents extends Context.Service<
   ProjectAgents,
@@ -59,5 +60,7 @@ export class ProjectAgents extends Context.Service<
     ) => Effect.Effect<Option.Option<Invitation>>;
     readonly inProject: (projectId: ProjectId) => Effect.Effect<readonly Invitation[]>;
     readonly ofAgent: (agentId: AgentId) => Effect.Effect<readonly Invitation[]>;
+    /** Whether the agent's invitation to this project ended, and none was made since. */
+    readonly ended: (agentId: AgentId, projectId: ProjectId) => Effect.Effect<boolean>;
   }
 >()("keel/ProjectAgents") {}

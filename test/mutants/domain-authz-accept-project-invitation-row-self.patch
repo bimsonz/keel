@@ -2,13 +2,13 @@
 # kills: authz.invitation-rows
 # why: a person accepts an invitation to a project as though it were their own record: the row asks `self`, which any account meets
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 900987d6..33674aad 100644
+index 4514aa2d..c7210b01 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -171,7 +171,7 @@ export const SPEC_ACTIONS = {
-   Agents_leaveNamespace: rule("Self", "agent"),
+@@ -187,7 +187,7 @@ export const SPEC_ACTIONS = {
    Agents_listProjects: rule("Self", "agent"),
    Agents_listReachableProjects: rule("Self", "agent"),
+   Agents_useProject: rule("Self", "agent"),
 -  Agents_acceptProjectInvitation: rule("Self", "agent"),
 +  Agents_acceptProjectInvitation: rule("Self", "self"),
    Agents_leaveProject: rule("Self", "agent"),

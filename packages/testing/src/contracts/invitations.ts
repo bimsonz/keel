@@ -61,6 +61,7 @@ interface Rows<Place> {
   readonly find: (agentId: AgentId, place: Place) => Effect.Effect<Option.Option<Invitation>>;
   readonly inPlace: (place: Place) => Effect.Effect<readonly Invitation[]>;
   readonly ofAgent: (agentId: AgentId) => Effect.Effect<readonly Invitation[]>;
+  readonly ended: (agentId: AgentId, place: Place) => Effect.Effect<boolean>;
   /** What names a place among an agent's rows. */
   readonly idOf: (place: Place) => string;
   readonly placeOf: (row: Invitation) => string | undefined;
@@ -73,6 +74,7 @@ const namespaceRows = (rows: (typeof NamespaceAgents)["Service"]): Rows<Namespac
   find: (agentId, namespace) => rows.find(agentId, namespace),
   inPlace: (namespace) => rows.inNamespace(namespace),
   ofAgent: (agentId) => rows.ofAgent(agentId),
+  ended: (agentId, namespace) => rows.ended(agentId, namespace),
   idOf: (namespace) => namespace,
   placeOf: (row) => row.namespace,
 });
@@ -88,6 +90,7 @@ const projectRows = (rows: (typeof ProjectAgents)["Service"]): Rows<ProjectPlace
   find: (agentId, { projectId }) => rows.find(agentId, projectId),
   inPlace: ({ projectId }) => rows.inProject(projectId),
   ofAgent: (agentId) => rows.ofAgent(agentId),
+  ended: (agentId, { projectId }) => rows.ended(agentId, projectId),
   idOf: ({ projectId }) => projectId,
   placeOf: (row) => row.projectId,
 });
@@ -141,6 +144,27 @@ function describeRowsContract<Place>(
           expect(yield* rows.apply(place, { _tag: "Left", agentId }, 3)).toBe(true);
           expect(yield* standingIn(rows, agentId, place)).toBeNull();
           expect(yield* stateIn(rows, agentId, place)).toBeNull();
+        }),
+    );
+
+    it.live(
+      `[${tag}] only an ended invitation reads as ended, until the agent is invited again`,
+      () =>
+        Effect.gen(function* () {
+          const rows = yield* open();
+          const [place, agentId, by] = [rows.aPlace(), anAgent(), aUser()];
+          expect(yield* rows.ended(agentId, place)).toBe(false);
+          yield* rows.apply(place, { _tag: "Invited", agentId, by, scopes: BOTH, at: T(1) }, 1);
+          expect(yield* rows.ended(agentId, place)).toBe(false);
+          yield* rows.apply(place, { _tag: "Joined", agentId, at: T(2) }, 2);
+          expect(yield* rows.ended(agentId, place)).toBe(false);
+          yield* rows.apply(place, { _tag: "Left", agentId }, 3);
+          expect(yield* rows.ended(agentId, place)).toBe(true);
+          // Another agent's end, and this agent's end elsewhere, say nothing of this one here.
+          expect(yield* rows.ended(anAgent(), place)).toBe(false);
+          expect(yield* rows.ended(agentId, rows.aPlace())).toBe(false);
+          yield* rows.apply(place, { _tag: "Invited", agentId, by, scopes: READ, at: T(4) }, 4);
+          expect(yield* rows.ended(agentId, place)).toBe(false);
         }),
     );
 

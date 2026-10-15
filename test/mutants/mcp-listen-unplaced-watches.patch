@@ -2,16 +2,15 @@
 # kills: mcp.watchable
 # why: an agent removed from its token's project still watches it, and a listen it holds is not ended when it is removed
 diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
-index 4a997533..e27efdb7 100644
+index fa4434e5..55aff0ca 100644
 --- a/apps/keel/src/adapters/driving/mcp/listen.ts
 +++ b/apps/keel/src/adapters/driving/mcp/listen.ts
-@@ -71,8 +71,7 @@ export function stands(admitted: Admitted): boolean {
+@@ -69,7 +69,7 @@ export interface Watches {
+ export function stands(admitted: Admitted): boolean {
+   const { principal, token } = admitted;
    return (
-     principal._tag === "Agent" &&
-     token?.bound !== undefined &&
--    !principal.paused &&
--    principal.standing._tag !== "None"
-+    !principal.paused
+-    principal._tag === "Agent" && token?.bound !== undefined && principal.standing._tag !== "None"
++    principal._tag === "Agent" && token?.bound !== undefined
    );
  }
  

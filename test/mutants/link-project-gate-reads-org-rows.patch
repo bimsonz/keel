@@ -2,10 +2,10 @@
 # kills: gate.project-invited
 # why: in a person's namespace the gate reads the org's rows, so an invitation to a project gives no standing
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index b47ae279..44dc8183 100644
+index a2dda811..056890fc 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -218,7 +218,7 @@ export const principalOf: (
+@@ -236,7 +236,7 @@ export const principalOf: (
        const invited =
          governs || Option.isNone(place) || projectId === undefined
            ? Option.none()
@@ -13,4 +13,4 @@ index b47ae279..44dc8183 100644
 +          : namespaceKind(org) !== "agent"
              ? yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org))
              : yield* ProjectAgents.use((agents) => agents.standing(agent.id, projectId));
-       const standing: AgentStanding = governs
+       // Only where it stands nowhere is it asked whether it stood there once.

@@ -5,6 +5,7 @@ import {
   type ChangeCommand,
   ChangeBounced,
   ChangeEvent,
+  ChangeHeldByOther,
   ChangeInOtherProject,
   ChangeNotFound,
   type ChangeOrigin,
@@ -33,6 +34,8 @@ import {
   type SubjectKey,
   subjectAncestors,
   TERMINAL,
+  isAgentOwned,
+  lapsesAt,
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
@@ -336,15 +339,17 @@ export interface SubmitChange {
 
 /**
  * Who withdraws, as the Change DO is told: the agent holding the change's
- * lease, or a maintainer of its project. The doorway authorised either on the
- * change's project; the DO checks the lease, and that a maintainer's project
- * is the change's.
+ * lease, with its token's project, or a maintainer of its project. The
+ * doorway authorised either on the change's project; the DO checks that the
+ * agent holds the change (`holdingRefusal`) and its lease, and that a
+ * maintainer's project is the change's.
  */
 export type Withdrawal =
   | {
       readonly _tag: "Lease";
       readonly leaseId: LeaseId;
       readonly agentId: AgentId;
+      readonly projectId: ProjectId;
       readonly run?: RunRef | undefined;
     }
   | { readonly _tag: "Maintainer"; readonly by: UserId; readonly projectId: ProjectId };
@@ -517,13 +522,51 @@ const inProject = (store: Store, changeId: ChangeId): { readonly project?: Proje
 };
 
 /**
- * Whether a call under a change's lease comes from the change's own project,
- * as its workspace row records it at declare. The lease alone proves nothing:
- * its id is on the change's public feed. A call from another project reads the
- * change as not found, before anything is read, replayed or committed.
+ * Why a call under a change's lease is refused before anything else, or
+ * undefined when it comes from the agent that holds the change, in the
+ * change's own project as its workspace row recorded it at declare. The lease
+ * alone proves nothing: its id was on the change's feed. A caller of another
+ * project reads the change as not found, as one that does not exist; another
+ * agent of its project, which can read it, is told who holds it and when it
+ * may adopt it. Checked before anything is read, replayed or committed, so a
+ * refused call commits and renews nothing.
  */
-const ownProject = (store: Store, changeId: ChangeId, projectId: ProjectId): boolean =>
-  heldWorkspace(store, changeId)?.projectId === projectId;
+const holdingRefusal = (
+  store: Store,
+  changeId: ChangeId,
+  caller: { readonly agentId: AgentId; readonly projectId: ProjectId },
+): ChangeNotFound | ChangeHeldByOther | undefined => {
+  const change = storedChange(store, changeId);
+  if (change === undefined || heldWorkspace(store, changeId)?.projectId !== caller.projectId)
+    return notFound(changeId);
+  if (change.agentId === caller.agentId) return undefined;
+  // While Keel holds the change its lease cannot lapse, so there is no time to give.
+  const lapses = isAgentOwned(change.state) ? lapsesAt(change.lease) : undefined;
+  return new ChangeHeldByOther({
+    changeId,
+    holder: change.agentId,
+    ...(lapses === undefined ? {} : { lapsesAt: lapses }),
+    // A `call`'s args are fed straight into its tool, so the time goes on a `wait`, as adopt's own refusal gives it.
+    nextActions: [
+      ...(lapses === undefined
+        ? []
+        : [
+            {
+              kind: "wait" as const,
+              title: "Wait for the holder's lease to lapse: it lapses unless its holder renews it",
+              args: { lapsesAt: lapses },
+            },
+          ]),
+      {
+        kind: "call",
+        title:
+          "Adopt the change once its lease lapses: only the agent holding it acts under its lease",
+        operationId: "adopt",
+        args: { changeId },
+      },
+    ],
+  });
+};
 
 /** A command as its fingerprint reads it: the caller's project decides who may call, not what was asked. */
 const askedOf = <C extends { readonly projectId: ProjectId }>({ projectId: _caller, ...rest }: C) =>
@@ -743,7 +786,9 @@ const renewingOnRefusal =
     return leaseId === undefined
       ? call(changeId, command)
       : Effect.tapError(call(changeId, command), (error) =>
-          error._tag === "LeaseStale" || error._tag === "ChangeNotFound"
+          error._tag === "LeaseStale" ||
+          error._tag === "ChangeNotFound" ||
+          error._tag === "ChangeHeldByOther"
             ? Effect.void
             : renewHeld(changeId, leaseId),
         );
@@ -1072,11 +1117,17 @@ const reviseCall: (
   command: ReviseChange,
 ) => Effect.Effect<
   RevisedChange,
-  ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
+  | ChangeNotFound
+  | ChangeHeldByOther
+  | LeaseStale
+  | RevisionMismatch
+  | ChangeStateRefused
+  | IdempotencyConflict,
   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
   const store = yield* EntityStore;
-  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
+  const notHeld = holdingRefusal(store, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const projectId = heldWorkspace(store, changeId)?.projectId;
   const revision: Omit<IntentRevision, "revision"> = {
     ...(command.goal === undefined ? {} : { goal: command.goal }),
@@ -1158,11 +1209,12 @@ const relyCall: (
   command: RelyChange,
 ) => Effect.Effect<
   RevisedChange,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict,
   Clock | EntityStore | EventOutbox | LiveChanges | Decisions
 > = Effect.fn("coordination/rely")(function* (changeId: ChangeId, command: RelyChange) {
   const store = yield* EntityStore;
-  if (!ownProject(store, changeId, command.projectId)) return yield* notFound(changeId);
+  const notHeld = holdingRefusal(store, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const projectId = heldWorkspace(store, changeId)?.projectId;
   const relying = { premisesAdded: [command.premise], premisesRetracted: [] };
   for (let read = 1; ; read++) {
@@ -1294,11 +1346,16 @@ const submitCall: (
   command: SubmitChange,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
+  | ChangeNotFound
+  | ChangeHeldByOther
+  | LeaseStale
+  | ChangeStateRefused
+  | CommitNotInWorkspace
+  | IdempotencyConflict,
   Clock | EntityStore | EventOutbox | CodeHost
 > = Effect.fn("coordination/submit")(function* (changeId: ChangeId, command: SubmitChange) {
-  if (!ownProject(yield* EntityStore, changeId, command.projectId))
-    return yield* notFound(changeId);
+  const notHeld = holdingRefusal(yield* EntityStore, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const held = heldWorkspace(yield* EntityStore, changeId);
   // A live change's own workspace repo always exists: its absence is a defect, never the agent's fault.
   const inWorkspace =
@@ -1355,19 +1412,25 @@ const abandonCall: (
   command: AbandonChange,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict,
   Clock | EntityStore | EventOutbox
 > = Effect.fn("coordination/abandon")(function* (changeId: ChangeId, command: AbandonChange) {
+  const { authority } = command;
+  if (authority._tag === "Lease") {
+    const notHeld = holdingRefusal(yield* EntityStore, changeId, authority);
+    if (notHeld !== undefined) return yield* notHeld;
+  }
+  const asked =
+    authority._tag === "Lease" ? { ...command, authority: askedOf(authority) } : command;
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
-      fingerprint: fingerprintOf("abandon", command),
+      fingerprint: fingerprintOf("abandon", asked),
       ...withdrawnBy(command),
       ...inProject(yield* EntityStore, changeId),
     },
     (tx): Result.Result<Transition<Change>, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
-      const { authority } = command;
       if (
         authority._tag === "Maintainer" &&
         heldWorkspace(tx.store, changeId)?.projectId !== authority.projectId
@@ -1408,14 +1471,14 @@ const distinguishCall: (
   command: DistinguishPrecedent,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | IdempotencyConflict,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | IdempotencyConflict,
   Clock | EntityStore | EventOutbox
 > = Effect.fn("coordination/distinguish")(function* (
   changeId: ChangeId,
   command: DistinguishPrecedent,
 ) {
-  if (!ownProject(yield* EntityStore, changeId, command.projectId))
-    return yield* notFound(changeId);
+  const notHeld = holdingRefusal(yield* EntityStore, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
@@ -1532,6 +1595,7 @@ const rebaseCall: (
 ) => Effect.Effect<
   RebasedChange,
   | ChangeNotFound
+  | ChangeHeldByOther
   | LeaseStale
   | ChangeStateRefused
   | IdempotencyConflict
@@ -1539,8 +1603,8 @@ const rebaseCall: (
   | PackTooLarge,
   Clock | EntityStore | EventOutbox | Trunks | WorkspaceRebaser
 > = Effect.fn("coordination/rebase")(function* (changeId: ChangeId, command: RebaseChange) {
-  if (!ownProject(yield* EntityStore, changeId, command.projectId))
-    return yield* notFound(changeId);
+  const notHeld = holdingRefusal(yield* EntityStore, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const fingerprint = fingerprintOf("rebase", askedOf(command));
   const answer = (change: Change): Effect.Effect<RebasedChange, ChangeStateRefused> =>
     change.baseSha === undefined
@@ -1600,23 +1664,11 @@ export const rebase = renewingOnRefusal(rebaseCall, (command) => command.leaseId
 /** Where an agent may commit to its workspace: as for Submit and Rebase. */
 const COMMITTABLE: ReadonlySet<ChangeState> = new Set<ChangeState>(["working", "bounced"]);
 
-/** Whether the caller is the change's own agent, in the change's project. */
-const isOwnAgent = (
-  store: Store,
-  change: Change,
-  caller: { readonly agentId: AgentId; readonly projectId: ProjectId },
-): boolean => {
-  const held = heldWorkspace(store, change.id);
-  return (
-    change.agentId === caller.agentId && (held === undefined || held.projectId === caller.projectId)
-  );
-};
-
 /**
  * Whether an agent may use the change's workspace: the one check behind every
  * use of a held workspace (a commit, a fresh token). Only the change's own
- * agent, in the change's project, may; any other reads the change as not
- * found. Then in `decideChange`'s order: an ended change is refused, then a
+ * agent, in the change's project, may (`holdingRefusal` says what any other
+ * is told). Then in `decideChange`'s order: an ended change is refused, then a
  * stale or lapsed lease, then a state outside `states` (absent: any state
  * before the change ends).
  */
@@ -1631,8 +1683,12 @@ const mayUseWorkspace = (
     readonly command: string;
   },
   now: Instant,
-): Result.Result<HeldWorkspace, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
-  if (!isOwnAgent(store, change, use)) return Result.fail(notFound(change.id));
+): Result.Result<
+  HeldWorkspace,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused
+> => {
+  const notHeld = holdingRefusal(store, change.id, use);
+  if (notHeld !== undefined) return Result.fail(notHeld);
   const held = heldWorkspace(store, change.id);
   if (TERMINAL.has(change.state)) return Result.fail(refused(change, use.command));
   const lease = checkLease(change, use.leaseId, now);
@@ -1664,7 +1720,7 @@ const commitFingerprint = (command: CommitEdits): string =>
 
 /**
  * Commits an agent's edits in its change's workspace, with no clone. Any
- * caller but the change's own agent reads the change as not found. A call
+ * caller but the change's own agent is refused (`holdingRefusal`). A call
  * whose key already made a commit answers that commit, or is refused if its
  * edits differ. Otherwise the change is checked first (`mayUseWorkspace`), so
  * a refused call writes nothing; then the writer applies the edits to
@@ -1680,6 +1736,7 @@ const commitEditsCall: (
 ) => Effect.Effect<
   CommittedChange,
   | ChangeNotFound
+  | ChangeHeldByOther
   | LeaseStale
   | ChangeStateRefused
   | IdempotencyConflict
@@ -1700,7 +1757,8 @@ const commitEditsCall: (
     }));
   const store = yield* EntityStore;
   const change = yield* getChange(changeId);
-  if (!isOwnAgent(store, change, command)) return yield* notFound(changeId);
+  const notHeld = holdingRefusal(store, changeId, command);
+  if (notHeld !== undefined) return yield* notHeld;
   const prior = madeCommit(store, changeId, command.idempotencyKey);
   if (prior !== undefined)
     return yield* prior.fingerprint === fingerprint ? answer(prior) : Effect.fail(conflict);
@@ -1752,7 +1810,7 @@ const commitEditsCall: (
       tx,
     ): Result.Result<
       Transition<MadeCommit>,
-      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+      ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict
     > => {
       const raced = madeCommit(tx.store, changeId, command.idempotencyKey);
       if (raced !== undefined)
@@ -1791,7 +1849,7 @@ const refreshWorkspaceCall: (
   command: RefreshWorkspace,
 ) => Effect.Effect<
   WorkspaceGrant,
-  ChangeNotFound | LeaseStale | ChangeStateRefused,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused,
   Clock | EntityStore | WorkspacePool
 > = Effect.fn("coordination/refreshWorkspace")(function* (
   changeId: ChangeId,

@@ -2,11 +2,11 @@
 # kills: b31.distinguish
 # why: a distinction is answered as an escalation, pointing the agent at a person instead of the decision
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index bd4fa281..fc97d53b 100644
+index 001c9e44..eec11c45 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -853,9 +853,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
-               Effect.flatMap((principal) => resolveMove(principal, scopeOf(caller), move)),
+@@ -1091,9 +1091,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+               namingHolder,
                Effect.match({
                  onSuccess: (view) =>
 -                  move.move === "distinguish"

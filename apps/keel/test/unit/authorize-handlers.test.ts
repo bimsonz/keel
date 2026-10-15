@@ -1,18 +1,30 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { ACTIONS, SPEC_ACTIONS } from "@keeltown/core/domain/identity";
+import {
+  AccessRefused,
+  ACTIONS,
+  type AgentPrincipal,
+  NotVisible,
+  runIdOf,
+  SPEC_ACTIONS,
+} from "@keeltown/core/domain/identity";
+import { makeId, RunLabel } from "@keeltown/core/kernel";
 import {
   makeAgentDirectoryMemory,
+  makeBetterAuthMemory,
   makeChangesMemory,
   makeNamespacesMemory,
   makeProjectNamespacesMemory,
   makeProjectsMemory,
+  sampleOrgId,
+  ulidOf,
 } from "@keeltown/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   authorizeHandlers,
   RESOLVERS,
+  standingRefusal,
 } from "../../src/adapters/driving/http/authorize-handlers.ts";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import type { Runner } from "../../src/adapters/driving/http/run.ts";
@@ -77,6 +89,129 @@ describe("authorizeHandlers", () => {
     expect(reached.toSorted()).toEqual([...open, "Operator_listProjects"].toSorted());
     for (const operation of operations.filter((o) => !reached.includes(o)))
       expect([401, 404]).toContain(statuses[operation]);
+  });
+});
+
+const AGENT = makeId("agt", ulidOf(71));
+const PROJECT = makeId("prj", ulidOf(72));
+const LABEL = Schema.decodeSync(RunLabel)("my-run");
+const RUN = { id: runIdOf(AGENT, { label: LABEL }), label: LABEL };
+
+/** An active agent's caller, its token for `projectId` or for none, in run `my-run` unless `inRun` is false. */
+const agentCaller = (over: Partial<AgentPrincipal> = {}, inRun = true): Caller => ({
+  requestId: "req-authz-standing",
+  principal: {
+    _tag: "Agent",
+    agentId: AGENT,
+    namespace: AGENT,
+    scopes: ["agent:read", "agent:work"],
+    paused: false,
+    standing: { _tag: "Governs" },
+    ...over,
+  },
+  token: {
+    agentId: AGENT,
+    scopes: ["agent:read", "agent:work"],
+    revocationEpoch: 0,
+    ...(inRun ? { run: RUN } : {}),
+  },
+  signal: new AbortController().signal,
+});
+
+/** What the wrapped `declare` and `Changes_listChanges` answer `caller` with, from memory stores that hold nothing. */
+async function ownProjectAnswers(caller: Caller) {
+  const wrapped = authorizeHandlers(
+    Object.fromEntries(
+      Object.keys(SPEC_ACTIONS).map((operation) => [operation, () => ({ status: 200, body: {} })]),
+    ) as unknown as Operations<Caller>,
+    RESOLVERS,
+    run,
+  ) as unknown as Record<string, (caller: Caller, input: unknown) => Promise<unknown>>;
+  const answer = (operation: string) => {
+    const handler = wrapped[operation];
+    if (handler === undefined) throw new Error(`${operation} is not wrapped`);
+    return handler(caller, {});
+  };
+  return [await answer("declare"), await answer("Changes_listChanges")];
+}
+
+describe("an agent refused for where its token stands", () => {
+  it("[authz.no-project] a token that names no project is told to choose one for its run, 403 run.no_project, at every operation of the token's project; with no run it is told to ask for one, and a paused agent is told it is paused", async () => {
+    const chosen = {
+      status: 403,
+      body: expect.objectContaining({
+        code: "run.no_project",
+        detail: expect.stringContaining("run my-run has chosen none"),
+        nextActions: [
+          expect.objectContaining({ operationId: "Agents_listReachableProjects" }),
+          expect.objectContaining({ operationId: "Agents_useProject" }),
+        ],
+      }),
+    };
+    expect(await ownProjectAnswers(agentCaller())).toEqual([chosen, chosen]);
+    const runless = await ownProjectAnswers(agentCaller({}, false));
+    expect(runless).toMatchObject([
+      { status: 403, body: { code: "run.no_project", nextActions: [{}, { kind: "escalate" }] } },
+      { status: 403, body: { code: "run.no_project" } },
+    ]);
+    expect(await ownProjectAnswers(agentCaller({ paused: true }))).toMatchObject([
+      { status: 403, body: { code: "auth.forbidden", detail: "Refused: agent-paused." } },
+      { status: 403, body: { code: "auth.forbidden", detail: "Refused: agent-paused." } },
+    ]);
+    // A token for a project answers as the project's own refusal: here, a project no store holds.
+    expect(await ownProjectAnswers(agentCaller({ projectId: PROJECT }))).toMatchObject([
+      { status: 404, body: { code: "resource.not_found" } },
+      { status: 404, body: { code: "resource.not_found" } },
+    ]);
+  });
+
+  it("[authz.left] an agent whose invitation to the token's project ended is told it left, by the namespace's handle; never paused, never elsewhere, never one that did not stand there", async () => {
+    const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "acme" }] });
+    const namespaces = makeNamespacesMemory(rows).layer;
+    const runIn = ((_caller: Caller, effect: Effect.Effect<unknown, never, never>) =>
+      Effect.runPromise(
+        effect.pipe(Effect.provide(namespaces)) as Effect.Effect<unknown>,
+      )) as Runner;
+    const project = {
+      _tag: "Project" as const,
+      namespace: sampleOrgId,
+      projectId: PROJECT,
+      visibility: "private" as const,
+      namespaceSuspended: false,
+      personOwned: false,
+    };
+    const leftOrg = {
+      namespace: sampleOrgId,
+      projectId: PROJECT,
+      standing: { _tag: "None" as const, left: true },
+    };
+    const told = await standingRefusal(agentCaller(leftOrg), project, new NotVisible(), runIn);
+    expect(told).toMatchObject({
+      status: 403,
+      body: {
+        code: "agent.left",
+        detail: "You no longer stand in acme: you left, or a member took you out.",
+        nextActions: [
+          { kind: "escalate", title: "Ask a member of acme to invite you again" },
+          { operationId: "Agents_listReachableProjects" },
+          { operationId: "Agents_useProject" },
+        ],
+      },
+    });
+    const refusedWork = new AccessRefused({ reason: "scope", nextActions: [] });
+    expect(await standingRefusal(agentCaller(leftOrg), project, refusedWork, runIn)).toMatchObject({
+      body: { code: "agent.left" },
+    });
+    const paused = new AccessRefused({ reason: "agent-paused", nextActions: [] });
+    expect(await standingRefusal(agentCaller(leftOrg), project, paused, runIn)).toBeUndefined();
+    const never = { ...leftOrg, standing: { _tag: "None" as const } };
+    expect(
+      await standingRefusal(agentCaller(never), project, new NotVisible(), runIn),
+    ).toBeUndefined();
+    const elsewhere = { ...project, namespace: makeId("org", ulidOf(73)) };
+    expect(
+      await standingRefusal(agentCaller(leftOrg), elsewhere, new NotVisible(), runIn),
+    ).toBeUndefined();
   });
 });
 

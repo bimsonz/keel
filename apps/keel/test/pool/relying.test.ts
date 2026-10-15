@@ -56,6 +56,10 @@ const changeOf = (event: EventEnvelope): unknown =>
     ? Reflect.get(event.payload, "changeId")
     : undefined;
 
+/** A token for the change's own agent: only the agent holding a change acts under its lease. */
+const holderOf = async (c: ChangeUnderTest) =>
+  tokenFor(await seedAgent({ projectId: c.projectId, id: c.agentId }));
+
 /** A fresh project, its changes reading its real index, and a token for another agent of it. */
 async function project() {
   const projectId: ProjectId = makeId("prj", ulid());
@@ -146,11 +150,12 @@ describe("[b21.relying-subscribes] a declared premise reaches its subject and th
 describe("[b21.rely] relying on a premise through the doorways", () => {
   it("[b21.rely] REST adds the premise at the next revision with its preflight, MCP's retry with the key answers the same, and the subject relies it", async () => {
     await using probes = await inertProbe();
-    const { projectId, token, change } = await project();
+    const { projectId, change } = await project();
     const b = await change();
     ok(await b.declare("declare-b", { declaredEffects: [cachedPerSession] }));
     await drainOutbox(b.stub);
     const a = await change();
+    const token = await holderOf(a);
     const declared = ok(await a.declare("declare-a"));
     const lease = declared.change.lease.id;
 
@@ -196,8 +201,9 @@ describe("[b21.rely] relying on a premise through the doorways", () => {
   });
 
   it("[b21.rely] refuses another lease as 409 change.lease_stale, and relies nothing", async () => {
-    const { token, change } = await project();
+    const { change } = await project();
     const a = await change();
+    const token = await holderOf(a);
     ok(await a.declare("declare-a"));
     const response = await relyRest(a, token, makeId("lse", ulid()), "rely-key-0002");
     expect(response.status).toBe(409);
@@ -281,8 +287,9 @@ describe("[b21.nearby] what is near a change, read-only", () => {
 
 describe("[b21.revise-route] revising at the revision last read", () => {
   it('[b21.revise-route] If-Match "1" revises; a stale revision is 412 naming the current one; a weak tag is 400; MCP\'s bare revision revises', async () => {
-    const { token, change } = await project();
+    const { change } = await project();
     const a = await change();
+    const token = await holderOf(a);
     const lease = ok(await a.declare("declare-a")).change.lease.id;
     const effects = { declaredEffects: [Schema.encodeSync(Proposition)(cachedPerSession)] };
 

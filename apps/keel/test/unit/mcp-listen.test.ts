@@ -76,7 +76,7 @@ const listening = (resourceSubscriptions: unknown) => ({
 });
 
 describe("what an MCP listen may watch", () => {
-  it("[mcp.watchable] an agent on its own token, unpaused and standing in its project, watches its inbox and that project's feed, and nothing else watches anything", () => {
+  it("[mcp.watchable] an agent on its own token, standing in its project, watches its inbox and that project's feed, a paused one its inbox alone, and nothing else watches anything", () => {
     const feed = feedUri(sampleProjectId);
     const { projectId: _none, ...unprojected } = claimsOf(admitted());
     const exchanged = admitted();
@@ -94,11 +94,11 @@ describe("what an MCP listen may watch", () => {
       proved: [INBOX_URI, feed],
       noProject: [INBOX_URI],
       exchanged: [],
-      paused: [],
+      paused: [INBOX_URI],
       removed: [],
       person: [],
     });
-    expect(stands(admitted({}, { paused: true }))).toBe(false);
+    expect(stands(admitted({}, { paused: true }))).toBe(true);
   });
 
   it("[mcp.narrow] a listen's resources are narrowed to what may be watched, once each, and the rest of its body is kept; a body that is no listen of resources passes as it came", () => {

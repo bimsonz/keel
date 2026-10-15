@@ -2,15 +2,15 @@
 # kills: cli.join
 # why: `agent join --key` is dropped, so a retried join is a new request rather than the same one
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 900fb7a1..7b5e23e0 100644
+index f0841230..4d5b8c25 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -309,7 +309,7 @@ async function dispatch(
+@@ -336,7 +336,7 @@ async function dispatch(
            { lease: required(values.lease, "lease"), ...idempotent },
          );
        if (command[0] === "agent" && command[1] === "join" && command.length === 3)
 -        return client.acceptInvitation(required(command[2], "namespace"), idempotent);
 +        return client.acceptInvitation(required(command[2], "namespace"));
+       if (command[0] === "agent" && command[1] === "use" && command.length === 3)
+         return client.useProject(required(command[2], "project"));
        if (command[0] === "nearby" && command.length === 2)
-         return client.nearby(required(command[1], "change"));
-       if (command[0] === "rebase" && command.length === 2)

@@ -2,10 +2,10 @@
 # kills: b11.held-leases
 # why: the held leases fold only events the agent did not cause, so its own declare and adopt never count
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index abf32f99..cb7bfb0a 100644
+index 987db9a5..39d5e91e 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -270,8 +270,8 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
+@@ -272,8 +272,8 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
  export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope): void {
    const about = changeOf(event);
    const before = about === undefined ? undefined : runHolding(store, about);
@@ -13,5 +13,5 @@ index abf32f99..cb7bfb0a 100644
    if (!notifies(agentId, event)) return;
 +  foldHeldLeases(store, agentId, event);
    const holder =
-     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
-   if (holder !== undefined && event.run?.id === holder) return;
+     about !== undefined
+       ? (before ?? runHolding(store, about))

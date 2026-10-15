@@ -380,7 +380,7 @@ const committedBy = async (agentId: AgentId, c: ChangeUnderTest) =>
     .map((event) => [event.type, event.run]);
 
 /** Somebody just signed in becomes the agent's sponsor: the agent asks with `token`, and that person approves with the code. */
-async function sponsored(agentId: AgentId, token: string): Promise<void> {
+async function sponsored(agentId: AgentId, token: string): Promise<{ readonly token: string }> {
   const asked = await asAgent(token, "/v1/agents/me/sponsor-request", {
     method: "POST",
     headers: { "idempotency-key": `ask-${ulid()}` },
@@ -400,6 +400,7 @@ async function sponsored(agentId: AgentId, token: string): Promise<void> {
   });
   if (approved.status !== 200)
     throw new Error(`the approval answered ${approved.status}: ${await approved.text()}`);
+  return person;
 }
 
 /** The agent ends its own sponsor link with `token`. */
@@ -677,5 +678,84 @@ describe("an agent's two runs, each with its own token", () => {
 
     expect(asA.frames).toEqual([[agent.forA, agent.forAll]]);
     expect(asNone.frames).toEqual([[agent.forAll]]);
+  });
+});
+
+/** What a run's inbox says after `cursor`: each notice's kind, its detail and the operations its next actions name, and the cursor to read on from. */
+async function toldAfter(token: string, cursor: string, wait = 0) {
+  const response = await asAgent(token, `/v1/inbox?cursor=${cursor}&wait=${wait}`);
+  if (response.status !== 200)
+    throw new Error(`the inbox answered ${response.status}: ${await response.text()}`);
+  const { result } = await response.json<{
+    result: {
+      cursor: string;
+      notices: { kind: string; detail?: string; nextActions?: { operationId?: string }[] }[];
+    };
+  }>();
+  return {
+    cursor: result.cursor,
+    notices: result.notices.map((n) => [
+      n.kind,
+      n.detail,
+      n.nextActions?.map((a) => a.operationId),
+    ]),
+  };
+}
+
+describe("[run.paused-told] a pause and an unpause reach every run", () => {
+  it("[run.paused-told] the sponsor's pause and unpause are told in every run's inbox, waking a read held there, and a paused agent is given a token that reads who it is and its inbox and nothing else", async () => {
+    const agent = await keyAgent();
+    const sponsor = await sponsored(agent.agentId, agent.a.token);
+    const move = (to: "suspend" | "reinstate") =>
+      worker(`${BASE}/v1/agents/${agent.agentId}/${to}`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${sponsor.token}`,
+          "content-type": "application/json",
+          "idempotency-key": `${to}-${ulid()}`,
+        },
+        ...(to === "suspend" ? { body: JSON.stringify({ reason: "runaway retries" }) } : {}),
+      });
+    const before = {
+      a: (await toldAfter(agent.a.token, "end")).cursor,
+      b: (await toldAfter(agent.b.token, "end")).cursor,
+    };
+
+    // Run b holds its inbox; the pause wakes it.
+    const held = toldAfter(agent.b.token, before.b, 20);
+    expect((await move("suspend")).status).toBe(200);
+    const paused = [
+      "AgentSuspended",
+      "your sponsor paused you: until they unpause you, Keel answers only whoami and your inbox",
+      ["inbox"],
+    ];
+    expect((await held).notices).toEqual([paused]);
+    const afterPause = await toldAfter(agent.a.token, before.a);
+    expect(afterPause.notices).toEqual([paused]);
+
+    // Paused, it is given a token: it reads who it is and its inbox, and the policy answers the rest.
+    const fresh = (
+      await granted(
+        await requestToken(agent.agentId, agent.account, {
+          project: agent.projectId,
+          run: "run-a",
+        }),
+      )
+    ).access_token;
+    expect((await asAgent(fresh, "/v1/agents/me")).status).toBe(200);
+    expect((await asAgent(fresh, `/v1/inbox?cursor=${afterPause.cursor}`)).status).toBe(200);
+    const refused = await asAgent(fresh, "/v1/agents/me/reachable-projects");
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ detail: "Refused: agent-paused." });
+
+    expect((await move("reinstate")).status).toBe(200);
+    const unpaused = [
+      "AgentReinstated",
+      "your sponsor unpaused you: your calls are taken again",
+      ["whoami"],
+    ];
+    expect((await toldAfter(agent.a.token, afterPause.cursor)).notices).toEqual([unpaused]);
+    expect((await toldAfter(agent.b.token, before.b)).notices).toEqual([paused, unpaused]);
+    expect((await asAgent(fresh, "/v1/agents/me/reachable-projects")).status).toBe(200);
   });
 });

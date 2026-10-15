@@ -94,7 +94,7 @@ describe("Better Auth at /v1/auth", () => {
       db: env.DB,
       secret: env.BETTER_AUTH_SECRET,
       host: env.KEEL_HOST,
-      agents: { find: async () => undefined },
+      agents: { find: async () => undefined, runProject: async () => undefined },
       endSponsorships: async () => {},
       sendOtp: async () => {},
       github: { clientId: "id", clientSecret: "secret" },

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-tools-only.test.ts -t mcp.tools-only
+# kills: mcp.tools-only
+# why: the MCP door hands an agent next actions that name operations it does not serve
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 0ddfbc4a..db93f041 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -186,7 +186,7 @@ export function onlyTools(handlers: Handlers): Handlers {
+     ) => Promise<{ readonly status: number; readonly body: unknown }>;
+     told[name] = async (caller: Caller, input: unknown) => {
+       const answered = await handler(caller, input);
+-      return { ...answered, body: toolsOnly(answered.body) };
++      return answered;
+     };
+   }
+   return told as Handlers;

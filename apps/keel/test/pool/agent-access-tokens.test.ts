@@ -28,7 +28,7 @@ const verify = (presented: Parameters<typeof verifyAgentToken>[3], resource: str
       db: env.DB,
       secret: env.BETTER_AUTH_SECRET,
       host: env.KEEL_HOST,
-      agents: { find: async () => undefined },
+      agents: { find: async () => undefined, runProject: async () => undefined },
       endSponsorships: async () => {},
     }),
     BASE,

@@ -1,5 +1,5 @@
 import { type Agent, type AgentToken, TokenRejected } from "@keeltown/core/domain/identity";
-import { type AgentId, Instant, makeId } from "@keeltown/core/kernel";
+import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
   Clock,
@@ -70,6 +70,8 @@ export function makeAgentDirectoryMemory() {
   const standingSeqs = new Map<AgentId, number>();
   /** The seq of the sponsor link's event each agent's row last took. */
   const sponsorSeqs = new Map<AgentId, number>();
+  /** The project each run chose, by `agentId` and `runId` joined by a newline. */
+  const runProjects = new Map<string, ProjectId>();
   /** Once a link event has written an agent's sponsor, an upsert leaves it as the row holds it. */
   const seed = (agent: Agent, credential: StoredCredential): void => {
     const held = agents.get(agent.id);
@@ -83,6 +85,7 @@ export function makeAgentDirectoryMemory() {
   return {
     agents,
     credentials,
+    runProjects,
     seed,
     layer: Layer.succeed(
       AgentDirectory,
@@ -117,6 +120,10 @@ export function makeAgentDirectoryMemory() {
               .filter((agent) => agent.sponsor === userId)
               .toSorted((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
           ),
+        runProject: (agentId, runId) =>
+          Effect.sync(() => Option.fromNullishOr(runProjects.get(`${agentId}\n${runId}`))),
+        chooseProject: (agentId, runId, projectId) =>
+          Effect.sync(() => void runProjects.set(`${agentId}\n${runId}`, projectId)),
         verifyCredential: (clientId, secret) =>
           Effect.promise(async () => {
             const credential = credentials.get(clientId);

@@ -2,6 +2,7 @@ import { Context, type Effect } from "effect";
 import type {
   Change,
   ChangeInOtherProject,
+  ChangeHeldByOther,
   ChangeNotFound,
   ChangeStateRefused,
   CommitNotInWorkspace,
@@ -105,7 +106,12 @@ export class Changes extends Context.Service<
       input: SubmitInput,
     ) => Effect.Effect<
       Change,
-      ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict
+      | ChangeNotFound
+      | ChangeHeldByOther
+      | LeaseStale
+      | ChangeStateRefused
+      | CommitNotInWorkspace
+      | IdempotencyConflict
     >;
     /**
      * Takes over a change whose lease lapsed: a new lease that fences the old
@@ -136,6 +142,7 @@ export class Changes extends Context.Service<
     ) => Effect.Effect<
       RebasedChange,
       | ChangeNotFound
+      | ChangeHeldByOther
       | LeaseStale
       | ChangeStateRefused
       | IdempotencyConflict
@@ -159,6 +166,7 @@ export class Changes extends Context.Service<
     ) => Effect.Effect<
       CommittedChange,
       | ChangeNotFound
+      | ChangeHeldByOther
       | LeaseStale
       | ChangeStateRefused
       | IdempotencyConflict
@@ -176,7 +184,10 @@ export class Changes extends Context.Service<
     readonly refreshWorkspace: (
       principal: AgentToken,
       input: RefreshInput,
-    ) => Effect.Effect<WorkspaceGrant, ChangeNotFound | LeaseStale | ChangeStateRefused>;
+    ) => Effect.Effect<
+      WorkspaceGrant,
+      ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused
+    >;
     /**
      * Revises the intent under the lease, at the revision the caller last read
      * (RevisionMismatch otherwise), and answers the preflight of the intent it
@@ -187,7 +198,12 @@ export class Changes extends Context.Service<
       input: ReviseInput,
     ) => Effect.Effect<
       Revised,
-      ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict
+      | ChangeNotFound
+      | ChangeHeldByOther
+      | LeaseStale
+      | RevisionMismatch
+      | ChangeStateRefused
+      | IdempotencyConflict
     >;
     /** Adds one premise under the lease, subscribing the change to its subject; idempotent by Idempotency-Key per change. */
     readonly rely: (
@@ -195,7 +211,7 @@ export class Changes extends Context.Service<
       input: RelyInput,
     ) => Effect.Effect<
       Revised,
-      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+      ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict
     >;
     /**
      * Records under the lease why a decision does not govern the change
@@ -204,7 +220,10 @@ export class Changes extends Context.Service<
     readonly distinguish: (
       principal: AgentToken,
       input: DistinguishInput,
-    ) => Effect.Effect<Change, ChangeNotFound | LeaseStale | IdempotencyConflict>;
+    ) => Effect.Effect<
+      Change,
+      ChangeNotFound | ChangeHeldByOther | LeaseStale | IdempotencyConflict
+    >;
     /**
      * The preflight of the change's intent as it stands; commits nothing. Only
      * for a reader of the change's project: another is ChangeInOtherProject.
@@ -223,7 +242,7 @@ export class Changes extends Context.Service<
       input: AbandonInput,
     ) => Effect.Effect<
       Change,
-      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+      ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict
     >;
     /** The change and its project, read from its own DO: read-your-writes, whatever its state. */
     readonly get: (changeId: ChangeId) => Effect.Effect<ChangeRead, ChangeNotFound>;

@@ -2,14 +2,14 @@
 # kills: whoami.reach-next
 # why: whoami never points an agent that has joined an org or a project at the projects it can reach, so it is left to guess the id a token names
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index e292dc54..f87c3d7f 100644
+index 78058bbd..aaeddee1 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -229,7 +229,6 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+@@ -239,7 +239,6 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
          ...waiting.next,
          ...sponsor.next,
          ...placed.next,
--        ...reach(identity).next,
+-        ...reach(identity, here).next,
        ].slice(0, MAX_NEXT),
        notices: [],
        cost: {},

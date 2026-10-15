@@ -20,6 +20,7 @@ import type {
 import type { PushRejected } from "@keeltown/core/domain/integration";
 import {
   type Change,
+  type ChangeHeldByOther,
   type ChangeInOtherProject,
   type ChangeNotFound,
   type ChangeStateRefused,
@@ -622,10 +623,30 @@ export function changeNotFound(
   };
 }
 
+/**
+ * A call under a change's lease from another agent of its project, which can
+ * read the change: it is told who holds it and when it may adopt it, never
+ * that the change does not exist.
+ */
+export function heldByOther(caller: Pick<Caller, "requestId">, error: ChangeHeldByOther) {
+  const holder = error.holderName ?? error.holder;
+  return {
+    status: 409 as const,
+    body: problem(409, "change.held_by_other", caller.requestId, {
+      detail:
+        error.lapsesAt === undefined
+          ? `${error.changeId} is held by ${holder}, and Keel holds it now: its lease cannot lapse until Keel hands it back. Only the agent holding a change acts under its lease.`
+          : `${error.changeId} is held by ${holder} under a lease that lapses at ${iso(error.lapsesAt)} unless renewed; adopt it after that. Only the agent holding a change acts under its lease.`,
+      nextActions: apiActions(error.nextActions),
+    }),
+  };
+}
+
 export function submitError(
   caller: Caller,
   error:
     | NamespaceHalted
+    | ChangeHeldByOther
     | ChangeNotFound
     | LeaseStale
     | ChangeStateRefused
@@ -641,6 +662,8 @@ export function submitError(
           nextActions: apiActions(error.nextActions),
         }),
       };
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -713,6 +736,7 @@ export function rebaseOk(rebased: RebasedChange): RebaseResult {
 export function rebaseError(
   caller: Caller,
   error:
+    | ChangeHeldByOther
     | ChangeNotFound
     | LeaseStale
     | ChangeStateRefused
@@ -721,6 +745,8 @@ export function rebaseError(
     | PackTooLarge,
 ): RebaseResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -887,6 +913,7 @@ const MALFORMED_EDITS: ReadonlySet<EditsRefused["reason"]> = new Set([
 export function commitEditsError(
   caller: Caller,
   error:
+    | ChangeHeldByOther
     | ChangeNotFound
     | LeaseStale
     | ChangeStateRefused
@@ -898,6 +925,8 @@ export function commitEditsError(
     | PackTooLarge,
 ): CommitResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -1027,9 +1056,11 @@ export function refreshedOk(workspace: WorkspaceGrant): RefreshWorkspaceTokenRes
 
 export function refreshError(
   caller: Caller,
-  error: WorkspaceNotFound | LeaseStale | ChangeStateRefused,
+  error: ChangeHeldByOther | WorkspaceNotFound | LeaseStale | ChangeStateRefused,
 ): RefreshWorkspaceTokenResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "WorkspaceNotFound":
       return {
         status: 404,
@@ -1237,9 +1268,17 @@ function stateRefused(caller: Caller, error: ChangeStateRefused) {
 
 export function reviseError(
   caller: Caller,
-  error: ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
+  error:
+    | ChangeHeldByOther
+    | ChangeNotFound
+    | LeaseStale
+    | RevisionMismatch
+    | ChangeStateRefused
+    | IdempotencyConflict,
 ): ReviseResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -1317,9 +1356,11 @@ export function relyOk(relied: Revised): RelyResult {
 
 export function relyError(
   caller: Caller,
-  error: ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  error: ChangeHeldByOther | ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
 ): RelyResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -1546,9 +1587,17 @@ export function abandonOk(change: Change): AbandonResult {
 
 export function abandonError(
   caller: Caller,
-  error: ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict | LeaseRequired,
+  error:
+    | ChangeHeldByOther
+    | ChangeNotFound
+    | LeaseStale
+    | ChangeStateRefused
+    | IdempotencyConflict
+    | LeaseRequired,
 ): AbandonResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
@@ -1752,9 +1801,17 @@ export function resolveOk({ conflict }: ConflictView): ResolveResult {
 
 export function resolveError(
   caller: Caller,
-  error: ChangeNotFound | LeaseStale | ConflictNotFound | MoveRefused | IdempotencyConflict,
+  error:
+    | ChangeHeldByOther
+    | ChangeNotFound
+    | LeaseStale
+    | ConflictNotFound
+    | MoveRefused
+    | IdempotencyConflict,
 ): ResolveResult {
   switch (error._tag) {
+    case "ChangeHeldByOther":
+      return heldByOther(caller, error);
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":

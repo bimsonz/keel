@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t "authz.lease-holder"
+# kills: authz.lease-holder
+# why: another agent's refused call renews the holder's lease, so a colleague holding only the lease id keeps the change from ever lapsing to it or anyone
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..1fa1bdfb 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -787,8 +787,7 @@ const renewingOnRefusal =
+       ? call(changeId, command)
+       : Effect.tapError(call(changeId, command), (error) =>
+           error._tag === "LeaseStale" ||
+-          error._tag === "ChangeNotFound" ||
+-          error._tag === "ChangeHeldByOther"
++          error._tag === "ChangeNotFound"
+             ? Effect.void
+             : renewHeld(changeId, leaseId),
+         );

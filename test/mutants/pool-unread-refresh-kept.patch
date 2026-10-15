@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts -t "pool.refresh-stuck"
+# kills: pool.refresh-stuck
+# why: a stranded refreshing slot whose main cannot be read stays refreshing for good, counted towards the pool
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 6e42ca41..46e035aa 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -749,7 +749,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+   for (const slot of stuck) {
+     const read = yield* settleRefresh(project, slot.id);
+     // Stuck past its bound and still unreadable: no workspace the pool can vouch for.
+-    const how = read === "unsettled" ? yield* collectUnsettled(project, slot.id) : read;
++    const how = read;
+     if (how === "collected") failed += 1;
+     // Its relay had landed; it counts once it stands on today's head, or it is refreshed again below.
+     if (how === "advanced" && slotOf(store, slot.id)?.baseSha === head) refreshed += 1;

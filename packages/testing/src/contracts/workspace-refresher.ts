@@ -100,6 +100,33 @@ export function describeWorkspaceRefresherContract(
       },
     );
 
+    it.live(
+      "[refresher.contract.empty] an empty workspace takes trunk's whole history from no main; one whose main exists refuses it as stale",
+      () => {
+        const { layer, projectId, trunk } = make();
+        return Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const refresher = yield* WorkspaceRefresher;
+          yield* host.create(trunk);
+          const base = yield* fixture.commit(trunk, MAIN, { "README.md": "base\n" });
+          const landed = yield* fixture.commit(trunk, MAIN, { "README.md": "landed\n", a: "1\n" });
+          const workspace = yield* host.create(fixture.scratch());
+
+          expect(yield* refresher.advance(projectId, workspace, null, landed)).toBe("advanced");
+          expect(yield* host.head(workspace, MAIN)).toBe(landed);
+          expect(yield* host.readTree(workspace, landed)).toEqual(
+            yield* host.readTree(trunk, landed),
+          );
+          expect(yield* host.isAncestor(workspace, base, landed, [])).toBe(true);
+          expect(
+            yield* Effect.flip(refresher.advance(projectId, workspace, null, landed)),
+          ).toMatchObject({ _tag: "PushRejected", reason: "stale" });
+          expect(yield* host.head(workspace, MAIN)).toBe(landed);
+        }).pipe(Effect.provide(layer));
+      },
+    );
+
     it.live("[refresher.contract.missing] a workspace that is gone fails RepoNotFound", () => {
       const { layer, projectId, trunk } = make();
       return Effect.gen(function* () {

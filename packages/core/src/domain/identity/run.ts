@@ -70,7 +70,8 @@ const asLabel = Schema.decodeUnknownOption(RunLabel);
  * exists.
  */
 export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunClaims, RunRefusal> {
-  if (agent.state !== "active")
+  // A paused agent is given a token: the gate lets it read who it is and its inbox, and nothing else.
+  if (agent.state === "revoked")
     return Result.fail(new AgentNotAdmitted({ agentId: agent.id, reason: agent.state }));
   const { runKey } = request;
   if (runKey !== undefined && agent.keys?.some((key) => key.jkt === runKey))

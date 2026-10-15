@@ -2,15 +2,15 @@
 # kills: mcp.watchable
 # why: an enrolled agent's exchanged token, which says nothing of a key, is let watch as an agent's own token is
 diff --git a/apps/keel/src/adapters/driving/mcp/listen.ts b/apps/keel/src/adapters/driving/mcp/listen.ts
-index 4a997533..15818cb8 100644
+index fa4434e5..24f0f99e 100644
 --- a/apps/keel/src/adapters/driving/mcp/listen.ts
 +++ b/apps/keel/src/adapters/driving/mcp/listen.ts
-@@ -70,7 +70,7 @@ export function stands(admitted: Admitted): boolean {
+@@ -69,7 +69,7 @@ export interface Watches {
+ export function stands(admitted: Admitted): boolean {
    const { principal, token } = admitted;
    return (
-     principal._tag === "Agent" &&
--    token?.bound !== undefined &&
-+    token !== undefined &&
-     !principal.paused &&
-     principal.standing._tag !== "None"
+-    principal._tag === "Agent" && token?.bound !== undefined && principal.standing._tag !== "None"
++    principal._tag === "Agent" && token !== undefined && principal.standing._tag !== "None"
    );
+ }
+ 

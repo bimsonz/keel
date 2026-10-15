@@ -136,7 +136,7 @@ async function http(
 const refusal = (a: Answer) => [a.status, a.body["code"], a.body["detail"]];
 
 describe("the sponsor link through the real Worker", () => {
-  it("[link.sponsor-real] an agent asks, a person on a fresh passkey sign-in approves, pauses and reinstates it, and a paused agent's every request is answered by the policy", async () => {
+  it("[link.sponsor-real] an agent asks, a person on a fresh passkey sign-in approves, pauses and reinstates it, and a paused agent's every request but whoami is answered by the policy", async () => {
     const projectId: ProjectId = makeId("prj", ulid());
     await placeProject(projectId);
     await establishProject(projectId);
@@ -217,15 +217,12 @@ describe("the sponsor link through the real Worker", () => {
     const paused = await http(sponsor.token, "POST", `/agents/${agentId}/suspend`, pausing);
     expect(paused).toMatchObject({ status: 200, body: { state: "suspended" } });
 
-    // Paused, the agent is admitted and the policy answers it, with what to do next; no token is minted for it.
-    const refused = await me();
+    // Paused, the agent still reads who it is; everything else the policy answers, with what to do next. No secret's token is minted for it.
+    expect((await me()).status).toBe(200);
+    const refused = await http(token, "DELETE", `/agents/${agentId}/sponsor`);
     expect(refusal(refused)).toEqual([403, "auth.forbidden", "Refused: agent-paused."]);
     expect(refused.body["nextActions"]).toMatchObject([
       { kind: "escalate", title: "You are paused; ask your sponsor to reinstate you" },
-    ]);
-    expect(refusal(await http(token, "DELETE", `/agents/${agentId}/sponsor`)).slice(0, 2)).toEqual([
-      403,
-      "auth.forbidden",
     ]);
     const minted = await exchange();
     expect(minted.status).not.toBe(200);

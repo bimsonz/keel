@@ -6,7 +6,9 @@ import {
   collectWorkspaces,
   configurePool,
   destroyPool,
+  FILL_MS,
   grantWorkspace,
+  RECLAIM_FORKING_MS,
   GRANT_TTL_SECONDS,
   holderOf,
   observePush,
@@ -26,7 +28,14 @@ import {
   ProjectId,
   type WorkspaceId,
 } from "@keeltown/core/kernel";
-import { Clock, CodeHost, EntityStore, EventOutbox, Trunks } from "@keeltown/core/ports";
+import {
+  Clock,
+  CodeHost,
+  EntityStore,
+  EventOutbox,
+  Trunks,
+  WorkspaceRefresher,
+} from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
@@ -35,7 +44,7 @@ import {
   makeTrunksMemory,
   makeWorkspaceRefresherMemory,
 } from "@keeltown/testing";
-import { Clock as EffectClock, Deferred, Effect, Fiber, Layer, Schema } from "effect";
+import { Clock as EffectClock, Deferred, Effect, Fiber, Layer, Logger, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 const MIRROR = { namespace: "keel-ws-00", name: "mirror" };
@@ -64,12 +73,25 @@ const yieldingClock = Layer.succeed(
  * behind it and a grant relays nothing (`workspace-pool-refresh.test.ts`
  * holds what a grant does when one is).
  */
-function pool(options: { readonly forkGate?: Deferred.Deferred<void> } = {}) {
+function pool(
+  options: {
+    readonly forkGate?: Deferred.Deferred<void>;
+    /** A repo whose main every read of fails as Artifacts' internal error, as keel/keel's mirror's did on 15 Oct. */
+    readonly unreadable?: string;
+    /** How many reads of `unreadable`'s main fail before they read: every one when not given. */
+    readonly unreadableReads?: number;
+    /** Every relay into a workspace never answers. */
+    readonly relaysHang?: boolean;
+    /** Every fork fails. */
+    readonly forksFail?: boolean;
+  } = {},
+) {
   const host = makeCodeHostMemory();
   const outbox = makeEventOutboxMemory();
   const gate = options.forkGate;
+  let failing = options.unreadableReads ?? Number.POSITIVE_INFINITY;
   const gated =
-    gate === undefined
+    gate === undefined && options.unreadable === undefined && options.forksFail !== true
       ? host.layer
       : Layer.effect(
           CodeHost,
@@ -77,8 +99,19 @@ function pool(options: { readonly forkGate?: Deferred.Deferred<void> } = {}) {
             const inner = yield* CodeHost;
             return CodeHost.of({
               ...inner,
+              head: (repo, ref) =>
+                Effect.suspend(() => {
+                  if (repo.name !== options.unreadable || failing <= 0)
+                    return inner.head(repo, ref);
+                  failing -= 1;
+                  return Effect.die(new Error(INTERNAL_ERROR));
+                }),
               fork: (source, target) =>
-                Deferred.await(gate).pipe(Effect.andThen(inner.fork(source, target))),
+                options.forksFail === true
+                  ? Effect.die(new Error(INTERNAL_ERROR))
+                  : gate === undefined
+                    ? inner.fork(source, target)
+                    : Deferred.await(gate).pipe(Effect.andThen(inner.fork(source, target))),
             });
           }),
         ).pipe(Layer.provideMerge(host.layer));
@@ -99,9 +132,33 @@ function pool(options: { readonly forkGate?: Deferred.Deferred<void> } = {}) {
     makeIdsMemory().layer,
     yieldingClock,
     trunks,
-    makeWorkspaceRefresherMemory(host, () => MIRROR).layer,
+    options.relaysHang === true
+      ? Layer.succeed(WorkspaceRefresher, WorkspaceRefresher.of({ advance: () => Effect.never }))
+      : makeWorkspaceRefresherMemory(host, () => MIRROR).layer,
   );
 }
+
+/** Artifacts' answer to every read of keel/keel's mirror on 15 Oct. */
+const INTERNAL_ERROR = "ArtifactsError: An internal error occurred.";
+
+/** A source that exists, but whose main cannot be read (see `pool({ unreadable })`). */
+const BROKEN = { namespace: "keel-ws-00", name: "broken-mirror" };
+
+/** `program` and the warnings it logged. */
+const warnings = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const said: string[] = [];
+    const value = yield* program.pipe(
+      Effect.provide(
+        Logger.layer([
+          Logger.make(({ logLevel, message }) => {
+            if (logLevel === "Warn") said.push(String(message));
+          }),
+        ]),
+      ),
+    );
+    return { value, said };
+  });
 
 /** The mirror the pool forks from, with one commit on main. */
 const seedMirror = Effect.gen(function* () {
@@ -597,6 +654,127 @@ describe("WorkspacePool", () => {
         expect(yield* reposLeft).toBe(0);
         expect((yield* Effect.flip(grantWorkspace(PROJECT, holder(3))))._tag).toBe("PoolExhausted");
       }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.fill-from-trunk] a refill whose source cannot be read forks nothing and makes a workspace from trunk, one a pass, and a grant gets it",
+    () =>
+      Effect.gen(function* () {
+        const base = yield* seedMirror;
+        yield* (yield* CodeHost).create(BROKEN);
+        yield* configurePool(PROJECT, { source: BROKEN, target: 3 });
+        const first = yield* warnings(refillPool(PROJECT));
+        expect(first.value).toEqual({ started: 1, ready: 1, failed: 0, abandoned: 0 });
+        expect(first.said).toHaveLength(1);
+        expect(first.said[0]).toContain(`source ${BROKEN.namespace}/${BROKEN.name} cannot be read`);
+        expect(first.said[0]).toContain(INTERNAL_ERROR);
+        expect(yield* refillPool(PROJECT)).toMatchObject({ started: 1, ready: 1 });
+        expect(yield* poolStatus()).toMatchObject({ ready: 2, forking: 0 });
+
+        const grant = yield* grantWorkspace(PROJECT, holder(1));
+        expect(grant.baseSha).toBe(base);
+        const events = yield* eventsOf(grant.workspaceId);
+        expect(events[0]).toMatchObject({ _tag: "WorkspaceForked", sourceRepo: "trunk" });
+        const slot = (yield* slotsHeld).find((s) => s.id === grant.workspaceId);
+        expect(yield* (yield* CodeHost).head(slot!.repo, "refs/heads/main")).toBe(base);
+      }).pipe(Effect.provide(pool({ unreadable: BROKEN.name }))),
+  );
+
+  it.effect(
+    "[pool.source-blip] a source whose main fails one read and then reads is forked as ever",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        const { value, said } = yield* warnings(refillPool(PROJECT));
+        expect(value).toEqual({ started: 2, ready: 2, failed: 0, abandoned: 0 });
+        expect(said).toEqual([]);
+      }).pipe(Effect.provide(pool({ unreadable: MIRROR.name, unreadableReads: 1 }))),
+  );
+
+  it.effect(
+    "[pool.fill-bounded] making a workspace from trunk whose relay never answers fails at FILL_MS, and the slot is collected",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* (yield* CodeHost).create(BROKEN);
+        yield* configurePool(PROJECT, { source: BROKEN, target: 1 });
+        const refill = yield* Effect.forkChild(refillPool(PROJECT));
+        for (let i = 0; i < 100 && (yield* poolStatus()).forking < 1; i++) yield* Effect.yieldNow;
+        expect(yield* poolStatus()).toMatchObject({ forking: 1 });
+        yield* TestClock.adjust(FILL_MS);
+        expect(yield* Fiber.join(refill)).toEqual({
+          started: 1,
+          ready: 0,
+          failed: 1,
+          abandoned: 0,
+        });
+        expect(yield* poolStatus()).toMatchObject({ forking: 0, collecting: 1 });
+      }).pipe(Effect.provide(pool({ unreadable: BROKEN.name, relaysHang: true }))),
+  );
+
+  it.effect(
+    "[pool.fork-failed-said] a refill whose forks fail says so for each, naming the source and why, and makes one workspace from trunk",
+    () =>
+      Effect.gen(function* () {
+        const base = yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        const { value, said } = yield* warnings(refillPool(PROJECT));
+        expect(value).toEqual({ started: 3, ready: 1, failed: 2, abandoned: 0 });
+        expect(said).toHaveLength(2);
+        for (const line of said) {
+          expect(line).toContain(`fork of ${MIRROR.namespace}/${MIRROR.name}`);
+          expect(line).toContain(INTERNAL_ERROR);
+        }
+        expect((yield* grantWorkspace(PROJECT, holder(1))).baseSha).toBe(base);
+      }).pipe(Effect.provide(pool({ forksFail: true }))),
+  );
+
+  it.effect(
+    "[pool.fill-failed-said] a workspace that cannot be made from trunk either is said and collected, and the pass counts it failed",
+    () =>
+      Effect.gen(function* () {
+        yield* (yield* CodeHost).create(MIRROR);
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        // A mirror with no main cannot be forked, and trunk (the mirror here) has no head to relay.
+        const { value, said } = yield* warnings(refillPool(PROJECT));
+        expect(value).toEqual({ started: 1, ready: 0, failed: 1, abandoned: 0 });
+        expect(said.join("\n")).toContain("from trunk failed");
+        expect(yield* poolStatus()).toMatchObject({ ready: 0, forking: 0, collecting: 1 });
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.reclaim-forking] a slot a reset left forking past RECLAIM_FORKING_MS is collected by the next grant, by its state alone, and once the pool refills a grant is granted",
+    () =>
+      Effect.gen(function* () {
+        const gate = yield* Deferred.make<void>();
+        yield* Effect.gen(function* () {
+          yield* seedMirror;
+          yield* configurePool(PROJECT, { source: MIRROR, target: 1 });
+          const refill = yield* Effect.forkChild(refillPool(PROJECT));
+          for (let i = 0; i < 100 && (yield* poolStatus()).forking < 1; i++) yield* Effect.yieldNow;
+          // The object is reset under its fork: the slot stays forking, and nothing will finish it.
+          yield* Fiber.interrupt(refill);
+          expect(yield* poolStatus()).toMatchObject({ forking: 1 });
+          yield* TestClock.adjust(RECLAIM_FORKING_MS + 1_000);
+          const refused = yield* warnings(Effect.flip(grantWorkspace(PROJECT, holder(1))));
+          expect(refused.value._tag).toBe("PoolExhausted");
+          // Said with what the pool holds, so a pool that stays exhausted shows why.
+          expect(refused.said.map((line) => JSON.parse(line))).toEqual([
+            expect.objectContaining({
+              event: "pool-exhausted",
+              target: 1,
+              forking: 0,
+              collecting: 1,
+            }),
+          ]);
+          expect(yield* poolStatus()).toMatchObject({ forking: 0, collecting: 1 });
+          yield* Deferred.succeed(gate, undefined);
+          expect(yield* refillPool(PROJECT)).toMatchObject({ ready: 1 });
+          expect((yield* grantWorkspace(PROJECT, holder(1))).workspaceId).toBeDefined();
+        }).pipe(Effect.provide(pool({ forkGate: gate })));
+      }),
   );
 
   it.effect(

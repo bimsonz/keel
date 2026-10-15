@@ -2,11 +2,12 @@
 # kills: workspace.refresh-ended
 # why: An ended change still has its workspace used, so the pool is asked to grant its holder again
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..9e3769d0 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1333,7 +1333,6 @@
- ): Result.Result<HeldWorkspace, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
-   if (!isOwnAgent(store, change, use)) return Result.fail(notFound(change.id));
+@@ -1690,7 +1690,6 @@ const mayUseWorkspace = (
+   const notHeld = holdingRefusal(store, change.id, use);
+   if (notHeld !== undefined) return Result.fail(notHeld);
    const held = heldWorkspace(store, change.id);
 -  if (TERMINAL.has(change.state)) return Result.fail(refused(change, use.command));
    const lease = checkLease(change, use.leaseId, now);

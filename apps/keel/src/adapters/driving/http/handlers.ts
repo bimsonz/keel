@@ -60,7 +60,11 @@ import {
   roleOf,
   SponsorRequestRefused,
 } from "@keeltown/core/domain/identity";
-import type { Change, ChangeNotFound } from "@keeltown/core/domain/coordination";
+import {
+  type Change,
+  ChangeHeldByOther,
+  type ChangeNotFound,
+} from "@keeltown/core/domain/coordination";
 import {
   agentActor,
   type ChangeId,
@@ -261,6 +265,38 @@ function claimsOf(caller: Caller): Effect.Effect<AgentClaims> {
  * The token of the agent calling, for work: the policy decides work on the
  * project the token names, so a token that names none was refused before here.
  */
+/**
+ * A holding refusal with its holder named as people read it: the handle it
+ * signed up with, or the name a person enrolled it by. Only the doorway reads
+ * the directory, so the Change's object answers the holder's id alone.
+ */
+const namingHolder = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | ChangeHeldByOther, R | AgentDirectory> =>
+  effect.pipe(
+    Effect.catch((error): Effect.Effect<never, E | ChangeHeldByOther, AgentDirectory> =>
+      error instanceof ChangeHeldByOther
+        ? AgentDirectory.use((directory) => directory.findAgent(error.holder)).pipe(
+            Effect.flatMap((found) =>
+              Effect.fail(
+                Option.match(found, {
+                  onNone: () => error,
+                  onSome: (agent) =>
+                    new ChangeHeldByOther({
+                      changeId: error.changeId,
+                      holder: error.holder,
+                      holderName: agent.handle ?? agent.name,
+                      ...(error.lapsesAt === undefined ? {} : { lapsesAt: error.lapsesAt }),
+                      nextActions: error.nextActions,
+                    }),
+                }),
+              ),
+            ),
+          )
+        : Effect.fail(error),
+    ),
+  );
+
 function tokenOf(caller: Caller): Effect.Effect<AgentToken> {
   return claimsOf(caller).pipe(
     Effect.flatMap((claims) => {
@@ -870,6 +906,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   }),
                 ),
               ),
+              namingHolder,
               Effect.match({
                 onSuccess: (answer) => answer,
                 onFailure: (error) => reviseError(caller, error),
@@ -894,6 +931,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   }),
                 ),
               ),
+              namingHolder,
               Effect.match({
                 onSuccess: (answer) => answer,
                 onFailure: (error) => relyError(caller, error),
@@ -922,6 +960,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             withdrawerOf(caller).pipe(
               Effect.flatMap((by) => abandonChange(by, decoded.success)),
+              namingHolder,
               Effect.match({
                 onSuccess: abandonOk,
                 onFailure: (error) => abandonError(caller, error),
@@ -947,6 +986,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => rebaseChange(principal, decoded.success)),
+              namingHolder,
               Effect.match({
                 onSuccess: rebaseOk,
                 onFailure: (error) => rebaseError(caller, error),
@@ -961,6 +1001,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => commitChange(principal, decoded.success)),
+              namingHolder,
               Effect.match({
                 onSuccess: committedOk,
                 onFailure: (error) => commitEditsError(caller, error),
@@ -975,6 +1016,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => refreshWorkspaceToken(principal, decoded.success)),
+              namingHolder,
               Effect.match({
                 onSuccess: refreshedOk,
                 onFailure: (error) => refreshError(caller, error),
@@ -989,6 +1031,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => submitChange(principal, decoded.success)),
+              namingHolder,
               Effect.match({
                 onSuccess: (change) => submitOk(change, decoded.success.commitSha),
                 onFailure: (error) => submitError(caller, error),
@@ -1045,6 +1088,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             caller,
             tokenOf(caller).pipe(
               Effect.flatMap((principal) => resolveMove(principal, scopeOf(caller), move)),
+              namingHolder,
               Effect.match({
                 onSuccess: (view) =>
                   move.move === "distinguish"

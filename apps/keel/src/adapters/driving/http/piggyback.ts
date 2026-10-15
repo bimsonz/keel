@@ -37,6 +37,7 @@ const ENVELOPED: Readonly<Record<EnvelopedOperation, true>> = {
   submit: true,
   status: true,
   resolve: true,
+  Agents_useProject: true,
   why: true,
   inbox: true,
 };

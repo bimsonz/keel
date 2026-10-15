@@ -63,24 +63,27 @@ export interface Watches {
 /**
  * Whether a caller may watch anything: an agent presenting its own token,
  * the one its key asked for (an enrolled agent's exchanged token says nothing
- * of a key, and a person watches nothing here), not paused, and with standing
- * in its token's project. The same rule admits a listen and keeps it open.
+ * of a key, and a person watches nothing here), with standing in its token's
+ * project.
  */
 export function stands(admitted: Admitted): boolean {
   const { principal, token } = admitted;
   return (
-    principal._tag === "Agent" &&
-    token?.bound !== undefined &&
-    !principal.paused &&
-    principal.standing._tag !== "None"
+    principal._tag === "Agent" && token?.bound !== undefined && principal.standing._tag !== "None"
   );
 }
 
-/** What a caller may watch: its own inbox, and the feed of the one project its token names. */
+/**
+ * What a caller may watch: its own inbox, and the feed of the one project its
+ * token names. A paused agent watches its inbox alone, so it hears when it is
+ * unpaused. The same rule admits a listen and keeps each watch open.
+ */
 export function watchable(admitted: Admitted): readonly string[] {
   if (!stands(admitted)) return [];
   const project = admitted.token?.projectId;
-  return project === undefined ? [INBOX_URI] : [INBOX_URI, feedUri(project)];
+  return project === undefined || (admitted.principal._tag === "Agent" && admitted.principal.paused)
+    ? [INBOX_URI]
+    : [INBOX_URI, feedUri(project)];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -124,7 +127,8 @@ export function narrowListen(
  * read; its deadline is `HOLD_SECONDS`. A read that brings something
  * publishes `resources/updated` for its address. After every read the
  * caller is admitted again from its token's claims, and the stream ends at
- * once when that is refused or it no longer `stands`. It ends too after
+ * once when that is refused or what it read is no longer `watchable` (a
+ * paused agent's project feed, say). It ends too after
  * `LISTEN_MS`, or when `MAX_LISTEN_READS` are made. When the client goes,
  * the SDK unsubscribes, and the watches stop with it.
  */
@@ -202,7 +206,7 @@ async function watch(
       cursor = page.cursor;
       // oxlint-disable-next-line no-await-in-loop -- the caller is admitted again at each read's end
       const again = await watches.admit(token);
-      if (again === null || !stands(again)) return end();
+      if (again === null || !watchable(again).includes(uri)) return end();
       if (page.arrived) publish(uri);
     }
   };

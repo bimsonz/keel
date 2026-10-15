@@ -262,8 +262,10 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
  * An entry is for the run that holds the change the event is about: the run
  * that held it before the event, or failing one the run that holds it after,
  * so a run is told when another takes its change. An event that names no
- * change is for the one run that holds what it affects. An event about no
- * change at all, or about one no run holds, is for every run. What a run does
+ * change is for the one run that holds what it affects, unless it is about the
+ * agent itself (a pause, an unpause, a sponsor): that is for every run, whatever
+ * changes it touches. An event about no change at all, or about one no run
+ * holds, is for every run. What a run does
  * to a change it holds is for that run alone, and it is never shown its own
  * acts, so nothing is kept for it.
  */
@@ -273,7 +275,11 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
   foldHeldLeases(store, agentId, event);
   if (!notifies(agentId, event)) return;
   const holder =
-    about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+    about !== undefined
+      ? (before ?? runHolding(store, about))
+      : event.entity.kind === "agent"
+        ? undefined
+        : soleHolder(store, event);
   if (holder !== undefined && event.run?.id === holder) return;
   recordDelivery(store, event, holder);
 }

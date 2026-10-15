@@ -657,11 +657,13 @@ describe("the WorkspacePool DO", () => {
     const second = stub.grant(holder());
     try {
       await vi.waitFor(async () => expect(await claimArmed()).toBeDefined(), WAIT);
+      const due = (await claimArmed())?.at;
       // The first holder asks again, and is answered at once with what it holds.
       const again = valueOf(WorkspacePoolCodecs.grant, await stub.grant(first));
       expect(again.workspaceId).toBe(held.workspaceId);
       expect(await statusOf(projectId)).toMatchObject({ refreshing: 0 });
-      expect(await claimArmed()).toBeDefined();
+      // A later claim never pushes the deadline out: claims that keep coming would keep it from ever coming due.
+      expect((await claimArmed())?.at).toBe(due);
     } finally {
       followed.headHeld = false;
     }

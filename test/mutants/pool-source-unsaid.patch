@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fill-from-trunk"
+# kills: pool.fill-from-trunk
+# why: a source the pool stopped forking is never said, so a broken mirror goes unseen
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..44988180 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -221,9 +221,6 @@ const sourceReadable = (project: ProjectId, source: RepoName) =>
+     if (Exit.isSuccess(first)) return true;
+     const again = yield* read;
+     if (Exit.isSuccess(again)) return true;
+-    yield* Effect.logWarning(
+-      `pool ${project}: source ${source.namespace}/${source.name} cannot be read, so workspaces are made from trunk: ${Cause.pretty(again.cause)}`,
+-    );
+     return false;
+   });
+ 

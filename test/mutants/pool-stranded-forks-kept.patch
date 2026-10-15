@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.reclaim-forking"
+# kills: pool.reclaim-forking
+# why: a slot a reset left forking counts towards the pool for good, and every declare meets pool_exhausted
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 6e42ca41..a4c84a15 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -125,7 +125,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+   const trunks = yield* Trunks;
+   /** The workspaces this grant could not bring to trunk's head. */
+   const tried = new Set<WorkspaceId>();
+-  yield* reclaimStranded(project);
+   // Each pass grants, loses a ready slot to another grant, or tries one more: the loop ends. The bound catches a slot that can never be granted.
+   for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
+     if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });

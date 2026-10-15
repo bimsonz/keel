@@ -302,7 +302,12 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         const lease = result.change.lease.id;
         yield* changes.abandon({
           changeId: result.change.id,
-          authority: { _tag: "Lease", leaseId: lease, agentId: who.agentId },
+          authority: {
+            _tag: "Lease",
+            leaseId: lease,
+            agentId: who.agentId,
+            projectId: who.projectId,
+          },
           reason: "A smaller change does it",
           idempotencyKey: `abandon-${crypto.randomUUID()}`,
         });
@@ -586,7 +591,12 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const lease = result.change.lease.id;
           const withdrawn = yield* changes.abandon({
             changeId: result.change.id,
-            authority: { _tag: "Lease", leaseId: lease, agentId: who.agentId },
+            authority: {
+              _tag: "Lease",
+              leaseId: lease,
+              agentId: who.agentId,
+              projectId: who.projectId,
+            },
             reason: "A smaller change does it",
             idempotencyKey: `abandon-${crypto.randomUUID()}`,
           });
@@ -643,7 +653,12 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const error = yield* Effect.flip(
             changes.abandon({
               changeId: result.change.id,
-              authority: { _tag: "Lease", leaseId: other, agentId: who.agentId },
+              authority: {
+                _tag: "Lease",
+                leaseId: other,
+                agentId: who.agentId,
+                projectId: who.projectId,
+              },
               idempotencyKey: `abandon-${crypto.randomUUID()}`,
             }),
           );
@@ -688,6 +703,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
               _tag: "Lease" as const,
               leaseId: result.change.lease.id,
               agentId: who.agentId,
+              projectId: who.projectId,
             },
             reason: "A smaller change does it",
             idempotencyKey: `abandon-${crypto.randomUUID()}`,

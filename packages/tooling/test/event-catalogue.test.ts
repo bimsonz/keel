@@ -381,11 +381,32 @@ function describeDifference(event: string, difference: Difference): string {
   return `${event} differs at ${difference.path}: core has ${show(difference.core)}, the spec ${show(difference.spec)}`;
 }
 
+/**
+ * Keys core records on an event that the feed never serves, so the spec has
+ * them optional where core requires them: a lease is its holder's alone, and
+ * the doorway leaves its id out of every event it serves.
+ */
+const FEED_OMITS: Readonly<Record<string, readonly string[]>> = {
+  IntentDeclared: ["leaseId"],
+  ChangeAdopted: ["leaseId"],
+  LeaseLapsed: ["leaseId"],
+  LeaseRestarted: ["leaseId"],
+};
+
+/** Core's schema as the feed serves it: `FEED_OMITS`'s keys no longer required. */
+function served(name: string, core: unknown): unknown {
+  const omits = FEED_OMITS[name] ?? [];
+  const required = at(core, "required");
+  return isRecord(core) && Array.isArray(required) && omits.length > 0
+    ? { ...core, required: required.filter((key) => !omits.includes(String(key))) }
+    : core;
+}
+
 /** Core's JSON Schema for an event and the spec's component, both normalised. */
 function sides(name: string, event: Schema.Top): { core: unknown; spec: unknown } {
   const compiled = coreDocument(event);
   return {
-    core: normalise(compiled.schema, effectResolver(compiled.definitions)),
+    core: served(name, normalise(compiled.schema, effectResolver(compiled.definitions))),
     spec: normalise(schemas[name], specResolver),
   };
 }

@@ -2,12 +2,12 @@
 # kills: authz.any-account
 # why: an agent cannot make an org: making one is kept to people
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..d47d83b5 100644
+index 4514aa2d..017f87e0 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -673,8 +673,8 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
-     case "anyone":
+@@ -732,8 +732,8 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
      case "self":
+     case "selfRead":
      case "agent":
 -    case "account":
        return granted();

@@ -178,6 +178,78 @@ describe("GET /v1/events", () => {
     ]);
   });
 
+  it("[feed.no-lease] serves no lease's id, to a member or to an agent of the project: not on IntentDeclared, ChangeAdopted, LeaseLapsed or LeaseRestarted, which core records it on", async () => {
+    const { projectA, member } = await tenancy();
+    const agent = await tokenFor(await seedAgent({ projectId: projectA }));
+    const from = await head(member);
+    const changeId = makeId("chg", ulid());
+    const leases = Array.from({ length: 4 }, () => makeId("lse", ulid()));
+    const [declared, adopted, lapsed, restarted] = leases;
+    const envelope = (type: string, seq: number, payload: object) =>
+      Schema.encodeSync(EventEnvelope)(
+        Schema.decodeUnknownSync(EventEnvelope)({
+          eventId: makeId("evt", ulid()),
+          type,
+          entity: { kind: "change", id: changeId },
+          seq,
+          at: Date.UTC(2026, 9, 15, 9),
+          dedupeKey: `change:${changeId}/events-test/${type}#${seq}`,
+          project: projectA,
+          affected: [],
+          notified: [],
+          payload: { _tag: type, changeId, ...payload },
+        }),
+      );
+    await projector().receive([
+      envelope("IntentDeclared", 1, {
+        agentId: makeId("agt", ulid()),
+        origin: "agent",
+        revision: 1,
+        goal: "Cache permission lookups per request",
+        footprint: [],
+        premises: [],
+        leaseId: declared,
+      }),
+      envelope("LeaseLapsed", 2, { leaseId: declared, renewedAt: Date.UTC(2026, 9, 15, 9) }),
+      envelope("ChangeAdopted", 3, {
+        previousAgentId: makeId("agt", ulid()),
+        agentId: makeId("agt", ulid()),
+        leaseId: adopted,
+        briefRef: "brief:1",
+      }),
+      envelope("LeaseLapsed", 4, { leaseId: lapsed, renewedAt: Date.UTC(2026, 9, 15, 9, 20) }),
+      envelope("LeaseRestarted", 5, { leaseId: restarted }),
+    ]);
+    const readers = await Promise.all([
+      worker(`${BASE}/v1/events?cursor=${from}`, {
+        headers: { authorization: `Bearer ${member}` },
+      }),
+      worker(`${BASE}/v1/events?cursor=${from}&project=${projectA}`, {
+        headers: { authorization: `Bearer ${agent}` },
+      }),
+    ]);
+    const pages = await Promise.all(
+      readers.map(async (response) => ({
+        text: await response.clone().text(),
+        body: await response.json<Page>(),
+      })),
+    );
+
+    expect(readers.map((response) => response.status)).toEqual([200, 200]);
+    for (const page of pages) {
+      const { items } = page.body;
+      expect(items.map((item) => item.type)).toEqual([
+        "IntentDeclared",
+        "LeaseLapsed",
+        "ChangeAdopted",
+        "LeaseLapsed",
+        "LeaseRestarted",
+      ]);
+      expect(items.map((item) => "leaseId" in item.payload)).toEqual(Array(5).fill(false));
+      expect(leases.filter((id) => page.text.includes(id))).toEqual([]);
+    }
+  });
+
   it("[a11.events-wait] answers a waiting read as soon as an event arrives", async () => {
     const { projectA, member } = await tenancy();
     const from = await head(member);

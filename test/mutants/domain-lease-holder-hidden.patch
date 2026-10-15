@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t "authz.lease-holder"
+# kills: authz.lease-holder
+# why: another agent of the change's project, which can read the change, is told it does not exist instead of who holds it and when to adopt it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1209660e..8513f7ec 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -540,6 +540,7 @@ const holdingRefusal = (
+   if (change === undefined || heldWorkspace(store, changeId)?.projectId !== caller.projectId)
+     return notFound(changeId);
+   if (change.agentId === caller.agentId) return undefined;
++  return notFound(changeId);
+   // While Keel holds the change its lease cannot lapse, so there is no time to give.
+   const lapses = isAgentOwned(change.state) ? lapsesAt(change.lease) : undefined;
+   return new ChangeHeldByOther({

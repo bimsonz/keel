@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.standing
+# kills: link.standing
+# why: the gate never marks an invitation that gives Read alone, so the agent is not told to ask a member for Write
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index a2dda811..8b74ed06 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -257,7 +257,6 @@ export const principalOf: (
+               ),
+               // Outside an org the invitation was to this project, and to nothing else of the namespace.
+               ...(namespaceKind(org) === "org" ? {} : { projectOnly: true }),
+-              ...(givesWork(invited.value.scopes) ? {} : { readOnly: true }),
+             };
+       return {
+         principal: {

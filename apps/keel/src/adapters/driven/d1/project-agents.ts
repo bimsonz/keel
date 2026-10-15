@@ -151,6 +151,16 @@ export function ProjectAgentsD1(db: D1Database) {
             .bind(agentId)
             .all(),
         ).pipe(Effect.map(({ results }) => results.map(toInvitation))),
+      ended: (agentId, projectId) =>
+        Effect.promise(() =>
+          db
+            .prepare(
+              `SELECT 1 AS ended FROM project_agents
+               WHERE project_id = ? AND agent_id = ? AND state = 'ended'`,
+            )
+            .bind(projectId, agentId)
+            .first(),
+        ).pipe(Effect.map((row) => row !== null)),
     }),
   );
 }

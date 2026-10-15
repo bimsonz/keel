@@ -51,8 +51,12 @@ async function call(token: string, path: string, key?: string, body?: object): P
  * The status the agent's own token now gets, by its directory row: 200 while
  * active, the policy's 403 while paused, the gate's 401 once revoked.
  */
+/**
+ * What the agent's next request is answered with: one a paused agent may not
+ * make (it still reads who it is and its inbox, so it hears when it is unpaused).
+ */
 async function gate(token: string): Promise<number> {
-  const response = await exports.default.fetch(`${BASE}/v1/agents/me`, {
+  const response = await exports.default.fetch(`${BASE}/v1/agents/me/namespaces`, {
     headers: { authorization: `Bearer ${token}` },
   });
   await response.body?.cancel();

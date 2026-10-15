@@ -2,15 +2,15 @@
 # kills: pool.names
 # why: Workspaces keep the old ws-<ulid> name, which names no project, so no push to them is ever observed
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 2f50536..afc0c17 100644
+index 991b8018..3821cf24 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -208,7 +208,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
-     const id: WorkspaceId = yield* ids.next("wsp");
+@@ -404,7 +404,7 @@ const startSlot = (project: ProjectId, source: RepoName) =>
+     const id: WorkspaceId = yield* (yield* Ids).next("wsp");
      const slot: Slot = {
        id,
 -      repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
 +      repo: { namespace: source.namespace, name: `ws-${id.slice(4).toLowerCase()}` },
        state: "forking",
-       since: now,
+       since: yield* (yield* Clock).now,
      };

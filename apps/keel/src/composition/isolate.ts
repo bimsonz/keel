@@ -252,6 +252,13 @@ function gateDeps(
           Effect.catchTag("AgentUnplaced", (error) =>
             Effect.succeed({ refused: "unplaced", agentId: error.agentId } as const),
           ),
+          Effect.catchTag("TokenProjectStale", (error) =>
+            Effect.succeed({
+              refused: "stale-project",
+              run: error.run.label ?? error.run.id,
+              projectId: error.projectId,
+            } as const),
+          ),
           Effect.catch(() => Effect.succeed({ refused: "invalid" } as const)),
         ),
       ),
@@ -400,6 +407,12 @@ export function makeIsolate(
       find: (agentId) =>
         runtime.runPromise(
           AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+            Effect.map(Option.getOrUndefined),
+          ),
+        ),
+      runProject: (agentId, runId) =>
+        runtime.runPromise(
+          AgentDirectory.use((directory) => directory.runProject(agentId, runId)).pipe(
             Effect.map(Option.getOrUndefined),
           ),
         ),

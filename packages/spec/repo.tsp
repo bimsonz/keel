@@ -204,6 +204,7 @@ interface Repo {
 
   /** Newest first along the first-parent chain. The cursor names a commit, so a page holds still while trunk moves. */
   @summary("List commits")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/commits")
   @get

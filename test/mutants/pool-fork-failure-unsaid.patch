@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fork-failed-said"
+# kills: pool.fork-failed-said
+# why: a refill whose forks all fail collects each slot in silence, and the pool runs dry unseen
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..47d6d305 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -365,9 +365,6 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+     if (Exit.isFailure(outcome)) {
+       unforked += 1;
+       // Said, so a pool that cannot fork is seen before it runs dry: a broken mirror once failed every fork in silence.
+-      yield* Effect.logWarning(
+-        `pool ${project}: fork of ${source.namespace}/${source.name} into ${slot.repo.name} failed: ${Cause.pretty(outcome.cause)}`,
+-      );
+       yield* markCollecting(project, slot.id, "fork-failed");
+       continue;
+     }

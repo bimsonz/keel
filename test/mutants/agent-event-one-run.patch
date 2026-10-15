@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts -t run.inbox-for
+# kills: run.inbox-for
+# why: an event about the agent itself goes to one run, so its other runs never hear they are paused
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index 987db9a5..7f97b902 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -277,9 +277,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+   const holder =
+     about !== undefined
+       ? (before ?? runHolding(store, about))
+-      : event.entity.kind === "agent"
+-        ? undefined
+-        : soleHolder(store, event);
++      : soleHolder(store, event);
+   if (holder !== undefined && event.run?.id === holder) return;
+   recordDelivery(store, event, holder);
+ }

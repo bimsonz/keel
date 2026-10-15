@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t nsagents.contract
+# kills: nsagents.contract
+# why: an invitation only waiting reads as ended in D1, so an agent invited and not yet joined is told it left
+diff --git a/apps/keel/src/adapters/driven/d1/namespace-agents.ts b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+index d01d7acc..e2f9757d 100644
+--- a/apps/keel/src/adapters/driven/d1/namespace-agents.ts
++++ b/apps/keel/src/adapters/driven/d1/namespace-agents.ts
+@@ -152,7 +152,7 @@ export function NamespaceAgentsD1(db: D1Database) {
+           db
+             .prepare(
+               `SELECT 1 AS ended FROM namespace_agents
+-               WHERE namespace_id = ? AND agent_id = ? AND state = 'ended'`,
++               WHERE namespace_id = ? AND agent_id = ? AND state <> 'joined'`,
+             )
+             .bind(namespace, agentId)
+             .first(),

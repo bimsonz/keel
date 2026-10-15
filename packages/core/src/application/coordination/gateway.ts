@@ -2,6 +2,7 @@ import { Effect, Option, Result, Schema } from "effect";
 import {
   type Change,
   type ChangeInOtherProject,
+  type ChangeHeldByOther,
   ChangeNotFound,
   checkLease,
   type ChangeStateRefused,
@@ -169,6 +170,7 @@ export const submitChange: (
   Change,
   | NamespaceHalted
   | ChangeNotFound
+  | ChangeHeldByOther
   | LeaseStale
   | ChangeStateRefused
   | CommitNotInWorkspace
@@ -202,6 +204,7 @@ export const rebaseChange: (
 ) => Effect.Effect<
   RebasedChange,
   | ChangeNotFound
+  | ChangeHeldByOther
   | LeaseStale
   | ChangeStateRefused
   | IdempotencyConflict
@@ -217,6 +220,7 @@ export const commitChange: (
 ) => Effect.Effect<
   CommittedChange,
   | ChangeNotFound
+  | ChangeHeldByOther
   | LeaseStale
   | ChangeStateRefused
   | IdempotencyConflict
@@ -241,7 +245,7 @@ export const refreshWorkspaceToken = (
   input: WorkspaceTokenInput,
 ): Effect.Effect<
   WorkspaceGrant,
-  WorkspaceNotFound | LeaseStale | ChangeStateRefused,
+  WorkspaceNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused,
   Changes | WorkspacePool
 > =>
   Effect.gen(function* () {
@@ -261,7 +265,12 @@ export const reviseChange: (
   input: ReviseInput,
 ) => Effect.Effect<
   Revised,
-  ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
+  | ChangeNotFound
+  | ChangeHeldByOther
+  | LeaseStale
+  | RevisionMismatch
+  | ChangeStateRefused
+  | IdempotencyConflict,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.revise(principal, input));
 
@@ -271,7 +280,7 @@ export const relyOn: (
   input: RelyInput,
 ) => Effect.Effect<
   Revised,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.rely(principal, input));
 
@@ -300,8 +309,9 @@ export type Withdrawer =
 
 /**
  * What the Change DO is told: an agent's lease, when it sent one, or the
- * maintainer and the project they maintain. Whether the lease is the change's,
- * and the project the change's, is the Change DO's to say.
+ * maintainer and the project they maintain, each with its project. Whether the
+ * agent holds the change, the lease is the change's and the project the
+ * change's, is the Change DO's to say.
  */
 const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | undefined => {
   switch (by._tag) {
@@ -312,6 +322,7 @@ const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | un
             _tag: "Lease",
             leaseId: lease,
             agentId: by.token.agentId,
+            projectId: by.token.projectId,
             ...(by.token.run === undefined ? {} : { run: by.token.run }),
           };
     case "Maintainer":
@@ -329,7 +340,12 @@ export const abandonChange: (
   call: AbandonCall,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict | LeaseRequired,
+  | ChangeNotFound
+  | ChangeHeldByOther
+  | LeaseStale
+  | ChangeStateRefused
+  | IdempotencyConflict
+  | LeaseRequired,
   Changes
 > = (by, call) => {
   const { lease, ...rest } = call;
@@ -642,7 +658,12 @@ export const resolveMove: (
   input: ResolveInput,
 ) => Effect.Effect<
   ConflictView,
-  ChangeNotFound | LeaseStale | ConflictNotFound | MoveRefused | IdempotencyConflict,
+  | ChangeNotFound
+  | ChangeHeldByOther
+  | LeaseStale
+  | ConflictNotFound
+  | MoveRefused
+  | IdempotencyConflict,
   Changes | ProjectViews | ConflictMoves | Clock
 > = (principal, scope, input) =>
   Effect.gen(function* () {

@@ -2,18 +2,22 @@
 # kills: authz.mcp
 # why: a bearer the gate refuses is served over MCP as an anonymous caller instead of a 401
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 8214fbad..fdc11eaa 100644
+index 0ddfbc4a..227914de 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -139,12 +139,9 @@ export function makeMcpEndpoint(
+@@ -249,16 +249,9 @@ export function makeMcpEndpoint(
      const gated = await gate(request, crypto.randomUUID(), deps, { cookies: false, door: "mcp" });
      // A token that could not be checked is the gate's own 503: a 401 here would tell a client its good token is bad.
      if (gated instanceof Response && gated.status === 503) return gated;
--    if (gated instanceof Response)
+-    // The gate's own words say why, such as a token minted before its run chose a project.
+-    if (gated instanceof Response) {
+-      const said: unknown = await gated.json().catch(() => undefined);
+-      const detail: unknown = Reflect.get(Object(said), "detail");
 -      return unauthenticated(
 -        gated.headers.get("www-authenticate") ?? deps.challenge("mcp"),
--        "The token is not admitted",
+-        typeof detail === "string" ? detail : "The token is not admitted",
 -      );
+-    }
 -    const { principal } = gated.admitted;
 +    const admitted =
 +      gated instanceof Response ? { principal: { _tag: "Anonymous" as const } } : gated.admitted;
@@ -21,7 +25,7 @@ index 8214fbad..fdc11eaa 100644
      const authInfo: AuthInfo = {
        token: presented.token,
        clientId:
-@@ -156,7 +153,7 @@ export function makeMcpEndpoint(
+@@ -270,7 +263,7 @@ export function makeMcpEndpoint(
        scopes: principal._tag === "Agent" ? [...principal.scopes] : [],
        // Keel's own expiry is enforced by the gate; the SDK requires a value.
        expiresAt: Math.floor(Date.now() / 1000) + 60,

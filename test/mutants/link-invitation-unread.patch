@@ -2,15 +2,15 @@
 # kills: gate.invited
 # why: the gate never reads an agent's invitation, so an agent a member invited and that accepted still has no standing
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index b47ae279..b1fc624a 100644
+index a2dda811..a46ce6fc 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -219,7 +219,7 @@ export const principalOf: (
+@@ -237,7 +237,7 @@ export const principalOf: (
          governs || Option.isNone(place) || projectId === undefined
            ? Option.none()
            : namespaceKind(org) === "org"
 -            ? yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org))
 +            ? Option.none<{ readonly by: never; readonly scopes: readonly never[] }>()
              : yield* ProjectAgents.use((agents) => agents.standing(agent.id, projectId));
-       const standing: AgentStanding = governs
-         ? { _tag: "Governs" }
+       // Only where it stands nowhere is it asked whether it stood there once.
+       const left =

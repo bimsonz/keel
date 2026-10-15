@@ -30,6 +30,7 @@ import {
   type Stored,
 } from "../ports/index.ts";
 import { AGENT } from "./enrol.ts";
+import { hearEvent } from "./session.ts";
 
 /** The moves on an agent's standing. */
 export type StandingMove = "suspend" | "reinstate" | "revoke";
@@ -148,7 +149,9 @@ export function sponsorOf(
  * moves the row back; the Projector repeats the write on delivery, which
  * repairs a crash between the commit and the row. A replay writes again and
  * answers the agent as it stands. The answer names no namespace
- * (`withoutNamespace`).
+ * (`withoutNamespace`). The agent is told in its own inbox, every run of it,
+ * so a paused agent hears why its calls are refused and when they are taken
+ * again.
  */
 export const changeStanding: (
   agentId: AgentId,
@@ -204,9 +207,12 @@ export const changeStanding: (
     const moved = standingOf(event);
     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
   }
-  return withoutNamespace(
-    committed.duplicate ? decodeAgent((yield* EntityStore).get(AGENT, agentId)) : committed.value,
-  );
+  const store = yield* EntityStore;
+  if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
+  store.transaction(() => {
+    for (const event of committed.events) hearEvent(store, agentId, event);
+  });
+  return withoutNamespace(committed.value);
 });
 
 /**

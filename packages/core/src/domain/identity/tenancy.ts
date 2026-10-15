@@ -92,8 +92,18 @@ export interface MemberStanding {
  */
 export type AgentStanding =
   | { readonly _tag: "Governs" }
-  | { readonly _tag: "Invited"; readonly by: MemberStanding; readonly projectOnly?: boolean }
-  | { readonly _tag: "None" };
+  | {
+      readonly _tag: "Invited";
+      readonly by: MemberStanding;
+      readonly projectOnly?: boolean;
+      /** The invitation gives read and not work: a member gives Write, and no token can. */
+      readonly readOnly?: boolean;
+    }
+  | {
+      readonly _tag: "None";
+      /** The agent stood here once: its invitation ended, by its leaving or a member's taking it out. */
+      readonly left?: boolean;
+    };
 
 /**
  * A Keel JWT: an agent acting as itself. The agent is tied to no project, but
@@ -195,6 +205,8 @@ export interface AgentResource {
 /** Nothing by that name. Answered exactly as a private resource the caller cannot see. */
 export interface MissingResource {
   readonly _tag: "Missing";
+  /** Nothing is named: the agent's token is for no project, and its run chose none. */
+  readonly unchosen?: boolean;
 }
 
 /** Forking `source` into a new project in `target`. */

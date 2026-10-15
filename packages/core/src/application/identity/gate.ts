@@ -6,7 +6,9 @@ import {
   AgentNotKnown,
   type AgentStanding,
   type Principal,
+  givesWork,
   scopesUnder,
+  TokenProjectStale,
   TokenRejected,
 } from "../../domain/identity/index.ts";
 import { AgentId, type NamespaceId, namespaceKind, UserId } from "../../domain/kernel/index.ts";
@@ -132,7 +134,8 @@ export type GateRefusal =
   | AgentNotKnown
   | AgentNotAdmitted
   | AgentUnplaced
-  | UserNotKnown;
+  | UserNotKnown
+  | TokenProjectStale;
 
 /**
  * Who is asking: a Keel token is an agent, a
@@ -155,7 +158,13 @@ export type GateRefusal =
  * cut to what the invitation gives. A pending invitation, an ended one and
  * none at all give it no standing. A token for a project that has no place
  * stands as one for a project the agent has no standing in, so a token never
- * tells whether a project exists.
+ * tells whether a project exists. Where it has none, the gate reads whether
+ * its invitation there ended, so it is told it left: it stood there, so
+ * nothing about the project is told that it did not know.
+ *
+ * A token that names a run and no project, of a run that has chosen a project
+ * to work in, was minted before the choice: it is stale, and the agent asks for
+ * a new one, which names that project.
  */
 export const principalOf: (
   credential: Credential,
@@ -209,7 +218,14 @@ export const principalOf: (
       const { claims } = credential;
       const agent = yield* admit(claims);
       const own: NamespaceId = agent.id;
-      const { projectId } = claims;
+      const { projectId, run } = claims;
+      if (projectId === undefined && run !== undefined) {
+        const chosen = yield* AgentDirectory.use((directory) =>
+          directory.runProject(agent.id, run.id),
+        );
+        if (Option.isSome(chosen))
+          return yield* new TokenProjectStale({ agentId: agent.id, run, projectId: chosen.value });
+      }
       const place =
         projectId === undefined
           ? Option.none()
@@ -223,10 +239,17 @@ export const principalOf: (
           : namespaceKind(org) === "org"
             ? yield* NamespaceAgents.use((agents) => agents.standing(agent.id, org))
             : yield* ProjectAgents.use((agents) => agents.standing(agent.id, projectId));
+      // Only where it stands nowhere is it asked whether it stood there once.
+      const left =
+        governs || Option.isSome(invited) || Option.isNone(place) || projectId === undefined
+          ? false
+          : namespaceKind(org) === "org"
+            ? yield* NamespaceAgents.use((agents) => agents.ended(agent.id, org))
+            : yield* ProjectAgents.use((agents) => agents.ended(agent.id, projectId));
       const standing: AgentStanding = governs
         ? { _tag: "Governs" }
         : Option.isNone(invited)
-          ? { _tag: "None" }
+          ? { _tag: "None", ...(left ? { left: true } : {}) }
           : {
               _tag: "Invited",
               by: yield* Memberships.use((memberships) =>
@@ -234,6 +257,7 @@ export const principalOf: (
               ),
               // Outside an org the invitation was to this project, and to nothing else of the namespace.
               ...(namespaceKind(org) === "org" ? {} : { projectOnly: true }),
+              ...(givesWork(invited.value.scopes) ? {} : { readOnly: true }),
             };
       return {
         principal: {

@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
 import { BASE, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
 
-/** A declared change in a project of its own whose trunk has moved on, its workspace, and a token for an agent of that project. */
+/** A declared change in a project of its own whose trunk has moved on, its workspace, and a token for its own agent. */
 async function bouncedOntoMovedTrunk() {
   const projectId: ProjectId = makeId("prj", ulid());
   const c = await changeUnderTest(projectId);
@@ -27,7 +27,7 @@ async function bouncedOntoMovedTrunk() {
     }).pipe(Effect.provide(c.code.layer)),
   );
   c.trunks.heads.set(projectId, landed);
-  const token = await tokenFor(await seedAgent({ projectId }));
+  const token = await tokenFor(await seedAgent({ projectId, id: c.agentId }));
   return { c, declared, landed, token };
 }
 

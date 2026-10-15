@@ -105,8 +105,19 @@ function eventRecord(entry: EventFeedEntry) {
         }),
     ...(entry.project === undefined ? {} : { project: entry.project }),
     ...(entry.label === undefined ? {} : { label: entry.label }),
-    payload,
+    payload: unleased(payload),
   };
+}
+
+/**
+ * An event as the feed serves it, to every reader: without a lease's id. A
+ * lease is its holder's alone, answered to it when it declares or adopts the
+ * change; the spec has the key optional on the four events core records it in.
+ */
+function unleased(payload: WireEvent): WireEvent {
+  if (!("leaseId" in payload)) return payload;
+  const { leaseId: _held, ...served } = payload;
+  return served;
 }
 
 /** How the log is answered: one short line per event, or the events whole. */

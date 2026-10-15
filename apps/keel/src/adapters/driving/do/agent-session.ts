@@ -235,13 +235,16 @@ export class AgentSessionDO
     return this.standing("revoke", command);
   }
 
-  private standing(move: StandingMove, command: typeof StandingCommand.Encoded) {
+  /** The agent is told in its own inbox, so an inbox held across a pause wakes once the commit is durable. */
+  private async standing(move: StandingMove, command: typeof StandingCommand.Encoded) {
     const agentId = agentIdOf(this.ctx.id.name);
     const program = Schema.decodeUnknownEffect(StandingCommand)(command).pipe(
       Effect.orDie,
       Effect.flatMap((moving) => changeStanding(agentId, move, moving)),
     );
-    return this.answer(AgentSessionCodecs[move], program);
+    const answer = await this.answer(AgentSessionCodecs[move], program);
+    await this.received();
+    return answer;
   }
 
   async askSponsor(command: typeof AskSponsorCommand.Encoded) {

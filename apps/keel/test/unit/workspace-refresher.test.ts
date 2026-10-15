@@ -7,9 +7,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, makeId } from "@keeltown/core/kernel";
 import { CodeHost, type RepoRef, WorkspaceRefresher } from "@keeltown/core/ports";
 import { makeCodeHostMemory } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
-import { WorkspaceRefresherGitCore } from "../../src/adapters/driven/gitcore/workspace-refresher.ts";
+import {
+  WHOLE_RELAY_MS,
+  WorkspaceRefresherGitCore,
+} from "../../src/adapters/driven/gitcore/workspace-refresher.ts";
 import { EMPTY_PACK, gitServer, type Reply } from "./git-server.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
@@ -62,6 +65,39 @@ afterEach(() => {
 });
 
 describe("WorkspaceRefresher.advance", () => {
+  it.live(
+    "[refresher.whole-bound] a relay of trunk's whole history into an empty workspace is bounded by its own deadline, not the git one",
+    () =>
+      Effect.gen(function* () {
+        expect(WHOLE_RELAY_MS).toBe(300_000);
+        // A trunk that never answers: the relay's fetch waits until its signal aborts it.
+        vi.stubGlobal(
+          "fetch",
+          async (_input: unknown, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+            }),
+        );
+        const code = makeCodeHostMemory();
+        yield* Effect.gen(function* () {
+          const h = yield* CodeHost;
+          yield* h.create(TRUNK);
+          yield* h.create(WORKSPACE);
+        }).pipe(Effect.provide(code.layer));
+        const start = Date.now();
+        const failed = yield* Effect.flatMap(WorkspaceRefresher, (r) =>
+          r.advance(PROJECT, WORKSPACE, null, HEAD),
+        ).pipe(
+          Effect.provide(
+            WorkspaceRefresherGitCore(() => TRUNK, 50).pipe(Layer.provide(code.layer)),
+          ),
+          Effect.exit,
+        );
+        expect(Exit.isFailure(failed) && Cause.pretty(failed.cause)).toContain("TimeoutError");
+        expect(Date.now() - start).toBeLessThan(10_000);
+      }),
+  );
+
   it.effect(
     "[refresher.cas] fetches trunk's head past the commit the pool names and pushes it to the workspace's main with that commit as old; the same commit sends nothing",
     () =>

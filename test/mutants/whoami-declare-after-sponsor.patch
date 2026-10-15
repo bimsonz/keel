@@ -2,10 +2,10 @@
 # kills: whoami.declare-next
 # why: whoami names declare after askSponsor, so an agent that follows its first step goes looking for a person before the work it can already do
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index e292dc54..68278bcd 100644
+index 78058bbd..291bc0af 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -225,9 +225,9 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+@@ -235,9 +235,9 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
        findings: [],
        // An invitation accepted is what lets the agent work, so its read comes before the sponsor ask.
        next: [
@@ -14,5 +14,5 @@ index e292dc54..68278bcd 100644
          ...sponsor.next,
 +        ...working.next,
          ...placed.next,
-         ...reach(identity).next,
+         ...reach(identity, here).next,
        ].slice(0, MAX_NEXT),

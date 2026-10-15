@@ -91,7 +91,12 @@ const withdrawn = async (c: ChangeUnderTest) =>
     decodeExit(
       ChangeCodecs.abandon,
       await c.stub.abandon({
-        authority: { _tag: "Lease", leaseId: (await c.current()).lease.id, agentId: c.agentId },
+        authority: {
+          _tag: "Lease",
+          leaseId: (await c.current()).lease.id,
+          agentId: c.agentId,
+          projectId: c.projectId,
+        },
         idempotencyKey: "abandon-1",
       }),
     ),

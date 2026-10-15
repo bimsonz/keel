@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fill-from-trunk|pool.fork-failed-said"
+# kills: pool.fill-from-trunk, pool.fork-failed-said
+# why: a pool whose source cannot be forked never makes a workspace another way, and declares meet pool_exhausted until the source is mended
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..9d25a063 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -378,7 +378,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+   let failed = fresh.length - ready;
+   // One workspace made from trunk itself when the source could not give them, one a pass: each
+   // relay holds trunk's whole pack in memory, and the object runs the next pass at once.
+-  const filled = (!forkable || unforked > 0) && !isDestroyed(store) ? need - ready : 0;
++  const filled = 0 * need;
+   if (filled > 0) {
+     const slot = yield* startSlot(project, source);
+     const made = yield* Effect.exit(fillOne(project, slot.repo));

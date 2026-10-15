@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t run.use-project
+# kills: run.use-project
+# why: a run asking for a project it cannot reach is given the first one it can, never told it is not found
+diff --git a/apps/keel/src/adapters/driving/http/invitations.ts b/apps/keel/src/adapters/driving/http/invitations.ts
+index 0a001cd6..4f3b4550 100644
+--- a/apps/keel/src/adapters/driving/http/invitations.ts
++++ b/apps/keel/src/adapters/driving/http/invitations.ts
+@@ -803,7 +803,7 @@ export function projectInvitationHandlers(
+           caller,
+           Effect.gen(function* () {
+             const reached = (yield* reachableProjects(agentId)).find(
+-              (item) => item.project.id === input.projectId,
++              (item) => item.project.id !== undefined,
+             );
+             if (reached === undefined)
+               return notFound(

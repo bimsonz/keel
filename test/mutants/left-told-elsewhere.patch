@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/authorize-handlers.test.ts -t authz.left
+# kills: authz.left
+# why: an agent that left one namespace is told it left there when it asks about another namespace's project
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f26c0fbd..e5ece34b 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -610,8 +610,7 @@ export async function standingRefusal(
+   if (
+     standing._tag !== "None" ||
+     standing.left !== true ||
+-    resolved._tag !== "Project" ||
+-    resolved.namespace !== principal.namespace
++    resolved._tag !== "Project"
+   )
+     return undefined;
+   const record = await run(

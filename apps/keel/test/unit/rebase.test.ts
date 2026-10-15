@@ -297,7 +297,7 @@ describe("rebase", () => {
           const reused = yield* Effect.flip(
             rebase(changeId, {
               ...rebasing(lease),
-              agentId: AgentId.make("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
+              run: Schema.decodeUnknownSync(RunRef)({ id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V1" }),
             }),
           );
           expect(reused._tag).toBe("IdempotencyConflict");

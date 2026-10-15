@@ -282,6 +282,7 @@ interface Conflicts {
    * unknown one is the same 404.
    */
   @summary("List conflicts")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @get
   listConflicts(

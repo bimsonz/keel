@@ -2,10 +2,10 @@
 # kills: pool.claim-none-ready
 # why: a pool with no ready workspace asks trunk for its head before refusing, so a project with no trunk yet answers a defect
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index c2c78b5d..38e6ed7b 100644
+index 6e42ca41..563d89c0 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -129,6 +129,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+@@ -143,6 +143,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
          repo: slot.repo,
        } satisfies WorkspaceGrant;
      }
@@ -13,8 +13,8 @@ index c2c78b5d..38e6ed7b 100644
      if (oldestReady(store, tried) === undefined) {
        // One being forked or refreshed is ready within seconds, and one a relay was refused for may take the next.
        const soonest =
-@@ -137,7 +138,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
-       const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+@@ -165,7 +166,6 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+       );
        return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
      }
 -    const head = yield* trunks.head(project);

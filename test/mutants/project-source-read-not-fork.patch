@@ -2,10 +2,10 @@
 # kills: project.source-private
 # why: the source is decided as a read of it alone, so a member of a private project's org copies it into any other org they belong to
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 1b09cc8..d4442f2 100644
+index f26c0fbd..b06089c2 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -492,7 +492,7 @@ export const decideFork = (
+@@ -586,7 +586,7 @@ export const decideFork = (
    principal: Principal,
    source: ProjectResource | MissingResource,
    target: NamespaceResource,
@@ -13,4 +13,4 @@ index 1b09cc8..d4442f2 100644
 +): Decision => authorize(principal, "Namespaces_getProject", source);
  
  /**
-  * The one authorization policy, in front of every operation: each operation's
+  * An agent refused for where its token stands, said as that: its token names no

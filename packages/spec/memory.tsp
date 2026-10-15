@@ -90,6 +90,7 @@ interface Memory {
    * project is read, and a private or unknown one is the same 404.
    */
   @summary("List decisions")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/decisions")
   @get
@@ -101,6 +102,7 @@ interface Memory {
 
   /** One decision, read by whoever may read its project: one the caller may not read is the 404 of an unknown one. */
   @summary("Get a decision")
+  @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/decisions/{decisionId}")
   @get

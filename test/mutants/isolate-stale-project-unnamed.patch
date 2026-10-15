@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t run.use-project
+# kills: run.use-project
+# why: a stale project-less token is answered as an unknown token, so the agent is not told its run works in a project now
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index f057a94f..66637ab7 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -252,13 +252,6 @@ function gateDeps(
+           Effect.catchTag("AgentUnplaced", (error) =>
+             Effect.succeed({ refused: "unplaced", agentId: error.agentId } as const),
+           ),
+-          Effect.catchTag("TokenProjectStale", (error) =>
+-            Effect.succeed({
+-              refused: "stale-project",
+-              run: error.run.label ?? error.run.id,
+-              projectId: error.projectId,
+-            } as const),
+-          ),
+           Effect.catch(() => Effect.succeed({ refused: "invalid" } as const)),
+         ),
+       ),

@@ -142,14 +142,20 @@ const projectNamed = (id: unknown) =>
     onSome: (projectId) => projectResource(projectId),
   });
 
+/** What an agent whose token names no project asks about: nothing, and it is told to choose. */
+const UNCHOSEN: MissingResource = { _tag: "Missing", unchosen: true };
+
 /**
  * The agent's own project: the one its token names, where work is ever done.
- * Anyone else, and an agent whose token names none, asks about nothing.
+ * Anyone else asks about nothing, and so does an agent whose token names none
+ * (its run has chosen none, or the gate refused the token as stale).
  */
 const ownProject = (_input: unknown, caller: Caller) =>
-  caller.principal._tag === "Agent" && caller.principal.projectId !== undefined
-    ? projectResource(caller.principal.projectId)
-    : Effect.succeed(MISSING);
+  caller.principal._tag !== "Agent"
+    ? Effect.succeed(MISSING)
+    : caller.principal.projectId === undefined
+      ? Effect.succeed(UNCHOSEN)
+      : projectResource(caller.principal.projectId);
 
 /** The project named, or for an agent naming none, its own. */
 const projectOrOwn = (id: unknown, caller: Caller) =>
@@ -336,6 +342,7 @@ export const RESOLVERS: Resolvers = {
   Agents_leaveNamespace: self,
   Agents_listProjects: self,
   Agents_listReachableProjects: self,
+  Agents_useProject: self,
   Agents_acceptProjectInvitation: self,
   Agents_leaveProject: self,
 
@@ -480,6 +487,72 @@ export function refusalResult(
 }
 
 /**
+ * An agent's token names no project, where the operation works in one. A
+ * run chooses its project (`Agents_useProject`), and a token without a run asks
+ * for one naming it. 403 and not 404: there is nothing it failed to find.
+ */
+export function noProject(caller: Caller): { readonly status: 403; readonly body: ProblemBody } {
+  const ofRun = caller.token?.run;
+  return {
+    status: 403,
+    body: problem(403, "run.no_project", caller.requestId, {
+      detail:
+        ofRun === undefined
+          ? "Your token names no project and no run, and this works in one project."
+          : `Your token names no project, and run ${ofRun.label ?? ofRun.id} has chosen none: this works in one project.`,
+      nextActions: [
+        {
+          kind: "call",
+          title: "List the projects you can work in",
+          operationId: "Agents_listReachableProjects",
+        },
+        ofRun === undefined
+          ? {
+              kind: "escalate",
+              title:
+                "Ask for a token that names a run, then choose its project with Agents_useProject",
+            }
+          : {
+              kind: "call",
+              title: "Work in one of them, by its id: your next token is for it",
+              operationId: "Agents_useProject",
+            },
+      ],
+    }),
+  };
+}
+
+/**
+ * An agent stood in the token's project once, and its invitation there ended:
+ * it is told so, where anyone else is refused or not told the project is there.
+ * It knew the project, so nothing is told that it did not know.
+ */
+export function agentLeft(
+  caller: Caller,
+  namespace: string,
+): { readonly status: 403; readonly body: ProblemBody } {
+  return {
+    status: 403,
+    body: problem(403, "agent.left", caller.requestId, {
+      detail: `You no longer stand in ${namespace}: you left, or a member took you out.`,
+      nextActions: [
+        { kind: "escalate", title: `Ask a member of ${namespace} to invite you again` },
+        {
+          kind: "call",
+          title: "List the projects you can work in",
+          operationId: "Agents_listReachableProjects",
+        },
+        {
+          kind: "call",
+          title: "Work in another of them, by its id",
+          operationId: "Agents_useProject",
+        },
+      ],
+    }),
+  };
+}
+
+/**
  * An operation about an agent's own record (its identity, its inbox) asked by a
  * user: the policy grants it to anyone on their own record, and a user has none
  * of an agent's. It points to the user's own.
@@ -516,6 +589,46 @@ export const decideFork = (
 ): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
 
 /**
+ * An agent refused for where its token stands, said as that: its token names no
+ * project, or it left the token's project. A pause is told as a pause, and every
+ * other refusal as the policy made it.
+ */
+export async function standingRefusal(
+  caller: Caller,
+  resolved: Resource,
+  refusal: AuthorizationRefusal,
+  run: Runner,
+) {
+  const { principal } = caller;
+  if (principal._tag !== "Agent" || refusal._tag === "AuthenticationRequired") return undefined;
+  if (refusal._tag === "AccessRefused" && refusal.reason === "agent-paused") return undefined;
+  if (resolved._tag === "Missing")
+    return resolved.unchosen === true && refusal._tag === "NotVisible"
+      ? noProject(caller)
+      : undefined;
+  const { standing } = principal;
+  if (
+    standing._tag !== "None" ||
+    standing.left !== true ||
+    resolved._tag !== "Project" ||
+    resolved.namespace !== principal.namespace
+  )
+    return undefined;
+  const record = await run(
+    caller,
+    Namespaces.use((namespaces) => namespaces.byId(resolved.namespace)),
+  );
+  if ("status" in record) return record;
+  return agentLeft(
+    caller,
+    Option.match(record, {
+      onNone: () => resolved.namespace,
+      onSome: (found) => found.handle,
+    }),
+  );
+}
+
+/**
  * The one authorization policy, in front of every operation: each operation's
  * resource is resolved, `authorize` decides,
  * and only a granted call reaches its handler, with the audience a read was
@@ -542,8 +655,10 @@ export function authorizeHandlers<H extends Operations<Caller>>(
       if ("status" in resolved) return resolved;
       if (resolved._tag === "PerItem") return handler(caller, input);
       const decided = authorize(caller.principal, action, resolved as ResourceFor<typeof action>);
-      if (Result.isFailure(decided))
-        return refusalResult(action, input, caller.requestId, decided.failure);
+      if (Result.isFailure(decided)) {
+        const why = await standingRefusal(caller, resolved, decided.failure, run);
+        return why ?? refusalResult(action, input, caller.requestId, decided.failure);
+      }
       const { audience } = decided.success;
       return handler(
         { ...caller, resource: resolved, ...(audience === undefined ? {} : { audience }) },

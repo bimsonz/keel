@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t "feed.no-lease"
+# kills: feed.no-lease
+# why: the feed serves each event's lease id to everyone who reads the project, though a lease is its holder's alone
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index 409307dd..9da28b95 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -105,7 +105,7 @@ function eventRecord(entry: EventFeedEntry) {
+         }),
+     ...(entry.project === undefined ? {} : { project: entry.project }),
+     ...(entry.label === undefined ? {} : { label: entry.label }),
+-    payload: unleased(payload),
++    payload,
+   };
+ }
+ 

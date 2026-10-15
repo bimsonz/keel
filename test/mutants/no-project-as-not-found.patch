@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/authorize-handlers.test.ts -t authz.no-project
+# kills: authz.no-project
+# why: a token that names no project is answered 404 at its own project's operations, so the agent is never told to choose one
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f26c0fbd..384572a3 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -603,7 +603,7 @@ export async function standingRefusal(
+   if (principal._tag !== "Agent" || refusal._tag === "AuthenticationRequired") return undefined;
+   if (refusal._tag === "AccessRefused" && refusal.reason === "agent-paused") return undefined;
+   if (resolved._tag === "Missing")
+-    return resolved.unchosen === true && refusal._tag === "NotVisible"
++    return resolved.unchosen === false && refusal._tag === "NotVisible"
+       ? noProject(caller)
+       : undefined;
+   const { standing } = principal;

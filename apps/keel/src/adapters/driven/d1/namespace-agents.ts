@@ -147,6 +147,16 @@ export function NamespaceAgentsD1(db: D1Database) {
             .bind(agentId)
             .all(),
         ).pipe(Effect.map(({ results }) => results.map(toInvitation))),
+      ended: (agentId, namespace) =>
+        Effect.promise(() =>
+          db
+            .prepare(
+              `SELECT 1 AS ended FROM namespace_agents
+               WHERE namespace_id = ? AND agent_id = ? AND state = 'ended'`,
+            )
+            .bind(namespace, agentId)
+            .first(),
+        ).pipe(Effect.map((row) => row !== null)),
     }),
   );
 }

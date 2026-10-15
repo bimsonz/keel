@@ -3,7 +3,7 @@ import { AgentId, Instant } from "@keeltown/core/kernel";
 import { sampleProjectId, sampleSponsorId } from "@keeltown/testing";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { whoamiOk } from "../../src/adapters/driving/http/mappers.ts";
+import { type TokenProject, whoamiOk } from "../../src/adapters/driving/http/mappers.ts";
 
 const agent: Agent = {
   id: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
@@ -30,8 +30,8 @@ const keyAgent: Agent = {
 
 const none = { namespaces: 0, projects: 0 };
 
-const answer = (identity: Identity) => {
-  const answered = whoamiOk(identity);
+const answer = (identity: Identity, here?: TokenProject) => {
+  const answered = whoamiOk(identity, here);
   if (answered.status !== 200) throw new Error(`whoami answered ${answered.status}`);
   return answered.body;
 };
@@ -72,18 +72,32 @@ describe("whoami's answer", () => {
     });
   });
 
-  it("[whoami.reach-next] points an agent that has joined an org or a project at the projects it can reach, last, and an agent that has joined nothing at none", () => {
-    const reads = (joined: { namespaces: number; projects: number }, invitations = none) =>
-      answer({ agent, session: null, invitations, joined }).next.map(
+  it("[whoami.reach-next] points an agent that has joined an org or a project at the projects it can reach, last, then while its token names none at choosing one, and an agent that has joined nothing at none", () => {
+    const reads = (
+      joined: { namespaces: number; projects: number },
+      invitations = none,
+      here?: TokenProject,
+    ) =>
+      answer({ agent, session: null, invitations, joined }, here).next.map(
         (action) => action.operationId,
       );
+    const chosen = [`Agents_listReachableProjects`, `Agents_useProject`];
     expect(reads(none)).toEqual([]);
-    expect(reads({ namespaces: 1, projects: 0 })).toEqual(["Agents_listReachableProjects"]);
-    expect(reads({ namespaces: 0, projects: 1 })).toEqual(["Agents_listReachableProjects"]);
+    expect(reads({ namespaces: 1, projects: 0 })).toEqual(chosen);
+    expect(reads({ namespaces: 0, projects: 1 })).toEqual(chosen);
     expect(reads({ namespaces: 1, projects: 0 }, { namespaces: 0, projects: 1 })).toEqual([
       "Agents_listProjects",
-      "Agents_listReachableProjects",
+      ...chosen,
     ]);
+    // A token that names a project works there already: the run has nothing to choose.
+    const working: TokenProject = {
+      project: { id: "prj_1B1YM1A788YVAYHTR6G6KW69TD", namespace: "acme", name: "notes" },
+      declares: true,
+    };
+    expect(reads({ namespaces: 1, projects: 0 }, none, working)).not.toContain("Agents_useProject");
+    expect(reads({ namespaces: 1, projects: 0 }, none, working)).toContain(
+      "Agents_listReachableProjects",
+    );
   });
 
   it("[whoami.sponsor-next] tells an agent nobody sponsors to ask a person, askSponsor first unless an invitation waits to be read, and says nothing of it once someone does", () => {

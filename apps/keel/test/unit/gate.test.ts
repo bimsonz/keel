@@ -5,8 +5,8 @@ import {
   principalOf,
   type SignedIn,
 } from "@keeltown/core/application/identity";
-import type { Agent, AgentClaims } from "@keeltown/core/domain/identity";
-import { Instant, makeId } from "@keeltown/core/kernel";
+import { type Agent, type AgentClaims, runIdOf } from "@keeltown/core/domain/identity";
+import { Instant, makeId, type ProjectId, RunLabel, type RunRef } from "@keeltown/core/kernel";
 import { NamespaceAgents, ProjectAgents, TokenIssuer } from "@keeltown/core/ports";
 import {
   hashSecret,
@@ -23,7 +23,7 @@ import {
   sampleProjectId,
   ulidOf,
 } from "@keeltown/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import {
   type Door,
   gate,
@@ -46,6 +46,8 @@ const ORIGIN = "https://keel.test";
 const JWT = "aaa.bbb.ccc";
 /** A token of the secret exchange whose agent the core gate refuses as revoked. */
 const REVOKED = "revoked.bbb.ccc";
+/** A token the core gate refuses as stale: its run chose a project, and it names none. */
+const STALE = "stale.bbb.ccc";
 const headed = (header: object) => `${btoa(JSON.stringify(header)).replaceAll("=", "")}.bbb.ccc`;
 /** An agent's own token, by what its header says it is; and one the identity adapter refuses. */
 const ACCESS_TOKEN = headed({ alg: "EdDSA", typ: "at+jwt" });
@@ -81,7 +83,13 @@ function recordingGate() {
       return Promise.resolve(
         credential._tag === "Token" && credential.token === REVOKED
           ? { refused: "revoked" }
-          : { admitted: { principal: { _tag: "Anonymous" } } },
+          : credential._tag === "Token" && credential.token === STALE
+            ? {
+                refused: "stale-project",
+                run: "my-run",
+                projectId: "prj_1B1YM1A788YVAYHTR6G6KW69TD",
+              }
+            : { admitted: { principal: { _tag: "Anonymous" } } },
       );
     },
   };
@@ -173,9 +181,12 @@ function keyedLayers(
   reads: { count: number } = { count: 0 },
   toProjects: ReturnType<typeof makeProjectAgentsMemory> = makeProjectAgentsMemory(),
   projectReads: { count: number } = { count: 0 },
+  chosen: readonly (readonly [RunRef, ProjectId])[] = [],
 ) {
   const directory = makeAgentDirectoryMemory();
   directory.agents.set(KEYED, { ...keyed, ...override });
+  for (const [run, projectId] of chosen)
+    directory.runProjects.set(`${KEYED}\n${run.id}`, projectId);
   const places = makeProjectNamespacesMemory();
   places.places.set(OWN, { projectId: OWN, namespace: KEYED, name: "mine" });
   places.places.set(ELSEWHERE, { projectId: ELSEWHERE, namespace: sampleOrgId, name: "theirs" });
@@ -470,6 +481,12 @@ describe("the request gate", () => {
     expect(await challenge(api, "Basic abc")).toEqual([401, "challenge for api"]);
     expect(await challenge(api, "Bearer sess-nobody")).toEqual([401, "challenge for api"]);
     expect(await challenge(api, `Bearer ${REVOKED}`)).toEqual([401, "challenge for api"]);
+    // A stale token is a 401 like any other, so a client that renews on a 401 asks again: at both doors.
+    expect(await challenge(api, `Bearer ${STALE}`)).toEqual([401, "challenge for api"]);
+    expect(await challenge(`${ORIGIN}/mcp`, `Bearer ${STALE}`, "mcp")).toEqual([
+      401,
+      "challenge for mcp",
+    ]);
     expect(await challenge(api, `DPoP ${BAD_ACCESS_TOKEN}`)).toEqual([
       401,
       "challenge for api: invalid_dpop_proof",
@@ -484,6 +501,55 @@ describe("the request gate", () => {
     ]);
     // A refused token is never handed to the core gate.
     expect(g.seen.filter((credential) => credential._tag === "Claims")).toEqual([]);
+  });
+
+  it.effect(
+    "[gate.stale-project] a token that names a run and no project is refused as stale once that run chose a project; one naming a project, another run's and one with no run are admitted",
+    () =>
+      Effect.gen(function* () {
+        const label = Schema.decodeSync(RunLabel)("my-run");
+        const run: RunRef = { id: runIdOf(KEYED, { label }), label };
+        const other: RunRef = {
+          id: runIdOf(KEYED, { label: Schema.decodeSync(RunLabel)("other") }),
+        };
+        const unchosen = keyedLayers();
+        expect(yield* reason(claims({ run })).pipe(Effect.provide(unchosen))).toBe("admitted");
+        const chose = keyedLayers({}, undefined, undefined, undefined, undefined, [[run, OWN]]);
+        const refused = yield* principalOf(claims({ run })).pipe(
+          Effect.flip,
+          Effect.provide(chose),
+        );
+        expect(refused).toMatchObject({
+          _tag: "TokenProjectStale",
+          agentId: KEYED,
+          run,
+          projectId: OWN,
+        });
+        // A named project wins over the run's choice; another run, and a token of no run, chose nothing.
+        const named = yield* principalOf(claims({ run, projectId: ELSEWHERE })).pipe(
+          Effect.provide(chose),
+        );
+        expect(named.principal).toMatchObject({ projectId: ELSEWHERE });
+        expect(yield* reason(claims({ run: other })).pipe(Effect.provide(chose))).toBe("admitted");
+        expect(yield* reason(claims()).pipe(Effect.provide(chose))).toBe("admitted");
+      }),
+  );
+
+  it("[gate.stale-project] a stale token is answered 401 invalid_token naming its run and project, with the way back", async () => {
+    const answered = await recordingGate().answer(
+      `${ORIGIN}/mcp`,
+      {
+        headers: { authorization: `Bearer ${STALE}` },
+      },
+      "mcp",
+    );
+    if (!(answered instanceof Response)) throw new Error("admitted");
+    expect(answered.status).toBe(401);
+    expect(await answered.json()).toMatchObject({
+      code: "auth.invalid_token",
+      detail: expect.stringContaining("Run my-run works in prj_1B1YM1A788YVAYHTR6G6KW69TD"),
+      nextActions: [{ kind: "escalate" }],
+    });
   });
 
   it.effect(
@@ -586,14 +652,18 @@ describe("the request gate", () => {
         expect(waiting.principal).toMatchObject({
           namespace: sampleOrgId,
           scopes: ["agent:work", "agent:read"],
-          standing: { _tag: "None" },
+        });
+        // Invited and not yet joined: it never stood there, so it did not leave.
+        expect(waiting.principal._tag === "Agent" && waiting.principal.standing).toEqual({
+          _tag: "None",
         });
 
         const ended = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined", "Left"]);
         const gone = yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(
           Effect.provide(keyedLayers({}, ended)),
         );
-        expect(gone.principal).toMatchObject({ standing: { _tag: "None" } });
+        // Its invitation ended: it stood there once, and is told it left.
+        expect(gone.principal).toMatchObject({ standing: { _tag: "None", left: true } });
 
         // Where it governs, and where the project has no place, the rows are never read.
         const both = yield* invitedBy(ANN, ["agent:read", "agent:work"], ["Joined"]);
@@ -606,7 +676,9 @@ describe("the request gate", () => {
         );
         expect(own.principal).toMatchObject({ standing: { _tag: "Governs" } });
         expect(account.principal).toMatchObject({ standing: { _tag: "Governs" } });
-        expect(nowhere.principal).toMatchObject({ standing: { _tag: "None" } });
+        expect(nowhere.principal._tag === "Agent" && nowhere.principal.standing).toEqual({
+          _tag: "None",
+        });
         // Neither table: not the org's rows, and not a project's.
         expect([reads.count, projectReads.count]).toEqual([0, 0]);
         yield* principalOf(claims({ projectId: ELSEWHERE })).pipe(Effect.provide(layer));

@@ -14,6 +14,13 @@ import { Effect, Layer } from "effect";
 import { MAIN, TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
 
 /**
+ * How long one request of a relay of trunk's whole history may run, the
+ * pool's `FILL_MS`: keel's own history relayed in 101 s on 15 Oct, against
+ * the 120 s every other git request is given.
+ */
+export const WHOLE_RELAY_MS = 300_000;
+
+/**
  * WorkspaceRefresher over GitCore and the code host: the project's trunk pack
  * for the head is relayed into the workspace's main, with the commit the pool
  * names as the explicit old value and the only have, so a main that is
@@ -24,30 +31,35 @@ import { MAIN, TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
  * and writes the workspace, each with a token minted for the call; neither
  * the tokens nor the remotes, which carry the account id, are ever put in an
  * error or a log. `trunkOf` finds a project's trunk (`projectRepos` unless a
- * test names its own).
+ * test names its own). A relay of trunk's whole history into an empty
+ * workspace is bounded by `wholeMs` a request rather than the git deadline.
  */
 export const WorkspaceRefresherGitCore = (
   trunkOf: (projectId: ProjectId) => RepoRef = (projectId) => projectRepos(projectId).trunk,
+  wholeMs: number = WHOLE_RELAY_MS,
 ) =>
   Layer.effect(
     WorkspaceRefresher,
     Effect.gen(function* () {
       const host = yield* CodeHost;
 
-      const remoteOf = (repo: RepoRef, access: "read" | "write") =>
+      const remoteOf = (repo: RepoRef, access: "read" | "write", deadlineMs?: number) =>
         Effect.gen(function* () {
           const info = yield* host.info(repo);
           const token = yield* host.mintToken(repo, access, TOKEN_TTL_SECONDS);
-          return gitRemote(info.remote, token.token);
+          const remote = gitRemote(info.remote, token.token);
+          return deadlineMs === undefined ? remote : { ...remote, deadlineMs };
         });
 
       return WorkspaceRefresher.of({
         advance: (projectId, workspace, from, to) =>
           Effect.gen(function* () {
             if (from === to) return "unchanged" satisfies SyncOutcome;
+            // Trunk's whole history, into a workspace made empty, outlasts the git deadline: keel's took 101 s.
+            const bound = from === null ? wholeMs : undefined;
             // The workspace first: one that is gone costs trunk no token.
-            const target = yield* remoteOf(workspace, "write");
-            const source = yield* remoteOf(trunkOf(projectId), "read").pipe(
+            const target = yield* remoteOf(workspace, "write", bound);
+            const source = yield* remoteOf(trunkOf(projectId), "read", bound).pipe(
               Effect.catchTag("RepoNotFound", Effect.die),
             );
             const outcome = yield* Effect.tryPromise({

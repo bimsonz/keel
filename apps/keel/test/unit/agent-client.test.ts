@@ -1,12 +1,19 @@
-import type { Agent } from "@keeltown/core/domain/identity";
-import { freshAgentKey, sampleAgent, signedUpAgent } from "@keeltown/testing";
+import { type Agent, runIdOf } from "@keeltown/core/domain/identity";
+import { makeId, type ProjectId, RunLabel, type RunId } from "@keeltown/core/kernel";
+import { freshAgentKey, sampleAgent, signedUpAgent, ulidOf } from "@keeltown/testing";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { AGENT_DISCOVERY, agentDiscovery } from "../../src/adapters/driven/better-auth/agents.ts";
+import {
+  AGENT_DISCOVERY,
+  agentClaims,
+  agentDiscovery,
+} from "../../src/adapters/driven/better-auth/agents.ts";
 
 /** The provider's question, asked of a directory that holds `agents`: who is this client? */
 async function client(agents: readonly Agent[], clientId: string): Promise<unknown> {
   const discovery = agentDiscovery({
     find: async (agentId) => agents.find((agent) => agent.id === agentId),
+    runProject: async () => undefined,
   });
   // The discovery reads nothing of the request, so none is made up for it.
   const answer: unknown = await Reflect.apply(discovery.resolve, discovery, [
@@ -39,12 +46,16 @@ describe("an agent as the token endpoint's provider reads a client", () => {
     });
   });
 
-  it("[discovery.client] a suspended agent and a revoked one are disabled clients", async () => {
-    for (const state of ["suspended", "revoked"] as const) {
+  it("[discovery.client] only a revoked agent is a disabled client: a paused one is given tokens, which read only who it is and its inbox", async () => {
+    for (const [state, disabled] of [
+      ["active", false],
+      ["suspended", false],
+      ["revoked", true],
+    ] as const) {
       const agent: Agent = { ...signedUpAgent(), state };
       expect([state, await client([agent], agent.id)]).toEqual([
         state,
-        expect.objectContaining({ disabled: true }),
+        expect.objectContaining({ disabled }),
       ]);
     }
   });
@@ -64,8 +75,61 @@ describe("an agent as the token endpoint's provider reads a client", () => {
     const enrolled: Agent = { ...sampleAgent, id: signedUpAgent().id };
     expect(await client([enrolled], enrolled.id)).toBeNull();
     expect(await client([], signedUpAgent().id)).toBeNull();
-    const discovery = agentDiscovery({ find: async () => enrolled });
+    const discovery = agentDiscovery({
+      find: async () => enrolled,
+      runProject: async () => undefined,
+    });
     expect(discovery.matches("keel-device")).toBe(false);
     expect(await client([enrolled], "keel-device")).toBeNull();
+  });
+});
+
+/**
+ * What the token endpoint adds to a token of `agent`'s for a request with this
+ * form, where the agent's runs chose as `chosen` says: the provider's input is
+ * made up of only what the claims read.
+ */
+async function claimsOf(
+  agent: Agent,
+  form: Readonly<Record<string, string>>,
+  chosen: ReadonlyMap<RunId, ProjectId> = new Map(),
+): Promise<unknown> {
+  const asked: RunId[] = [];
+  const access = {
+    find: async () => agent,
+    runProject: async (_agentId: string, runId: RunId) => {
+      asked.push(runId);
+      return chosen.get(runId);
+    },
+  };
+  const input = {
+    client: { clientId: agent.id, clientDiscoveryId: AGENT_DISCOVERY },
+    ctx: { body: form, headers: new Headers() },
+  };
+  const claims: unknown = await Reflect.apply(agentClaims, undefined, [access, input]);
+  return { claims, asked };
+}
+
+describe("what the token endpoint adds to an agent's token", () => {
+  it("[token.run-project] a request that names a run and no project is for the project that run chose; a named project wins, another run chose nothing, and a request with no run asks nothing", async () => {
+    const agent = signedUpAgent();
+    const label = Schema.decodeSync(RunLabel)("my-run");
+    const run = runIdOf(agent.id, { label });
+    const [chosen, named] = [makeId("prj", ulidOf(61)), makeId("prj", ulidOf(62))];
+    const choices = new Map([[run, chosen]]);
+    expect(await claimsOf(agent, { run: "my-run" }, choices)).toMatchObject({
+      claims: { prj: chosen, run, run_label: "my-run" },
+      asked: [run],
+    });
+    expect(await claimsOf(agent, { run: "my-run", project: named }, choices)).toEqual({
+      claims: expect.objectContaining({ prj: named }),
+      asked: [],
+    });
+    const other = await claimsOf(agent, { run: "other" }, choices);
+    expect(Reflect.get(Object(Reflect.get(Object(other), "claims")), "prj")).toBeUndefined();
+    expect(await claimsOf(agent, {}, choices)).toEqual({
+      claims: expect.not.objectContaining({ prj: expect.anything() }),
+      asked: [],
+    });
   });
 });

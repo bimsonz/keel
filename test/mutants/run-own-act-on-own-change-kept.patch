@@ -2,13 +2,13 @@
 # kills: run.inbox-own
 # why: what a run does to a change it holds is filed, for that run and by it, so the log grows with entries no run is ever shown
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index abf32f99..63228258 100644
+index 987db9a5..60e35fb8 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -274,7 +274,6 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
-   if (!notifies(agentId, event)) return;
-   const holder =
-     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+@@ -280,7 +280,6 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+       : event.entity.kind === "agent"
+         ? undefined
+         : soleHolder(store, event);
 -  if (holder !== undefined && event.run?.id === holder) return;
    recordDelivery(store, event, holder);
  }

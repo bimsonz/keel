@@ -309,7 +309,8 @@ model IntentDeclared {
   footprint: MFP.FootprintEntry[];
   premises: EventProposition[];
   declaredEffects?: EventProposition[];
-  leaseId: LeaseId;
+  /** Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts. */
+  leaseId?: LeaseId;
 }
 
 model PreflightIssued {
@@ -579,7 +580,8 @@ model ChangeAdopted {
   /** The adopter's run, which holds the change from here; absent when the adopter's token named none. */
   run?: RunRef;
 
-  leaseId: LeaseId;
+  /** Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts. */
+  leaseId?: LeaseId;
   briefRef: string;
 }
 
@@ -600,7 +602,8 @@ model ChangeSuperseded {
 model LeaseLapsed {
   _tag: "LeaseLapsed";
   changeId: ChangeId;
-  leaseId: LeaseId;
+  /** Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts. */
+  leaseId?: LeaseId;
   renewedAt: Instant;
 }
 
@@ -608,7 +611,8 @@ model LeaseLapsed {
 model LeaseRestarted {
   _tag: "LeaseRestarted";
   changeId: ChangeId;
-  leaseId: LeaseId;
+  /** Never on the feed: a lease is its holder's alone, answered to it when it declares or adopts. */
+  leaseId?: LeaseId;
 }
 
 model SubjectMinted {

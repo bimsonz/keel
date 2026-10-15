@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t link.standing
+# kills: link.standing
+# why: an agent whose invitation gives Read alone is told its token lacks the scope, and asks for a token it can never get
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 4514aa2d..812ef4a8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -702,7 +702,7 @@ const whyNoWork = (
+     case "Invited":
+       if (standing.by.suspended) return "inviter-suspended";
+       if (standing.by.role === undefined) return "inviter-left";
+-      return standing.readOnly === true ? "read-only" : "scope";
++      return "scope";
+     case "Governs":
+       return "scope";
+     default:

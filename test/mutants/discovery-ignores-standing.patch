@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-client.test.ts
 # kills: discovery.client
-# why: a suspended or revoked agent is an enabled client, so only the claims rule stands between a paused agent and a new token
+# why: a revoked agent is an enabled client, so only the claims rule stands between a revoked agent and a new token
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 5a71018f..e387fbef 100644
+index f9773c85..f49ba6ac 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -99,7 +99,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
-         clientId: agent.id,
-         clientDiscoveryId: AGENT_DISCOVERY,
+@@ -104,7 +104,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
          name: agent.name,
--        disabled: agent.state !== "active",
+         // Only a revoked agent is no client: a paused one is given a token, and the gate lets it
+         // read who it is and its inbox alone, so it hears when its sponsor unpauses it.
+-        disabled: agent.state === "revoked",
 +        disabled: false,
          tokenEndpointAuthMethod: "private_key_jwt",
          grantTypes: ["client_credentials"],

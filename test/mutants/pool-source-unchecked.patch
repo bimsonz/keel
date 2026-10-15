@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fill-from-trunk"
+# kills: pool.fill-from-trunk
+# why: a source that cannot be read is forked anyway, every fork fails, and a pass makes nothing ready first
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..f7564e88 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -349,7 +349,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+     return { started: 0, ready: 0, failed: 0, abandoned: stuck.length } satisfies RefillReport;
+ 
+   // A source that cannot be read is not forked at all: every fork of it would fail.
+-  const forkable = yield* sourceReadable(project, source);
++  const forkable = true;
+   const fresh: Slot[] = [];
+   const forks = forkable ? need : 0;
+   for (let i = 0; i < forks; i++) fresh.push(yield* startSlot(project, source));

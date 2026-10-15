@@ -2,13 +2,13 @@
 # kills: authz.invitation-rows
 # why: an agent is refused its own invitations as a person's business, so nobody accepts one
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e161bdfa..90d3a5fc 100644
+index 4514aa2d..4f254691 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -672,9 +672,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
-   switch (need) {
+@@ -731,9 +731,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
      case "anyone":
      case "self":
+     case "selfRead":
 -    case "agent":
      case "account":
        return granted();

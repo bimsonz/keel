@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/authorize-handlers.test.ts -t authz.left
+# kills: authz.left
+# why: a paused agent that also left is told it left, not that it is paused
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f26c0fbd..0f232859 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -601,7 +601,6 @@ export async function standingRefusal(
+ ) {
+   const { principal } = caller;
+   if (principal._tag !== "Agent" || refusal._tag === "AuthenticationRequired") return undefined;
+-  if (refusal._tag === "AccessRefused" && refusal.reason === "agent-paused") return undefined;
+   if (resolved._tag === "Missing")
+     return resolved.unchosen === true && refusal._tag === "NotVisible"
+       ? noProject(caller)

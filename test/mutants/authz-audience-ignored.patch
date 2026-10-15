@@ -2,10 +2,11 @@
 # kills: authz.audience
 # why: every granted read sees as a member, so an outsider reading a public project gets its members-only events
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f26c0fbd..401b1ca5 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -317,7 +317,7 @@
-         return refusalResult(action, input, caller.requestId, decided.failure);
+@@ -661,7 +661,7 @@ export function authorizeHandlers<H extends Operations<Caller>>(
+       }
        const { audience } = decided.success;
        return handler(
 -        { ...caller, resource: resolved, ...(audience === undefined ? {} : { audience }) },

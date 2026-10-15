@@ -23,12 +23,14 @@ export class WorkspaceRefresher extends Context.Service<
      * PushRejected `stale`: main was not at `from`, or `to` is behind `from`
      * (a workspace is only ever moved forward); `busy`: the workspace stayed
      * busy. Nothing moved in any of these. It never reads main back: the
-     * caller does, to learn where a refused or lost push left it.
+     * caller does, to learn where a refused or lost push left it. `from`
+     * null is an empty workspace with no main yet: trunk's whole history at
+     * `to` is sent, and a main that exists refuses it.
      */
     readonly advance: (
       projectId: ProjectId,
       workspace: RepoRef,
-      from: CommitSha,
+      from: CommitSha | null,
       to: CommitSha,
     ) => Effect.Effect<SyncOutcome, RepoNotFound | PushRejected | PackTooLarge>;
   }

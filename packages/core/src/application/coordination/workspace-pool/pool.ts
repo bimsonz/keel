@@ -1,4 +1,4 @@
-import { Effect, Exit, Result, Schema } from "effect";
+import { Cause, Effect, Exit, Result, Schema } from "effect";
 import {
   PoolExhausted,
   WorkspaceCollected,
@@ -125,6 +125,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
   const trunks = yield* Trunks;
   /** The workspaces this grant could not bring to trunk's head. */
   const tried = new Set<WorkspaceId>();
+  yield* reclaimStranded(project);
   // Each pass grants, loses a ready slot to another grant, or tries one more: the loop ends. The bound catches a slot that can never be granted.
   for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
     if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
@@ -148,6 +149,20 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
         countIn(store, "forking") + countIn(store, "refreshing") + tried.size > 0 ? 5_000 : 15_000;
       const { readyAt } = settingsOf(store);
       const untilReady = readyAt === undefined ? 0 : readyAt - (yield* (yield* Clock).now);
+      // Said with what the pool holds, so a pool that stays exhausted shows why.
+      yield* Effect.logWarning(
+        JSON.stringify({
+          event: "pool-exhausted",
+          project,
+          target: settingsOf(store).target,
+          ready: countIn(store, "ready"),
+          forking: countIn(store, "forking"),
+          refreshing: countIn(store, "refreshing"),
+          granted: countIn(store, "granted"),
+          collecting: countIn(store, "collecting"),
+          tried: tried.size,
+        }),
+      );
       return yield* new PoolExhausted({ retryAfterMs: Math.max(soonest, untilReady) });
     }
     const head = yield* trunks.head(project);
@@ -201,6 +216,46 @@ export interface RefillReport {
   readonly failed: number;
   readonly abandoned: number;
 }
+
+/**
+ * How long making one workspace from trunk itself may run: an empty repo
+ * made (5 s live) and trunk's whole history relayed into its main (101 s
+ * for keel's own, 15 Oct), with room.
+ */
+export const FILL_MS = 300_000;
+
+/**
+ * Whether the pool's source can be forked from: its main reads, on the
+ * first try or the second, so one failed request is not taken for a broken
+ * repo. A source that is gone, has no main, or fails both reads cannot.
+ */
+const sourceReadable = (project: ProjectId, source: RepoName) =>
+  Effect.gen(function* () {
+    const read = (yield* CodeHost).head(source, MAIN).pipe(Effect.exit);
+    const first = yield* read;
+    if (Exit.isSuccess(first)) return true;
+    const again = yield* read;
+    if (Exit.isSuccess(again)) return true;
+    yield* Effect.logWarning(
+      `pool ${project}: source ${source.namespace}/${source.name} cannot be read, so workspaces are made from trunk: ${Cause.pretty(again.cause)}`,
+    );
+    return false;
+  });
+
+/**
+ * Makes one workspace from trunk itself: an empty repo, and trunk's whole
+ * history relayed into its main. The refill's way when its source cannot
+ * be forked, so an agent never waits on the mirror. Bounded by `FILL_MS`.
+ */
+const fillOne = (project: ProjectId, repo: RepoName) =>
+  Effect.gen(function* () {
+    const host = yield* CodeHost;
+    yield* host.create(repo);
+    const head = yield* (yield* Trunks).head(project);
+    yield* (yield* WorkspaceRefresher).advance(project, repo, null, head);
+    const info = yield* host.info(repo);
+    return { remote: info.remote, baseSha: head };
+  }).pipe(Effect.timeout(FILL_MS));
 
 /** Forks `source` into a fresh repo and reads what a grant hands out. */
 const forkOne = (source: RepoName, repo: RepoName) =>
@@ -283,6 +338,39 @@ export const forksStuck = Effect.fn("coordination/forksStuck")(function* () {
 });
 
 /**
+ * How long a slot may stand `forking` before a grant takes it for stranded:
+ * past the longest a refill gives one (a fork, or a fill bounded by
+ * `FILL_MS`), so it is never one still being made.
+ */
+export const RECLAIM_FORKING_MS = FILL_MS + 1_000;
+
+/**
+ * How many slots stand `refreshing` past `STUCK_REFRESH_MS`: their relay
+ * died with its pass or its object. Only a refresh pass reads one back, and
+ * the pool's object arms one while any is left.
+ */
+export const refreshesStuck = Effect.fn("coordination/refreshesStuck")(function* () {
+  const now = yield* (yield* Clock).now;
+  return slots(yield* EntityStore).filter(
+    (s) => s.state === "refreshing" && now - s.since > STUCK_REFRESH_MS,
+  ).length;
+});
+
+/**
+ * Collects every slot left `forking` past `RECLAIM_FORKING_MS`, by its state
+ * alone: a grant reads nothing of Artifacts. On 15 Oct a deploy's reset left
+ * keel/keel's pool counting such slots, and every declare met pool_exhausted.
+ */
+const reclaimStranded = (project: ProjectId) =>
+  Effect.gen(function* () {
+    const now = yield* (yield* Clock).now;
+    const stranded = slots(yield* EntityStore).filter(
+      (s) => s.state === "forking" && now - s.since > RECLAIM_FORKING_MS,
+    );
+    for (const slot of stranded) yield* markCollecting(project, slot.id, "fork-abandoned");
+  });
+
+/**
  * Tops the pool up to its target. Each new slot is committed as `forking`
  * before its fork starts; the forks run in parallel outside any transaction
  * (a fork is ready when the call resolves, spike S2); each that resolves
@@ -295,7 +383,6 @@ export const forksStuck = Effect.fn("coordination/forksStuck")(function* () {
  */
 export const refillPool = Effect.fn("coordination/refillPool")(function* (project: ProjectId) {
   const store = yield* EntityStore;
-  const ids = yield* Ids;
   const now = yield* (yield* Clock).now;
   const settings = settingsOf(store);
   const stuck = stuckIn(store, now);
@@ -309,14 +396,65 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
   if (source === null || need <= 0 || isDestroyed(store))
     return { started: 0, ready: 0, failed: 0, abandoned: stuck.length } satisfies RefillReport;
 
+  // A source that cannot be read is not forked at all: every fork of it would fail.
+  const forkable = yield* sourceReadable(project, source);
   const fresh: Slot[] = [];
-  for (let i = 0; i < need; i++) {
-    const id: WorkspaceId = yield* ids.next("wsp");
+  const forks = forkable ? need : 0;
+  for (let i = 0; i < forks; i++) fresh.push(yield* startSlot(project, source));
+
+  const outcomes = yield* Effect.forEach(fresh, (slot) => Effect.exit(forkOne(source, slot.repo)), {
+    concurrency: "unbounded",
+  });
+  let ready = 0;
+  let unforked = 0;
+  for (const [i, outcome] of outcomes.entries()) {
+    const slot = fresh[i];
+    if (slot === undefined) continue;
+    if (Exit.isFailure(outcome)) {
+      unforked += 1;
+      // Said, so a pool that cannot fork is seen before it runs dry: a broken mirror once failed every fork in silence.
+      yield* Effect.logWarning(
+        `pool ${project}: fork of ${source.namespace}/${source.name} into ${slot.repo.name} failed: ${Cause.pretty(outcome.cause)}`,
+      );
+      yield* markCollecting(project, slot.id, "fork-failed");
+      continue;
+    }
+    if (yield* madeReady(project, slot, outcome.value, source.name)) ready += 1;
+  }
+
+  // A slot given up while it forked (the pool destroyed) counts as failed too, as it always has.
+  let failed = fresh.length - ready;
+  // One workspace made from trunk itself when the source could not give them, one a pass: each
+  // relay holds trunk's whole pack in memory, and the object runs the next pass at once.
+  const filled = (!forkable || unforked > 0) && !isDestroyed(store) ? need - ready : 0;
+  if (filled > 0) {
+    const slot = yield* startSlot(project, source);
+    const made = yield* Effect.exit(fillOne(project, slot.repo));
+    if (Exit.isFailure(made)) {
+      failed += 1;
+      yield* Effect.logWarning(
+        `pool ${project}: making ${slot.repo.name} from trunk failed: ${Cause.pretty(made.cause)}`,
+      );
+      yield* markCollecting(project, slot.id, "fork-failed");
+    } else if (yield* madeReady(project, slot, made.value, "trunk")) ready += 1;
+  }
+  return {
+    started: fresh.length + (filled > 0 ? 1 : 0),
+    ready,
+    failed,
+    abandoned: stuck.length,
+  } satisfies RefillReport;
+});
+
+/** A new slot for `source`'s namespace, committed as `forking` before anything is made for it. */
+const startSlot = (project: ProjectId, source: RepoName) =>
+  Effect.gen(function* () {
+    const id: WorkspaceId = yield* (yield* Ids).next("wsp");
     const slot: Slot = {
       id,
       repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
       state: "forking",
-      since: now,
+      since: yield* (yield* Clock).now,
     };
     yield* commit(
       { entity: { kind: "workspace", id }, cause: `fork-start:${id}`, project },
@@ -325,20 +463,21 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
         return Result.succeed({ value: undefined, drafts: [] });
       },
     );
-    fresh.push(slot);
-  }
-
-  const outcomes = yield* Effect.forEach(fresh, (slot) => Effect.exit(forkOne(source, slot.repo)), {
-    concurrency: "unbounded",
+    return slot;
   });
-  let ready = 0;
-  for (const [i, outcome] of outcomes.entries()) {
-    const slot = fresh[i];
-    if (slot === undefined) continue;
-    if (Exit.isFailure(outcome)) {
-      yield* markCollecting(project, slot.id, "fork-failed");
-      continue;
-    }
+
+/**
+ * Commits a made slot `ready` with `WorkspaceForked` naming where it came
+ * from: whether it counts as ready (false: given up while it was made, and
+ * collected again now its repo exists).
+ */
+const madeReady = (
+  project: ProjectId,
+  slot: Slot,
+  made: { readonly remote: string; readonly baseSha: CommitSha },
+  sourceRepo: string,
+) =>
+  Effect.gen(function* () {
     const at = yield* (yield* Clock).now;
     const forked = yield* commit(
       { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}`, project },
@@ -354,8 +493,8 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
           ...current,
           state: "ready",
           since: at,
-          remote: outcome.value.remote,
-          baseSha: outcome.value.baseSha,
+          remote: made.remote,
+          baseSha: made.baseSha,
         });
         return Result.succeed({
           value: true,
@@ -364,21 +503,14 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
               _tag: "WorkspaceForked",
               workspaceId: slot.id,
               repo: slot.repo.name,
-              sourceRepo: source.name,
+              sourceRepo,
             }),
           ],
         });
       },
     );
-    if (forked.duplicate || forked.value) ready += 1;
-  }
-  return {
-    started: fresh.length,
-    ready,
-    failed: fresh.length - ready,
-    abandoned: stuck.length,
-  } satisfies RefillReport;
-});
+    return forked.duplicate || forked.value;
+  });
 
 /** Moves a slot that never became a workspace (its fork failed or was abandoned) to collection; no event, as no workspace existed. */
 const markCollecting = (project: ProjectId, id: WorkspaceId, why: string) =>
@@ -511,6 +643,19 @@ const settleRefresh = (project: ProjectId, id: WorkspaceId) =>
     return done.duplicate ? ("left" satisfies Refreshed) : done.value;
   });
 
+/** Collects a slot still `refreshing` whose main could not be read back. */
+const collectUnsettled = (project: ProjectId, id: WorkspaceId) =>
+  Effect.gen(function* () {
+    const done = yield* commit(
+      { entity: { kind: "workspace", id }, cause: `refresh-unread:${id}`, project },
+      (tx) =>
+        slotOf(tx.store, id)?.state === "refreshing"
+          ? decided("collected", collectIn(tx, id, "expired", tx.at))
+          : decided("left"),
+    );
+    return done.duplicate ? ("left" satisfies Refreshed) : done.value;
+  });
+
 /**
  * Refreshes one slot, for a pass or for a claim. It is claimed first (`ready`
  * to `refreshing`, checked again inside the transaction, so one granted or
@@ -602,7 +747,9 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
   let refreshed = 0;
   let failed = 0;
   for (const slot of stuck) {
-    const how = yield* settleRefresh(project, slot.id);
+    const read = yield* settleRefresh(project, slot.id);
+    // Stuck past its bound and still unreadable: no workspace the pool can vouch for.
+    const how = read === "unsettled" ? yield* collectUnsettled(project, slot.id) : read;
     if (how === "collected") failed += 1;
     // Its relay had landed; it counts once it stands on today's head, or it is refreshed again below.
     if (how === "advanced" && slotOf(store, slot.id)?.baseSha === head) refreshed += 1;

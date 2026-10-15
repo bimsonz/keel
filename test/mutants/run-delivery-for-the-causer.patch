@@ -2,12 +2,12 @@
 # kills: run.inbox-for
 # why: an entry is filed for the run that caused the event, not the run that holds the change, so the holder is the one lane never told
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index 8297d62..b33575d 100644
+index 987db9a5..8240bed5 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -275,7 +275,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
-   const holder =
-     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+@@ -281,7 +281,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+         ? undefined
+         : soleHolder(store, event);
    if (holder !== undefined && event.run?.id === holder) return;
 -  recordDelivery(store, event, holder);
 +  recordDelivery(store, event, event.run?.id);

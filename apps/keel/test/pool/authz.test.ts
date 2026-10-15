@@ -505,7 +505,13 @@ async function move(
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });
   const body = await response.json<Record<string, unknown>>();
-  return { status: response.status, code: body["code"], lease: Object(body["result"]).lease?.id };
+  return {
+    status: response.status,
+    code: body["code"],
+    detail: body["detail"],
+    nextActions: body["nextActions"],
+    lease: Object(body["result"]).lease?.id,
+  };
 }
 
 const PER_SESSION = Schema.encodeSync(Proposition)(
@@ -523,6 +529,7 @@ describe("[authz.lease-foreign] a change's lease moves it only from the change's
     const c = await changeUnderTest(projectId, "project");
     const declared = ok(await c.declare("declare-1")).change.lease.id;
     const sha = await c.push();
+    const own = await tokenFor(await seedAgent({ projectId, id: c.agentId }));
     const ofProject = await seedAgent({ projectId });
     const colleague = await tokenFor(ofProject);
     const foreigner = await tokenFor(await seedForeignAgent());
@@ -575,17 +582,11 @@ describe("[authz.lease-foreign] a change's lease moves it only from the change's
     );
     const untouched = { log: await c.log(), change: await c.current() };
 
-    // An agent of the change's own project moves it under the lease, and after adopting it.
-    const revised = await move(
-      colleague,
-      `/changes/${c.changeId}/revisions`,
-      declared,
-      "c-revise-key",
-      {
-        ifMatch: '"1"',
-        body: { goal: "Cache permission lookups per request, in the colleague's words" },
-      },
-    );
+    // The change's own agent moves it under the lease, and another agent of its project after adopting it.
+    const revised = await move(own, `/changes/${c.changeId}/revisions`, declared, "c-revise-key", {
+      ifMatch: '"1"',
+      body: { goal: "Cache permission lookups per request, in its own agent's words" },
+    });
     c.clock.advance(LEASE_TTL_MS);
     const adopted = await move(colleague, `/changes/${c.changeId}/adopt`, undefined, "c-adopt-key");
     const second = await foreign(String(adopted.lease), 2, "f2");
@@ -629,7 +630,7 @@ describe("[authz.lease-foreign] a change's lease moves it only from the change's
     expect([revised.status, adopted.status]).toEqual([200, 200]);
     expect(second).toEqual(NOT_FOUND);
     expect(after.intent.goal).toBe(
-      "Cache permission lookups per request, in the colleague's words",
+      "Cache permission lookups per request, in its own agent's words",
     );
     expect([relied.status, refusal(ownDistinction), rebased.status, submitted.status]).toEqual([
       200,
@@ -637,5 +638,160 @@ describe("[authz.lease-foreign] a change's lease moves it only from the change's
       200,
       202,
     ]);
+  });
+});
+
+describe("[authz.lease-holder] only the agent holding a change acts under its lease", () => {
+  it("[authz.lease-holder] another agent of the change's project, holding its id and lease, is 409 change.held_by_other naming the holder, with when the lease lapses and adopt to call then, on revise, rely, rebase, submit, commit and abandon over REST, revise over MCP, and distinguish and a fresh workspace token at the change's object; an agent of another org is still 404; nothing moves; once the colleague adopts the change it moves it, and its former holder is told who holds it now, whichever lease it sends", async () => {
+    const projectId = makeId("prj", ulid());
+    const c = await changeUnderTest(projectId, "project");
+    const declared = ok(await c.declare("declare-1")).change.lease;
+    const sha = await c.push();
+    const holder = await tokenFor(
+      await seedAgent({ projectId, id: c.agentId, name: "cache-holder" }),
+    );
+    const ofProject = await seedAgent({ projectId, name: "cache-colleague" });
+    const colleague = await tokenFor(ofProject);
+    const foreigner = await tokenFor(await seedForeignAgent());
+    // A refusal that renewed the lease would move its time: the clock moves first, so one would show.
+    c.clock.advance(60_000);
+
+    /** Every move `token` can make on the change under `lease`, each answered whole. */
+    const moves = async (token: string, lease: string, revision: number, round: string) => {
+      const answers = await Promise.all([
+        move(token, `/changes/${c.changeId}/revisions`, lease, `${round}-revise-key`, {
+          ifMatch: `"${revision}"`,
+          body: { goal: "Rewritten by an agent that does not hold the change" },
+        }),
+        move(token, `/changes/${c.changeId}/premises`, lease, `${round}-rely-key`, {
+          body: { premise: PER_SESSION },
+        }),
+        move(token, `/changes/${c.changeId}/rebase`, lease, `${round}-rebase-key`),
+        move(token, "/submissions", lease, `${round}-submit-key`, {
+          body: { changeId: c.changeId, commitSha: sha },
+        }),
+        move(token, `/changes/${c.changeId}/commits`, lease, `${round}-commit-key`, {
+          body: {
+            expectedHead: sha,
+            message: "Rewrite a",
+            edits: [{ path: "a.txt", content: "b" }],
+          },
+        }),
+        move(token, `/changes/${c.changeId}/abandon`, lease, `${round}-abandon-key`, { body: {} }),
+      ]);
+      const viaTool = await tool(token, "revise", {
+        changeId: c.changeId,
+        "keel-lease": lease,
+        "idempotency-key": `${round}-revise-mcp`,
+        "if-match": String(revision),
+        goal: "Rewritten by an agent that does not hold the change",
+      });
+      return [...answers, Object(viaTool.body)];
+    };
+    /** Distinguish and a fresh workspace token, at the change's own object, which no doorway reaches with another agent. */
+    const atObject = async (agentId: string, lease: string, round: string) => [
+      refusal(
+        decodeExit(
+          ChangeCodecs.distinguish,
+          await c.stub.distinguish({
+            agentId,
+            projectId,
+            leaseId: lease,
+            decisionId: makeId("dec", ulid()),
+            distinction: "A decision of this change's project does not govern it",
+            idempotencyKey: `${round}-distinguish-key`,
+          }),
+        ),
+      ),
+      refusal(
+        decodeExit(
+          ChangeCodecs.refreshWorkspace,
+          await c.stub.refreshWorkspace({ agentId, projectId, leaseId: lease }),
+        ),
+      ),
+    ];
+    const heldBy = (name: string, lapsesAt: number) => ({
+      status: 409,
+      code: "change.held_by_other",
+      detail: expect.stringContaining(
+        `held by ${name} under a lease that lapses at ${new Date(lapsesAt).toISOString()}`,
+      ),
+      nextActions: [
+        { kind: "wait", title: expect.any(String), args: { lapsesAt } },
+        {
+          kind: "call",
+          title: expect.any(String),
+          operationId: "adopt",
+          args: { changeId: c.changeId },
+        },
+      ],
+    });
+
+    const before = { log: await c.log(), change: await c.current() };
+    const told = await moves(colleague, declared.id, 1, "c1");
+    const toldAtObject = await atObject(ofProject.agent.id, declared.id, "c1");
+    const fromOtherOrg = await Promise.all([
+      move(foreigner, `/changes/${c.changeId}/revisions`, declared.id, "f1-revise-key", {
+        ifMatch: '"1"',
+        body: { goal: "Rewritten by an agent of another org" },
+      }),
+      move(foreigner, `/changes/${c.changeId}/commits`, declared.id, "f1-commit-key", {
+        body: { expectedHead: sha, message: "Rewrite a", edits: [{ path: "a.txt", content: "b" }] },
+      }),
+      move(foreigner, `/changes/${c.changeId}/abandon`, declared.id, "f1-abandon-key", {
+        body: {},
+      }),
+    ]);
+    const untouched = { log: await c.log(), change: await c.current() };
+
+    // The colleague adopts the change once its lease lapses, and moves it under its own lease.
+    c.clock.advance(LEASE_TTL_MS);
+    const adopted = await move(colleague, `/changes/${c.changeId}/adopt`, undefined, "c-adopt-key");
+    const lease = String(adopted.lease);
+    const revised = await move(
+      colleague,
+      `/changes/${c.changeId}/revisions`,
+      lease,
+      "c-revise-key",
+      {
+        ifMatch: '"1"',
+        body: { goal: "Cache permission lookups per request, as its adopter put it" },
+      },
+    );
+    const adoptedLease = (await c.current()).lease;
+    const formerOld = await move(
+      holder,
+      `/changes/${c.changeId}/revisions`,
+      declared.id,
+      "h-old-key",
+      {
+        ifMatch: '"2"',
+        body: { goal: "Rewritten by the change's former holder" },
+      },
+    );
+    const formerNew = await move(holder, `/changes/${c.changeId}/revisions`, lease, "h-new-key", {
+      ifMatch: '"2"',
+      body: { goal: "Rewritten by the change's former holder" },
+    });
+    const after = await c.current();
+
+    const lapses = declared.renewedAt + LEASE_TTL_MS;
+    expect(told).toEqual([
+      ...Array.from({ length: 6 }, () => expect.objectContaining(heldBy("cache-holder", lapses))),
+      expect.objectContaining({ status: 409, code: "change.held_by_other" }),
+    ]);
+    expect(toldAtObject.map((answer) => answer.includes('"_tag":"ChangeHeldByOther"'))).toEqual([
+      true,
+      true,
+    ]);
+    expect(fromOtherOrg.map((answer) => [answer.status, answer.code])).toEqual(
+      Array.from({ length: 3 }, () => [404, "change.not_found"]),
+    );
+    expect(untouched).toEqual(before);
+    expect([adopted.status, revised.status]).toEqual([200, 200]);
+    const adopterLapses = adoptedLease.renewedAt + LEASE_TTL_MS;
+    expect(formerOld).toMatchObject(heldBy("cache-colleague", adopterLapses));
+    expect(formerNew).toMatchObject(heldBy("cache-colleague", adopterLapses));
+    expect(after.intent.goal).toBe("Cache permission lookups per request, as its adopter put it");
   });
 });

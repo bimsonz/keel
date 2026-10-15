@@ -2,7 +2,7 @@
 # kills: run.published
 # why: the feed publishes an event without its run, so the console and every reader see one agent where several runs worked
 diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
-index f62b8e28..e68086c4 100644
+index 409307dd..9403c552 100644
 --- a/apps/keel/src/adapters/driving/http/events.ts
 +++ b/apps/keel/src/adapters/driving/http/events.ts
 @@ -95,14 +95,6 @@ function eventRecord(entry: EventFeedEntry) {
@@ -19,4 +19,4 @@ index f62b8e28..e68086c4 100644
 -        }),
      ...(entry.project === undefined ? {} : { project: entry.project }),
      ...(entry.label === undefined ? {} : { label: entry.label }),
-     payload,
+     payload: unleased(payload),

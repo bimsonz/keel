@@ -2,15 +2,15 @@
 # kills: mcp.wait
 # why: the tools are served the handlers as they are, so a held inbox read with a progress token sends nothing until its answer
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 71fcf8c1..5a95c4c9 100644
+index 0ddfbc4a..b75884c4 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -123,7 +123,7 @@ export function makeMcpEndpoint(
+@@ -223,7 +223,7 @@ export function makeMcpEndpoint(
        { name: "keel", version: openApiDocument.info.version },
        { instructions: INSTRUCTIONS },
      );
--    registerTools(server, (call) => held(handlers, call), toolDeps(admitted));
-+    registerTools(server, () => handlers, toolDeps(admitted));
-     registerResources(server, handlers, (signal) => callerOf(admitted, signal));
+-    registerTools(server, (call) => held(told, call), toolDeps(admitted));
++    registerTools(server, () => told, toolDeps(admitted));
+     registerResources(server, told, (signal) => callerOf(admitted, signal));
      // Only the current revision listens; an earlier one has no way to watch a resource here.
      if (context.era === "modern")

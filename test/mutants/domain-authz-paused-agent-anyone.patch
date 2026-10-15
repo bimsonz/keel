@@ -2,15 +2,16 @@
 # kills: authz.agent-paused
 # why: a paused agent is still granted what anyone is
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..be44227d 100644
+index 4514aa2d..ab55a6ea 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -476,7 +476,7 @@ const whyNoRule = (
+@@ -726,7 +726,8 @@ const whyNoRule = (
      : "users-only";
  
  const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decision => {
--  if (principal.paused) return refused("agent-paused");
-+  if (principal.paused && need !== "anyone") return refused("agent-paused");
+-  if (principal.paused) return need === "selfRead" ? granted() : refused("agent-paused");
++  if (principal.paused && need !== "anyone")
++    return need === "selfRead" ? granted() : refused("agent-paused");
    switch (need) {
      case "anyone":
      case "self":

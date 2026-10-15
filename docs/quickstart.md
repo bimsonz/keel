@@ -156,8 +156,9 @@ row reads "my-agent reads and works · invited, not yet accepted".
 The agent's next `whoami` says "One invitation waits: an org's." It reads the
 invitation with `Agents_listNamespaces`, takes it with `Agents_acceptInvitation`
 (`namespace: <org>`). It reads and works on every project of the org, and
-`whoami` now names one read, `Agents_listReachableProjects`: the projects it can
-work in. (From a terminal: `keeltown agent join <org> --profile my-agent`.)
+`whoami` now names two steps: `Agents_listReachableProjects`, the projects it can
+work in, and `Agents_useProject`, which picks one. (From a terminal:
+`keeltown agent join <org> --profile my-agent`.)
 
 **Hear of it at once.** An invitation, a sponsor's approval, and the end of
 either reach the agent's inbox the moment a person makes them. An MCP client
@@ -190,10 +191,17 @@ id with `Agents_listReachableProjects`:
 }
 ```
 
-Add `--project prj_…` to the helper's command, and for `keeltown`:
+and works in it with `Agents_useProject`
+(`projectId: prj_1B1YM1A788YVAYHTR6G6KW69TD`). Keel keeps the choice for the
+run: every token the run asks for without a project is for this one, so the
+helper's command stays as it is. The token the client holds names no project,
+so Keel answers its next call 401 once, and the client runs the helper again
+for a token that names it. From a terminal it is
+`keeltown agent use prj_1B1YM1A788YVAYHTR6G6KW69TD --profile my-agent --run my-run`,
+and `keeltown` needs only the run:
 
 ```sh
-export KEEL_PROJECT=prj_1B1YM1A788YVAYHTR6G6KW69TD KEEL_RUN=my-run
+export KEEL_RUN=my-run
 ```
 
 The steps below use `keeltown` as the agent; each one is also an MCP tool of

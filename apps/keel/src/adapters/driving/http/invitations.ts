@@ -13,6 +13,7 @@ import {
 import { AgentId, NamespaceId, ProjectId, type UserId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
+  Clock,
   Invitations,
   Memberships,
   NamespaceAgents,
@@ -31,6 +32,7 @@ import type {
   Agents_listNamespacesResult,
   Agents_listProjectsResult,
   Agents_listReachableProjectsResult,
+  Agents_useProjectResult,
   Namespaces_inviteAgentResult,
   Namespaces_listAgentsResult,
   Namespaces_removeAgentResult,
@@ -41,6 +43,7 @@ import type {
 } from "../../../generated/http/app.gen.ts";
 import { agentsOnly } from "./authorize-handlers.ts";
 import type { Caller } from "./caller.ts";
+import { runView } from "./mappers.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import type { Runner } from "./run.ts";
 
@@ -262,6 +265,22 @@ const notFound = (caller: Caller, detail?: string) => ({
     caller.requestId,
     detail === undefined ? {} : { detail },
   ),
+});
+
+/** A project chosen by a token that names no run: a choice is a run's, and nothing holds one that is no run's. */
+const runRequired = (caller: Caller) => ({
+  status: 409 as const,
+  body: problem(409, "run.required", caller.requestId, {
+    detail:
+      "Your token names no run, and the project you work in is chosen for a run: ask for a token with `run` set.",
+    nextActions: [
+      {
+        kind: "escalate" as const,
+        title:
+          "Ask the token endpoint for a token with `run` set to a label of your own, then choose again",
+      },
+    ],
+  }),
 });
 
 /** An invitation asked for with scopes no invitation gives: 400, from the body's check or the machine's. */
@@ -775,6 +794,48 @@ export function projectInvitationHandlers(
           ),
         ),
       ),
+    // A run's choice is checked against the same reading as the list, and the gate checks it again on every request.
+    Agents_useProject: (caller: Caller, input: Input<"Agents_useProject">) =>
+      asAgent(caller, (agentId) => {
+        const ofRun = caller.token?.run;
+        if (ofRun === undefined) return runRequired(caller);
+        return run(
+          caller,
+          Effect.gen(function* () {
+            const reached = (yield* reachableProjects(agentId)).find(
+              (item) => item.project.id === input.projectId,
+            );
+            if (reached === undefined)
+              return notFound(
+                caller,
+                "You cannot work in that project now: `Agents_listReachableProjects` lists the ones you can.",
+              );
+            const at = yield* Clock.use((clock) => clock.now);
+            yield* AgentDirectory.use((directory) =>
+              directory.chooseProject(agentId, ofRun.id, reached.project.id, at),
+            );
+            const { project } = reached;
+            return {
+              status: 200 as const,
+              body: {
+                ok: true,
+                summary: `Run ${ofRun.label ?? ofRun.id} works in ${project.namespace}/${project.name} from now on: each token it asks for without a project is for it. A token that names none is refused once (401) so your client asks for one that does.`,
+                result: { project, run: runView(ofRun) },
+                findings: [],
+                next: [
+                  {
+                    kind: "call" as const,
+                    title: `Declare the change you will make in ${project.namespace}/${project.name}`,
+                    operationId: "declare",
+                  },
+                ],
+                notices: [],
+                cost: {},
+              },
+            } satisfies Agents_useProjectResult;
+          }),
+        );
+      }),
     Agents_acceptProjectInvitation: (
       caller: Caller,
       input: Input<"Agents_acceptProjectInvitation">,

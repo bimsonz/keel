@@ -250,7 +250,7 @@ describe("commit", () => {
   );
 
   it.effect(
-    "[commit.own-agent] another agent, or the change's agent in another project, reads the change as not found and nothing is written",
+    "[commit.own-agent] another agent of the project is told who holds the change, the change's agent in another project reads it as not found, and nothing is written",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -260,7 +260,7 @@ describe("commit", () => {
           const stranger = yield* Effect.flip(
             commitEdits(changeId, { ...committing(lease, base), agentId: otherAgent }),
           );
-          expect(stranger).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect(stranger).toMatchObject({ _tag: "ChangeHeldByOther", changeId, holder: agentId });
           const elsewhere = yield* Effect.flip(
             commitEdits(changeId, {
               ...committing(lease, base, "commit-2"),
@@ -359,7 +359,7 @@ describe("commit", () => {
           const pushing = yield* Effect.forkChild(commitEdits(changeId, committing(lease, base)));
           yield* Effect.promise(() => hold.held);
           yield* abandon(changeId, {
-            authority: { _tag: "Lease", leaseId: lease, agentId },
+            authority: { _tag: "Lease", leaseId: lease, agentId, projectId: sampleProjectId },
             idempotencyKey: "abandon-1",
           });
           hold.release();
@@ -391,7 +391,7 @@ describe("commit", () => {
           });
           hold.release();
           const answer = yield* Effect.flip(Fiber.join(pushing));
-          expect(answer).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect(answer).toMatchObject({ _tag: "ChangeHeldByOther", changeId, holder: otherAgent });
           const after = yield* getChange(changeId);
           expect(after.agentId).toBe(otherAgent);
           expect(after.lease).toEqual(adopted.change.lease);
@@ -449,7 +449,7 @@ describe("refresh", () => {
   );
 
   it.effect(
-    "[workspace.refresh-own] another agent, or the change's agent in another project, reads the change as not found",
+    "[workspace.refresh-own] another agent of the project is told who holds the change, and the change's agent in another project reads it as not found",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -459,7 +459,7 @@ describe("refresh", () => {
           const stranger = yield* Effect.flip(
             refreshWorkspace(changeId, { ...asking(lease), agentId: otherAgent }),
           );
-          expect(stranger).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect(stranger).toMatchObject({ _tag: "ChangeHeldByOther", changeId, holder: agentId });
           const elsewhere = yield* Effect.flip(
             refreshWorkspace(changeId, { ...asking(lease), projectId: otherProject }),
           );
@@ -479,7 +479,7 @@ describe("refresh", () => {
         return yield* Effect.gen(function* () {
           const { lease } = yield* declared;
           yield* abandon(changeId, {
-            authority: { _tag: "Lease", leaseId: lease, agentId },
+            authority: { _tag: "Lease", leaseId: lease, agentId, projectId: sampleProjectId },
             idempotencyKey: "abandon-1",
           });
           const refused = yield* Effect.flip(refreshWorkspace(changeId, asking(lease)));

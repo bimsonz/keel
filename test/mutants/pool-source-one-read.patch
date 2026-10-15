@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.source-blip"
+# kills: pool.source-blip
+# why: one failed read of the source stops every fork of it for that pass
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..6680a233 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -219,8 +219,7 @@ const sourceReadable = (project: ProjectId, source: RepoName) =>
+     const read = (yield* CodeHost).head(source, MAIN).pipe(Effect.exit);
+     const first = yield* read;
+     if (Exit.isSuccess(first)) return true;
+-    const again = yield* read;
+-    if (Exit.isSuccess(again)) return true;
++    const again = first;
+     yield* Effect.logWarning(
+       `pool ${project}: source ${source.namespace}/${source.name} cannot be read, so workspaces are made from trunk: ${Cause.pretty(again.cause)}`,
+     );

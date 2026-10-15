@@ -10,7 +10,7 @@ import {
   runClaims,
   type RunRefusal,
 } from "@keeltown/core/domain/identity";
-import { AgentId } from "@keeltown/core/kernel";
+import { AgentId, type ProjectId, type RunId } from "@keeltown/core/kernel";
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError } from "better-auth/api";
 import { deriveDpopJkt } from "better-auth/oauth2";
@@ -30,6 +30,8 @@ import { KEY_ALGORITHMS } from "./key-proofs.ts";
 export interface AgentAccess {
   /** The agent a client id names, or undefined when there is none. */
   readonly find: (agentId: AgentId) => Promise<Agent | undefined>;
+  /** The project a run of the agent chose to work in (`Agents_useProject`), or undefined. */
+  readonly runProject: (agentId: AgentId, runId: RunId) => Promise<ProjectId | undefined>;
 }
 
 /** Where an agent asks for a token, under Better Auth's base path. */
@@ -100,7 +102,9 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
         clientId: agent.id,
         clientDiscoveryId: AGENT_DISCOVERY,
         name: agent.name,
-        disabled: agent.state !== "active",
+        // Only a revoked agent is no client: a paused one is given a token, and the gate lets it
+        // read who it is and its inbox alone, so it hears when its sponsor unpauses it.
+        disabled: agent.state === "revoked",
         tokenEndpointAuthMethod: "private_key_jwt",
         grantTypes: ["client_credentials"],
         redirectUris: [],
@@ -134,7 +138,7 @@ function refusal(failure: RunRefusal): APIError {
         "A token is bound to a key made for the run, never to the key the agent signed up with.",
       );
     case "AgentNotAdmitted":
-      return refuse("invalid_client", "This agent may not act.");
+      return refuse("invalid_client", "This agent's key was revoked: it is given no token.");
     default: {
       const unmapped: never = failure;
       return unmapped;
@@ -168,8 +172,10 @@ async function proofKey(proof: string): Promise<KeyThumbprint> {
 
 /**
  * What Keel adds to an agent's token: the project and the run the request
- * names, the agent's epoch and its handle. A request the rule refuses gets no
- * token.
+ * names, the agent's epoch and its handle. A request that names a run and no
+ * project is for the project that run chose, if it chose one: so a client that
+ * cannot name a project works where the agent chose. A request the rule
+ * refuses gets no token.
  */
 export async function agentClaims(
   agents: AgentAccess,
@@ -187,7 +193,10 @@ export async function agentClaims(
     runKey: proof === undefined ? undefined : await proofKey(proof),
   });
   if (Result.isFailure(decided)) throw refusal(decided.failure);
-  const { epoch, handle, prj, run } = decided.success;
+  const { epoch, handle, run } = decided.success;
+  const prj =
+    decided.success.prj ??
+    (run === undefined ? undefined : await agents.runProject(agent.id, run.id));
   return {
     epoch,
     ...(handle === undefined ? {} : { handle }),
@@ -250,6 +259,7 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
       read.set(agentId, known);
       return known;
     },
+    runProject: (agentId, runId) => config.agents.runProject(agentId, runId),
   };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above: the plugin is one, its declared type is what does not assign
   return oauthProvider({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t agentdir.run-project
+# kills: agentdir.run-project
+# why: a run that chooses again keeps its first project in D1, so it can never move
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index 2733205d..68975934 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -195,7 +195,7 @@ export function AgentDirectoryD1(db: D1Database) {
+           db
+             .prepare(
+               `INSERT INTO agent_run_projects (agent_id, run_id, project_id, chosen_at) VALUES (?, ?, ?, ?)
+-               ON CONFLICT (agent_id, run_id) DO UPDATE SET project_id = excluded.project_id, chosen_at = excluded.chosen_at`,
++               ON CONFLICT (agent_id, run_id) DO NOTHING`,
+             )
+             .bind(agentId, runId, projectId, at)
+             .run(),

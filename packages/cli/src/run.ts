@@ -48,6 +48,7 @@ const USAGE = `keeltown <command> [options]
   agent show [--profile <name>]
   agent sponsor-request [--person <handle>] [--profile <name>]
   agent join <namespace> [--profile <name>] [--key <idempotency-key>]
+  agent use <prj_…> [--run <label>] [--profile <name>]
   token [--project <prj_…>] [--run <label>] [--mcp] [--header] [--profile <name>]
   whoami
   session open [--harness <name>] [--model <id>] [--key <idempotency-key>]
@@ -69,13 +70,15 @@ const USAGE = `keeltown <command> [options]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
 An agent is a key: \`agent signup\` makes one, keeps it in this machine's key store and signs up with it.
-Its commands then run as that agent, each token for one project (--project or KEEL_PROJECT) and one
-run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that takes only a bearer;
+Its commands then run as that agent, each token for one project (--project or KEEL_PROJECT, or else
+the project the run chose with \`agent use\`) and one run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that takes only a bearer;
 --mcp asks for one Keel's MCP endpoint takes (the API refuses it, as /mcp refuses the API's), and
 --header prints it as the header an MCP client's helper wants. Where there is no key store, the key
 comes from KEEL_AGENT_KEY with KEEL_AGENT_ID (\`agent signup --print-key\` prints one, once).
 \`agent sponsor-request\` prints the page where a signed-in person approves sponsoring the agent, or
 with --person puts the request on that person's own list, and \`agent join\` accepts an org's invitation by the org's handle.
+\`agent use\` has the run work in a project: from then on a token the run asks for without --project is
+for it, so a tool whose token helper names no project works there too.
 Other credentials: KEEL_URL always; an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's
 KEEL_SESSION, which win over a key when set. Projects and agents are governed by a user.
 A person signs in with \`login\`: Keel names a page to open, the sign-in is approved there, and it
@@ -334,6 +337,8 @@ async function dispatch(
         );
       if (command[0] === "agent" && command[1] === "join" && command.length === 3)
         return client.acceptInvitation(required(command[2], "namespace"), idempotent);
+      if (command[0] === "agent" && command[1] === "use" && command.length === 3)
+        return client.useProject(required(command[2], "project"));
       if (command[0] === "nearby" && command.length === 2)
         return client.nearby(required(command[1], "change"));
       if (command[0] === "rebase" && command.length === 2)

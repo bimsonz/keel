@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.fill-failed-said"
+# kills: pool.fill-failed-said
+# why: a workspace that could not be made from trunk is collected in silence
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 991b8018..f034bc12 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -384,9 +384,6 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+     const made = yield* Effect.exit(fillOne(project, slot.repo));
+     if (Exit.isFailure(made)) {
+       failed += 1;
+-      yield* Effect.logWarning(
+-        `pool ${project}: making ${slot.repo.name} from trunk failed: ${Cause.pretty(made.cause)}`,
+-      );
+       yield* markCollecting(project, slot.id, "fork-failed");
+     } else if (yield* madeReady(project, slot, made.value, "trunk")) ready += 1;
+   }

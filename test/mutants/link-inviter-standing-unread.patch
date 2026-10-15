@@ -2,11 +2,11 @@
 # kills: gate.invited
 # why: the gate takes the member who invited an agent as a member still, so an inviter who left the org keeps answering for it and the agent keeps its work
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index b47ae279..138fd934 100644
+index a2dda811..9312ed2b 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -227,9 +227,7 @@ export const principalOf: (
-           ? { _tag: "None" }
+@@ -252,9 +252,7 @@ export const principalOf: (
+           ? { _tag: "None", ...(left ? { left: true } : {}) }
            : {
                _tag: "Invited",
 -              by: yield* Memberships.use((memberships) =>
@@ -15,4 +15,4 @@ index b47ae279..138fd934 100644
 +              by: { userId: invited.value.by, role: "member", suspended: false },
                // Outside an org the invitation was to this project, and to nothing else of the namespace.
                ...(namespaceKind(org) === "org" ? {} : { projectOnly: true }),
-             };
+               ...(givesWork(invited.value.scopes) ? {} : { readOnly: true }),

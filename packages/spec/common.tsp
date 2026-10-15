@@ -206,6 +206,7 @@ union ProblemCode {
   whyNothingToExplain: "why.nothing_to_explain",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",
+  changeHeldByOther: "change.held_by_other",
   changeStateRefused: "change.state_refused",
   changeRevisionMismatch: "change.revision_mismatch",
   changeCommitNotInWorkspace: "change.commit_not_in_workspace",
@@ -221,6 +222,9 @@ union ProblemCode {
   repoRefNotFound: "repo.ref_not_found",
   repoPathNotFound: "repo.path_not_found",
   agentStateRefused: "agent.state_refused",
+  agentLeft: "agent.left",
+  runRequired: "run.required",
+  runNoProject: "run.no_project",
   invitationStateRefused: "invitation.state_refused",
   projectNameTaken: "project.name_taken",
   projectImportRefused: "project.import_refused",
@@ -481,6 +485,10 @@ model IdempotencyKey {
 }
 
 model LeaseHeader {
-  /** The lease on the change, from `declare` or `adopt`. A stale lease is refused. */
+  /**
+   * The lease on the change, from `declare` or `adopt`. A stale lease is refused, and so is any
+   * agent but the one holding the change: another agent of its project is 409
+   * `change.held_by_other`, naming the holder and when its lease lapses.
+   */
   @header("keel-lease") lease: LeaseId;
 }

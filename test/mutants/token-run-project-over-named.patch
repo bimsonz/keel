@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-client.test.ts -t token.run-project
+# kills: token.run-project
+# why: the run's choice wins over the project a token request names, so an explicit --project is ignored
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index f9773c85..1b71c5a6 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -195,8 +195,8 @@ export async function agentClaims(
+   if (Result.isFailure(decided)) throw refusal(decided.failure);
+   const { epoch, handle, run } = decided.success;
+   const prj =
+-    decided.success.prj ??
+-    (run === undefined ? undefined : await agents.runProject(agent.id, run.id));
++    (run === undefined ? undefined : await agents.runProject(agent.id, run.id)) ??
++    decided.success.prj;
+   return {
+     epoch,
+     ...(handle === undefined ? {} : { handle }),

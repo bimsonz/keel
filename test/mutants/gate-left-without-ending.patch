@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts -t gate.invited
+# kills: gate.invited
+# why: every agent with no standing is marked as having left, so one only invited, or never invited, is told it left
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index a2dda811..1f84cb3b 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -244,7 +244,7 @@ export const principalOf: (
+         governs || Option.isSome(invited) || Option.isNone(place) || projectId === undefined
+           ? false
+           : namespaceKind(org) === "org"
+-            ? yield* NamespaceAgents.use((agents) => agents.ended(agent.id, org))
++            ? true
+             : yield* ProjectAgents.use((agents) => agents.ended(agent.id, projectId));
+       const standing: AgentStanding = governs
+         ? { _tag: "Governs" }
