@@ -70,7 +70,7 @@ export function SubTabs<Tab extends string>({
 /** The main column, and beside it what the thing is tied to. */
 export function Split({ main, side }: { main: ReactNode; side: ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
+    <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex min-w-0 flex-col gap-4">{main}</div>
       <aside className="a-side sticky top-0">{side}</aside>
     </div>

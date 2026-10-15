@@ -34,16 +34,12 @@ export function EscalationPage({ name }: { name: string }) {
   if (escalation === undefined && hidden)
     return (
       <Column>
-        <h1 className="sr-only">Escalation {name}</h1>
+        <h1 className="sr-only">Question {name}</h1>
         <ForMembers what="question" />
       </Column>
     );
   if (escalation === undefined) {
-    return (
-      <Notice title={`There is no escalation ${name} in what Keel has said so far`}>
-        A question arrives only when proof exists and the answer is a matter of judgement.
-      </Notice>
-    );
+    return <Notice title={`Question ${name} not found`} />;
   }
   return (
     <Escalation

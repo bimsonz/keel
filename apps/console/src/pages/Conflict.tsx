@@ -25,11 +25,7 @@ export function ConflictPage({ name, tab, mode }: { name: string; tab: ConflictT
     if (probeId !== undefined) player.wantProbe(probeId);
   }, [player, probeId]);
   if (id === undefined) {
-    return (
-      <Notice title={`There is no conflict ${name} in what Keel has said so far`}>
-        A conflict opens when two changes hold incompatible propositions about one subject.
-      </Notice>
-    );
+    return <Notice title={`Conflict ${name} not found`} />;
   }
   // Every conflict Keel names has a page. The address was resolved a moment before the page was read.
   if (state === null) return null;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.title
+# why: a page above every project is titled without Keel
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 9dd7fe61..f665a671 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -173,7 +173,7 @@ export function titleOfPlace(place: Place): string {
+         return place.handle;
+     }
+   })();
+-  return `${page} · Keel`;
++  return page;
+ }
+ 
+ export function hrefOf(place: Place, next?: string): string {

@@ -6,6 +6,8 @@
   /* Landed is a code host's merged: violet, kept apart from the green of a check that passed. */
   --a-landed: light-dark(oklch(52% 0.2 300), oklch(72% 0.16 300));
   --a-landed-tint: light-dark(oklch(96% 0.03 300), oklch(30% 0.07 300 / 0.5));
+  /* Behind white text, dark enough in both themes to read at 4.5:1. */
+  --a-landed-solid: oklch(50% 0.2 300);
 }
 
 :root .a-pill {
@@ -27,7 +29,7 @@
 }
 
 :root .a-pill[data-pill="landed"] {
-  background: var(--a-landed);
+  background: var(--a-landed-solid);
 }
 
 :root .a-pill[data-pill="closed"] {

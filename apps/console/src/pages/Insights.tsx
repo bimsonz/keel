@@ -62,7 +62,7 @@ export function InsightsFrame({ at, children }: { at: InsightsPlace; children: R
   // Keel remembers a project's decisions, and a test fixture has no memory of its own to read.
   const remembers = usePlayer().source.decisions !== undefined;
   return (
-    <div className="grid h-full grid-cols-[208px_minmax(0,1fr)]">
+    <div className="grid h-full grid-cols-1 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[208px_minmax(0,1fr)] md:grid-rows-1">
       <nav aria-label="Insights" className="a-submenu">
         {PAGES.filter(
           (page) =>

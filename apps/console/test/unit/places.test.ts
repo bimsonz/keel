@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hrefOf, nextOf, placeOf, sentFrom } from "../../src/places.ts";
+import { hrefOf, nextOf, placeOf, sentFrom, titleOfPlace } from "../../src/places.ts";
 import { RESERVED_SEGMENTS } from "../../src/contract/keel/index.ts";
 import { parse } from "../../src/route.ts";
 
@@ -206,5 +206,22 @@ describe("the pages above every project", () => {
       "elsewhere.example",
     ])
       expect(nextOf(`?next=${encodeURIComponent(elsewhere)}`)).toBe("/");
+  });
+});
+
+describe("what each page above every project is titled", () => {
+  it("[places.title] titles each page as a code host does, the page first and Keel last, so no two tabs read alike", () => {
+    expect(titleOfPlace({ at: "login" })).toBe("Sign in · Keel");
+    expect(titleOfPlace({ at: "signup" })).toBe("Sign up · Keel");
+    expect(titleOfPlace({ at: "settings" })).toBe("Settings · Keel");
+    expect(titleOfPlace({ at: "new-project" })).toBe("New project · Keel");
+    expect(titleOfPlace({ at: "fork", namespace: "keel", project: "keel" })).toBe(
+      "Fork keel/keel · Keel",
+    );
+    expect(titleOfPlace({ at: "namespace", handle: "keel" })).toBe("keel · Keel");
+    expect(titleOfPlace({ at: "org", org: "keel", tab: "members" })).toBe("Members · keel · Keel");
+    expect(titleOfPlace({ at: "org", org: "keel", tab: "settings" })).toBe(
+      "Settings · keel · Keel",
+    );
   });
 });

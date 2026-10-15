@@ -379,11 +379,10 @@ function Project({
     return (
       <WhereProvider namespace="" project="" route={{ at: "missing" }}>
         <Frame source={{ mode: reading.mode, seed }} {...(reader === undefined ? {} : { reader })}>
-          <Notice title={`There is no project ${namespace}/${name} here`}>
+          <Notice title={`Project ${namespace}/${name} not found`}>
             <a href="/" className="a-link">
               See the projects Keel has
             </a>
-            .
           </Notice>
         </Frame>
       </WhereProvider>

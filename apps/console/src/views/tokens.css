@@ -1066,6 +1066,21 @@
   font-size: 14px;
 }
 
+/* On a phone the menu is one row above the page, scrolling inside itself. */
+@media (width < 48rem) {
+  :root .a-submenu {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-kumo-line);
+  }
+  :root .a-submenu a {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
 :root .a-submenu a:hover {
   background: var(--color-kumo-tint);
 }

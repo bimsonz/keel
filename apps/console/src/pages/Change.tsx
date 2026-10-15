@@ -83,12 +83,7 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
   // While the log is still being read, a change not read yet is drawn from Keel's read model of the project's
   // changes: its goal, its number and where it stands, with the rest to come.
   if (state === null && !player.loaded) return <EarlyChange name={name} />;
-  if (state === null)
-    return (
-      <Notice title={`There is no change ${name} in what Keel has said so far`}>
-        A change is here once an agent has declared its intent.
-      </Notice>
-    );
+  if (state === null) return <Notice title={`Change #${name} not found`} />;
   return (
     <Change
       state={state}

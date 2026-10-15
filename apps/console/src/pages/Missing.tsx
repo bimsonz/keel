@@ -8,8 +8,7 @@ const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 export function Missing() {
   const { project } = useWhere();
   return (
-    <Notice title="There is nothing at this address">
-      It may have been mistyped, or it may name something this console does not have.{" "}
+    <Notice title="Page not found">
       {project === "" ? (
         <a href="/" className="a-link">
           Go to the home page

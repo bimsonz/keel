@@ -20,6 +20,7 @@ import { Link, carriedParams, useWhere } from "../router.tsx";
 import { type TabId, tabOf, titleOf } from "../tabs.ts";
 import { Footer } from "./Footer.tsx";
 import { HomeLink } from "./HomeLink.tsx";
+import { MAIN, SkipLink } from "./SkipLink.tsx";
 import { ReaderMenu } from "./ReaderMenu.tsx";
 import { TabBar, TabFace } from "./TabBar.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
@@ -133,6 +134,7 @@ export function Frame({
   }, [route, namespace, project]);
   return (
     <div className="a-root flex h-screen w-screen flex-col overflow-hidden bg-kumo-canvas text-base text-kumo-default">
+      <SkipLink />
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
         {/* On a narrow screen the row wraps: who is reading goes under where they are, and nothing is cut off. */}
         <div className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-1.5 sm:px-6">
@@ -233,18 +235,22 @@ export function Frame({
           </TabBar>
         )}
       </header>
-      <main className="relative min-h-0 flex-1">{children}</main>
+      <main id={MAIN} tabIndex={-1} className="relative min-h-0 flex-1 outline-none">
+        {children}
+      </main>
       <Footer />
     </div>
   );
 }
 
 /** A page that has nothing to draw says why, in the middle of where it would have been. */
-export function Notice({ title, children }: { title: string; children: ReactNode }) {
+export function Notice({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
       <h1 className="text-xl font-semibold text-kumo-strong">{title}</h1>
-      <p className="max-w-[60ch] text-base text-kumo-subtle">{children}</p>
+      {children !== undefined && (
+        <p className="max-w-[60ch] text-base text-kumo-subtle">{children}</p>
+      )}
     </div>
   );
 }

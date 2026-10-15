@@ -60,7 +60,7 @@ export function Fork({
   if (found === undefined) return null;
   if (found === null)
     return (
-      <Card title={`There is no project ${namespace}/${project} here`}>
+      <Card title={`Project ${namespace}/${project} not found`}>
         <a className="a-link text-sm" href="/">
           See the projects Keel has
         </a>

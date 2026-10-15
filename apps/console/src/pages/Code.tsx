@@ -116,7 +116,7 @@ function Counted({ count, label, to }: { count: number; label: string; to: Route
   return (
     <Link
       to={to}
-      className="flex items-center gap-2 text-sm text-kumo-default hover:text-kumo-link"
+      className="flex min-h-6 items-center gap-2 text-sm text-kumo-default hover:text-kumo-link"
     >
       <b className="a-num font-semibold text-kumo-strong">{count.toLocaleString("en-US")}</b>
       {label}

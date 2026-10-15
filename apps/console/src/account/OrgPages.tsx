@@ -542,10 +542,7 @@ export function NamespacePublic({
   if (namespace === undefined || projects === undefined) return null;
   if (namespace === null)
     return (
-      <Card
-        title={`There is no ${handle} here`}
-        lede={`Nobody and no org is called ${handle} on this Keel.`}
-      >
+      <Card title={`No user or org named ${handle}`}>
         <a className="a-link" href="/">
           See the projects Keel has
         </a>
@@ -719,10 +716,7 @@ export function NamespacePages({
     );
   if (held === null)
     return (
-      <Card
-        title={`There is no org ${handle} here`}
-        lede={`Either there is no org called ${handle} on this Keel, or you are not a member of it.`}
-      >
+      <Card title={`Org ${handle} not found`}>
         <a className="a-link" href={hrefOf({ at: "new-org" })}>
           Make an org
         </a>

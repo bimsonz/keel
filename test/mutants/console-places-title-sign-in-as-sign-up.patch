@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.title
+# why: the sign-in page is titled as the sign-up page
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 9dd7fe61..ea1ab94d 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -149,7 +149,7 @@ export function titleOfPlace(place: Place): string {
+   const page = ((): string => {
+     switch (place.at) {
+       case "login":
+-        return "Sign in";
++        return "Sign up";
+       case "signup":
+         return "Sign up";
+       case "settings":

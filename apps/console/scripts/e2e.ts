@@ -228,7 +228,7 @@ expectEqual(
 
 // From there to the list of what is waiting for a person, to the question, and back the way one came.
 await page.getByRole("link", { name: "Holding: a person is being asked" }).click();
-await page.getByRole("list", { name: "Escalations, newest first" }).waitFor();
+await page.getByRole("list", { name: "Questions, newest first" }).waitFor();
 expectEqual("escalations: listed at their own address", pathOf(page), "/acme/demo/escalations");
 expectEqual(
   "escalations: one row, open, with what waits on it",
@@ -244,7 +244,7 @@ await page.locator(".a-list-title a", { hasText: QUESTION }).click();
 await page.getByRole("heading", { level: 1, name: QUESTION }).waitFor();
 expectEqual("escalation: named in its address", pathOf(page), "/acme/demo/escalations/E-1");
 await page.goBack();
-await page.getByRole("list", { name: "Escalations, newest first" }).waitFor();
+await page.getByRole("list", { name: "Questions, newest first" }).waitFor();
 expectEqual("Back returns to the list it was opened from", pathOf(page), "/acme/demo/escalations");
 await page.goBack();
 await page.getByText("Holding: a person is being asked").waitFor();
@@ -432,6 +432,50 @@ expectEqual(
 await parts.filter({ hasText: "Files changed" }).click();
 await page.locator('main section[id^="diff-"]').first().waitFor();
 expectEqual("change: its files have an address", pathOf(page), "/acme/demo/changes/1/files");
+// The landed pill is white on violet, and reads at the contrast a page's text needs, 4.5:1.
+expectEqual(
+  "change: the landed pill's text reads against it",
+  await page
+    .locator('.a-pill[data-pill="landed"]')
+    .first()
+    .evaluate((pill) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const paint = canvas.getContext("2d", { willReadFrequently: true });
+      if (paint === null) return "no canvas";
+      // oxlint-disable-next-line unicorn/consistent-function-scoping -- it runs in the page, so it is written here
+      const luminance = (colour: string): number => {
+        paint.clearRect(0, 0, 1, 1);
+        paint.fillStyle = colour;
+        paint.fillRect(0, 0, 1, 1);
+        const [r = 0, g = 0, b = 0] = paint.getImageData(0, 0, 1, 1).data;
+        // oxlint-disable-next-line unicorn/consistent-function-scoping -- it runs in the page, so it is written here
+        const linear = (value: number): number => {
+          const share = value / 255;
+          return share <= 0.040_45 ? share / 12.92 : ((share + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+      };
+      const style = window.getComputedStyle(pill);
+      const [back, fore] = [luminance(style.backgroundColor), luminance(style.color)];
+      const ratio = (Math.max(back, fore) + 0.05) / (Math.min(back, fore) + 0.05);
+      return ratio >= 4.5 ? "reads" : `${ratio.toFixed(2)}:1`;
+    })
+    .catch(() => "no landed pill"),
+  "reads",
+);
+// The first tab stop skips the header and the tabs, to the page's own content.
+await page.locator("body").focus();
+await page.keyboard.press("Tab");
+const firstStop = squash(await page.evaluate(() => document.activeElement?.textContent ?? ""));
+// Enter on any other first stop would follow it away from the page.
+if (firstStop === "Skip to content") await page.keyboard.press("Enter");
+expectEqual(
+  "frame: the first tab stop skips to the content",
+  `${firstStop} | ${await page.evaluate(() => document.activeElement?.id ?? "")}`,
+  "Skip to content | main",
+);
 // A part's address opens that part, from nowhere.
 await page.goto(at("/changes/1/files", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.locator('main section[id^="diff-"]').first().waitFor();
@@ -1194,7 +1238,7 @@ expectEqual(
 
 // An address that names nothing says so, inside the project's frame, with the way back.
 await page.goto(at("/nowhere", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
-await page.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+await page.getByRole("heading", { name: "Page not found" }).waitFor();
 expectEqual("missing: the frame is still there", String(await tabs.count()), "6");
 await page.getByRole("link", { name: "Go to the project's code" }).click();
 await page.locator(".a-prose h2").first().waitFor();
@@ -1348,7 +1392,7 @@ await page.getByRole("heading", { level: 1 }).first().waitFor();
 expectEqual(
   "agents: a project has no Agents tab, and no address for its agents",
   `${await tabs.filter({ hasText: "Agents" }).count()} tabs | ${squash(await page.getByRole("heading", { level: 1 }).first().innerText())}`,
-  "0 tabs | There is nothing at this address",
+  "0 tabs | Page not found",
 );
 // Insights: trunk's numbers with what each means, the review funnel, and the benchmark where a run was sealed.
 // A change a ruling went against is counted where it had got to, under that cause and no other.
@@ -1553,6 +1597,26 @@ for (const place of ["", "/changes", "/conflicts/C-1", "/mission-control"]) {
     "0",
   );
 }
+// A change's page on a phone: what the change is tied to stacks under it, as a pull request's sidebar does, and
+// the main column keeps the screen's width.
+await narrow.goto(at("/changes/1", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
+await narrow.getByRole("heading", { level: 1 }).first().waitFor();
+expectEqual(
+  "narrow: a change's sidebar stacks under its main column",
+  await narrow
+    .locator("aside.a-side")
+    .first()
+    .evaluate((side) => {
+      const main = side.previousElementSibling?.getBoundingClientRect();
+      const box = side.getBoundingClientRect();
+      if (main === undefined) return "no main column";
+      return box.top >= main.bottom - 1 && main.width >= 300
+        ? "stacked"
+        : `beside it, the main column ${Math.round(main.width)} px`;
+    })
+    .catch(() => "no sidebar"),
+  "stacked",
+);
 await pocket.close();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1716,7 +1780,7 @@ const toldAt = async (shown: Page, namespace: string, name: string): Promise<str
     (await shown.getByRole("main").count()) > 0 ? shown.getByRole("main") : shown.locator("body");
   return `${squash(await said.innerText()).replaceAll(`${namespace}/${name}`, "<namespace>/<name>")} | ${await tabsOf(shown).count()} tabs`;
 };
-const NO_PROJECT = "There is no project <namespace>/<name> here";
+const NO_PROJECT = "Project <namespace>/<name> not found";
 
 // ── A project's frame, before Keel has found the project ──
 // What a project is called and its tabs are its address's: they are drawn while Keel is still finding it, as a code
@@ -2104,7 +2168,7 @@ expectEqual(
   "/ada/demo/subjects/authz.permission-evaluation",
 );
 await visitor.goto(`${built}/ada/demo/nowhere`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+await visitor.getByRole("heading", { name: "Page not found" }).waitFor();
 const wayBack = async (shown: Page): Promise<string> =>
   (
     await shown
@@ -2125,7 +2189,7 @@ expectEqual(
 );
 // A first segment Keel reserves that names no page here: the not-found page, with no project to go back to.
 await visitor.goto(`${built}/admin`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+await visitor.getByRole("heading", { name: "Page not found" }).waitFor();
 expectEqual(
   "built: above every project, the not-found page's way back is the home page",
   await wayBack(visitor),
@@ -2147,7 +2211,7 @@ expectEqual(
       .innerText({ timeout: 3_000 })
       .catch(() => "none"),
   )} | ${await wayBack(visitor)}`,
-  "There is nothing at this address | Go to the home page → /",
+  "Page not found | Go to the home page → /",
 );
 
 // Keel reads a project's questions to its members and to nobody else. A visitor is told so where the list and
@@ -2230,7 +2294,7 @@ await countedPublic(visitor);
 expectEqual(
   "visitor: and so is one question, with nothing of it shown and nothing to tap",
   `${await mainSaid(visitor)} | ${await visitor.locator(".a-option").count()} options | ${await visitor.getByText(QUESTION_ASKED).count()}`,
-  `Escalation E-1 ${FOR_MEMBERS} | 0 options | 0`,
+  `Question E-1 ${FOR_MEMBERS} | 0 options | 0`,
 );
 // The conflict that waits on that question says it waits on a ruling: that much is the conflict's own, and public.
 await visitor.goto(`${built}/ada/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
@@ -2530,7 +2594,7 @@ for (const place of ["/mission-control", "/changes", "/escalations/E-1", "/blob/
   expectEqual(
     `visitor: ${place} of a private project shows nothing of it`,
     `${squash(await outsider.getByRole("heading").first().innerText())} | ${await tabsOf(outsider).count()} tabs | ${await outsider.locator(".a-tree, .a-prose, .a-code, .a-option").count()}`,
-    "There is no project ada/demo here | 0 tabs | 0",
+    "Project ada/demo not found | 0 tabs | 0",
   );
 }
 // That the handle is someone's is no secret, though: the person is there, with nothing of theirs to show.
@@ -2992,6 +3056,9 @@ const second = await browser.newContext({ viewport: { width: 1280, height: 900 }
 await asDeployed(second, { keel: shut, sent: sentToKeel });
 const grace = watch(await second.newPage(), "account, a second user");
 await grace.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await grace.getByLabel("Email").waitFor();
+// Each page above a project has a title of its own, as a code host's does: no two tabs read alike.
+expectEqual("account: the sign-up page's title", await grace.title(), "Sign up · Keel");
 await grace.getByLabel("Email").fill("grace@example.com");
 await grace.getByRole("button", { name: "Send a code" }).click();
 await grace.getByLabel("The code sent to grace@example.com").waitFor();
@@ -3387,7 +3454,7 @@ await countedPublic(guest);
 expectEqual(
   "stranger: a public project's question is its members' to read, and someone signed in who is none is told so",
   `${squash(await guest.getByRole("main").innerText()).split(" A question")[0] ?? ""} | ${await guest.locator(".a-option").count()} options, ${await guest.getByRole("link", { name: "Sign in" }).count()} ways in offered`,
-  `Escalation E-1 ${FOR_MEMBERS} | 0 options, 0 ways in offered`,
+  `Question E-1 ${FOR_MEMBERS} | 0 options, 0 ways in offered`,
 );
 // And her own home lists her none of it: Keel lists a question to the person it was put to and to the
 // namespace's maintainers.
@@ -3808,7 +3875,7 @@ await person
 expectEqual(
   "fork: a project that is not there has no fork, and is said to be none",
   `${squash(await person.getByRole("heading", { level: 1 }).first().innerText())} | ${await forkIt.count()} forms`,
-  "There is no project ada/none here | 0 forms",
+  "Project ada/none not found | 0 forms",
 );
 // A visitor is sent to sign in, and back to the form.
 const outside = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -4109,7 +4176,7 @@ await recall
 expectEqual(
   "decision: an address that names none says so, and asks Keel for nothing by that name",
   `${squash(await recall.getByRole("heading", { level: 1 }).last().innerText())} | ${remembers.calls.filter((call) => call.path === "/v1/decisions/D-9").length} asked`,
-  "There is no decision D-9 in what Keel has said so far | 0 asked",
+  "Decision D-9 not found | 0 asked",
 );
 // At a phone's width the page's words stay on the screen: each run of text is measured where it is drawn.
 await recall.setViewportSize({ width: 390, height: 844 });

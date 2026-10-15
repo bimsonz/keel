@@ -56,15 +56,15 @@ export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; s
   if (hidden)
     return (
       <Column>
-        <h1 className="sr-only">Escalations</h1>
+        <h1 className="sr-only">Questions</h1>
         <ForMembers what="list" />
       </Column>
     );
   return (
     <Column>
-      <h1 className="sr-only">Escalations</h1>
+      <h1 className="sr-only">Questions</h1>
       <Filters
-        label="Escalations, by state"
+        label="Questions, by state"
         options={FILTERS.map((option) => ({ ...option, count: list.counts[option.id] }))}
         active={filter}
         to={(next) => ({ at: "escalations", filter: next, shown: PAGE })}
@@ -72,7 +72,7 @@ export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; s
       {list.rows.length === 0 ? (
         <Nothing title={title} />
       ) : (
-        <Rows label="Escalations, newest first">
+        <Rows label="Questions, newest first">
           {list.rows.map((row) => (
             <Row
               key={row.id}

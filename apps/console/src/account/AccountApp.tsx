@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
+import { type Place, hrefOf, nextOf, sentFrom, titleOfPlace } from "../places.ts";
 import type { NamespaceTab } from "./namespaceTabs.ts";
 import {
   createHttpCredentials,
@@ -23,6 +23,7 @@ import {
 import type { KeelCredentials, KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { HomeLink } from "../views/HomeLink.tsx";
+import { MAIN, SkipLink } from "../views/SkipLink.tsx";
 import { ReaderMenu } from "../views/ReaderMenu.tsx";
 import { Switch } from "../views/Switch.tsx";
 import { TabSlot } from "../views/TabBar.tsx";
@@ -837,6 +838,7 @@ function Shell({
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   return (
     <div className="a-root flex min-h-screen w-screen flex-col bg-kumo-canvas text-base text-kumo-default">
+      <SkipLink />
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
         <div className="flex h-12 items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
@@ -877,7 +879,7 @@ function Shell({
         </div>
         <div ref={setSlot} className="contents" />
       </header>
-      <main className="flex-1">
+      <main id={MAIN} tabIndex={-1} className="flex-1 outline-none">
         <TabSlot.Provider value={slot}>{children}</TabSlot.Provider>
       </main>
       <Footer />
@@ -907,6 +909,9 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
     return () => window.removeEventListener("hashchange", take);
   }, [onSponsor]);
   const [reader, signedIn] = useReader(account);
+  useEffect(() => {
+    document.title = titleOfPlace(place);
+  }, [place]);
   useEffect(() => {
     applyMode(
       new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.title
+# why: an org's pages are all titled by the org alone
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 9dd7fe61..f6f16521 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -163,7 +163,7 @@ export function titleOfPlace(place: Place): string {
+       case "fork":
+         return `Fork ${place.namespace}/${place.project}`;
+       case "org":
+-        return `${ORG_TAB_TITLE[place.tab]} · ${place.org}`;
++        return place.org;
+       case "invite":
+         return "Invitation";
+       case "sponsor":

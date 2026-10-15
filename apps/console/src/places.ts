@@ -138,6 +138,44 @@ function pathOf(place: Place): string[] {
   }
 }
 
+const ORG_TAB_TITLE: Record<Exclude<OrgTab, "home">, string> = {
+  members: "Members",
+  credentials: "Credentials",
+  settings: "Settings",
+};
+
+/** What a page above every project is titled, as a code host titles its own: the page, whose it is, then Keel. */
+export function titleOfPlace(place: Place): string {
+  const page = ((): string => {
+    switch (place.at) {
+      case "login":
+        return "Sign in";
+      case "signup":
+        return "Sign up";
+      case "settings":
+        return "Settings";
+      case "device":
+        return "Device activation";
+      case "new-org":
+        return "New org";
+      case "new-project":
+        return "New project";
+      case "fork":
+        return `Fork ${place.namespace}/${place.project}`;
+      case "org":
+        return `${ORG_TAB_TITLE[place.tab]} · ${place.org}`;
+      case "invite":
+        return "Invitation";
+      case "sponsor":
+        return "Sponsor";
+      default:
+        // A namespace's page, by its handle: the one place left.
+        return place.handle;
+    }
+  })();
+  return `${page} · Keel`;
+}
+
 export function hrefOf(place: Place, next?: string): string {
   const query = new URLSearchParams();
   if (place.at === "device" && place.userCode !== "") query.set("user_code", place.userCode);

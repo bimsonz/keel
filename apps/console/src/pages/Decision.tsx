@@ -102,11 +102,7 @@ export function DecisionPage({ name }: { name: string }) {
       </Notice>
     );
   if (id === undefined || (answer !== undefined && "view" in answer && answer.view === null))
-    return (
-      <Notice title={`There is no decision ${name} in what Keel has said so far`}>
-        A decision is recorded when a person rules on a question about a proven conflict.
-      </Notice>
-    );
+    return <Notice title={`Decision ${name} not found`} />;
   if (answer !== undefined && "refused" in answer)
     return <Notice title={`Keel did not read decision ${name}`}>{answer.refused}</Notice>;
   if (detail === undefined)
