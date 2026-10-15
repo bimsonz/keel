@@ -102,7 +102,11 @@ function nowhere(pathname: string): boolean {
 }
 
 export interface Console {
-  fetch(request: Request, env: Env): Promise<Response>;
+  fetch(
+    request: Request,
+    env: Env,
+    context?: { waitUntil(work: Promise<unknown>): void },
+  ): Promise<Response>;
 }
 
 /** The first segments that name no project: Keel's reserved words. */
@@ -119,7 +123,7 @@ export interface Cards {
 
 export function createConsole(cards: Cards = {}): Console {
   return {
-    async fetch(request, env) {
+    async fetch(request, env, context) {
       const { origin, pathname } = new URL(request.url);
       if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
       if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);
@@ -155,7 +159,13 @@ export function createConsole(cards: Cards = {}): Console {
       if (place === null || cards.retag === undefined) return env.ASSETS.fetch(request);
       const [page, card] = await Promise.all([
         env.ASSETS.fetch(request),
-        readCard(env.KEEL, origin, place, cards.cache),
+        readCard(
+          env.KEEL,
+          origin,
+          place,
+          cards.cache,
+          context === undefined ? undefined : (work) => context.waitUntil(work),
+        ),
       ]);
       if (card === null || !page.ok) return page;
       return cards.retag(page, card, `${origin}${pathname}`, `${origin}/og.png`);

@@ -2,15 +2,15 @@
 # kills: cards.fallback
 # why: a slow Keel holds a crawler's page as long as Keel takes, where the site's card was due at the bound
 diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
-index 574ff574..0b1017f3 100644
+index 96e63b43..93ecda7f 100644
 --- a/apps/console/src/worker/cards.ts
 +++ b/apps/console/src/worker/cards.ts
-@@ -107,7 +107,7 @@ export async function readCard(
-       .then(async (response): Promise<unknown> => (response.ok ? response.json() : null))
-       .catch(() => null),
-     new Promise<"late">((resolve) => {
--      timer = setTimeout(() => resolve("late"), waitMs);
-+      timer = setTimeout(() => resolve("late"), waitMs * 1000);
+@@ -141,7 +141,7 @@ export async function readCard(
+   const view = await Promise.race([
+     answered,
+     new Promise<typeof LATE>((resolve) => {
+-      timer = setTimeout(() => resolve(LATE), waitMs);
++      timer = setTimeout(() => resolve(LATE), waitMs * 1000);
      }),
    ]);
    clearTimeout(timer);

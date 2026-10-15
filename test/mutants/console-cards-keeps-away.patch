@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/cards.test.ts -t "cards.late-kept"
+# kills: cards.late-kept
+# why: Keel away for a moment is kept for five minutes as the project having no card
+diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
+index 96e63b43..3ed78005 100644
+--- a/apps/console/src/worker/cards.ts
++++ b/apps/console/src/worker/cards.ts
+@@ -119,7 +119,7 @@ export async function readCard(
+     .then(async (response): Promise<{ view: unknown; keep: boolean }> =>
+       response.ok
+         ? { view: await response.json(), keep: true }
+-        : { view: null, keep: response.status === 404 },
++        : { view: null, keep: true },
+     )
+     .catch(() => ({ view: null, keep: false }))
+     .then(async ({ view, keep }) => {

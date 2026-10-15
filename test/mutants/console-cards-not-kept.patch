@@ -2,15 +2,15 @@
 # kills: cards.kept
 # why: every crawler a share fans out to reads Keel again, where one read was kept five minutes
 diff --git a/apps/console/src/worker/cards.ts b/apps/console/src/worker/cards.ts
-index 574ff574..44b3fe22 100644
+index 96e63b43..59c6fee2 100644
 --- a/apps/console/src/worker/cards.ts
 +++ b/apps/console/src/worker/cards.ts
-@@ -93,7 +93,7 @@ export async function readCard(
+@@ -106,7 +106,7 @@ export async function readCard(
    const key = new Request(
      `${origin}/.card/${encodeURIComponent(place.namespace)}/${encodeURIComponent(place.project)}`,
    );
 -  const kept = await cache?.match(key).catch(() => undefined);
 +  const kept: Response | undefined = undefined;
    if (kept !== undefined) return cardOf(place, await kept.json().catch(() => null));
-   let timer: ReturnType<typeof setTimeout> | undefined;
-   const view = await Promise.race([
+   // Keel's answer, kept as it comes: the project, or its having none. Anything else is not Keel's answer.
+   const answered = keel

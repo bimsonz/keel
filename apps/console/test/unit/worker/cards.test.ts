@@ -113,7 +113,14 @@ describe("a link's card", () => {
     const silent = { fetch: () => new Promise<Response>(() => undefined) };
     const started = Date.now();
     expect(
-      await readCard(silent, ORIGIN, { namespace: "keel", project: "keel" }, undefined, 50),
+      await readCard(
+        silent,
+        ORIGIN,
+        { namespace: "keel", project: "keel" },
+        undefined,
+        undefined,
+        50,
+      ),
     ).toBeNull();
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(placeOf("/keel/forge.git/info/refs", new Set())).toBeNull();
@@ -131,5 +138,47 @@ describe("a link's card", () => {
       "/v1/namespaces/keel/projects/keel",
       "/v1/namespaces/acme/projects/secret",
     ]);
+  });
+
+  it("[cards.late-kept] keeps a card Keel brings after the wait for the next crawler, and never keeps Keel's being away", async () => {
+    const place = { namespace: "keel", project: "keel" };
+    const cache = memoryCache();
+    let asked = 0;
+    // Keel answers in 100 ms, past a wait of 20.
+    const slow = {
+      fetch: (request: Request) => {
+        asked += 1;
+        return new Promise<Response>((resolve) => {
+          setTimeout(() => void knowsKeel(request).then(resolve), 100);
+        });
+      },
+    };
+    const deferred: Promise<unknown>[] = [];
+    expect(
+      await readCard(slow, ORIGIN, place, cache, (work) => deferred.push(work), 20),
+    ).toBeNull();
+    expect(deferred).toHaveLength(1);
+    await Promise.all(deferred);
+    // The next crawler is given what the late read brought, and Keel is not asked again.
+    expect(await readCard(slow, ORIGIN, place, cache, undefined, 20)).toEqual({
+      title: "keel/keel",
+      description: SITE.description,
+    });
+    expect(asked).toBe(1);
+
+    // Keel away, or a read that fails on the way, is no answer: nothing is kept, and the next asks again.
+    const away = memoryCache();
+    let tries = 0;
+    const struggling = {
+      fetch: (): Promise<Response> => {
+        tries += 1;
+        return tries === 1
+          ? Promise.resolve(Response.json({ code: "service.unavailable" }, { status: 503 }))
+          : Promise.reject(new Error("dropped"));
+      },
+    };
+    expect(await readCard(struggling, ORIGIN, place, away)).toBeNull();
+    expect(await readCard(struggling, ORIGIN, place, away)).toBeNull();
+    expect([tries, away.size()]).toEqual([2, 0]);
   });
 });

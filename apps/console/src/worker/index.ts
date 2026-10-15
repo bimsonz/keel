@@ -26,5 +26,5 @@ function retag(page: Response, card: Card, url: string, image: string): Response
 const mission = createConsole({ cache: caches.default, retag });
 
 export default {
-  fetch: (request, env) => mission.fetch(request, env),
+  fetch: (request, env, context) => mission.fetch(request, env, context),
 } satisfies ExportedHandler<Env>;

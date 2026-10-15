@@ -2,11 +2,11 @@
 # kills: handler.git-forward
 # why: a clone address's git paths are the page, so git clone is answered HTML
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index bdaf18e2..84d7306b 100644
+index d723b817..7b0b5c8a 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -122,7 +122,7 @@ export function createConsole(cards: Cards = {}): Console {
-     async fetch(request, env) {
+@@ -126,7 +126,7 @@ export function createConsole(cards: Cards = {}): Console {
+     async fetch(request, env, context) {
        const { origin, pathname } = new URL(request.url);
        if (pathname === "/healthz") return Response.json({ ok: true, service: "keel-console" });
 -      if (GIT.test(pathname) || KEELS.test(pathname)) return env.KEEL.fetch(request);

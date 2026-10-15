@@ -24,8 +24,12 @@ export const SITE = {
   description: "A Git platform for software agents, built on Cloudflare Workers and Artifacts.",
 } as const;
 
-/** How long a project's card is waited for, at most: past it, the site's card is served. */
-export const CARD_WAIT_MS = 400;
+/**
+ * How long a crawler's page waits for a project's card, at most: past it, the site's card is served, and the read
+ * goes on to be kept for the next. Keel reads a project anonymously in half a second to two and a half (measured
+ * from outside on 15 Oct), and no person waits on it: a crawler gives a page several seconds.
+ */
+export const CARD_WAIT_MS = 2_000;
 
 /** How long a project's card, or Keel's having none to show, is kept for the next crawler. */
 export const CARD_KEPT_S = 300;
@@ -78,16 +82,25 @@ export interface CardCache {
   put(request: Request, response: Response): Promise<void>;
 }
 
+/** What a race against the wait says when the wait won. */
+const LATE = Symbol("late");
+
+/** Keeps a promise going past the response it was started for: the Worker's `waitUntil`. */
+export type Defer = (work: Promise<unknown>) => void;
+
 /**
- * The project's card as Keel shows it to anyone, or null where it shows none (a private project, one that is not
- * there, or a Keel slower than `CARD_WAIT_MS`). Read with nothing of the asker's request: no cookie, no
- * credential. Kept for `CARD_KEPT_S` per project, a project with none to show among them.
+ * The project's card as Keel shows it to anyone, or null where it shows none: a private project, one that is not
+ * there, or a Keel slower than `waitMs`. Read with nothing of the asker's request: no cookie, no credential.
+ * What Keel answers is kept for `CARD_KEPT_S` per project, whenever it comes: a read that outlasts the wait goes
+ * on (`defer`), and the next crawler is given what it brought. Only Keel's own answer is kept, the project or
+ * its having none (404): a read that failed, timed out or met Keel away is asked again by the next.
  */
 export async function readCard(
   keel: Fetcher,
   origin: string,
   place: Place,
   cache: CardCache | undefined,
+  defer?: Defer,
   waitMs: number = CARD_WAIT_MS,
 ): Promise<Card | null> {
   const key = new Request(
@@ -95,32 +108,48 @@ export async function readCard(
   );
   const kept = await cache?.match(key).catch(() => undefined);
   if (kept !== undefined) return cardOf(place, await kept.json().catch(() => null));
+  // Keel's answer, kept as it comes: the project, or its having none. Anything else is not Keel's answer.
+  const answered = keel
+    .fetch(
+      new Request(
+        `${origin}/v1/namespaces/${encodeURIComponent(place.namespace)}/projects/${encodeURIComponent(place.project)}`,
+        { headers: { accept: "application/json" } },
+      ),
+    )
+    .then(async (response): Promise<{ view: unknown; keep: boolean }> =>
+      response.ok
+        ? { view: await response.json(), keep: true }
+        : { view: null, keep: response.status === 404 },
+    )
+    .catch(() => ({ view: null, keep: false }))
+    .then(async ({ view, keep }) => {
+      if (keep)
+        await cache
+          ?.put(
+            key,
+            new Response(JSON.stringify(view), {
+              headers: {
+                "content-type": "application/json",
+                "cache-control": `max-age=${CARD_KEPT_S}`,
+              },
+            }),
+          )
+          .catch(() => undefined);
+      return view;
+    });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const view = await Promise.race([
-    keel
-      .fetch(
-        new Request(
-          `${origin}/v1/namespaces/${encodeURIComponent(place.namespace)}/projects/${encodeURIComponent(place.project)}`,
-          { headers: { accept: "application/json" } },
-        ),
-      )
-      .then(async (response): Promise<unknown> => (response.ok ? response.json() : null))
-      .catch(() => null),
-    new Promise<"late">((resolve) => {
-      timer = setTimeout(() => resolve("late"), waitMs);
+    answered,
+    new Promise<typeof LATE>((resolve) => {
+      timer = setTimeout(() => resolve(LATE), waitMs);
     }),
   ]);
   clearTimeout(timer);
-  // A Keel too slow to answer is not remembered as having no card: the next crawler asks again.
-  if (view === "late") return null;
-  await cache
-    ?.put(
-      key,
-      new Response(JSON.stringify(view), {
-        headers: { "content-type": "application/json", "cache-control": `max-age=${CARD_KEPT_S}` },
-      }),
-    )
-    .catch(() => undefined);
+  if (view === LATE) {
+    // The page goes with the site's card; the read goes on, and what it brings is kept for the next crawler.
+    defer?.(answered);
+    return null;
+  }
   return cardOf(place, view);
 }
 
