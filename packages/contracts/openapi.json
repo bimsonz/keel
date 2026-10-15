@@ -11704,6 +11704,36 @@
         ],
         "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), or nobody yet (`unattributed`)."
       },
+      "BatchDropped": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "batchId",
+          "because"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "BatchDropped"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "because": {
+            "$ref": "#/components/schemas/BatchId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Any event in the catalogue. `_tag` names it.Speculation cancelled a batch behind a failed one, `because`, before it promoted: it left the trunk's queue, or is remembered before its verdict arrives, and never promotes."
+      },
       "BatchFailed": {
         "type": "object",
         "required": [
@@ -17055,6 +17085,9 @@
             "$ref": "#/components/schemas/TrunkSynced"
           },
           {
+            "$ref": "#/components/schemas/BatchDropped"
+          },
+          {
             "$ref": "#/components/schemas/ProjectCreated"
           },
           {
@@ -17138,8 +17171,7 @@
           {
             "$ref": "#/components/schemas/DeliveryRefused"
           }
-        ],
-        "description": "Any event in the catalogue. `_tag` names it."
+        ]
       },
       "KeelRecord": {
         "type": "object",

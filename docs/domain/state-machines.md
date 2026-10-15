@@ -355,17 +355,22 @@ stateDiagram-v2
   [*] --> Idle: TrunkInitialized
   Idle --> Debouncing: BatchVerified
   Idle --> Syncing: TrunkSyncStarted
+  Idle --> Idle: BatchDropped
   Debouncing --> Debouncing: BatchVerified
   Debouncing --> Idle: PromotionDeclined [queue-empty]
   Debouncing --> Debouncing: PromotionDeclined [batches-waiting]
+  Debouncing --> Idle: BatchDropped [queue-empty]
+  Debouncing --> Debouncing: BatchDropped [batches-waiting]
   Debouncing --> Promoting: PromotionStarted
   Debouncing --> Frozen: PromotionFrozen
   Debouncing --> Syncing: TrunkSyncStarted
   Syncing --> Syncing: BatchVerified
   Syncing --> Idle: TrunkSynced [queue-empty]
   Syncing --> Debouncing: TrunkSynced [batches-waiting]
+  Syncing --> Syncing: BatchDropped
   Syncing --> Frozen: PromotionFrozen
   Promoting --> Promoting: BatchVerified
+  Promoting --> Promoting: BatchDropped
   Promoting --> Promoting: PromotionComposed
   Promoting --> Idle: TrunkAdvanced [queue-empty]
   Promoting --> Debouncing: TrunkAdvanced [batches-waiting]
@@ -374,6 +379,7 @@ stateDiagram-v2
   Promoting --> Debouncing: PromotionDeclined [batches-waiting]
   Promoting --> Frozen: PromotionFrozen
   Frozen --> Frozen: BatchVerified
+  Frozen --> Frozen: BatchDropped
   Frozen --> Frozen: PromotionDeclined
   Frozen --> Idle: PromotionResumed [queue-empty]
   Frozen --> Debouncing: PromotionResumed [batches-waiting]
@@ -395,12 +401,14 @@ The Trunk DO's state is folded from its own events and from the `BatchVerified` 
 | Promoting | Frozen | Read-back shows any other head | — | `PromotionFrozen {reason: readback-mismatch}` |
 | Promoting | Idle, or Debouncing | Artifacts refuses the group's push, or the composed pack would take the repo past its quota | The group is composed, and the head is still `old` (a push that may have landed is read back instead) | `PromotionDeclined {reason: pack-too-large or repo-bytes-quota, nextActions}` for each batch of the group, the last ending it; trunk does not move and never freezes. A batch refused alone as too large, and every batch of a full repo, has `reverify` empty: its members bounce. A group of several refused as too large names each batch's members in `reverify`, and from then on each group is one batch, until a push lands |
 | Frozen | Idle, or Debouncing | An operator releases the freeze, confirming trunk's head | Scope `operator` | `PromotionDeclined {reason: frozen}` for each batch of the stopped group, then `PromotionResumed {head}` |
+| Any | The same, or Idle | The Lane cancels a batch speculation verified behind a failed one | The batch is not in the group being pushed and none of its members landed (otherwise refused as too late) | `BatchDropped {batchId, because}`: the batch leaves the queue, Idle when it leaves a debounce with none, or is remembered before its verdict arrives. A batch dropped already is answered the same again, with nothing recorded |
 
 The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. On red it bisects across commutation-promoted commits and declares a revert change with `origin: auditor`, which lands like any other change.
 
 **Invariants**
 - A retry pushes the SHA recorded in `PromotionComposed`, never a recompose: compose is deterministic only within one code version, and a Durable Object can run the previous version for minutes after a deploy.
 - Every WAL group ends exactly once, in `TrunkAdvanced` or `PromotionFrozen`. Nothing promotes from Frozen until `PromotionResumed`.
+- A dropped batch never promotes: a `BatchVerified` for it is refused however late it arrives, so its members, queued again, land once.
 - Artifacts' own compare-and-swap, if it exists, is a second fence and never the only one.
 
 ---

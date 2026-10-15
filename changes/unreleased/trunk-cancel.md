@@ -1,0 +1,3 @@
+### Added
+
+- **The trunk drops a batch speculation cancels** (additive: one port method, one Trunk DO RPC, one event, one rejection). `Trunks.cancel(projectId, {batchId, because, members})` answers `dropped` when the batch was queued at the trunk or its verdict has not arrived: the trunk records `BatchDropped {projectId, batchId, because}`, remembers the batch in `Trunk.dropped`, and refuses a `BatchVerified` for it however late it comes, so it never promotes and its members, queued again, land once. A batch in the group being pushed, or one a member of which landed, is `too-late` (`CancelTooLate`, reason `promoting` or `promoted`). A dropped batch is answered `dropped` again. The memory adapter answers `dropped` unless told otherwise (`answersCancel`).

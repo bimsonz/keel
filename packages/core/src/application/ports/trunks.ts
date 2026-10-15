@@ -8,8 +8,33 @@ import type {
   TrunkNotInitialized,
   TrunkOrigin,
 } from "../../domain/integration/index.ts";
-import type { CommandActor, CommitSha, Instant, ProjectId } from "../../domain/kernel/index.ts";
+import type {
+  BatchId,
+  ChangeId,
+  CommandActor,
+  CommitSha,
+  Instant,
+  ProjectId,
+} from "../../domain/kernel/index.ts";
 import type { RepoNotFound } from "./code-host.ts";
+
+/** A batch speculation cancels, behind the failed batch `because`, with its members. */
+export interface BatchCancel {
+  readonly batchId: BatchId;
+  readonly because: BatchId;
+  readonly members: readonly ChangeId[];
+}
+
+/**
+ * What the trunk made of a cancel. `dropped`: the batch left the queue, or
+ * was remembered before its verdict arrived, and never promotes; its members
+ * may be queued again. `too-late`: it is in the group being pushed
+ * (`promoting`), or a member of it landed (`promoted`); it lands or fails with
+ * that group, and its members are not queued again.
+ */
+export type CancelAnswer =
+  | { readonly _tag: "dropped" }
+  | { readonly _tag: "too-late"; readonly reason: "promoting" | "promoted" };
 
 /**
  * A history too large to start a project from, imported or forked: its one
@@ -149,6 +174,16 @@ export class Trunks extends Context.Service<
       projectId: ProjectId,
       by: CommandActor,
     ) => Effect.Effect<UpstreamSynced, SyncRefused>;
+    /**
+     * Cancels a batch speculation verified behind a failed one, whether it is
+     * queued at the trunk or its verdict has not arrived yet: `dropped` means
+     * it never promotes, and only then may its members be queued again.
+     * Idempotent: a dropped batch is answered `dropped` again.
+     */
+    readonly cancel: (
+      projectId: ProjectId,
+      cancel: BatchCancel,
+    ) => Effect.Effect<CancelAnswer, TrunkNotInitialized>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
     readonly sync: (projectId: ProjectId) => Effect.Effect<ReposSynced>;
     /**

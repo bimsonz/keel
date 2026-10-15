@@ -112,6 +112,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AuditCompleted: "public",
   TrunkSyncStarted: "public",
   TrunkSynced: "public",
+  BatchDropped: "public",
 
   ConflictSuspected: "public",
   ProbeDrafted: "public",

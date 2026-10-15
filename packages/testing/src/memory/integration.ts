@@ -38,6 +38,8 @@ import {
   type SyncRefused,
   UpstreamUnreachable,
   type UpstreamSynced,
+  type BatchCancel,
+  type CancelAnswer,
   type InstanceStanding,
   type VerificationJob,
 } from "@keeltown/core/ports";
@@ -440,6 +442,8 @@ export function makeTrunksMemory(
   const syncedUp: { readonly projectId: ProjectId; readonly by: string; readonly to: CommitSha }[] =
     [];
   const destroyed = new Map<ProjectId, string>();
+  const cancels: (BatchCancel & { readonly projectId: ProjectId })[] = [];
+  const cancelAnswers = new Map<string, CancelAnswer>();
   const standings = new Map<
     ProjectId,
     { readonly phase: PromotionState; readonly advancedAt: Instant }
@@ -486,6 +490,12 @@ export function makeTrunksMemory(
     },
     /** Every sync from upstream that moved a trunk, in order. */
     syncedUp: () => [...syncedUp],
+    /** Every cancel the trunks were asked for, in order. */
+    cancelled: () => [...cancels],
+    /** A cancel of `batchId` answers `answer` from here on; every other answers `dropped`. */
+    answersCancel: (batchId: string, answer: CancelAnswer) => {
+      cancelAnswers.set(batchId, answer);
+    },
     destroyed,
     layer: Layer.succeed(
       Trunks,
@@ -565,6 +575,11 @@ export function makeTrunksMemory(
             return head === undefined || standing === undefined
               ? Option.none()
               : Option.some({ head, ...standing });
+          }),
+        cancel: (projectId, cancel) =>
+          Effect.sync((): CancelAnswer => {
+            cancels.push({ projectId, ...cancel });
+            return cancelAnswers.get(cancel.batchId) ?? { _tag: "dropped" };
           }),
         syncUpstream: (projectId, by) =>
           Effect.suspend((): Effect.Effect<UpstreamSynced, SyncRefused> => {

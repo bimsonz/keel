@@ -2,19 +2,14 @@
 # kills: promotion.fold-table
 # why: the fold no longer refuses BatchVerified on `event.base === undefined`.
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index d5224caa..aa3750ae 100644
+index fd1821ae..99da9890 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -459,11 +459,7 @@ export const evolvePromotion = (
-       return illegal(trunk, event);
- 
+@@ -590,7 +590,6 @@ export const evolvePromotion = (
      case "BatchVerified": {
--      if (
--        event.members === undefined ||
+       if (
+         event.members === undefined ||
 -        event.base === undefined ||
--        trunk.queue.some((b) => b.batchId === event.batchId)
--      )
-+      if (event.members === undefined || trunk.queue.some((b) => b.batchId === event.batchId))
-         return illegal(trunk, event);
-       const queued: QueuedBatch = {
-         batchId: event.batchId,
+         trunk.queue.some((b) => b.batchId === event.batchId) ||
+         trunk.dropped?.includes(event.batchId) === true
+       )

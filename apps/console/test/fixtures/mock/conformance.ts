@@ -209,6 +209,10 @@ const RULES: Record<EventType, Rule[]> = {
   // A sync from upstream: its write-ahead entry between promotions, then main moved.
   TrunkSyncStarted: [{ kind: "trunk", idField: "projectId", from: ["idle"], to: "syncing" }],
   TrunkSynced: [{ kind: "trunk", idField: "projectId", from: ["syncing"], to: "idle" }],
+  // A batch speculation cancelled leaves the queue, or is remembered before its verdict: in any phase.
+  BatchDropped: [
+    { kind: "trunk", idField: "projectId", from: ["idle", "promoting", "frozen", "syncing"] },
+  ],
 
   RulingGiven: [{ kind: "escalation", idField: "escalationId", from: ["open"], to: "ruled" }],
   DecisionRecorded: [{ kind: "decision", idField: "decisionId", from: null, to: "active" }],

@@ -11,6 +11,7 @@ import {
   resumeTrunk,
   seedTrunk,
   syncFromUpstream,
+  cancelBatch,
   syncMirror,
   syncTrunk,
   takeTrunk,
@@ -33,10 +34,12 @@ import {
   type Transaction,
 } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
-import { TrunkCodecs, type TrunkRpc } from "../../../rpc/trunk.ts";
+import { BatchCancel, TrunkCodecs, type TrunkRpc } from "../../../rpc/trunk.ts";
 import { type TrunkServices, trunkServices } from "../../../composition/do.ts";
 import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
+
+const decodeCancel = Schema.decodeSync(BatchCancel);
 
 /** The trunk's own deadlines: the group-commit debounce, a push to retry, and the mirror to sync. */
 export const TRUNK_DEBOUNCE = "trunk debounce";
@@ -182,6 +185,10 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     );
     await this.afterSync();
     return answer;
+  }
+
+  async cancel(cancel: typeof BatchCancel.Encoded) {
+    return this.answer(TrunkCodecs.cancel, cancelBatch(this.projectId, decodeCancel(cancel)));
   }
 
   async destroy(by: string) {

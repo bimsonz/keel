@@ -178,11 +178,19 @@ export const promotionChart: Chart = {
   initial: "idle",
   meta: { createdBy: "TrunkInitialized", section: "Promotion (Trunk DO)" },
   states: {
-    idle: { on: { BatchVerified: p("debouncing"), TrunkSyncStarted: p("syncing") } },
+    // A cancelled batch is dropped in any phase, or remembered before its verdict arrives.
+    idle: {
+      on: {
+        BatchVerified: p("debouncing"),
+        TrunkSyncStarted: p("syncing"),
+        BatchDropped: p("idle"),
+      },
+    },
     debouncing: {
       on: {
         BatchVerified: p("debouncing"),
         ...settles("PromotionDeclined"),
+        ...settles("BatchDropped"),
         PromotionStarted: p("promoting"),
         PromotionFrozen: p("frozen"),
         TrunkSyncStarted: p("syncing"),
@@ -193,12 +201,14 @@ export const promotionChart: Chart = {
       on: {
         BatchVerified: p("syncing"),
         ...settles("TrunkSynced"),
+        BatchDropped: p("syncing"),
         PromotionFrozen: p("frozen"),
       },
     },
     promoting: {
       on: {
         BatchVerified: p("promoting"),
+        BatchDropped: p("promoting"),
         PromotionComposed: p("promoting"),
         ...settles("TrunkAdvanced"),
         // A refused push declines the group's batches one by one; the last ends the group.
@@ -213,6 +223,7 @@ export const promotionChart: Chart = {
     frozen: {
       on: {
         BatchVerified: p("frozen"),
+        BatchDropped: p("frozen"),
         PromotionDeclined: p("frozen"),
         ...settles("PromotionResumed"),
       },

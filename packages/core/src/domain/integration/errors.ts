@@ -62,6 +62,17 @@ export class NotFastForward extends Schema.TaggedError<NotFastForward>()("NotFas
   upstream: CommitSha,
 }) {}
 
+/**
+ * A cancel came too late: the batch is in the group being pushed
+ * (`promoting`), or a member of it already landed (`promoted`). It lands or
+ * fails with that group, and its members are not queued again.
+ */
+export class CancelTooLate extends Schema.TaggedError<CancelTooLate>()("CancelTooLate", {
+  projectId: ProjectId,
+  batchId: BatchId,
+  reason: Schema.Literals(["promoting", "promoted"]),
+}) {}
+
 /** The command is not valid in the trunk's current promotion phase. */
 export class PromotionStateRefused extends Schema.TaggedError<PromotionStateRefused>()(
   "PromotionStateRefused",

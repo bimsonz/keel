@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.drop-fold, promotion.cancel-order
+# why: a dropped batch stays queued
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..b3e61acf 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -652,7 +652,7 @@ export const evolvePromotion = (
+         wal?.batches.some((b) => b.batchId === event.batchId) === true
+       )
+         return illegal(trunk, event);
+-      const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
++      const queue = trunk.queue;
+       return {
+         ...trunk,
+         queue,

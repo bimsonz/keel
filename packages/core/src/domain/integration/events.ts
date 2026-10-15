@@ -289,6 +289,17 @@ export const AuditCompleted = Schema.TaggedStruct("AuditCompleted", {
   runRef: Schema.String,
 });
 
+/**
+ * Speculation cancelled a batch behind a failed one, `because`, before it
+ * promoted: it left the queue if it was there, and the trunk remembers it, so
+ * a verdict for it that arrives later is refused and the batch never promotes.
+ */
+export const BatchDropped = Schema.TaggedStruct("BatchDropped", {
+  projectId: ProjectId,
+  batchId: BatchId,
+  because: BatchId,
+});
+
 export const IntegrationEvent = Schema.Union([
   BatchFormed,
   CandidateAssembled,
@@ -311,5 +322,6 @@ export const IntegrationEvent = Schema.Union([
   AuditCompleted,
   TrunkSyncStarted,
   TrunkSynced,
+  BatchDropped,
 ]);
 export type IntegrationEvent = typeof IntegrationEvent.Type;

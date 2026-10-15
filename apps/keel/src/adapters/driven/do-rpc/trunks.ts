@@ -73,6 +73,10 @@ export function TrunksRpc(
             ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
           }),
         ),
+      cancel: (projectId, cancel) =>
+        callObject(TrunkCodecs.cancel, () =>
+          trunk(projectId).cancel({ ...cancel, members: [...cancel.members] }),
+        ),
       destroy: (projectId, by) =>
         callObject(TrunkCodecs.destroy, () => trunk(projectId).destroy(by)),
     }),

@@ -1,0 +1,26 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.cancel-order, promotion.cancel-answers, promotion.drop-fold
+# why: a cancelled batch's late verdict queues it, and it promotes
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..227d24dd 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -373,7 +373,7 @@ export const decidePromotion = (
+         (b) => b.batchId === command.batchId,
+       );
+       // A cancelled batch's verdict, however late, never queues it.
+-      return known || trunk.dropped?.includes(command.batchId) === true
++      return known
+         ? refuse(trunk, command)
+         : Result.succeed([
+             BatchVerified.make({
+@@ -591,8 +591,7 @@ export const evolvePromotion = (
+       if (
+         event.members === undefined ||
+         event.base === undefined ||
+-        trunk.queue.some((b) => b.batchId === event.batchId) ||
+-        trunk.dropped?.includes(event.batchId) === true
++        trunk.queue.some((b) => b.batchId === event.batchId)
+       )
+         return illegal(trunk, event);
+       const queued: QueuedBatch = {

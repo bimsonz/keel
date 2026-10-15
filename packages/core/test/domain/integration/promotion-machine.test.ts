@@ -2,6 +2,7 @@ import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   type Batch,
+  BatchDropped,
   type CandidateCommand,
   type CandidateEvent,
   commutation,
@@ -85,11 +86,11 @@ const PROGRESS: Readonly<Record<Phase, readonly Kind[]>> = {
   syncing: ["ReadBack", "Enqueue"],
 };
 /**
- * What each step tries besides the kinds it draws from: a sync from upstream. It is never
- * drawn, so no plan's walk moves; the tours' trunk was not imported, so each one is refused,
- * and the sync's own walk is `syncTour`'s.
+ * What each step tries besides the kinds it draws from: a sync from upstream, and a cancel.
+ * Neither is drawn, so no plan's walk moves. The tours' trunk was not imported, so each sync
+ * is refused, and the sync's own walk is `syncTour`'s; a cancel's is `cancelTour`'s.
  */
-const PROBED: readonly Kind[] = [...KINDS, "Sync"];
+const PROBED: readonly Kind[] = [...KINDS, "Sync", "Cancel"];
 
 interface Step {
   readonly mode: "progress" | "any";
@@ -157,8 +158,9 @@ const build = (
   step: Step,
   world: World,
 ): PromotionCommand => {
-  // A sync counts nothing in the world, so trying one moves no batch's id, shape or flag.
+  // A sync or a cancel counts nothing in the world, so trying one moves no batch's id, shape or flag.
   if (kind === "Sync") return syncCommand(state, step);
+  if (kind === "Cancel") return cancelCommand(state, step);
   world.n += 1;
   const n = world.n;
   switch (kind) {
@@ -257,6 +259,32 @@ function syncCommand(state: Trunk | undefined, step: Step): PromotionCommand {
   const head = state?.head ?? H0;
   const to = step.pick % 4 === 3 ? head : (UPSTREAM[step.pick % 2] ?? H0);
   return { _tag: "Sync", by: RELEASER, from: step.honest ? head : STRAY, to };
+}
+
+/** Ids no step mints: the world counts from 100 and no walk reaches nine million. */
+const OUTSIDE = 9_000_000;
+/** The failed batch a cancel names. */
+const RED = makeId("bat", ulid(OUTSIDE));
+/**
+ * A cancel of a queued batch, of one in the group being pushed, of one whose member landed, of
+ * a dropped one again, or of one whose verdict has not arrived: whichever `pick` names.
+ */
+function cancelCommand(state: Trunk | undefined, step: Step): PromotionCommand {
+  const unseen = {
+    batchId: makeId("bat", ulid(OUTSIDE + 1 + (step.pick % 2))),
+    members: [makeId("chg", ulid(OUTSIDE + 1))],
+  };
+  const targets: readonly { readonly batchId: BatchId; readonly members: readonly ChangeId[] }[] = [
+    ...(state?.queue ?? []),
+    ...(state?.wal?.batches ?? []),
+    ...(state?.promoted ?? [])
+      .slice(-1)
+      .map((member) => ({ batchId: makeId("bat", ulid(OUTSIDE + 3)), members: [member] })),
+    ...(state?.dropped ?? []).slice(-1).map((batchId) => ({ batchId, members: unseen.members })),
+    unseen,
+  ];
+  const target = targets[step.pick % targets.length] ?? unseen;
+  return { _tag: "Cancel", batchId: target.batchId, because: RED, members: target.members };
 }
 
 interface Probe {
@@ -376,7 +404,9 @@ const oracle = (
     case "Initialize":
       return "refused";
     case "Enqueue":
-      return [...before.queue, ...(wal?.batches ?? [])].some((b) => b.batchId === command.batchId)
+      return [...before.queue, ...(wal?.batches ?? [])].some(
+        (b) => b.batchId === command.batchId,
+      ) || before.dropped?.includes(command.batchId) === true
         ? "refused"
         : before.phase === "idle"
           ? "debouncing"
@@ -416,6 +446,15 @@ const oracle = (
       if (before.phase !== "idle" && before.phase !== "debouncing") return "refused";
       if (command.from !== before.head) return "refused";
       return command.to === command.from ? "noop" : "syncing";
+    case "Cancel":
+      // A dropped batch is answered the same again. Too late once it is being pushed or landed.
+      if (before.dropped?.includes(command.batchId) === true) return "noop";
+      if (wal?.batches.some((b) => b.batchId === command.batchId) === true) return "refused";
+      if (command.members.some((m) => before.promoted.includes(m))) return "refused";
+      return before.phase === "debouncing" &&
+        before.queue.some((b) => b.batchId === command.batchId)
+        ? settled(before, 1)
+        : before.phase;
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -1247,7 +1286,7 @@ const syncTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
     moves: (state) =>
       state === undefined
         ? [{ command: importedInit, dt: 1 }]
-        : PROBED.filter((kind) => kind !== "Initialize").flatMap((kind) =>
+        : PROBED.filter((kind) => kind !== "Initialize" && kind !== "Cancel").flatMap((kind) =>
             [true, false].flatMap((honest) =>
               [0, 1, 2, 3].map((pick) => ({
                 command: build(
@@ -1272,6 +1311,49 @@ const syncTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
       ].join("|"),
   });
   return walkedSyncTour;
+};
+
+/**
+ * The machine walked breadth-first from an imported trunk with a cancel among its moves: every
+ * batch cancelled from every phase, a sync's among them, queued, pushed, landed, dropped already,
+ * or not seen yet, and the verdicts that come after. Its own walk, so the promotion tour and its
+ * fold table stay as they were.
+ */
+let walkedCancelTour: readonly Fold<Trunk, TrunkEvent>[] | undefined;
+const cancelTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
+  if (walkedCancelTour !== undefined) return walkedCancelTour;
+  const world: World = { touched: new Map(), behind: new Set(), n: 100 };
+  walkedCancelTour = tour(promotionMachine, {
+    start: T0,
+    facts: (now) => ({ now, projectId: PROJECT }),
+    moves: (state) =>
+      state === undefined
+        ? [{ command: importedInit, dt: 1 }]
+        : PROBED.filter((kind) => kind !== "Initialize").flatMap((kind) =>
+            [true, false].flatMap((honest) =>
+              [0, 1, 2, 3].map((pick) => ({
+                command: build(
+                  kind,
+                  state,
+                  { mode: "progress", pick, honest, path: pick % PATHS.length, behind: false },
+                  world,
+                ),
+                dt: 1,
+              })),
+            ),
+          ),
+    signature: (t) =>
+      [
+        phaseOf(t),
+        Math.min(t?.queue.length ?? 0, 2),
+        t?.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
+        t?.sync === undefined ? "-" : "sync",
+        t?.frozen === undefined ? "-" : "frozen",
+        Math.min(t?.dropped?.length ?? 0, 2),
+        Math.min(t?.promoted.length ?? 0, 1),
+      ].join("|"),
+  });
+  return walkedCancelTour;
 };
 
 /** A verdict's `verified` flag as the Lane DO sets it. */
@@ -1719,6 +1801,12 @@ const trunkFolds = (
         ...(event.height === undefined ? {} : { height: event.height }),
       };
     }
+    case "BatchDropped": {
+      // No tour of this table cancels; `[promotion.drop-fold]` is the drop's table, with the batches dropped already.
+      if (from.group?.batches.some((b) => b.batchId === event.batchId) === true) return "illegal";
+      const queue = from.queue.filter((b) => b.batchId !== event.batchId);
+      return { ...from, queue, phase: from.phase === "debouncing" ? rests(queue) : from.phase };
+    }
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -2130,8 +2218,208 @@ describe("the Promotion chart", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    const walked = [...promotionTour(), ...syncTour()];
+    const walked = [...promotionTour(), ...syncTour(), ...cancelTour()];
     expect(offChart(promotionChart, walked, promotionView)).toEqual([]);
     expect(uncovered(promotionChart, walked, promotionView)).toEqual([]);
+  });
+});
+
+/** Every trunk the promotion and cancel tours reach, one of each shape, with none, one or several batches dropped. */
+const reachedTrunks = (): readonly Trunk[] => {
+  const seen = new Map<string, Trunk>();
+  for (const { after } of [...promotionTour(), ...cancelTour()]) {
+    const key = `${shapeOf(after)}|${Math.min((after.dropped ?? []).length, 2)}|${after.sync === undefined}`;
+    if (!seen.has(key)) seen.set(key, after);
+  }
+  return [...seen.values()];
+};
+
+const folded = (t: Trunk, payload: TrunkEvent): Trunk | "illegal" => {
+  try {
+    return evolvePromotion(t, { at: T0, payload });
+  } catch (error) {
+    if (!(error instanceof IllegalTransition)) throw error;
+    return "illegal";
+  }
+};
+
+/** Brings every batch the trunk can promote onto trunk: flush, compose and read back until a flush takes none. */
+const settle = (state: Trunk, started: BatchId[], at: number): Trunk => {
+  let trunk = state;
+  for (let round = 0; round < 6 && trunk.phase === "debouncing"; round += 1) {
+    const inputs = trunk.queue.map((b, i) => ({
+      batchId: b.batchId,
+      touched: footprints(b.members, [PATHS[i % 3] ?? "src/a.ts"]),
+      intervening: footprints([], []),
+      mergeTreeClean: true,
+    }));
+    const flushed = attempt(trunk, flush(inputs, trunk.head, `settle-${at}-${round}`), T0);
+    trunk = flushed.after ?? trunk;
+    for (const event of eventsOf(flushed.result))
+      if (event._tag === "PromotionStarted") started.push(...event.batches);
+    if (trunk.phase !== "promoting" || trunk.wal === undefined) break;
+    const head = sha(0x5000 + at * 8 + round);
+    trunk =
+      attempt(
+        trunk,
+        composedAs(
+          trunk.wal.batches.flatMap((b) => b.members),
+          head,
+        ),
+        T0,
+      ).after ?? trunk;
+    trunk = attempt(trunk, readBack(head), T0).after ?? trunk;
+  }
+  return trunk;
+};
+
+const drop = (batchId: BatchId) => BatchDropped.make({ projectId: PROJECT, batchId, because: RED });
+
+describe("a batch speculation cancels", { timeout: PROPERTY_TIMEOUT }, () => {
+  const X = makeId("bat", ulid(OUTSIDE + 10));
+  const lateX: PromotionCommand = {
+    _tag: "Enqueue",
+    batchId: X,
+    candidateId: makeId("cnd", ulid(OUTSIDE + 10)),
+    verdictId: makeId("vrd", ulid(OUTSIDE + 10)),
+    members: [C2],
+    base: H0,
+    predecessors: [C1],
+  };
+  const cancelX: PromotionCommand = { _tag: "Cancel", batchId: X, because: RED, members: [C2] };
+
+  it("[promotion.cancel-answers] a cancel drops a queued batch or one not seen yet and remembers it, answers a retry the same, refuses the batch's verdict after, and is too late for a batch being pushed or one that landed", () => {
+    const queued = drive([init, lateX, cancelX, cancelX, lateX]);
+    expect(queued.tags).toEqual([
+      ["TrunkInitialized"],
+      ["BatchVerified"],
+      ["BatchDropped"],
+      [],
+      [],
+    ]);
+    expect(failureTag(queued.results[4])).toBe("PromotionStateRefused");
+    expect(queued.state).toMatchObject({ phase: "idle", queue: [], dropped: [X] });
+    const unseen = drive([init, cancelX, lateX]);
+    expect(unseen.tags).toEqual([["TrunkInitialized"], ["BatchDropped"], []]);
+    expect(unseen.state).toMatchObject({ phase: "idle", queue: [], dropped: [X] });
+    const pushing = drive([
+      ...l1Path,
+      { _tag: "Cancel", batchId: makeId("bat", ulid(1)), because: RED, members: [C1] },
+    ]);
+    expect(pushing.results.at(-1)).toEqual(
+      Result.fail(expect.objectContaining({ _tag: "CancelTooLate", reason: "promoting" })),
+    );
+    const landed = drive([
+      ...l1Path,
+      readBack(NEW),
+      { _tag: "Cancel", batchId: makeId("bat", ulid(1)), because: RED, members: [C1] },
+    ]);
+    expect(landed.results.at(-1)).toEqual(
+      Result.fail(expect.objectContaining({ _tag: "CancelTooLate", reason: "promoted" })),
+    );
+    expect(landed.state?.dropped).toBeUndefined();
+  });
+
+  /**
+   * Plays a late verdict, its cancel and the batch ahead in `order`, settling the trunk after each
+   * when `settling`, then queues the members again only if the cancel was answered dropped: true
+   * when the cancelled batch never promoted, the queue emptied, and each member landed once.
+   */
+  const landsOnce = (order: readonly string[], settling: boolean): boolean => {
+    const started: BatchId[] = [];
+    let trunk = drive([init]).state;
+    let answer: Decision | undefined;
+    order.forEach((step, i) => {
+      if (trunk === undefined) return;
+      const command = step === "verdict" ? lateX : step === "cancel" ? cancelX : enqueue(1, C1);
+      const p = attempt(trunk, command, T0);
+      if (step === "cancel") answer = p.result;
+      trunk = p.after ?? trunk;
+      if (settling) trunk = settle(trunk, started, i);
+    });
+    if (trunk === undefined || answer === undefined) return false;
+    trunk = settle(trunk, started, 7);
+    const dropped = Result.isSuccess(answer);
+    // Only a dropped batch's members go back to the queue, and come again in a batch of their own.
+    if (dropped) {
+      const again: PromotionCommand = {
+        ...lateX,
+        batchId: makeId("bat", ulid(OUTSIDE + 11)),
+      };
+      trunk = settle(attempt(trunk, again, T0).after ?? trunk, started, 8);
+    }
+    return (
+      started.filter((b) => b === X).length === (dropped ? 0 : 1) &&
+      trunk.queue.length === 0 &&
+      trunk.phase === "idle" &&
+      trunk.promoted.filter((c) => c === C2).length === 1 &&
+      trunk.promoted.filter((c) => c === C1).length === 1
+    );
+  };
+
+  it("[promotion.cancel-order] whatever order a batch's late verdict, its cancel and the batch ahead of it arrive in, a dropped batch never promotes and never stops the queue, and each member lands once", () => {
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray(["verdict", "cancel", "ahead"], { minLength: 3, maxLength: 3 }),
+        fc.boolean(),
+        landsOnce,
+      ),
+    );
+    // The order the tombstone is for: the cancel first, its verdict after, the batch ahead last.
+    expect(landsOnce(["cancel", "verdict", "ahead"], false)).toBe(true);
+  });
+
+  it("[promotion.drop-fold] BatchDropped takes a queued batch out of the queue and remembers it, remembers one not seen yet, and is illegal for one being pushed or one dropped already; a dropped batch's verdict is illegal", () => {
+    const trunks = reachedTrunks();
+    const unseen = makeId("bat", ulid(OUTSIDE + 20));
+    let cases = 0;
+    for (const t of trunks) {
+      const remembered = (id: BatchId, queue: Trunk["queue"]): Trunk => ({
+        ...t,
+        queue,
+        dropped: [...(t.dropped ?? []), id],
+        phase: t.phase === "debouncing" && queue.length === 0 ? "idle" : t.phase,
+      });
+      const expected: [BatchId, Trunk | "illegal"][] = [
+        ...t.queue.map((b): [BatchId, Trunk] => [
+          b.batchId,
+          remembered(
+            b.batchId,
+            t.queue.filter((q) => q.batchId !== b.batchId),
+          ),
+        ]),
+        ...(t.wal?.batches ?? []).map((b): [BatchId, "illegal"] => [b.batchId, "illegal"]),
+        ...(t.dropped ?? []).map((id): [BatchId, "illegal"] => [id, "illegal"]),
+        [unseen, remembered(unseen, t.queue)],
+      ];
+      for (const [id, want] of expected) {
+        cases += 1;
+        const got = folded(t, drop(id));
+        expect(got === "illegal" ? got : comparable(got)).toBe(
+          want === "illegal" ? want : comparable(want),
+        );
+      }
+      for (const id of t.dropped ?? []) {
+        cases += 1;
+        const verdict = eventsOf(decidePromotion(undefined, init, { now: T0, projectId: PROJECT }));
+        expect(verdict.length).toBe(1);
+        expect(
+          folded(t, {
+            _tag: "BatchVerified",
+            batchId: id,
+            candidateId: makeId("cnd", ulid(OUTSIDE + 21)),
+            verdictId: makeId("vrd", ulid(OUTSIDE + 21)),
+            members: [C2],
+            base: t.head,
+            predecessors: [],
+          }),
+        ).toBe("illegal");
+      }
+    }
+    // The tours reach trunks with batches queued, being pushed and dropped: every row meets each.
+    expect(trunks.some((t) => t.queue.length > 0)).toBe(true);
+    expect(trunks.some((t) => (t.wal?.batches.length ?? 0) > 0)).toBe(true);
+    expect(trunks.some((t) => (t.dropped?.length ?? 0) > 0)).toBe(true);
+    expect(cases).toBeGreaterThan(trunks.length);
   });
 });

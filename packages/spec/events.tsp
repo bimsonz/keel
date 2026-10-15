@@ -1834,6 +1834,14 @@ model DeliveryRefused {
 // ─── The catalogue ──────────────────────────────────────────────────────────
 
 /** Any event in the catalogue. `_tag` names it. */
+/** Speculation cancelled a batch behind a failed one, `because`, before it promoted: it left the trunk's queue, or is remembered before its verdict arrives, and never promotes. */
+model BatchDropped {
+  _tag: "BatchDropped";
+  projectId: ProjectId;
+  batchId: BatchId;
+  because: BatchId;
+}
+
 union KeelEvent {
   // Identity
   AgentEnrolled,
@@ -1930,6 +1938,7 @@ union KeelEvent {
   AuditCompleted,
   TrunkSyncStarted,
   TrunkSynced,
+  BatchDropped,
   ProjectCreated,
   ProjectDeleted,
   ProjectSettingsChanged,

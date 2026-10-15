@@ -18,6 +18,7 @@ import {
   type TrunkOrigin,
 } from "../../domain/integration/index.ts";
 import type {
+  BatchId,
   CandidateId,
   ChangeId,
   CommandActor,
@@ -293,6 +294,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
     Effect.catchTags({
       TrunkNotInitialized: Effect.die,
       CompositionMismatch: Effect.die,
+      CancelTooLate: Effect.die,
       NotImported: Effect.die,
     }),
   );
@@ -771,6 +773,39 @@ export const finishUpstreamSync = Effect.fn("integration/finishUpstreamSync")(fu
 });
 
 /**
+ * Speculation cancels a batch behind a failed one. The trunk drops it if it
+ * is queued, or remembers it before its verdict arrives, and answers
+ * `dropped`: it never promotes, and only then are its members queued again.
+ * A batch being pushed, or one a member of which landed, is `too-late`: it
+ * lands or fails with its group. A dropped batch is answered `dropped` again.
+ */
+export const cancelBatch = Effect.fn("integration/cancelBatch")(function* (
+  projectId: ProjectId,
+  cancel: {
+    readonly batchId: BatchId;
+    readonly because: BatchId;
+    readonly members: readonly ChangeId[];
+  },
+) {
+  const answer:
+    | { readonly _tag: "dropped" }
+    | {
+        readonly _tag: "too-late";
+        readonly reason: "promoting" | "promoted";
+      } = yield* promote(projectId, { _tag: "Cancel", ...cancel }, `cancel:${cancel.batchId}`).pipe(
+    Effect.as({ _tag: "dropped" } as const),
+    Effect.catchTags({
+      CancelTooLate: (late) => Effect.succeed({ _tag: "too-late", reason: late.reason } as const),
+      // A cancel is refused in no phase, and composes and syncs nothing.
+      PromotionStateRefused: Effect.die,
+      CompositionMismatch: Effect.die,
+      NotImported: Effect.die,
+    }),
+  );
+  return answer;
+});
+
+/**
  * An owner's sync of an imported trunk from its upstream, the URL and branch
  * its import took, kept on its origin. In order, each step before the move
  * refusing with nothing moved:
@@ -838,7 +873,11 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
     },
   );
   yield* promote(projectId, { _tag: "Sync", by, from, to }, `sync:${to}`, from).pipe(
-    Effect.catchTags({ TrunkNotInitialized: Effect.die, CompositionMismatch: Effect.die }),
+    Effect.catchTags({
+      TrunkNotInitialized: Effect.die,
+      CompositionMismatch: Effect.die,
+      CancelTooLate: Effect.die,
+    }),
     Effect.tapError(() =>
       Effect.andThen(
         usage.record(namespace, REPO_BYTES, -admitted, `sync-giveback:${to}`),

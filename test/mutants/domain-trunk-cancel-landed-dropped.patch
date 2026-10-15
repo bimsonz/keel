@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.transitions, promotion.cancel-answers
+# why: a batch a member of which landed is dropped
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..c4948d8e 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -395,8 +395,6 @@ export const decidePromotion = (
+         Result.fail(new CancelTooLate({ projectId, batchId: command.batchId, reason }));
+       if (wal?.batches.some((b) => b.batchId === command.batchId) === true)
+         return tooLate("promoting");
+-      if (command.members.some((member) => trunk.promoted.includes(member)))
+-        return tooLate("promoted");
+       return Result.succeed([
+         BatchDropped.make({ projectId, batchId: command.batchId, because: command.because }),
+       ]);

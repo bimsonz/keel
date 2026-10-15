@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-cancel.test.ts
+# kills: trunk.cancel
+# why: a cancel too late is answered dropped, so its members would be queued again
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 3e4d41a9..61e4352c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -795,7 +795,7 @@ export const cancelBatch = Effect.fn("integration/cancelBatch")(function* (
+       } = yield* promote(projectId, { _tag: "Cancel", ...cancel }, `cancel:${cancel.batchId}`).pipe(
+     Effect.as({ _tag: "dropped" } as const),
+     Effect.catchTags({
+-      CancelTooLate: (late) => Effect.succeed({ _tag: "too-late", reason: late.reason } as const),
++      CancelTooLate: () => Effect.succeed({ _tag: "dropped" } as const),
+       // A cancel is refused in no phase, and composes and syncs nothing.
+       PromotionStateRefused: Effect.die,
+       CompositionMismatch: Effect.die,

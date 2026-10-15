@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.cancel-answers
+# why: a retried cancel records the drop again
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..9b55e195 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -390,7 +390,6 @@ export const decidePromotion = (
+ 
+     case "Cancel": {
+       // Cancelled already: the same answer again, with nothing recorded.
+-      if (trunk.dropped?.includes(command.batchId) === true) return Result.succeed([]);
+       const tooLate = (reason: "promoting" | "promoted"): Decision =>
+         Result.fail(new CancelTooLate({ projectId, batchId: command.batchId, reason }));
+       if (wal?.batches.some((b) => b.batchId === command.batchId) === true)

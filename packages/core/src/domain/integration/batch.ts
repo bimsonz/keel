@@ -109,6 +109,11 @@ export const Trunk = Schema.Struct({
   queue: Schema.Array(QueuedBatch),
   /** Every change promoted so far, for commutation's wait check. */
   promoted: Schema.Array(ChangeId),
+  /**
+   * Every batch speculation cancelled before it promoted: a verdict for one
+   * that arrives later is refused, so it never promotes. Absent until the first.
+   */
+  dropped: Schema.optional(Schema.Array(BatchId)),
   /** How many times Keel has advanced trunk since TrunkInitialized; absent in state folded before it was kept. */
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   /** Where trunk started, as TrunkInitialized said it; absent on a trunk initialized before origins were kept. */

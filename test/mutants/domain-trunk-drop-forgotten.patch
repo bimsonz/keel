@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.drop-fold, promotion.cancel-answers
+# why: the trunk forgets a dropped batch
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..a678e67d 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -656,7 +656,6 @@ export const evolvePromotion = (
+       return {
+         ...trunk,
+         queue,
+-        dropped: [...(trunk.dropped ?? []), event.batchId],
+         phase: trunk.phase === "debouncing" ? settled(queue) : trunk.phase,
+       };
+     }

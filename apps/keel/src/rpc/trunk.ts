@@ -7,7 +7,13 @@ import {
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
 import { QuotaExceeded } from "@keeltown/core/domain/identity";
-import { type CommandActor, CommitSha, InstantSchema } from "@keeltown/core/kernel";
+import {
+  BatchId,
+  ChangeId,
+  type CommandActor,
+  CommitSha,
+  InstantSchema,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { ImportTooLarge, RepoNotFound } from "./project.ts";
@@ -61,6 +67,19 @@ export const UpstreamUnreachable = Schema.TaggedStruct("UpstreamUnreachable", {
   reason: Schema.Literals(["unreachable", "branch-gone"]),
 });
 
+/** A batch speculation cancels, behind the failed batch `because`, with its members. */
+export const BatchCancel = Schema.Struct({
+  batchId: BatchId,
+  because: BatchId,
+  members: Schema.Array(ChangeId),
+});
+
+/** What the trunk made of a cancel: dropped, or too late for a batch being pushed or landed. */
+export const CancelAnswer = Schema.Union([
+  Schema.TaggedStruct("dropped", {}),
+  Schema.TaggedStruct("too-late", { reason: Schema.Literals(["promoting", "promoted"]) }),
+]);
+
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),
   origin: exitCodec(TrunkStart, Schema.Never),
@@ -86,6 +105,7 @@ export const TrunkCodecs = {
       QuotaExceeded,
     ]),
   ),
+  cancel: exitCodec(CancelAnswer, TrunkNotInitialized),
   destroy: exitCodec(Schema.Void, Schema.Never),
 };
 
@@ -153,6 +173,12 @@ export interface TrunkRpc {
    * own deadline, and answers `synced` false until then.
    */
   syncUpstream(by: CommandActor): Promise<ExitJson>;
+  /**
+   * Cancels a batch speculation verified behind a failed one: `dropped` when
+   * it was queued here or its verdict has not arrived (it never promotes),
+   * `too-late` when it is being pushed or a member landed. Idempotent.
+   */
+  cancel(cancel: typeof BatchCancel.Encoded): Promise<ExitJson>;
   /**
    * Destroys the trunk for good, when its project is deleted: it takes no
    * batch and promotes nothing from here on, and deletes the project's trunk,

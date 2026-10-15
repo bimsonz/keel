@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.drop-fold, promotion.transitions
+# why: a debounce left with no batch stays debouncing
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index fd1821ae..f1f698c8 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -657,7 +657,7 @@ export const evolvePromotion = (
+         ...trunk,
+         queue,
+         dropped: [...(trunk.dropped ?? []), event.batchId],
+-        phase: trunk.phase === "debouncing" ? settled(queue) : trunk.phase,
++        phase: trunk.phase,
+       };
+     }
+ 

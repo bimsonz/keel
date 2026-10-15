@@ -17,12 +17,14 @@ import {
 import { isVerified, type PendingGroup, type QueuedBatch, type Trunk } from "./batch.ts";
 import { commutation, type Footprints } from "./commutation.ts";
 import {
+  CancelTooLate,
   CompositionMismatch,
   NotImported,
   PromotionStateRefused,
   TrunkNotInitialized,
 } from "./errors.ts";
 import {
+  BatchDropped,
   BatchVerified,
   type MemberCommit,
   type MemberLanding,
@@ -54,6 +56,7 @@ export const TrunkEvent = Schema.Union([
   PromotionResumed,
   TrunkSyncStarted,
   TrunkSynced,
+  BatchDropped,
 ]);
 export type TrunkEvent = typeof TrunkEvent.Type;
 
@@ -125,6 +128,17 @@ export type PromotionCommand =
       readonly by: CommandActor;
       readonly from: CommitSha;
       readonly to: CommitSha;
+    }
+  | {
+      /**
+       * Speculation cancels a batch behind a failed one, `because`: whether it
+       * is queued here or its verdict has not arrived yet. `members` are the
+       * batch's, so a batch that already landed is told apart.
+       */
+      readonly _tag: "Cancel";
+      readonly batchId: BatchId;
+      readonly because: BatchId;
+      readonly members: readonly ChangeId[];
     };
 
 /** Facts from I/O: the time, and the project whose trunk this is (the Trunk DO's key). */
@@ -134,6 +148,7 @@ export interface PromotionFacts {
 }
 
 export type PromotionRejection =
+  | CancelTooLate
   | TrunkNotInitialized
   | PromotionStateRefused
   | CompositionMismatch
@@ -357,7 +372,8 @@ export const decidePromotion = (
       const known = [...trunk.queue, ...(wal?.batches ?? [])].some(
         (b) => b.batchId === command.batchId,
       );
-      return known
+      // A cancelled batch's verdict, however late, never queues it.
+      return known || trunk.dropped?.includes(command.batchId) === true
         ? refuse(trunk, command)
         : Result.succeed([
             BatchVerified.make({
@@ -370,6 +386,20 @@ export const decidePromotion = (
               ...(command.verified === undefined ? {} : { verified: command.verified }),
             }),
           ]);
+    }
+
+    case "Cancel": {
+      // Cancelled already: the same answer again, with nothing recorded.
+      if (trunk.dropped?.includes(command.batchId) === true) return Result.succeed([]);
+      const tooLate = (reason: "promoting" | "promoted"): Decision =>
+        Result.fail(new CancelTooLate({ projectId, batchId: command.batchId, reason }));
+      if (wal?.batches.some((b) => b.batchId === command.batchId) === true)
+        return tooLate("promoting");
+      if (command.members.some((member) => trunk.promoted.includes(member)))
+        return tooLate("promoted");
+      return Result.succeed([
+        BatchDropped.make({ projectId, batchId: command.batchId, because: command.because }),
+      ]);
     }
 
     case "Flush":
@@ -561,7 +591,8 @@ export const evolvePromotion = (
       if (
         event.members === undefined ||
         event.base === undefined ||
-        trunk.queue.some((b) => b.batchId === event.batchId)
+        trunk.queue.some((b) => b.batchId === event.batchId) ||
+        trunk.dropped?.includes(event.batchId) === true
       )
         return illegal(trunk, event);
       const queued: QueuedBatch = {
@@ -613,6 +644,21 @@ export const evolvePromotion = (
         return illegal(trunk, event);
       const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
       return { ...trunk, queue, phase: settled(queue) };
+    }
+
+    case "BatchDropped": {
+      if (
+        trunk.dropped?.includes(event.batchId) === true ||
+        wal?.batches.some((b) => b.batchId === event.batchId) === true
+      )
+        return illegal(trunk, event);
+      const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
+      return {
+        ...trunk,
+        queue,
+        dropped: [...(trunk.dropped ?? []), event.batchId],
+        phase: trunk.phase === "debouncing" ? settled(queue) : trunk.phase,
+      };
     }
 
     case "PromotionStarted": {
