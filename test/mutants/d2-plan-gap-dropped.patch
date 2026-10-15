@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
-# kills: d21.plan-gap
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "flow-ruling.agent-namespace"
+# kills: flow-ruling.agent-namespace
 # why: A plan holding a step KeelVerify cannot run is compiled, so the change parks by design, or lands without it
 diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
-index 88ca4c0..63ce621 100644
+index 8990ea8f..76b245cf 100644
 --- a/packages/core/src/application/verification/precheck.ts
 +++ b/packages/core/src/application/verification/precheck.ts
-@@ -352,7 +352,7 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision =>
-     defaultFlowPolicy,
-   );
-   if (Result.isFailure(plan)) return brokenFlow(plan.failure.map((e) => e._tag).join(", "));
--  const missing = plan.success.steps.filter((s) => !executable(s)).map((s) => s.id);
-+  const missing = plan.success.steps.filter((s) => !executable(s) && false).map((s) => s.id);
+@@ -405,7 +405,7 @@ export const decidePrecheck = (
+   // The gate asks a person for a ruling, and an agent's own namespace has none to ask.
+   const rulable = namespaceKind(namespace) !== "agent";
+   const missing = plan.success.steps
+-    .filter((s) => !executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable))
++    .filter((s) => (!executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable)) && false)
+     .map((s) => s.id);
    const [gap, ...gaps] = missing;
    if (gap !== undefined)
-     return {

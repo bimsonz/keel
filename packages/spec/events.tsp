@@ -1169,6 +1169,7 @@ union EscalationCategory {
   "unprovable-conflict",
   "overrule-request",
   "frozen-trunk",
+  "verification-change",
 }
 
 /** One piece of evidence put before the person, by class. */

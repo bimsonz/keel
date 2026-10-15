@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "flow-ruling.parks|flow-ruling.refuse-resubmit|flow-ruling.approve-bounce-resubmit"
+# kills: flow-ruling.parks, flow-ruling.refuse-resubmit, flow-ruling.approve-bounce-resubmit
+# why: the change parks on its revision's question, which a resubmission at the same revision shares with the run already ruled
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bcad1bed..e0cfb4db 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1943,7 +1943,7 @@ export const planCompiled: (
+         // conflict already with a person holds the change too: either the moment it is queued.
+         const asked =
+           plan.needsRuling === true
+-            ? flowRulingIdOf(changeId, plan.instanceId)
++            ? flowRulingIdOf(changeId, String(plan.revision))
+             : awaitedEscalation(store);
+         return [
+           compile,

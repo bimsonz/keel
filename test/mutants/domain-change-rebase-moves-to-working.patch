@@ -2,10 +2,10 @@
 # kills: change.rebase-moves-base, change.transitions
 # why: a rebase from Bounced also moves the change to Working
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2edb39a..ee32685 100644
+index 90d3e897..3e107889 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -881,7 +881,7 @@ export const evolveChange = (
+@@ -1004,7 +1004,7 @@ export const evolveChange = (
          : illegal(change, event);
      case "ChangeRebased":
        return from("working", "bounced") && event.from === change.baseSha
@@ -13,4 +13,4 @@ index 2edb39a..ee32685 100644
 +        ? { ...moveTo(change, "working"), baseSha: event.to }
          : illegal(change, event);
      case "PrecheckStarted":
-       // A new pass derives again: the commit may differ though the revision does not.
+       // A new pass derives again: the commit may differ though the revision does not, and the

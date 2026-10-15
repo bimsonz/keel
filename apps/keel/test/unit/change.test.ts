@@ -10,7 +10,10 @@ import {
   planCompiled,
   precheckRefused,
   precheckStarted,
+  decisionIdOf,
   escalationIdOf,
+  FLOW_RULING_APPROVE,
+  flowRulingIdOf,
   reactToBatch,
   RELY_READS,
   rely,
@@ -24,6 +27,7 @@ import {
   CommitSha,
   ConflictId,
   type EntityRef,
+  EscalationId,
   EventEnvelope,
   makeId,
 } from "@keeltown/core/kernel";
@@ -127,6 +131,17 @@ const compiling = (revision: number, instanceId: string) =>
     planHash: `sha256:${"0".repeat(64)}`,
     steps: 1,
     costEstimate: 1,
+  });
+
+/** Precheck's compiled plan for a change to `.keel/flow`: it holds the human-class gate. */
+const compilingGated = (revision: number, instanceId: string) =>
+  Schema.decodeUnknownSync(PlanCompiledCommand)({
+    revision,
+    instanceId,
+    planHash: `sha256:${"0".repeat(64)}`,
+    steps: 2,
+    costEstimate: 1,
+    needsRuling: true,
   });
 
 const refusing = (revision: number, instanceId: string) =>
@@ -799,6 +814,188 @@ describe("the change's batch, delivered", () => {
 
         expect(yield* getChange(changeId)).toMatchObject({ state: "integrating", batchId });
         expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+/** A maintainer's ruling on `escalationId`, as the namespace's object records it and the change hears it. */
+const ruledOn = (escalationId: string, option: string) =>
+  arriving(
+    { kind: "escalation", id: escalationId },
+    {
+      _tag: "DecisionRecorded",
+      decisionId: decisionIdOf(Schema.decodeUnknownSync(EscalationId)(escalationId)),
+      escalationId,
+      option,
+      summary: option === FLOW_RULING_APPROVE ? "Approve and verify" : "Send it back",
+      evidence: [],
+      alternatives: [],
+    },
+  );
+
+/** Declares, submits and compiles a plan holding the gate: the change parks for its ruling as it is queued. */
+const gated = Effect.gen(function* () {
+  yield* deriving("precheck-1");
+  return yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+});
+
+describe("a change to how Keel verifies", () => {
+  it.effect(
+    "[flow-ruling.parks] a plan holding the gate queues the change and parks it for a ruling asked of its Precheck run, in the plan's commit",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const compiled = yield* gated;
+        const log = (yield* EventOutbox).log(changeRef);
+        const [plan, queuedEvent, parkedEvent] = log.slice(-3);
+
+        expect([plan?.type, queuedEvent?.type, parkedEvent?.type]).toEqual([
+          "PlanCompiled",
+          "ChangeQueued",
+          "ChangeParked",
+        ]);
+        expect(parkedEvent?.payload).toEqual({
+          _tag: "ChangeParked",
+          changeId,
+          reason: "awaiting-ruling",
+          escalationId: flowRulingIdOf(changeId, "precheck-1"),
+        });
+        expect(parkedEvent?.dedupeKey.split("/")[1]).toBe(plan?.dedupeKey.split("/")[1]);
+        expect(compiled).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          parkedFrom: "queued",
+        });
+        expect(flowRulingIdOf(changeId, "precheck-2")).not.toBe(
+          flowRulingIdOf(changeId, "precheck-1"),
+        );
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.approve] a maintainer's approve on its question resumes the change into the queue, naming the decision",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* gated;
+        const gate = flowRulingIdOf(changeId, "precheck-1");
+        const reaction = yield* receive(ruledOn(gate, FLOW_RULING_APPROVE));
+
+        expect(reaction?.problem).toBeUndefined();
+        expect((yield* lastEvent)?.payload).toEqual({
+          _tag: "ChangeResumed",
+          changeId,
+          decisionId: decisionIdOf(gate),
+        });
+        expect((yield* getChange(changeId)).state).toBe("queued");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.refuse] any other answer bounces the change, citing the decision and saying what to do",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* gated;
+        const gate = flowRulingIdOf(changeId, "precheck-1");
+        yield* receive(ruledOn(gate, "refuse"));
+        const bounced = yield* lastEvent;
+
+        expect(bounced?.type).toBe("ChangeBounced");
+        expect(bounced?.payload).toMatchObject({
+          changeId,
+          decisionId: decisionIdOf(gate),
+          nextActions: [
+            {
+              kind: "call",
+              operationId: "Memory_getDecision",
+              args: { decisionId: decisionIdOf(gate) },
+            },
+            { kind: "call", operationId: "submit", args: { changeId } },
+          ],
+        });
+        expect(JSON.stringify(Reflect.get(Object(bounced?.payload), "reasons"))).toMatch(
+          /did not approve this change to how Keel verifies/,
+        );
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.stale] a ruling on another Precheck run's question moves nothing: the change waits on its own",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* gated;
+        const before = (yield* EventOutbox).log(changeRef).length;
+        const reaction = yield* receive(
+          ruledOn(flowRulingIdOf(changeId, "precheck-2"), FLOW_RULING_APPROVE),
+        );
+
+        expect(reaction?.drafts ?? []).toEqual([]);
+        expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
+        expect((yield* getChange(changeId)).state).toBe("parked");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.refuse-resubmit] a refused change submitted again, at the same revision and commit, waits on its new run's question, which the old ruling does not answer",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const { lease, sha } = yield* deriving("precheck-1");
+        yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+        const refused = flowRulingIdOf(changeId, "precheck-1");
+        yield* receive(ruledOn(refused, "refuse"));
+        yield* submit(changeId, submitting(lease, sha, "submit-2"));
+        yield* precheckStarted(changeId, starting(1, "precheck-2"));
+        const parked = yield* planCompiled(changeId, compilingGated(1, "precheck-2"));
+        const asked = flowRulingIdOf(changeId, "precheck-2");
+        const before = (yield* EventOutbox).log(changeRef).length;
+        const stale = yield* receive(ruledOn(refused, FLOW_RULING_APPROVE));
+
+        expect(asked).not.toBe(refused);
+        expect(parked).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          escalationId: asked,
+        });
+        expect(stale?.drafts ?? []).toEqual([]);
+        expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
+        yield* receive(ruledOn(asked, FLOW_RULING_APPROVE));
+        expect((yield* getChange(changeId)).state).toBe("queued");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.approve-bounce-resubmit] an approved change that bounces in its batch and is submitted again is asked again, of its new run",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const { lease, sha } = yield* deriving("precheck-1");
+        yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+        yield* receive(ruledOn(flowRulingIdOf(changeId, "precheck-1"), FLOW_RULING_APPROVE));
+        const batchId = freshBatch();
+        yield* receive(formed(batchId, [changeId]));
+        yield* receive(verdictOn(batchId, ["test-failed: flow.test.ts"]));
+        yield* receive(failed(batchId, changeId));
+        const bounced = yield* getChange(changeId);
+        yield* submit(changeId, submitting(lease, sha, "submit-2"));
+        yield* precheckStarted(changeId, starting(1, "precheck-2"));
+        const parked = yield* planCompiled(changeId, compilingGated(1, "precheck-2"));
+
+        expect(bounced.state).toBe("bounced");
+        expect(parked).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          escalationId: flowRulingIdOf(changeId, "precheck-2"),
+        });
       }).pipe(Effect.provide(layer));
     },
   );

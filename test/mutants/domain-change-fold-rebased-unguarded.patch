@@ -2,10 +2,10 @@
 # kills: change.fold-table
 # why: the fold takes ChangeRebased with its guard gone: `from("working", "bounced") && event.from === change.baseSha`.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..ad704a88 100644
+index 90d3e897..eee849e4 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -989,9 +989,7 @@ export const evolveChange = (
+@@ -1003,9 +1003,7 @@ export const evolveChange = (
          ? { ...moveTo(change, "submitted"), commitSha: event.commitSha }
          : illegal(change, event);
      case "ChangeRebased":
@@ -14,5 +14,5 @@ index 49027283..ad704a88 100644
 -        : illegal(change, event);
 +      return { ...change, baseSha: event.to };
      case "PrecheckStarted":
-       // A new pass derives again: the commit may differ though the revision does not.
-       return from("submitted")
+       // A new pass derives again: the commit may differ though the revision does not, and the
+       // pass is its own run, so a ruling asked of an earlier one never answers it.

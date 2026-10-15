@@ -40,6 +40,8 @@ import type {
  * - `member`, `maintain`, `own`: that role or above in the resource's org, or
  *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
  *   sponsor of the agent concerned, or whoever holds `maintain`;
+ *   `sponsorOrMaintainAsUser`: that, and a person: a question Keel puts to
+ *   people is answered by one, so no agent rules, whatever it maintains;
  *   `invite`: a member, and a person: an invitation names the person who
  *   answers for the agent, so no agent makes one, wherever it governs;
  *   `inviterOrMaintain`: the member who invited the agent concerned into the
@@ -64,6 +66,7 @@ export type Need =
   | "member"
   | "invite"
   | "sponsorOrMaintain"
+  | "sponsorOrMaintainAsUser"
   | "inviterOrMaintain"
   | "maintain"
   | "own"
@@ -160,7 +163,7 @@ export const SPEC_ACTIONS = {
   abandon: rule("Project", "workOrMaintain"),
 
   Operator_enrolAgent: rule("Project", "member"),
-  Operator_giveRuling: rule("Project", "sponsorOrMaintain"),
+  Operator_giveRuling: rule("Project", "sponsorOrMaintainAsUser"),
   Operator_revokeAgent: rule("Project", "sponsorOrMaintain"),
   // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.
   Operator_suspendAgent: rule("Agent", "sponsor"),
@@ -629,6 +632,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "ownAsUser":
       return rights.has("own") ? granted() : lacksRole("own", kind);
     case "sponsorOrMaintain":
+    case "sponsorOrMaintainAsUser":
       return rights.has("maintain") ||
         (rights.has("member") &&
           resource._tag === "Project" &&
@@ -741,6 +745,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
     case "invite":
     case "inviterOrMaintain":
     case "ownAsUser":
+    case "sponsorOrMaintainAsUser":
       return refused("users-only");
     default:
       return hidden();

@@ -49,6 +49,7 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Na
 | `workOrMaintain` | That, or whoever holds `maintain` |
 | `member`, `maintain`, `own` | A user with that role or above in the org, or an agent where it governs and no person owns |
 | `sponsorOrMaintain` | The sponsor of the agent the action concerns (a person), or whoever holds `maintain` |
+| `sponsorOrMaintainAsUser` | That, and a person: a ruling on a question Keel puts to people. Never an agent, whatever it maintains |
 | `invite` | A user who is a member of the org. Never an agent, wherever it governs: an invitation names the person who answers for the agent |
 | `inviterOrMaintain` | The member who invited the agent the action concerns, or a user who holds `maintain`. Never an agent |
 

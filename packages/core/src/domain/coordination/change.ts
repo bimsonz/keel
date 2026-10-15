@@ -114,6 +114,8 @@ export const Change = Schema.Struct({
   predicatePolicy: Schema.optional(PredicatePolicies),
   /** The derivation its current Precheck pass recorded (EffectsDerived): at most one a pass, cleared when the next pass starts. */
   derivationRef: Schema.optional(Schema.String),
+  /** The Precheck run of its current pass (PrecheckStarted's Workflow instance): a flow change's ruling is asked of that run. */
+  precheckInstance: Schema.optional(Schema.String),
 });
 export type Change = typeof Change.Type;
 

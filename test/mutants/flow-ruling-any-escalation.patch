@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "flow-ruling.stale|flow-ruling.refuse-resubmit"
+# kills: flow-ruling.stale, flow-ruling.refuse-resubmit
+# why: a ruling on an earlier Precheck run's question resumes the change, so an approve outlives the submission it was given on
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bcad1bed..4ef1f0f3 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2220,13 +2220,7 @@ const commandFor = (
+       const recorded = decodeRecorded(event.payload);
+       if (Option.isNone(recorded)) return undefined;
+       const { escalationId, decisionId, option, summary } = recorded.value;
+-      if (
+-        change.parkReason !== "awaiting-ruling" ||
+-        change.escalationId !== escalationId ||
+-        change.precheckInstance === undefined ||
+-        escalationId !== flowRulingIdOf(change.id, change.precheckInstance)
+-      )
+-        return undefined;
++      if (change.parkReason !== "awaiting-ruling") return undefined;
+       return option === FLOW_RULING_APPROVE
+         ? {
+             command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },

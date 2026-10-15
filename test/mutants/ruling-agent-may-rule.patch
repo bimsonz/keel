@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t "authz.ruling-people-only"
+# kills: authz.ruling-people-only
+# why: an agent that maintains the project rules on a change to how Keel verifies, and approves its own
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 2ef42bec..2ce1c729 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -163,7 +163,7 @@ export const SPEC_ACTIONS = {
+   abandon: rule("Project", "workOrMaintain"),
+ 
+   Operator_enrolAgent: rule("Project", "member"),
+-  Operator_giveRuling: rule("Project", "sponsorOrMaintainAsUser"),
++  Operator_giveRuling: rule("Project", "sponsorOrMaintain"),
+   Operator_revokeAgent: rule("Project", "sponsorOrMaintain"),
+   // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.
+   Operator_suspendAgent: rule("Agent", "sponsor"),

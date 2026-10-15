@@ -24,6 +24,7 @@ export const CATEGORY: Record<EscalationCategory, string> = {
   "unprovable-conflict": "Unprovable conflict",
   "overrule-request": "Overrule request",
   "frozen-trunk": "Trunk frozen",
+  "verification-change": "Change to how Keel verifies",
 };
 
 /** A question already answered, in a line: what a phone shows beneath the open one. */

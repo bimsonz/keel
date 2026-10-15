@@ -321,6 +321,8 @@ export const PlanCompiledCommand = Schema.Struct({
   steps: Schema.Int,
   costEstimate: Schema.Number,
   predicatePolicy: Schema.optional(PredicatePolicies),
+  /** The plan holds the human-class gate: the change parks for a maintainer's ruling as it is queued. */
+  needsRuling: Schema.optional(Schema.Literal(true)),
 });
 export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
 

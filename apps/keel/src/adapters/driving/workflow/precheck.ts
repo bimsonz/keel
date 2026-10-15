@@ -6,6 +6,7 @@ import {
   commitDerivation,
   decidePrecheck,
   deriveSubmission,
+  needsRuling,
   planSubjects,
   PrecheckDecision,
   type PrecheckFindings,
@@ -16,8 +17,9 @@ import {
   refuseUnplaced,
   startPrecheck,
 } from "@keeltown/core/application/verification";
+import { askFlowRuling } from "@keeltown/core/application/coordination";
 import { ChangeId, CommitSha } from "@keeltown/core/kernel";
-import { Cause, type Effect, Exit, type ManagedRuntime, Option, Schema } from "effect";
+import { Cause, Effect, Exit, type ManagedRuntime, Option, Schema } from "effect";
 import { precheckRuntime } from "../../../composition/workflow.ts";
 import { claimedInput } from "./pooled.ts";
 import { placedStep } from "./steps.ts";
@@ -89,7 +91,11 @@ const settledValue = <A>(settled: Settled<A>): A => {
  * through `refuse`, since nothing of it can be kept), `ancestry`, then for a commit on its base `diff`, `policy`, `flow`,
  * `guards`, `derive` (which keeps the derivation record and answers only its
  * hash and subjects) and `derived` (which commits what was kept), `decide`,
- * then `refuse` or `compile` (which stores the plan before recording it).
+ * then `refuse` or `compile` (which stores the plan before recording it),
+ * and for a plan holding the human-class gate (a change to `.keel/flow`),
+ * `ruling`: the change parked for a maintainer's ruling as it was queued,
+ * and this puts the question to the project's maintainers. Precheck does not
+ * wait for it: the change's object hears the ruling.
  * Nothing derives for a commit off its base, or one whose diff could not be
  * read. Each write is idempotent by this instance's id, so a replayed step
  * commits nothing new. A warm instance (`precheck-pool-…`, started by its
@@ -197,7 +203,9 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       const decision = Schema.decodeUnknownSync(PrecheckDecision)(
         JSON.parse(
           await step.do("decide", async () =>
-            JSON.stringify(Schema.encodeSync(PrecheckDecision)(decidePrecheck(findings))),
+            JSON.stringify(
+              Schema.encodeSync(PrecheckDecision)(decidePrecheck(findings, namespace)),
+            ),
           ),
         ),
       );
@@ -205,9 +213,21 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       const compiled = await step.do("compile", () =>
         settle(runtime, recordPlan(namespace, submission, decision)),
       );
-      return compiled._tag === "Stale"
-        ? { outcome: "stale", step: "compile", reason: compiled.reason }
-        : { outcome: "compiled", planHash: decision.planHash };
+      if (compiled._tag === "Stale")
+        return { outcome: "stale", step: "compile", reason: compiled.reason };
+      if (needsRuling(decision))
+        await step.do("ruling", () =>
+          runtime.runPromise(
+            askFlowRuling({
+              namespace,
+              project: workspace.projectId,
+              changeId: submission.changeId,
+              revision: submission.revision,
+              instanceId: submission.instanceId,
+            }).pipe(Effect.orDie, Effect.as("asked")),
+          ),
+        );
+      return { outcome: "compiled", planHash: decision.planHash };
     } finally {
       await runtime.dispose();
     }

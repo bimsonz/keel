@@ -4927,7 +4927,7 @@
       "post": {
         "operationId": "Operator_giveRuling",
         "summary": "Rule on an escalation",
-        "description": "Answer a question: the person first asked, or a maintainer of its namespace, names one of its\noptions. The ruling records a decision and resolves the conflict the question was about. An\noption the question does not offer is a 400 `escalation.option_unknown` whose next actions rule\neach valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.",
+        "description": "Answer a question: the person first asked, or a person who maintains its namespace, names one\nof its options; an agent is refused (`users-only`), whatever it maintains. The ruling records a\ndecision and resolves what the question was about: the conflict, or the change to how Keel\nverifies (`verification-change`), which `approve` resumes into the queue and anything else\nsends back. An\noption the question does not offer is a 400 `escalation.option_unknown` whose next actions rule\neach valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.",
         "parameters": [
           {
             "name": "escalationId",
@@ -15200,7 +15200,8 @@
           "ambiguous-requirement",
           "unprovable-conflict",
           "overrule-request",
-          "frozen-trunk"
+          "frozen-trunk",
+          "verification-change"
         ],
         "description": "What kind of question a person is asked to rule on."
       },

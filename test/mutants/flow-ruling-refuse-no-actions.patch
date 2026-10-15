@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "flow-ruling.refuse"
+# kills: flow-ruling.refuse
+# why: a refused change is told only to revise or withdraw, not to read the ruling or split its flow edits out
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bcad1bed..bda495dc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2239,7 +2239,8 @@ const commandFor = (
+               reasons: [
+                 `${decisionId}: a maintainer did not approve this change to how Keel verifies (${summary}).`,
+               ],
+-              nextActions: [
++              nextActions: [],
++              _unused: [
+                 {
+                   kind: "call",
+                   title: `Read decision ${decisionId}, the maintainer's ruling that sent this change back`,

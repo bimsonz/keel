@@ -57,6 +57,8 @@ export interface PrecheckCompiled extends PrecheckCall {
   readonly costEstimate: number;
   /** The plan's predicate policy, read at the base commit; absent, or a predicate left out, is `advise`. */
   readonly predicatePolicy?: PredicatePolicies | undefined;
+  /** The plan holds the human-class gate (the change edits `.keel/flow`): it parks for a maintainer's ruling as it is queued. */
+  readonly needsRuling?: true | undefined;
 }
 
 /** Precheck derived the submission's effects from its code: `derivationRef` is Precheck's own name for the derivation. */

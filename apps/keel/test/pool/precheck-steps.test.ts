@@ -160,7 +160,7 @@ describe("Precheck's steps", () => {
       guards: answers(20, done(CLEAN.guards)),
       derive: answers(10, done(KEPT)),
     });
-    const decision = decidePrecheck(CLEAN);
+    const decision = decidePrecheck(CLEAN, POOL_ORG);
     if (decision._tag !== "Compile")
       throw new Error(`a clean submission was refused: ${decision.reasons.join(", ")}`);
     expect(await ended).toEqual({ outcome: "compiled", planHash: decision.planHash });

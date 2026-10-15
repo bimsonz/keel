@@ -2,6 +2,7 @@ import { Effect, Option, Result, Schema } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
+  type ChangeId,
   type ConflictId,
   DecisionId,
   type EntityRef,
@@ -9,6 +10,7 @@ import {
   Instant,
   NamespaceId,
   namespaceKind,
+  type ProjectId,
   userActor,
 } from "../../domain/kernel/index.ts";
 import {
@@ -37,6 +39,7 @@ import {
   EntityStore,
   type EscalationAsk,
   EscalationRecord,
+  HumanGate,
   ProjectAgents,
   type RaiseRequest,
   type RulingCommand,
@@ -52,6 +55,71 @@ type Store = Transaction["store"];
  */
 export const escalationIdOf = (conflictId: ConflictId): EscalationId =>
   EscalationId.make(`esc_${hashedIdBody(conflictId)}`);
+
+/**
+ * The escalation a change to how Keel verifies (its `.keel/flow` or
+ * `.keel/plugins`) waits on, for one Precheck run (its Workflow instance):
+ * every submission is a new run, so a resubmission is asked again, even of
+ * the same revision and commit, and a ruling never outlives the submission
+ * it was given on.
+ */
+export const flowRulingIdOf = (changeId: ChangeId, precheckInstance: string): EscalationId =>
+  EscalationId.make(`esc_${hashedIdBody(`flow-ruling:${changeId}:${precheckInstance}`)}`);
+
+/** The option of a flow ruling that verifies and queues the change; any other sends it back. */
+export const FLOW_RULING_APPROVE = "approve";
+
+/**
+ * Puts a change to how Keel verifies to its project's maintainers: the
+ * question for its Precheck run, raised by the change's own object, which hears
+ * the ruling's decision and is resumed into the queue by an approve or sent
+ * back by anything else. With no sponsor and no agent named, the
+ * maintainers are asked at once, and only a person among them may rule.
+ * Raising it again answers it as it stands and asks nobody twice.
+ */
+export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (asked: {
+  readonly namespace: NamespaceId;
+  readonly project: ProjectId;
+  readonly changeId: ChangeId;
+  readonly revision: number;
+  /** The Precheck run that compiled the plan: the question is that run's. */
+  readonly instanceId: string;
+}) {
+  const { changeId, revision } = asked;
+  return yield* (yield* HumanGate).raise({
+    namespace: asked.namespace,
+    escalationId: flowRulingIdOf(changeId, asked.instanceId),
+    project: asked.project,
+    raisedBy: `change:${changeId}`,
+    ask: {
+      question: `${changeId} at revision ${String(revision)} changes how Keel verifies this project: it edits .keel/flow or .keel/plugins. Verify it and queue it to land?`,
+      options: [
+        {
+          id: FLOW_RULING_APPROVE,
+          label: "Approve and verify",
+          consequence:
+            "Keel verifies the change under the project's flow as it stands and queues it to land",
+        },
+        {
+          id: "refuse",
+          label: "Send it back",
+          consequence: "The change bounces to its agent, citing this ruling",
+        },
+      ],
+      about: { kind: "change", id: changeId },
+      category: "verification-change",
+      evidence: [
+        {
+          class: "ruling",
+          summary:
+            "A change to .keel/flow or .keel/plugins changes the checks every later change runs, so a maintainer rules on it",
+        },
+      ],
+      precedents: [],
+      default: "refuse",
+    },
+  });
+});
 
 /** The decision an escalation's ruling records, named from the escalation: one ruling, one decision. */
 export const decisionIdOf = (escalationId: EscalationId): DecisionId =>

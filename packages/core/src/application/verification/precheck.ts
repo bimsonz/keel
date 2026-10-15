@@ -6,6 +6,7 @@ import {
   ContentHash,
   NextAction,
   type NamespaceId,
+  namespaceKind,
   type ProjectId,
   type VerdictId,
 } from "../../domain/kernel/index.ts";
@@ -361,11 +362,14 @@ const brokenFlow = (why: string): PrecheckDecision => ({
  * a submission the diff, the flow or the guard repo could not read. Then
  * compile the plan from the base: the project's flow (or its detected pack's)
  * and its predicate policy, with the admitted guards the change is exposed
- * to. A plan holding a step KeelVerify cannot run yet (today a human-class
- * gate, which a flow change adds) is refused rather than let through
- * without it, or parked by design.
+ * to. A plan holding a step KeelVerify cannot run is refused rather than
+ * let through without it, or parked by design: so is the human-class gate a
+ * flow change adds, in an agent's own namespace, where no person can rule.
  */
-export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => {
+export const decidePrecheck = (
+  findings: PrecheckFindings,
+  namespace: NamespaceId,
+): PrecheckDecision => {
   if (!("touched" in findings)) return ancestryRefusal(findings.ancestry);
   const { ancestry, touched, policy, flow, guards, subjects } = findings;
   const baseSha = ancestry.base;
@@ -398,7 +402,11 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => 
     defaultFlowPolicy,
   );
   if (Result.isFailure(plan)) return brokenFlow(plan.failure.map((e) => e._tag).join(", "));
-  const missing = plan.success.steps.filter((s) => !executable(s)).map((s) => s.id);
+  // The gate asks a person for a ruling, and an agent's own namespace has none to ask.
+  const rulable = namespaceKind(namespace) !== "agent";
+  const missing = plan.success.steps
+    .filter((s) => !executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable))
+    .map((s) => s.id);
   const [gap, ...gaps] = missing;
   if (gap !== undefined)
     return {
@@ -408,7 +416,7 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => 
         {
           kind: "call",
           title: missing.includes(HUMAN_CLASS_STEP)
-            ? "Changes to .keel/flow and .keel/plugins need a ruling, which a running plan cannot take yet: split those edits out of this change, then submit again"
+            ? "Changes to .keel/flow and .keel/plugins need a person's ruling, and no person can rule in an agent's own namespace: split those edits out of this change, then submit again"
             : `Keel cannot run ${missing.join(", ")} yet: split out what needs it, then submit again`,
           operationId: "submit",
           args: { steps: missing },
@@ -485,5 +493,16 @@ export const recordPlan = Effect.fn("verification/recordPlan")(function* (
     steps: decision.steps,
     costEstimate: decision.costEstimate,
     predicatePolicy: decision.predicatePolicy,
+    ...(needsRuling(decision) ? { needsRuling: true } : {}),
   });
 });
+
+/**
+ * Whether a compiled plan holds the human-class gate, which a change to
+ * `.keel/flow` or `.keel/plugins` adds: its change parks for a maintainer's
+ * ruling as it is queued, and Precheck puts the question to them.
+ */
+export const needsRuling = (decision: Extract<PrecheckDecision, { _tag: "Compile" }>): boolean => {
+  const plan = readStoredPlan(decision.planHash, decision.plan);
+  return Result.isSuccess(plan) && plan.success.steps.some((s) => s.id === HUMAN_CLASS_STEP);
+};

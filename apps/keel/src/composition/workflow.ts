@@ -31,6 +31,7 @@ import type {
   ProbeRunner,
   ProbeSources,
   ProbeStore,
+  HumanGate,
   ProjectNamespaces,
   Projects,
   SmokeProbe,
@@ -62,6 +63,7 @@ import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.
 import { SYNTAX_WASM } from "../adapters/driven/syntax/wasm.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
+import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { DepsBuilderRpc } from "../adapters/driven/do-rpc/deps-builder.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
@@ -265,7 +267,8 @@ export function precheckRuntime(
   | SyntaxSource
   | PlanStore
   | EvidenceStore
-  | ProjectNamespaces,
+  | ProjectNamespaces
+  | HumanGate,
   never
 > {
   const project = (projectId: string) =>
@@ -286,6 +289,7 @@ export function precheckRuntime(
       PlanStoreR2(env.ARCHIVE),
       EvidenceStoreR2(env.ARCHIVE),
       ProjectNamespacesD1(env.DB),
+      HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
     ),
   );
 }

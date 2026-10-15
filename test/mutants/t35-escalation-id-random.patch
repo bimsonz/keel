@@ -2,10 +2,10 @@
 # kills: t35.resolve-escalate
 # why: an escalation's id is not derived from its conflict alone, so the same conflict escalated again is another escalation and nobody can name the one a conflict has
 diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
-index fce7e5e..1fb3541 100644
+index b0337c58..a8f159ba 100644
 --- a/packages/core/src/application/coordination/escalations.ts
 +++ b/packages/core/src/application/coordination/escalations.ts
-@@ -46,7 +46,8 @@ type Store = Transaction["store"];
+@@ -54,7 +54,8 @@ type Store = Transaction["store"];
   * however often, it is the same question to the same person.
   */
  export const escalationIdOf = (conflictId: ConflictId): EscalationId =>
@@ -13,5 +13,5 @@ index fce7e5e..1fb3541 100644
 +  EscalationId.make(`esc_${hashedIdBody(`${conflictId}${(minted += 1)}`)}`);
 +let minted = 0;
  
- /** The decision an escalation's ruling records, named from the escalation: one ruling, one decision. */
- export const decisionIdOf = (escalationId: EscalationId): DecisionId =>
+ /**
+  * The escalation a change to how Keel verifies (its `.keel/flow` or

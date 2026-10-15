@@ -2,11 +2,11 @@
 # kills: change.fold-table
 # why: the fold takes EffectsDerived without the check `from("deriving")`.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..3de19d10 100644
+index 90d3e897..411fd2aa 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -998,10 +998,7 @@ export const evolveChange = (
-         ? moveTo(change, "deriving", ["derivationRef"])
+@@ -1013,10 +1013,7 @@ export const evolveChange = (
+         ? { ...moveTo(change, "deriving", ["derivationRef"]), precheckInstance: event.instanceId }
          : illegal(change, event);
      case "EffectsDerived":
 -      return from("deriving") &&

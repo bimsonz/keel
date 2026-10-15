@@ -291,4 +291,35 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
         expect(refusing.steps).toEqual([]);
       }),
   );
+
+  it.effect(
+    "[flow-ruling.gate-passes] the human-class gate passes as the ruling it was resumed by, in no box and no probe",
+    () =>
+      Effect.gen(function* () {
+        const runtime = makeVerifierRuntimeMemory();
+        const probes = makeProbeRunnerMemory(() => ran("fail"));
+        const durable = recordingDurable();
+        const [step] = workerAppPlan().steps;
+        if (step === undefined) throw new Error("the plan has steps");
+        const gate = { ...step, id: "keel.human-class", kind: "human" as const };
+        const report = yield* candidateRunner(
+          sampleNamespace,
+          job,
+          durable.durable,
+          HANDED,
+        )(gate, undefined).pipe(
+          Effect.provide(
+            Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer),
+          ),
+        );
+        expect(report).toMatchObject({
+          stepId: "keel.human-class",
+          outcome: "pass",
+          evidenceClass: "ruling",
+        });
+        expect(runtime.jobs).toEqual([]);
+        expect(probes.requests).toEqual([]);
+        expect(durable.names).toEqual([]);
+      }),
+  );
 });

@@ -5,7 +5,11 @@ import {
   runInDurableObject,
 } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { subjectAddress } from "@keeltown/core/application/coordination";
+import {
+  flowRulingIdOf,
+  namespaceAddress,
+  subjectAddress,
+} from "@keeltown/core/application/coordination";
 import {
   DERIVATION_KIND,
   DerivationRecord,
@@ -16,11 +20,18 @@ import {
 import { DerivedEffect, Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
 import type { AdmittedGuard } from "@keeltown/core/domain/verification";
 import { CommitSha, ContentHash, type Json, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, EvidenceStore, type PrecheckWorkspace } from "@keeltown/core/ports";
+import {
+  CodeHost,
+  Escalations,
+  EvidenceStore,
+  type PrecheckWorkspace,
+  PROJECTOR,
+} from "@keeltown/core/ports";
 import { CodeHostFixture, TEST_GUARD } from "@keeltown/testing";
 import { Effect, Layer, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
 import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
 import { EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
 import { POOLED } from "../../src/adapters/driving/do/workflow-pool.ts";
@@ -645,6 +656,58 @@ describe("Precheck", () => {
       reasons: [`precheck:unreadable:ObjectNotFound ${BASE}`],
     });
     expect(log.map((e) => e.type)).not.toContain("EffectsDerived");
+  });
+
+  it("[flow-ruling.pool.precheck] a change to .keel/flow compiles, queues and parks for its ruling, and the Workflow's ruling step puts the question to the project's maintainers", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    const derive = await kept(c, commitSha);
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+      await m.mockStepResult({ name: "diff" }, touched([".keel/flow.json"]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
+      await m.mockStepResult({ name: "derive" }, derive);
+    });
+    await submit();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    const [instance] = await workflows.get();
+    await instance?.waitForStatus("complete");
+
+    // The question is the Precheck run's own: a resubmission's run asks again.
+    const started = (await c.log()).find((event) => event.type === "PrecheckStarted");
+    const run = String(Reflect.get(Object(started?.payload), "instanceId"));
+    expect(started).toBeDefined();
+    const escalationId = flowRulingIdOf(c.changeId, run);
+    expect(await c.current()).toMatchObject({
+      state: "parked",
+      parkReason: "awaiting-ruling",
+      escalationId,
+    });
+    // The question reaches the Projector from the namespace object's outbox.
+    const namespaceObject = drainAfter(
+      env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(POOL_ORG))),
+    );
+    await vi.waitFor(async () => {
+      await drainOutbox(namespaceObject);
+      const asked = await Effect.runPromise(
+        Escalations.use((port) => port.get(escalationId)).pipe(
+          Effect.provide(
+            EscalationsRpc(
+              () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR)),
+              (address) => drainAfter(env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+            ),
+          ),
+          Effect.orDie,
+        ),
+      );
+      expect(asked).toMatchObject({
+        namespace: POOL_ORG,
+        project: c.projectId,
+        escalation: { state: "open", category: "verification-change" },
+      });
+    }, WAIT);
   });
 
   it("[d12.pool.refused] bounces a change to a guard path, with next actions and a ruling verdict", async () => {

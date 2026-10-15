@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts -t "flow-ruling.gate-passes"
+# kills: flow-ruling.gate-passes
+# why: the gate goes to a Tier 2 runner, which has none for it, so every ruled change abstains and parks
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index 97afdb2f..53609daf 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -168,7 +168,6 @@ export const candidateRunner = (
+   const run: StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> = (step, world) => {
+     if (world !== undefined) return Effect.succeed(abstainUnrun(step, world));
+     // A change holding the gate was parked when queued and resumed only by a maintainer's approve.
+-    if (step.id === HUMAN_CLASS_STEP) return Effect.succeed(ruled(step));
+     if (step.kind === "deploy")
+       return deploy === undefined
+         ? Effect.succeed(abstainUnrun(step, undefined))

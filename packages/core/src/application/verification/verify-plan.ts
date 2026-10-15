@@ -8,6 +8,7 @@ import type {
 } from "../../domain/kernel/index.ts";
 import {
   type FlowWorld,
+  HUMAN_CLASS_STEP,
   type PlanStep,
   type StepReport,
   StepResult,
@@ -113,6 +114,20 @@ export type DurableReport = (
   report: Effect.Effect<StepReport>,
 ) => Effect.Effect<StepReport>;
 
+/**
+ * The human-class gate, in no box: a change to `.keel/flow` parks for a
+ * maintainer's ruling as it is queued, and the machine batches it only once
+ * an approve resumes it (a refuse bounces it), so a batch holding the gate
+ * holds it ruled.
+ */
+const ruled = (step: PlanStep): StepReport => ({
+  stepId: step.id,
+  outcome: "pass",
+  evidenceClass: "ruling",
+  tier: step.tier,
+  durationMs: 0,
+});
+
 const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport => ({
   stepId: step.id,
   outcome: "abstain",
@@ -166,6 +181,8 @@ export const candidateRunner = (
     });
   const run: StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> = (step, world) => {
     if (world !== undefined) return Effect.succeed(abstainUnrun(step, world));
+    // A change holding the gate was parked when queued and resumed only by a maintainer's approve.
+    if (step.id === HUMAN_CLASS_STEP) return Effect.succeed(ruled(step));
     if (step.kind === "deploy")
       return deploy === undefined
         ? Effect.succeed(abstainUnrun(step, undefined))

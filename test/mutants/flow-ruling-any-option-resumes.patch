@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "flow-ruling.refuse"
+# kills: flow-ruling.refuse
+# why: a maintainer's refuse resumes the change into the queue as an approve would
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bcad1bed..57f1e6d1 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2227,7 +2227,7 @@ const commandFor = (
+         escalationId !== flowRulingIdOf(change.id, change.precheckInstance)
+       )
+         return undefined;
+-      return option === FLOW_RULING_APPROVE
++      return option !== ""
+         ? {
+             command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+             refusable: true,

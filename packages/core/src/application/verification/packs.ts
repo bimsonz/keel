@@ -3,6 +3,7 @@ import { DEPLOY_SPEC_PATH, type DeploySpec, parseDeploySpec } from "../../domain
 import { contentHashOf } from "../../domain/kernel/index.ts";
 import {
   type FlowDefaults,
+  HUMAN_CLASS_STEP,
   type PlanStep,
   type StepSpec,
 } from "../../domain/verification/index.ts";
@@ -301,12 +302,15 @@ export const TIER2_STEP_IDS: readonly string[] = [
  * Whether KeelVerify can run the step on a candidate: a guard step (its
  * pinned probe, on a VerifierDO), a Tier 2 step it has a runner for, or a
  * Tier 2 step carrying a command of the project's own (`run`), or a deploy
- * step Keel runs itself in Tier 0 on the deploy spec it carries.
- * Nothing else runs yet: not a human step, until rulings reach a running
- * plan, and not any other Tier 0 or Tier 1 step. Precheck refuses a
- * plan holding such a step, so no change parks by design.
+ * step Keel runs itself in Tier 0 on the deploy spec it carries, or the
+ * human-class gate a change to `.keel/flow` adds: the change parks for a
+ * maintainer's ruling when it is queued, and a batch reads the gate as that
+ * ruling. Nothing else runs yet: no other human step, and no other Tier 0
+ * or Tier 1 step. Precheck refuses a plan holding such a step, so no change
+ * parks by design.
  */
 export const executable = (step: PlanStep): boolean =>
+  step.id === HUMAN_CLASS_STEP ||
   step.guards !== undefined ||
   (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id))) ||
   (step.tier.tier === 0 &&

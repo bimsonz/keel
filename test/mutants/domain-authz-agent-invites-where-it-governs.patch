@@ -2,14 +2,14 @@
 # kills: authz.invite-people-only
 # why: an agent that governs an org no person owns invites an agent into it and takes one out, though no person would answer for it
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 64994aa5..e4ce4fc5 100644
+index 2ef42bec..d93d41b7 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -735,6 +735,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+@@ -744,6 +744,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
      // another, wherever it governs. Its own invitation it ends as itself, by another action.
      case "invite":
      case "inviterOrMaintain":
 +      return rights.has("member") ? granted() : refused(whyNoRule(principal, resource));
      case "ownAsUser":
+     case "sponsorOrMaintainAsUser":
        return refused("users-only");
-     default:

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "flow-ruling.compiles"
+# kills: flow-ruling.compiles
+# why: Precheck refuses every change to .keel/flow as a plan gap again, so no flow change can land
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index cd7c57af..a0c4fdfa 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -310,7 +310,6 @@ export const TIER2_STEP_IDS: readonly string[] = [
+  * parks by design.
+  */
+ export const executable = (step: PlanStep): boolean =>
+-  step.id === HUMAN_CLASS_STEP ||
+   step.guards !== undefined ||
+   (step.tier.tier === 2 && (step.run !== undefined || TIER2_STEP_IDS.includes(step.id))) ||
+   (step.tier.tier === 0 &&

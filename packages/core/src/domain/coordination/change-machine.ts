@@ -1007,9 +1007,10 @@ export const evolveChange = (
         ? { ...change, baseSha: event.to }
         : illegal(change, event);
     case "PrecheckStarted":
-      // A new pass derives again: the commit may differ though the revision does not.
+      // A new pass derives again: the commit may differ though the revision does not, and the
+      // pass is its own run, so a ruling asked of an earlier one never answers it.
       return from("submitted")
-        ? moveTo(change, "deriving", ["derivationRef"])
+        ? { ...moveTo(change, "deriving", ["derivationRef"]), precheckInstance: event.instanceId }
         : illegal(change, event);
     case "EffectsDerived":
       return from("deriving") &&

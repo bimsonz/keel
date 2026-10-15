@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   checkAncestry,
   decidePrecheck,
+  needsRuling,
   type PrecheckFindings,
   type PrecheckSubmission,
   precheckReads,
@@ -17,6 +18,7 @@ import {
   contentHashOf,
   Glob,
   makeId,
+  type NamespaceId,
   type ProjectId,
   type WorkspaceId,
 } from "@keeltown/core/kernel";
@@ -168,7 +170,12 @@ function precheckWorld(
               .compiled(id, plan)
               .pipe(
                 Effect.tap(() =>
-                  Effect.sync(() => void recorded.push(`compiled ${plan.planHash}`)),
+                  Effect.sync(
+                    () =>
+                      void recorded.push(
+                        `compiled ${plan.planHash}${plan.needsRuling === true ? " needs-ruling" : ""}`,
+                      ),
+                  ),
                 ),
               ),
         });
@@ -243,7 +250,7 @@ function precheckWorld(
    * derivation: `derive` and `derived` are taken in precheck-derive.test.ts.
    * Nothing is derived here, so the plan's subjects are the workspace's.
    */
-  const run = (submission: PrecheckSubmission) =>
+  const run = (submission: PrecheckSubmission, namespace: NamespaceId = sampleNamespace) =>
     Effect.gen(function* () {
       const workspace = yield* startPrecheck(submission);
       const ancestry = yield* checkAncestry(workspace, submission);
@@ -255,9 +262,9 @@ function precheckWorld(
               subjects: workspace.subjects,
             }
           : { ancestry };
-      const decision = decidePrecheck(findings);
+      const decision = decidePrecheck(findings, namespace);
       if (decision._tag === "Refuse") yield* refuseSubmission(submission, decision);
-      else yield* recordPlan(sampleNamespace, submission, decision);
+      else yield* recordPlan(namespace, submission, decision);
       return decision;
     }).pipe(Effect.provide(layer));
 
@@ -414,20 +421,62 @@ describe("Precheck", () => {
   );
 
   it.effect(
-    "[d21.plan-gap] refuses a flow change, whose human-class step KeelVerify cannot run yet",
+    "[flow-ruling.compiles] compiles a flow change with its human-class gate, and records it parked for a maintainer's ruling",
     () => {
       const world = precheckWorld();
       return Effect.gen(function* () {
         const decision = yield* world.run(yield* world.submitted([withFile(".keel/flow.yaml")]));
-        expect(decision).toMatchObject({
+        if (decision._tag !== "Compile") throw new Error(`not compiled: ${decision._tag}`);
+        const plan = Result.getOrThrow(readStoredPlan(decision.planHash, decision.plan));
+        expect(plan.steps.map((s) => s.id)).toContain("keel.human-class");
+        expect(needsRuling(decision)).toBe(true);
+        expect(world.recorded).toEqual([
+          `put ${decision.planHash}`,
+          `compiled ${decision.planHash} needs-ruling`,
+        ]);
+        expect(world.changes.stateOf(changeId)).toBe("parked");
+      });
+    },
+  );
+
+  it.effect("[flow-ruling.plain] a change that leaves the flow alone needs no ruling", () => {
+    const world = precheckWorld();
+    return Effect.gen(function* () {
+      const decision = yield* world.run(yield* world.submitted([withFile("src/a.ts")]));
+      if (decision._tag !== "Compile") throw new Error(`not compiled: ${decision._tag}`);
+      expect(needsRuling(decision)).toBe(false);
+      expect(world.recorded).toEqual([`put ${decision.planHash}`, `compiled ${decision.planHash}`]);
+      expect(world.changes.stateOf(changeId)).toBe("queued");
+    });
+  });
+
+  it.effect(
+    "[flow-ruling.agent-namespace] refuses a flow change in an agent's own namespace, where no person can rule, and says to split its flow edits out; a person's own namespace is asked",
+    () => {
+      const agents = precheckWorld();
+      const persons = precheckWorld();
+      return Effect.gen(function* () {
+        const refused = yield* agents.run(
+          yield* agents.submitted([withFile(".keel/flow.yaml")]),
+          makeId("agt", "01JZ8PT2C4E6G8J0M2N4Q6S8V7"),
+        );
+        const asked = yield* persons.run(
+          yield* persons.submitted([withFile(".keel/flow.yaml")]),
+          makeId("usr", "01JZ8PT2C4E6G8J0M2N4Q6S8V7"),
+        );
+
+        expect(refused).toMatchObject({
           _tag: "Refuse",
           reasons: ["precheck:plan-gap:keel.human-class"],
           nextActions: [
             { kind: "call", operationId: "submit", args: { steps: ["keel.human-class"] } },
           ],
         });
-        expect(world.changes.stateOf(changeId)).toBe("bounced");
-        expect(world.recorded).toEqual([]);
+        expect(JSON.stringify(refused)).toMatch(/no person can rule in an agent's own namespace/);
+        expect(agents.changes.stateOf(changeId)).toBe("bounced");
+        expect(agents.recorded).toEqual([]);
+        expect(asked._tag).toBe("Compile");
+        expect(persons.changes.stateOf(changeId)).toBe("parked");
       });
     },
   );

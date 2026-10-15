@@ -16,6 +16,7 @@ export const EscalationCategory = Schema.Literals([
   "unprovable-conflict",
   "overrule-request",
   "frozen-trunk",
+  "verification-change",
 ]);
 export type EscalationCategory = typeof EscalationCategory.Type;
 

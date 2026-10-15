@@ -362,7 +362,8 @@ interface PrecheckedChange {
  * The Change DO's side of `ChangePrecheck`, in memory: the transitions its
  * machine takes (submitted → deriving on `started`, there one derivation a
  * pass on `derived`, then bounced on `refused`, or on `compiled` verifying
- * and, with no step before the queue, queued in the same commit),
+ * and, with no step before the queue, queued in the same commit, or parked
+ * there for a maintainer's ruling when the plan holds the human-class gate),
  * idempotent by instance, and ChangeStateRefused for a stale revision or a
  * step the state does not allow.
  * `submit` seeds a change; `calls` lists the writes that took effect.
@@ -446,9 +447,14 @@ export function makeChangePrecheckMemory() {
             ),
           ),
         compiled: (changeId, plan) =>
-          write(changeId, "planCompiled", plan, "deriving", "queued", () => undefined).pipe(
-            Effect.asVoid,
-          ),
+          write(
+            changeId,
+            "planCompiled",
+            plan,
+            "deriving",
+            plan.needsRuling === true ? "parked" : "queued",
+            () => undefined,
+          ).pipe(Effect.asVoid),
       }),
     ),
   };

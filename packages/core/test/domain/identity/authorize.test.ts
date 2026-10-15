@@ -261,10 +261,15 @@ const GOVERNING: ReadonlySet<Need> = new Set([
   "own",
   "ownAsUser",
   "sponsorOrMaintain",
+  "sponsorOrMaintainAsUser",
   "inviterOrMaintain",
 ]);
 /** The governing needs only a person meets, wherever an agent governs: an invitation names the person who answers for the agent. */
-const PEOPLE_ONLY: ReadonlySet<Need> = new Set(["invite", "inviterOrMaintain"]);
+const PEOPLE_ONLY: ReadonlySet<Need> = new Set([
+  "invite",
+  "inviterOrMaintain",
+  "sponsorOrMaintainAsUser",
+]);
 /** A person's own namespace that no drawn user or agent is in: its id is that person's. */
 const SOMEONES: NamespaceId = makeId("usr", ulid(97));
 const PEOPLES: readonly Right[] = ["member", "maintain", "own"];
@@ -666,6 +671,7 @@ describe("authorize", () => {
     expect(ACTION_NAMES.filter((a) => PEOPLE_ONLY.has(needOf(a))).toSorted()).toEqual([
       "Namespaces_inviteAgent",
       "Namespaces_removeAgent",
+      "Operator_giveRuling",
     ]);
   });
 
@@ -1117,6 +1123,7 @@ describe("authorize", () => {
       workOrMaintain: 2,
       invite: 1,
       sponsorOrMaintain: 2,
+      sponsorOrMaintainAsUser: 2,
       inviterOrMaintain: 2,
       own: 3,
       ownAsUser: 3,
@@ -1160,6 +1167,15 @@ describe("authorize", () => {
         ),
       ),
     ).toBe("ok:");
+  });
+
+  it("[authz.ruling-people-only] a ruling is a person's: a maintainer or the sponsor rules, and an agent that maintains the project is refused", () => {
+    const governing = agentOn(PRJ_1, { standing: GOVERNS });
+    const resource = project(PRJ_1, "private", { personOwned: false });
+    expect(outcome(authorize(governing, "Operator_putSettings", resource))).toBe("ok:");
+    expect(outcome(authorize(governing, "Operator_giveRuling", resource))).toBe("403:users-only");
+    const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
+    expect(outcome(authorize(maintainer, "Operator_giveRuling", resource))).toBe("ok:");
   });
 
   it("[authz.member-management] a maintainer manages members but not owners, and only an owner deletes the org", () => {

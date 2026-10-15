@@ -36,6 +36,7 @@ import {
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
+  DecisionRecorded,
   PrecedentDistinguished,
   PrecedentSurfaced,
   scopedPrecedent,
@@ -115,7 +116,7 @@ import {
   WorkspaceWriter,
 } from "../ports/index.ts";
 import { planStateOf, submissionStateOf } from "../verification/index.ts";
-import { escalationIdOf } from "./escalations.ts";
+import { escalationIdOf, FLOW_RULING_APPROVE, flowRulingIdOf } from "./escalations.ts";
 import { subjectIdOf } from "./hashed-id.ts";
 import {
   consequenceAgainst,
@@ -456,6 +457,8 @@ export interface CompiledPlan extends PrecheckStep {
   readonly costEstimate: number;
   /** Per predicate, what a conflict proven against the change does; absent, or a predicate left out, is `advise`. */
   readonly predicatePolicy?: PredicatePolicies | undefined;
+  /** The plan holds the human-class gate: the change parks for a maintainer's ruling asked of this Precheck run as it is queued. */
+  readonly needsRuling?: true | undefined;
 }
 
 /** What Precheck derived from the submission's code: the effects, and its own reference for the derivation. */
@@ -1936,8 +1939,12 @@ export const planCompiled: (
         const blockers = blockersOf(store, plan.predicatePolicy);
         const bounce = conflictBounce(blockers.openProvenConflicts);
         if (bounce !== undefined) return [compile, bounce];
-        // A conflict already with a person holds the change the moment it is queued.
-        const asked = awaitedEscalation(store);
+        // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
+        // conflict already with a person holds the change too: either the moment it is queued.
+        const asked =
+          plan.needsRuling === true
+            ? flowRulingIdOf(changeId, plan.instanceId)
+            : awaitedEscalation(store);
         return [
           compile,
           { _tag: "Queue", laneId, blockers },
@@ -2069,6 +2076,7 @@ const OUT_OF_THE_RUNNING: ReadonlySet<Change["state"]> = new Set([
 const decodeProven = Schema.decodeUnknownOption(ConflictProven);
 const decodeEscalated = Schema.decodeUnknownOption(ConflictEscalated);
 const decodeResolved = Schema.decodeUnknownOption(ConflictResolved);
+const decodeRecorded = Schema.decodeUnknownOption(DecisionRecorded);
 
 /**
  * A conflict proven against the change, under the predicate policy its latest
@@ -2204,6 +2212,51 @@ const commandFor = (
             refusable: true,
           }
         : undefined;
+    }
+    case "DecisionRecorded": {
+      // The ruling a change to how Keel verifies waits on, asked of the Precheck run it waits from: an
+      // approve takes it back into the queue, any other answer sends it back. A ruling on an earlier
+      // run's question finds the change waiting on another one, and moves nothing.
+      const recorded = decodeRecorded(event.payload);
+      if (Option.isNone(recorded)) return undefined;
+      const { escalationId, decisionId, option, summary } = recorded.value;
+      if (
+        change.parkReason !== "awaiting-ruling" ||
+        change.escalationId !== escalationId ||
+        change.precheckInstance === undefined ||
+        escalationId !== flowRulingIdOf(change.id, change.precheckInstance)
+      )
+        return undefined;
+      return option === FLOW_RULING_APPROVE
+        ? {
+            command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+            refusable: true,
+          }
+        : {
+            command: {
+              _tag: "Bounce",
+              decisionId,
+              reasons: [
+                `${decisionId}: a maintainer did not approve this change to how Keel verifies (${summary}).`,
+              ],
+              nextActions: [
+                {
+                  kind: "call",
+                  title: `Read decision ${decisionId}, the maintainer's ruling that sent this change back`,
+                  operationId: "Memory_getDecision",
+                  args: { decisionId },
+                },
+                {
+                  kind: "call",
+                  title:
+                    "Split the .keel/flow and .keel/plugins edits out of this change, or change them as the ruling asks, then submit again",
+                  operationId: "submit",
+                  args: { changeId: change.id },
+                },
+              ],
+            },
+            refusable: true,
+          };
     }
     case "VerdictIssued": {
       const verdict = decodeVerdict(event.payload);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "flow-ruling.compiles"
+# kills: flow-ruling.compiles
+# why: the Change DO is never told the plan holds the gate, so it queues the change and nobody is asked
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 98dedd6d..fcbefd72 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -483,7 +483,6 @@ export const recordPlan = Effect.fn("verification/recordPlan")(function* (
+     steps: decision.steps,
+     costEstimate: decision.costEstimate,
+     predicatePolicy: decision.predicatePolicy,
+-    ...(needsRuling(decision) ? { needsRuling: true } : {}),
+   });
+ });
+ 
