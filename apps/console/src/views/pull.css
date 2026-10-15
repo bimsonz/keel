@@ -1,0 +1,128 @@
+/*
+ * A change as a code host shows a pull request: the pill beside its title, the box above its merge button,
+ * and its checks' logs. Every colour is a Kumo token or a light-dark() pair, as in tokens.css.
+ */
+:root {
+  /* Landed is a code host's merged: violet, kept apart from the green of a check that passed. */
+  --a-landed: light-dark(oklch(52% 0.2 300), oklch(72% 0.16 300));
+  --a-landed-tint: light-dark(oklch(96% 0.03 300), oklch(30% 0.07 300 / 0.5));
+}
+
+:root .a-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  border-radius: 14px;
+  color: oklch(99% 0 0);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:root .a-pill[data-pill="open"] {
+  background: light-dark(oklch(52% 0.15 150), oklch(55% 0.14 150));
+}
+
+:root .a-pill[data-pill="landed"] {
+  background: var(--a-landed);
+}
+
+:root .a-pill[data-pill="closed"] {
+  background: light-dark(oklch(52% 0.19 25), oklch(55% 0.18 25));
+}
+
+/* The merge box: one bordered box, a row for each thing it says, the first of them where the change stands. */
+:root .a-merge {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  overflow: hidden;
+}
+
+:root .a-merge-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-merge-row:first-child {
+  border-top: 0;
+  padding-block: 18px;
+}
+
+:root .a-merge-row:first-child h3 {
+  font-size: 1.125rem;
+}
+
+:root .a-merge-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--color-kumo-tint);
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-merge-row[data-tone="pass"] .a-merge-icon {
+  background: var(--a-pass-tint);
+  color: var(--a-pass);
+}
+
+:root .a-merge-row[data-tone="fail"] .a-merge-icon {
+  background: var(--a-fail-tint);
+  color: var(--a-fail);
+}
+
+:root .a-merge-row[data-tone="person"] .a-merge-icon {
+  background: var(--a-person-tint);
+  color: var(--a-person);
+}
+
+:root .a-merge-row[data-tone="landed"] .a-merge-icon {
+  background: var(--a-landed-tint);
+  color: var(--a-landed);
+}
+
+/* A person is being asked: the row that asks is the one lit. */
+:root .a-merge-row[data-tone="person"]:first-child {
+  background: var(--a-person-tint);
+}
+
+:root .a-log {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-kumo-tint);
+  color: var(--text-color-kumo-default);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes a-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+:root .a-spin {
+  animation: a-spin 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .a-spin {
+    animation: none;
+  }
+}

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/checks.test.ts
+# kills: checks.failed
+# why: a change Keel bounced with no step's result to read is said to have its checks held, not failed
+diff --git a/apps/console/src/engine/checks.ts b/apps/console/src/engine/checks.ts
+index 600718d8..bb2805ef 100644
+--- a/apps/console/src/engine/checks.ts
++++ b/apps/console/src/engine/checks.ts
+@@ -61,7 +61,7 @@ export function checksOf(
+       state: RUNNING.has(change.state) ? "running" : QUEUED.has(change.state) ? "queued" : "none",
+       steps,
+     };
+-  if (steps.some((step) => step.result === "fail") || verdict.outcome === "bounce")
++  if (steps.some((step) => step.result === "fail"))
+     return { state: "failed", steps };
+   if (verdict.outcome === "land") return { state: "passed", steps };
+   return { state: "held", steps };

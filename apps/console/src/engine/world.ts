@@ -32,6 +32,7 @@ import type {
   UnsealObservation,
 } from "../contract/observations.ts";
 import type { EscalationCategory, EscalationOption } from "../contract/events.ts";
+import type { ChangeRequeued } from "../contract/keel/index.ts";
 import type { EvidenceItem } from "../domain/state.ts";
 import type {
   AgentClass,
@@ -128,6 +129,8 @@ export interface ChangeEntry {
   batchId?: string;
   workspaceId?: string;
   commit?: string;
+  /** Keel's latest reason for putting it back in its queue, when, and how many times it has. */
+  requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
   /** The run that holds the change, where its holder's token named one. Whoever adopts the change replaces it. */
   run?: RunRef;
   declaredAt: string;
@@ -815,7 +818,13 @@ export class World {
         break;
       }
       case "ChangeRequeued": {
-        this.#change(event.payload.changeId, "queued");
+        const change = this.#change(event.payload.changeId, "queued");
+        if (change === undefined) break;
+        change.requeued = {
+          reason: event.payload.reason,
+          at: event.at,
+          times: (change.requeued?.times ?? 0) + 1,
+        };
         break;
       }
       case "ChangeLanded": {

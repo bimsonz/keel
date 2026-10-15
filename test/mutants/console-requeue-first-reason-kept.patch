@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/requeue.test.ts
+# kills: requeue.reason
+# why: a change is shown the first reason Keel requeued it for, not the latest
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 6bd37d7c..e74fdcf6 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -784,7 +784,7 @@ export class World {
+         const change = this.#change(event.payload.changeId, "queued");
+         if (change === undefined) break;
+         change.requeued = {
+-          reason: event.payload.reason,
++          reason: change.requeued?.reason ?? event.payload.reason,
+           at: event.at,
+           times: (change.requeued?.times ?? 0) + 1,
+         };

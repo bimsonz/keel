@@ -475,7 +475,7 @@ expectEqual(
 // bounce on the conflict itself: Keel issues no verdict for that, and the page shows none.
 const WAYS_FORWARD =
   "Read the conflict and the proof against the change | Revise the change's intent around the conflict | Resolve the conflict with a move";
-const standing = page.getByRole("region", { name: "Verdict" });
+const standing = page.getByRole("region", { name: "Status" });
 await page.goto(at("/changes/1", "scenario=s4&t=460&play=0"), { waitUntil: "networkidle" });
 await standing.getByRole("heading", { level: 2 }).waitFor();
 expectEqual(
@@ -2347,7 +2347,7 @@ expectEqual(
 );
 // Keel parks a change on the question it puts to a person, and issues no verdict for that: the change's page has
 // no verdict's evidence to show, and Keel is asked for none.
-await visitor.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
+await visitor.goto(`${built}/ada/demo/changes/1/checks`, { waitUntil: "domcontentloaded" });
 await visitor
   .getByText("Evidence is listed here once Keel issues a verdict.")
   .first()
@@ -4264,7 +4264,7 @@ expectEqual(
   "/ada/demo/decisions/D-1",
 );
 // The verdict the change bounced on names its batch. The plan it was issued under is read from Keel's view of it.
-await recall.goto(`${built}/ada/demo/changes/1205/verification`, { waitUntil: "domcontentloaded" });
+await recall.goto(`${built}/ada/demo/changes/1205/checks`, { waitUntil: "domcontentloaded" });
 const builtSteps = recall.getByRole("list", { name: "The plan's steps, in Keel's order" });
 await builtSteps.waitFor({ timeout: 10_000 }).catch(() => undefined);
 expectEqual(
@@ -4468,7 +4468,7 @@ const pastBounceSaid = async (): Promise<string> => {
     .catch(() => undefined);
   return `${squash(
     await movedOn
-      .getByRole("region", { name: "Verdict" })
+      .getByRole("region", { name: "Status" })
       .getByRole("heading", { level: 2 })
       .innerText()
       .catch(() => "no heading"),
@@ -4524,7 +4524,7 @@ expectEqual(
 // what Keel recorded for the change.
 await movedOn.goto(`${built}/ada/demo/changes/2`, { waitUntil: "domcontentloaded" });
 await movedOn
-  .getByRole("region", { name: "Verdict" })
+  .getByRole("region", { name: "Status" })
   .waitFor({ timeout: 15_000 })
   .catch(() => undefined);
 const precedents = movedOn.locator("section.a-panel", {
@@ -5623,7 +5623,7 @@ expectEqual(
   ),
   "Keel's verdict was to bounce it.",
 );
-await reader.goto(`${built}/ada/demo/changes/1205/verification`, { waitUntil: "domcontentloaded" });
+await reader.goto(`${built}/ada/demo/changes/1205/checks`, { waitUntil: "domcontentloaded" });
 const recordedOn = reader.getByRole("list", { name: "Evidence Keel recorded with the verdict" });
 await reader
   .getByText("Evidence behind the verdict")

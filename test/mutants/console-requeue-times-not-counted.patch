@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/requeue.test.ts
+# kills: requeue.reason
+# why: a change put back in its queue twice is said to have been once
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 6bd37d7c..aa3809c8 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -786,7 +786,7 @@ export class World {
+         change.requeued = {
+           reason: event.payload.reason,
+           at: event.at,
+-          times: (change.requeued?.times ?? 0) + 1,
++          times: 1,
+         };
+         break;
+       }

@@ -17,6 +17,7 @@ import type {
   ConflictState,
   Drift,
   ProbeDiscard,
+  ChangeRequeued,
   SuspectEvidence,
   VerdictPlanStep,
 } from "../contract/keel/index.ts";
@@ -349,6 +350,8 @@ export interface ChangePageState {
     /** The lane it was queued in, by the name Keel gives it within the project. */
     lane?: string;
   };
+  /** Keel's latest reason for putting it back in its queue, when, and how many times it has. */
+  requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
   agent: { label: string; class: ShownClass; harness: string; model: string };
   /** Its holder's page in this project, and the run it is held under. */
   held: HeldUnder;

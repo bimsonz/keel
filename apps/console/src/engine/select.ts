@@ -731,6 +731,7 @@ export function changePageOf(
         against: `${nameOf(world, holder)}'s premise: ${premise.predicate} ${premise.relation.replace("-", " ")} ${String(premise.value)}`,
       };
     }),
+    ...(change.requeued === undefined ? {} : { requeued: { ...change.requeued } }),
     drift: change.drift,
     ...(verdict === undefined
       ? {}

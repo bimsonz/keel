@@ -29,7 +29,7 @@ const ADDRESSES: [string, Route][] = [
     { at: "changes", filter: "not-landed", shown: 150 },
   ],
   ["/acme/demo/changes/7", { at: "change", name: "7", tab: "overview" }],
-  ["/acme/demo/changes/7/verification", { at: "change", name: "7", tab: "verification" }],
+  ["/acme/demo/changes/7/checks", { at: "change", name: "7", tab: "checks" }],
   ["/acme/demo/changes/chg_01JABC/files", { at: "change", name: "chg_01JABC", tab: "files" }],
   ["/acme/demo/conflicts", { at: "conflicts", filter: "open", shown: 50 }],
   ["/acme/demo/conflicts?state=settled", { at: "conflicts", filter: "settled", shown: 50 }],

@@ -581,7 +581,7 @@ export function Conflict({
                         <li key={side.changeId} className="text-base text-kumo-default">
                           <ChangeLink
                             id={side.changeId}
-                            tab="verification"
+                            tab="checks"
                             className="a-link font-semibold"
                           >
                             {side.label}

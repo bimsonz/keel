@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/checks.test.ts
+# kills: checks.step-result
+# why: a line about a step that is not its result is read as how the step went
+diff --git a/apps/console/src/engine/checks.ts b/apps/console/src/engine/checks.ts
+index 600718d8..7b749f3f 100644
+--- a/apps/console/src/engine/checks.ts
++++ b/apps/console/src/engine/checks.ts
+@@ -29,7 +29,7 @@ export function stepResultOf(id: string, lines: readonly string[]): StepResult |
+     if (!line.startsWith(head)) continue;
+     const [word] = line.slice(head.length).split(" ");
+     const result = RESULTS.find((known) => known === word);
+-    if (result !== undefined) return result;
++    return word as StepResult;
+   }
+   return undefined;
+ }

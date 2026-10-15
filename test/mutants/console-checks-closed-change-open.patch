@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/checks.test.ts
+# kills: checks.pill
+# why: a withdrawn change is shown as open, as if it could still land
+diff --git a/apps/console/src/engine/checks.ts b/apps/console/src/engine/checks.ts
+index 600718d8..8b4a3287 100644
+--- a/apps/console/src/engine/checks.ts
++++ b/apps/console/src/engine/checks.ts
+@@ -10,7 +10,7 @@ export type Pill = "open" | "landed" | "closed";
+ /** A change is open until it lands, or its agent withdraws it, or another change supersedes it. */
+ export function pillOf(state: ChangeState): Pill {
+   if (state === "landed") return "landed";
+-  if (state === "withdrawn" || state === "superseded") return "closed";
++  if (state === "superseded") return "closed";
+   return "open";
+ }
+ 

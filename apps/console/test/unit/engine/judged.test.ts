@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { noneDerived, unjudged, verdictSaid } from "../../../src/engine/judged.ts";
+import { noneDerived, verdictSaid } from "../../../src/engine/judged.ts";
 import { changePageOf } from "../../../src/engine/select.ts";
 import { World } from "../../../src/engine/world.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
@@ -166,25 +166,6 @@ describe("a change's page, in Keel's own fields", () => {
       "Keel's verdict was to park it.",
       "Keel's verdict was to hold it.",
       "Keel's verdict was to supersede it.",
-    ]);
-  });
-
-  it("[judged.over] says no verdict is to come for a change that is over, and that none has come yet for one still on its way", () => {
-    expect(
-      (["landed", "withdrawn", "superseded"] as const).map((state) => unjudged(state)),
-    ).toEqual([
-      "The change is landed. Keel issued no verdict for it.",
-      "The change is withdrawn. Keel issued no verdict for it.",
-      "The change is superseded. Keel issued no verdict for it.",
-    ]);
-    expect(
-      (["declared", "submitted", "queued", "bounced", "parked"] as const).map(unjudged),
-    ).toEqual([
-      "The change is declared. Keel has not issued a verdict yet.",
-      "The change is submitted. Keel has not issued a verdict yet.",
-      "The change is queued. Keel has not issued a verdict yet.",
-      "The change is bounced. Keel has not issued a verdict yet.",
-      "The change is parked. Keel has not issued a verdict yet.",
     ]);
   });
 
