@@ -15,7 +15,7 @@ import { EscalationsPage } from "./pages/Escalations.tsx";
 import { DecisionPage } from "./pages/Decision.tsx";
 import { DecisionsPage } from "./pages/Decisions.tsx";
 import { HomePage } from "./pages/Home.tsx";
-import { InsightsPage } from "./pages/Insights.tsx";
+import { InsightsFrame, InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
 import { PipelinePage } from "./pages/Pipeline.tsx";
@@ -126,6 +126,7 @@ function useReader(live: boolean): Reader | undefined {
       setReader({
         mark: {
           name: nameOf(who),
+          handle: who.handle,
           orgs: accountsOf(orgs, who),
         },
         orgs,
@@ -152,15 +153,27 @@ function Page({ route, mode, project }: { route: Route; mode: Mode; project: Pro
     case "change":
       return <ChangePage name={route.name} tab={route.tab} mode={mode} />;
     case "conflicts":
-      return <ConflictsPage filter={route.filter} shown={route.shown} />;
+      return (
+        <InsightsFrame at="conflicts">
+          <ConflictsPage filter={route.filter} shown={route.shown} />
+        </InsightsFrame>
+      );
     case "conflict":
       return <ConflictPage name={route.name} tab={route.tab} mode={mode} />;
     case "escalations":
-      return <EscalationsPage filter={route.filter} shown={route.shown} />;
+      return (
+        <InsightsFrame at="questions">
+          <EscalationsPage filter={route.filter} shown={route.shown} />
+        </InsightsFrame>
+      );
     case "escalation":
       return <EscalationPage name={route.name} />;
     case "decisions":
-      return <DecisionsPage {...(route.subject === undefined ? {} : { subject: route.subject })} />;
+      return (
+        <InsightsFrame at="decisions">
+          <DecisionsPage {...(route.subject === undefined ? {} : { subject: route.subject })} />
+        </InsightsFrame>
+      );
     case "decision":
       return <DecisionPage name={route.name} />;
     case "mission-control":
@@ -250,8 +263,6 @@ function Console({
           {...(found.forkedFrom === undefined ? {} : { forkedFrom: found.forkedFrom })}
           // Keel holds a project's settings, so a test fixture, which is not Keel, has none to offer.
           settings={maintains(found) && player.source.getSettings !== undefined}
-          // Keel remembers a project's decisions, and a test fixture has no memory of its own to read.
-          decisions={player.source.decisions !== undefined}
           {...(reader === undefined ? {} : { reader })}
           {...(player.loaded ? { counts } : {})}
         >
@@ -354,12 +365,7 @@ function Project({
   if (opened.is === "reading")
     return (
       <WhereProvider namespace={namespace} project={name} route={route}>
-        <Frame
-          source={{ mode: reading.mode, seed }}
-          // Keel remembers every project's decisions; a test fixture says whether it has any once it is read.
-          decisions={reading.mode === "live"}
-          {...(reader === undefined ? {} : { reader })}
-        >
+        <Frame source={{ mode: reading.mode, seed }} {...(reader === undefined ? {} : { reader })}>
           {null}
         </Frame>
       </WhereProvider>

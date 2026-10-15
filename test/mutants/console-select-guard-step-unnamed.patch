@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/stepnames.test.ts
+# kills: select.guard-step-name
+# why: a guard's check is named by Keel's raw id for its step
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 44d384ec..b88fd81d 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -734,7 +734,7 @@ export function changePageOf(
+     ...(change.requeued === undefined ? {} : { requeued: { ...change.requeued } }),
+     // A guard's step is named by Keel's id for the guard; the page names it by the guard's label.
+     stepNames: Object.fromEntries(
+-      [...world.guards.values()].map((guard) => [`guard:${guard.id}`, `Guard ${guard.label}`]),
++      [...world.guards.values()].map((guard) => [`guard:${guard.id}`, `guard:${guard.id}`]),
+     ),
+     ...(change.state === "parked" && change.parkedOn !== undefined
+       ? { parkedOn: change.parkedOn }

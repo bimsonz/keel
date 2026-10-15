@@ -732,6 +732,13 @@ export function changePageOf(
       };
     }),
     ...(change.requeued === undefined ? {} : { requeued: { ...change.requeued } }),
+    // A guard's step is named by Keel's id for the guard; the page names it by the guard's label.
+    stepNames: Object.fromEntries(
+      [...world.guards.values()].map((guard) => [`guard:${guard.id}`, `Guard ${guard.label}`]),
+    ),
+    ...(change.state === "parked" && change.parkedOn !== undefined
+      ? { parkedOn: change.parkedOn }
+      : {}),
     drift: change.drift,
     ...(verdict === undefined
       ? {}

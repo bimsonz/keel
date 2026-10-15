@@ -59,7 +59,7 @@ describe("a change as a pull request", () => {
 
   it("[checks.waiting] says they are running or queued from the change's state until a verdict is issued", () => {
     expect(checksOf({ state: "verifying" })).toEqual({ state: "running", steps: [] });
-    expect(checksOf({ state: "integrating" }).state).toBe("running");
+    expect(checksOf({ state: "integrating" }).state).toBe("passed");
     expect(checksOf({ state: "queued" }).state).toBe("queued");
     expect(checksOf({ state: "submitted" }).state).toBe("queued");
     expect(checksOf({ state: "working" }).state).toBe("none");

@@ -572,7 +572,7 @@ export function Conflict({
                 )}
                 {state.after.length > 0 && (
                   <Panel
-                    title="After it was settled"
+                    title="Verdicts after"
                     aside="the matrix above is the probe's record"
                     bodyClassName="p-3.5"
                   >
@@ -585,11 +585,10 @@ export function Conflict({
                             className="a-link font-semibold"
                           >
                             {side.label}
-                          </ChangeLink>{" "}
-                          {side.revision > 1
-                            ? `came back as revision ${side.revision}`
-                            : "was judged"}
-                          : verdict <b className="font-semibold text-kumo-strong">{side.outcome}</b>
+                          </ChangeLink>
+                          {side.revision > 1 && ` · revision ${side.revision}`}
+                          {" · verdict "}
+                          <b className="font-semibold text-kumo-strong">{side.outcome}</b>
                           {side.summary !== "" && (
                             <span className="text-kumo-subtle"> · {side.summary}</span>
                           )}
@@ -598,7 +597,7 @@ export function Conflict({
                     </ul>
                   </Panel>
                 )}
-                <Panel title="What happened" aside="oldest first" bodyClassName="">
+                <Panel title="Events" aside="oldest first" bodyClassName="">
                   <ol className="a-timeline">
                     {state.timeline.map((item) => (
                       <li
@@ -675,8 +674,7 @@ export function Conflict({
                   <Tied title="Outcome">
                     {conflict.proven !== undefined && (
                       <span className="leading-snug">
-                        Proven by{" "}
-                        <b className="font-semibold text-kumo-strong">{conflict.proven}</b>
+                        Proven · <b className="font-semibold text-kumo-strong">{conflict.proven}</b>
                       </span>
                     )}
                     {conflict.dismissed !== undefined && (
@@ -686,18 +684,17 @@ export function Conflict({
                     )}
                     {conflict.move !== undefined && (
                       <span className="leading-snug">
-                        Resolved by the move{" "}
-                        <b className="a-mono font-semibold text-kumo-strong">{conflict.move}</b>
+                        Resolved ·{" "}
+                        <b className="font-semibold text-kumo-strong">
+                          {conflict.move === "escalate" ? "by ruling" : conflict.move}
+                        </b>
                       </span>
                     )}
                   </Tied>
                 )}
                 {escalation === undefined && hidden && conflict.state === "escalated" && (
-                  <Tied title="Escalation">
-                    <span className="leading-snug text-kumo-subtle">
-                      This conflict waits on a person's ruling. Keel shows the question to the
-                      project's members.
-                    </span>
+                  <Tied title="Question">
+                    <span className="leading-snug text-kumo-subtle">Members only</span>
                     {state.escalated !== undefined && (
                       <span className="leading-snug text-kumo-subtle">
                         {ESCALATED[state.escalated]}

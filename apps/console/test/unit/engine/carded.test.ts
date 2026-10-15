@@ -3,7 +3,7 @@ import type { AgentCard } from "../../../src/contract/keel/index.ts";
 import { canvasOf } from "../../../src/engine/canvas.ts";
 import { type Cards, holdersOf } from "../../../src/engine/holder.ts";
 import { subjectOf } from "../../../src/engine/lanes.ts";
-import { CHANGE_FILTERS, PAGE, changesOf } from "../../../src/engine/lists.ts";
+import { PAGE, changesOf } from "../../../src/engine/lists.ts";
 import { type Resources, changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { subjectDetailOf } from "../../../src/engine/subject.ts";
 import { World } from "../../../src/engine/world.ts";
@@ -60,7 +60,9 @@ const read = (cards?: Cards): Resources => ({
 });
 
 const rowsOf = (world: World, cards?: Cards): string[] =>
-  CHANGE_FILTERS.flatMap((filter) => changesOf(world, filter, PAGE, cards).rows)
+  // Every change is open or closed, and listed once between the two.
+  (["open", "closed"] as const)
+    .flatMap((filter) => changesOf(world, filter, PAGE, cards).rows)
     .map((row) => `${row.label} ${row.agent} ${row.agentClass}`)
     .toSorted();
 

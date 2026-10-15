@@ -2,7 +2,7 @@
 # kills: route.decisions
 # why: a link to one subject's decisions leads to every decision
 diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
-index 89c2f5f0..dfe6a46e 100644
+index 69197204..02b2f361 100644
 --- a/apps/console/src/route.ts
 +++ b/apps/console/src/route.ts
 @@ -239,7 +239,7 @@ function queryOf(route: Route): string {
@@ -12,5 +12,5 @@ index 89c2f5f0..dfe6a46e 100644
 -      : new URLSearchParams({ subject: route.subject }).toString();
 +      : "";
    if (route.at !== "changes" && route.at !== "conflicts" && route.at !== "escalations") return "";
-   const first: string = route.at === "changes" ? "in-flight" : "open";
-   const query = new URLSearchParams();
+   // Each list's first filter is its open things, and needs no parameter.
+   const first = "open";

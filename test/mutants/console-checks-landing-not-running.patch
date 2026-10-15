@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/checks.test.ts
 # kills: checks.waiting
-# why: a change going onto trunk is said to have no checks yet
+# why: a change going onto trunk, its checks passed, is said to have no checks yet
 diff --git a/apps/console/src/engine/checks.ts b/apps/console/src/engine/checks.ts
-index 600718d8..7e6ff5f1 100644
+index e2f34878..59d59fd4 100644
 --- a/apps/console/src/engine/checks.ts
 +++ b/apps/console/src/engine/checks.ts
-@@ -44,7 +44,7 @@ export interface Checks {
- }
- 
- /** The states in which a change's batch is being verified, or its candidate is going onto trunk. */
--const RUNNING: ReadonlySet<ChangeState> = new Set(["verifying", "integrating"]);
-+const RUNNING: ReadonlySet<ChangeState> = new Set(["verifying"]);
+@@ -46,7 +46,7 @@ export interface Checks {
+ /** The state in which a change's batch is being verified. */
+ const RUNNING: ReadonlySet<ChangeState> = new Set(["verifying"]);
+ /** The state in which a change's checks have passed and its candidate is going onto trunk. */
+-const PASSED: ReadonlySet<ChangeState> = new Set(["integrating"]);
++const PASSED: ReadonlySet<ChangeState> = new Set([]);
  /** The states in which a change has pushed and waits for Keel to verify it. */
  const QUEUED: ReadonlySet<ChangeState> = new Set(["submitted", "deriving", "drifted", "queued"]);
  

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/ruling.test.ts
+# kills: ruling.words
+# why: the question is titled by Keel's raw sentence of change ids
+diff --git a/apps/console/src/engine/ruling.ts b/apps/console/src/engine/ruling.ts
+index b883f6e9..68599d77 100644
+--- a/apps/console/src/engine/ruling.ts
++++ b/apps/console/src/engine/ruling.ts
+@@ -77,7 +77,7 @@ export function rulingWords(world: World, escalation: EscalationEntry): RulingWo
+     premise === undefined || name === undefined
+       ? escalation.question
+       : pure
+-        ? `Can ${name} stay pure?`
++        ? escalation.question
+         : `Does ${premiseSaid(premise.proposition)} hold?`;
+   const options = escalation.options.map((option) => {
+     if (option.id === "premise-holds" && changes !== undefined)

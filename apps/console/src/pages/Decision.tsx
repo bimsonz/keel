@@ -9,13 +9,53 @@ import { usePlayer, usePublicOnly, useSelected } from "../engine/react.tsx";
 import { Head } from "../views/Detail.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
-import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
+import { ChangeLink, ConflictLink, EscalationLink, Said, SubjectLink } from "../views/links.tsx";
 import { Panel, PropositionLine, dateTime } from "../views/parts.tsx";
 
 /** Keel's answer for the decision asked for: `of` is whose it is, so another's is never shown as this one's. */
 type Read = { of: string; view: DecisionView | null } | { of: string; refused: string } | undefined;
 
 const NONE = "text-base text-kumo-subtle";
+
+/** A change in one of the decision's lists, as a row: its number, then its goal. */
+function ChangeRow({ id, label }: { id: string; label: string }) {
+  const goal = useSelected((world) => world.changes.get(id)?.goal, [id]);
+  return (
+    <li className="flex min-w-0 items-baseline gap-2">
+      <ChangeLink id={id} className="a-mono a-link font-semibold">
+        {label}
+      </ChangeLink>
+      {goal !== undefined && <span className="truncate text-kumo-default">{goal}</span>}
+    </li>
+  );
+}
+
+/**
+ * Why the ruling went as it did, where the log says it to anyone: the reasons Keel gave with the bounce of a
+ * change the ruling went against. A question's own record is its project's members'.
+ */
+function Rationale({ id }: { id: string }) {
+  const reasons = useSelected(
+    (world) => {
+      for (const change of world.changes.values())
+        if (change.bounce?.decisionId === id && change.bounce.reasons.length > 0)
+          return change.bounce.reasons.join(" ");
+      return undefined;
+    },
+    [id],
+  );
+  return (
+    <Panel title="Rationale">
+      {reasons === undefined ? (
+        <p className={NONE}>Members only</p>
+      ) : (
+        <p className="text-base text-kumo-default">
+          <Said text={reasons} />
+        </p>
+      )}
+    </Panel>
+  );
+}
 
 export function DecisionPage({ name }: { name: string }) {
   const player = usePlayer();
@@ -132,6 +172,8 @@ export function DecisionPage({ name }: { name: string }) {
         )}
       </Panel>
 
+      <Rationale id={detail.id} />
+
       <Panel title="The guard that holds it">
         <div className="flex flex-col gap-2" data-part="guard" data-standing={detail.standing}>
           {detail.guards.length > 0 && (
@@ -158,10 +200,7 @@ export function DecisionPage({ name }: { name: string }) {
             </ul>
           )}
           {detail.standing === "blocks" ? (
-            <p className="text-base text-kumo-default">
-              A change that fails this guard is bounced, whatever this project's policy for the
-              predicate.
-            </p>
+            <p className="text-base text-kumo-default">Blocks any change that fails it</p>
           ) : detail.standing === "ended" ? (
             <p className={NONE}>
               This decision was {detail.state}, so its guard no longer blocks for it.
@@ -176,16 +215,9 @@ export function DecisionPage({ name }: { name: string }) {
         {detail.against.length === 0 ? (
           <p className={NONE}>Keel names no change this ruling went against.</p>
         ) : (
-          <ul
-            className="flex flex-wrap gap-x-4 gap-y-1"
-            aria-label="Changes the ruling went against"
-          >
+          <ul className="flex flex-col gap-1.5" aria-label="Changes the ruling went against">
             {detail.against.map((change) => (
-              <li key={change.id}>
-                <ChangeLink id={change.id} className="a-mono a-link-quiet font-semibold">
-                  {change.label}
-                </ChangeLink>
-              </li>
+              <ChangeRow key={change.id} id={change.id} label={change.label} />
             ))}
           </ul>
         )}
@@ -195,16 +227,9 @@ export function DecisionPage({ name }: { name: string }) {
         {detail.bounced.length === 0 ? (
           <p className={NONE}>No change has been bounced citing this decision.</p>
         ) : (
-          <ul
-            className="flex flex-wrap gap-x-4 gap-y-1"
-            aria-label="Changes bounced citing this decision"
-          >
+          <ul className="flex flex-col gap-1.5" aria-label="Changes bounced citing this decision">
             {detail.bounced.map((change) => (
-              <li key={change.id}>
-                <ChangeLink id={change.id} className="a-mono a-link-quiet font-semibold">
-                  {change.label}
-                </ChangeLink>
-              </li>
+              <ChangeRow key={change.id} id={change.id} label={change.label} />
             ))}
           </ul>
         )}

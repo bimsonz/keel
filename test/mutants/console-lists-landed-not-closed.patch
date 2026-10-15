@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lists.test.ts
+# kills: lists.filed
+# why: a landed change is left out of the closed list
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 60937411..a4b6043e 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -42,7 +42,7 @@ export const FILTERS_OF_CHANGE: Record<ChangeState, readonly ChangeFilter[]> = {
+   parked: ["open", "parked"],
+   // Refused by a verdict, and not the end of it: its agent may revise it.
+   bounced: ["open", "bounced"],
+-  landed: ["closed", "landed"],
++  landed: ["landed"],
+   withdrawn: ["closed"],
+   superseded: ["closed"],
+ };

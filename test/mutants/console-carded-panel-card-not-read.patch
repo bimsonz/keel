@@ -2,13 +2,13 @@
 # kills: carded.panel
 # why: a subject's panel names an agent from the log's enrolment alone, and never from Keel's card
 diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
-index 55e58cfd..2921d5cf 100644
+index 61cf91d7..6af83b7f 100644
 --- a/apps/console/src/engine/subject.ts
 +++ b/apps/console/src/engine/subject.ts
-@@ -185,7 +185,7 @@ export function subjectDetailOf(
-             label: change.label,
+@@ -195,7 +195,7 @@ export function subjectDetailOf(
              goal: change.goal,
              state: change.state,
+             ruling: waitsOnARuling(change),
 -            agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
 +            agent: agentName(by) ?? "an agent",
              agentClass: by?.class ?? "unnamed",

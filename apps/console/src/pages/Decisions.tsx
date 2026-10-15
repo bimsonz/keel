@@ -82,10 +82,7 @@ export function DecisionsPage({ subject }: { subject?: string }) {
       ) : "refused" in answer ? (
         <Nothing title="Keel did not list this project's decisions">{answer.refused}</Nothing>
       ) : rows.length === 0 ? (
-        <Nothing title={subject === undefined ? "No decision yet" : `No decision on ${subject}`}>
-          A decision is recorded when a person rules on a question about a proven conflict. Keel
-          remembers what the ruling upheld, and the guard drawn from the proof holds it.
-        </Nothing>
+        <Nothing title={subject === undefined ? "No decisions" : `No decisions on ${subject}`} />
       ) : (
         <Rows label="Decisions, newest first">
           {rows.map((row) => (
@@ -102,7 +99,7 @@ export function DecisionsPage({ subject }: { subject?: string }) {
               title={<DecisionLink id={row.id}>{row.summary}</DecisionLink>}
               meta={
                 <>
-                  <b className="font-semibold text-kumo-default">{row.label}</b>
+                  <span className="text-kumo-subtle">{row.label}</span>
                   <span>
                     decided <time className="a-num">{dateTime(row.decidedAt)}</time>
                   </span>

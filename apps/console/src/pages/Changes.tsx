@@ -1,59 +1,97 @@
-// The project's changes, listed.
+// The project's changes, listed as a code host lists pull requests: open and closed in the list's own header,
+// the narrower filters beside them, and a row for each change with its state, who opened it and what it waits on.
 
-import { HandPalmIcon } from "@phosphor-icons/react";
+import {
+  CircleNotchIcon,
+  ClockIcon,
+  GitMergeIcon,
+  GitPullRequestIcon,
+  HandPalmIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
+import type { ParkReason } from "../contract/keel/index.ts";
+import type { ChangeState } from "../domain/state.ts";
+import { pillOf } from "../engine/checks.ts";
 import { type ChangeFilter, PAGE, changesOf } from "../engine/lists.ts";
 import { useHolderCards, useSelected } from "../engine/react.tsx";
-import {
-  CHANGE_TONE,
-  CONFLICT_TONE,
-  ChangeMark,
-  Column,
-  Filters,
-  More,
-  Nothing,
-  Row,
-  Rows,
-} from "../views/List.tsx";
-import {
-  ChangeLink,
-  ConflictLink,
-  EscalationLink,
-  HolderLink,
-  HeldRun,
-  SubjectLink,
-} from "../views/links.tsx";
+import { Link } from "../router.tsx";
+import { CONFLICT_TONE, Column, More, Nothing, Row } from "../views/List.tsx";
+import { ChangeLink, ConflictLink, EscalationLink, HolderLink, HeldRun } from "../views/links.tsx";
 import { AgentMark, Unverified, agentLine, dateTime } from "../views/parts.tsx";
 
-const FILTERS: { id: ChangeFilter; label: string }[] = [
-  { id: "in-flight", label: "In flight" },
-  { id: "parked", label: "Parked" },
-  { id: "bounced", label: "Bounced" },
-  { id: "landed", label: "Landed" },
-  { id: "not-landed", label: "Not landed" },
+/** Open and closed, as a code host's list heads its pull requests. */
+const MAIN: { id: ChangeFilter; label: string; Icon: typeof GitPullRequestIcon }[] = [
+  { id: "open", label: "Open", Icon: GitPullRequestIcon },
+  { id: "closed", label: "Closed", Icon: GitMergeIcon },
 ];
 
-const EMPTY: Record<ChangeFilter, [string, string]> = {
-  "in-flight": [
-    "Nothing is in flight",
-    "Every change declared so far has landed, is parked on a question, has bounced, or will not land.",
-  ],
-  parked: [
-    "Nothing is parked",
-    "A change parks when it waits on a person's answer. None is waiting now.",
-  ],
-  bounced: [
-    "Nothing has bounced",
-    "A change bounces when Keel's verdict refuses it as it stands. It is still open: its agent may revise it.",
-  ],
-  landed: [
-    "Nothing has landed yet",
-    "A change lands when Keel has verified it against everything it could have broken.",
-  ],
-  "not-landed": [
-    "Every change may still land, or has",
-    "A change that was withdrawn or superseded will not land, and is listed here.",
-  ],
+/** The narrower filters beside them. */
+const NARROW: { id: ChangeFilter; label: string }[] = [
+  { id: "parked", label: "Waiting on a ruling" },
+  { id: "bounced", label: "Bounced" },
+  { id: "landed", label: "Landed" },
+];
+
+const EMPTY: Record<ChangeFilter, string> = {
+  open: "No open changes",
+  closed: "No closed changes",
+  landed: "No landed changes",
+  parked: "No changes waiting on a ruling",
+  bounced: "No bounced changes",
 };
+
+/** Where an open change stands, in a word or two, as a code host labels a pull request's status. */
+const OPEN_LABEL: Partial<Record<ChangeState, { label: string; tone?: string }>> = {
+  declared: { label: "Not pushed" },
+  working: { label: "Not pushed" },
+  submitted: { label: "Deriving" },
+  deriving: { label: "Deriving" },
+  drifted: { label: "Drifted", tone: "suspected" },
+  queued: { label: "Queued" },
+  verifying: { label: "Checks running" },
+  integrating: { label: "Landing" },
+  parked: { label: "Waiting on a ruling", tone: "person" },
+  bounced: { label: "Bounced", tone: "proven" },
+};
+
+/** The mark beside a row: open, landed or closed, in a code host's colours. */
+function PullMark({ state }: { state: ChangeState }) {
+  const pill = pillOf(state);
+  if (pill === "landed")
+    return <GitMergeIcon size={18} weight="bold" className="a-mark-landed" aria-label="Landed" />;
+  return (
+    <GitPullRequestIcon
+      size={18}
+      weight="bold"
+      className={pill === "open" ? "a-mark-open" : "a-mark-closed"}
+      aria-label={pill === "open" ? "Open" : "Closed"}
+    />
+  );
+}
+
+/** A change parked because its agent's lease lapsed waits on its agent, not on a person. */
+const AGENT_LAPSED = { label: "Waiting on its agent" };
+
+/** What an open change waits on, beside its row: its checks, a ruling, or its agent. */
+function Waiting({ state, parkedOn }: { state: ChangeState; parkedOn?: ParkReason }) {
+  const lapsed = state === "parked" && parkedOn !== "awaiting-ruling";
+  const shown = lapsed ? AGENT_LAPSED : OPEN_LABEL[state];
+  if (shown === undefined) return null;
+  return (
+    <span className="a-chip" data-tone={"tone" in shown ? shown.tone : "quiet"}>
+      {state === "verifying" || state === "integrating" ? (
+        <CircleNotchIcon size={12} className="a-spin" />
+      ) : state === "parked" && !lapsed ? (
+        <HandPalmIcon size={12} weight="fill" />
+      ) : state === "bounced" ? (
+        <XCircleIcon size={12} weight="fill" />
+      ) : (
+        <ClockIcon size={12} />
+      )}
+      {shown.label}
+    </span>
+  );
+}
 
 export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: number }) {
   const list = useSelected(
@@ -61,89 +99,97 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
     [filter, shown],
   );
   useHolderCards(list.rows.map((row) => row.id));
-  const any = Object.values(list.counts).some((count) => count > 0);
-  const [title, body] = any
-    ? EMPTY[filter]
-    : [
-        "No change has been declared yet",
-        "A change appears here when an agent declares an intent: what it means to do, before it writes any code.",
-      ];
   return (
     <Column>
       <h1 className="sr-only">Changes</h1>
-      <Filters
-        label="Changes, by state"
-        options={FILTERS.map((option) => ({ ...option, count: list.counts[option.id] }))}
-        active={filter}
-        to={(next) => ({ at: "changes", filter: next, shown: PAGE })}
-      />
-      {list.rows.length === 0 ? (
-        <Nothing title={title}>{body}</Nothing>
-      ) : (
-        <Rows label="Changes, newest first">
-          {list.rows.map((row) => (
-            <Row
-              key={row.id}
-              mark={<ChangeMark state={row.state} />}
-              title={<ChangeLink id={row.id}>{row.goal}</ChangeLink>}
-              meta={
-                <>
-                  <b className="a-mono font-semibold text-kumo-default">{row.label}</b>
-                  <span>
-                    declared <time className="a-num">{dateTime(row.declaredAt)}</time> by
-                  </span>
-                  <HolderLink
-                    held={row.held}
-                    className="a-link-quiet inline-flex items-center gap-1.5"
-                  >
-                    <AgentMark agentClass={row.agentClass} size={12} />
-                    {agentLine(row.agent, row.agentClass)}
-                  </HolderLink>
-                  <HeldRun held={row.held} className="a-link-quiet" />
-                  {row.subject !== undefined && (
-                    <SubjectLink subject={row.subject} className="a-mono a-link-quiet">
-                      {row.subject}
-                    </SubjectLink>
-                  )}
-                </>
-              }
-              tied={
-                <>
-                  {row.conflicts.map((conflict) => (
-                    <ConflictLink
-                      key={conflict.id}
-                      id={conflict.id}
-                      className="a-chip"
-                      data-tone={CONFLICT_TONE[conflict.state] ?? "quiet"}
-                      title={`Conflict ${conflict.label}`}
+      <section className="a-boxed" aria-label="Changes">
+        <header className="a-list-head">
+          <nav aria-label="Open or closed" className="flex items-center gap-4">
+            {MAIN.map(({ id, label, Icon }) => (
+              <Link
+                key={id}
+                to={{ at: "changes", filter: id, shown: PAGE }}
+                aria-current={id === filter ? "true" : undefined}
+              >
+                <Icon size={16} weight="bold" />
+                <span className="a-num">{list.counts[id].toLocaleString("en-US")}</span> {label}
+              </Link>
+            ))}
+          </nav>
+          <nav aria-label="Filters" className="flex flex-wrap items-center gap-3">
+            {NARROW.map(({ id, label }) => (
+              <Link
+                key={id}
+                to={{ at: "changes", filter: id, shown: PAGE }}
+                aria-current={id === filter ? "true" : undefined}
+                {...(id === "parked" && list.counts.parked > 0 ? { "data-tone": "person" } : {})}
+              >
+                {label} <span className="a-num">{list.counts[id].toLocaleString("en-US")}</span>
+              </Link>
+            ))}
+          </nav>
+        </header>
+        {list.rows.length === 0 ? (
+          <Nothing title={EMPTY[filter]} />
+        ) : (
+          <ul className="a-list" aria-label="Changes, newest first">
+            {list.rows.map((row) => (
+              <Row
+                key={row.id}
+                mark={<PullMark state={row.state} />}
+                title={<ChangeLink id={row.id}>{row.goal}</ChangeLink>}
+                meta={
+                  <>
+                    <span className="a-num">{row.label}</span>
+                    <span>
+                      opened <time className="a-num">{dateTime(row.declaredAt)}</time> by
+                    </span>
+                    <HolderLink
+                      held={row.held}
+                      className="a-link-quiet inline-flex items-center gap-1.5"
                     >
-                      {conflict.label}
-                    </ConflictLink>
-                  ))}
-                  {row.escalation !== undefined && (
-                    <EscalationLink
-                      id={row.escalation.id}
-                      className="a-chip"
-                      data-tone={row.escalation.open ? "person" : "quiet"}
-                      title={`Escalation ${row.escalation.label}`}
-                    >
-                      {row.escalation.open && <HandPalmIcon size={12} weight="fill" />}
-                      {row.escalation.label}
-                    </EscalationLink>
-                  )}
-                  {row.unverified && <Unverified />}
-                  <span
-                    className="a-chip w-24 justify-center"
-                    data-tone={CHANGE_TONE[row.state] ?? "quiet"}
-                  >
-                    {row.state}
-                  </span>
-                </>
-              }
-            />
-          ))}
-        </Rows>
-      )}
+                      <AgentMark agentClass={row.agentClass} size={12} />
+                      {agentLine(row.agent, row.agentClass)}
+                    </HolderLink>
+                    <HeldRun held={row.held} className="a-link-quiet" />
+                  </>
+                }
+                tied={
+                  <>
+                    {row.conflicts.map((conflict) => (
+                      <ConflictLink
+                        key={conflict.id}
+                        id={conflict.id}
+                        className="a-chip"
+                        data-tone={CONFLICT_TONE[conflict.state] ?? "quiet"}
+                        title={`Conflict ${conflict.label}`}
+                      >
+                        {conflict.label}
+                      </ConflictLink>
+                    ))}
+                    {row.escalation?.open === true && (
+                      <EscalationLink
+                        id={row.escalation.id}
+                        className="a-chip"
+                        data-tone="person"
+                        title={`Question ${row.escalation.label}`}
+                      >
+                        <HandPalmIcon size={12} weight="fill" />
+                        {row.escalation.label}
+                      </EscalationLink>
+                    )}
+                    {row.unverified && <Unverified />}
+                    <Waiting
+                      state={row.state}
+                      {...(row.parkedOn === undefined ? {} : { parkedOn: row.parkedOn })}
+                    />
+                  </>
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </section>
       <More
         shown={shown}
         total={list.total}

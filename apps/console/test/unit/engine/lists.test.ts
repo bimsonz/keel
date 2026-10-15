@@ -4,7 +4,7 @@ import { createRng } from "../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../fixtures/mock/builder.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
 import {
-  FILTER_OF_CHANGE,
+  FILTERS_OF_CHANGE,
   changeNamed,
   changesOf,
   conflictNamed,
@@ -63,15 +63,15 @@ function worldOf(changes: { id: string; label?: string }[]): World {
 }
 
 describe("the list of changes", () => {
-  it("files each change under one filter, newest first, with what it is tied to", async () => {
+  it("[lists.filed] files each change as open or closed, and under its narrower filter, newest first, with what it is tied to", async () => {
     const held = await worldAt("s1", 472, "live");
     const parked = changesOf(held, "parked");
     expect(parked.counts).toEqual({
-      "in-flight": 0,
+      open: 2,
+      closed: 0,
+      landed: 0,
       parked: 2,
       bounced: 0,
-      landed: 0,
-      "not-landed": 0,
     });
     expect(parked.rows.map((row) => row.label)).toEqual(["#2", "#1"]);
     expect(parked.rows[1]).toMatchObject({
@@ -87,12 +87,13 @@ describe("the list of changes", () => {
 
     const done = await worldAt("s1", 9999);
     expect(changesOf(done, "landed").counts).toEqual({
-      "in-flight": 0,
+      open: 0,
+      closed: 2,
+      landed: 2,
       parked: 0,
       bounced: 0,
-      landed: 2,
-      "not-landed": 0,
     });
+    expect(changesOf(done, "closed").rows.map((row) => row.label)).toEqual(["#2", "#1"]);
     expect(changesOf(done, "landed").rows[0]?.escalation).toMatchObject({
       label: "E-1",
       open: false,
@@ -111,7 +112,7 @@ describe("the list of changes", () => {
     ]);
   });
 
-  it("gives every state of a change exactly one filter, so no change is counted twice or left out", async () => {
+  it("[lists.open-or-closed] files every state of a change as open or closed, never both, so the two count every change once", async () => {
     const states: ChangeState[] = [
       "declared",
       "working",
@@ -127,16 +128,19 @@ describe("the list of changes", () => {
       "withdrawn",
       "superseded",
     ];
-    expect(Object.keys(FILTER_OF_CHANGE).toSorted()).toEqual(states.toSorted());
+    expect(Object.keys(FILTERS_OF_CHANGE).toSorted()).toEqual(states.toSorted());
+    for (const state of states)
+      expect(
+        FILTERS_OF_CHANGE[state].filter((filter) => filter === "open" || filter === "closed"),
+      ).toHaveLength(1);
     // Scenario 2 has a change that bounced beside the ones that landed. Bounced is not the end of it: its agent
-    // may revise it. So it is filed on its own, and is not among those that will never land.
+    // may revise it. So it is open, and filed as bounced too.
     const world = await worldAt("s2", 200);
     const { counts, rows } = changesOf(world, "bounced");
     expect(rows.map((row) => [row.label, row.state])).toEqual([["#1205", "bounced"]]);
-    expect(counts["not-landed"]).toBe(0);
-    expect(
-      counts["in-flight"] + counts.parked + counts.bounced + counts.landed + counts["not-landed"],
-    ).toBe(world.changes.size);
+    expect(changesOf(world, "open").rows.map((row) => row.label)).toContain("#1205");
+    expect(changesOf(world, "closed").rows.map((row) => row.label)).not.toContain("#1205");
+    expect(counts.open + counts.closed).toBe(world.changes.size);
   });
 
   it("shows a page at a time, and says when there is more", () => {
@@ -146,11 +150,11 @@ describe("the list of changes", () => {
         label: `#${index + 1}`,
       })),
     );
-    const first = changesOf(world, "in-flight");
+    const first = changesOf(world, "open");
     expect(first.rows).toHaveLength(50);
     expect(first.rows[0]?.label).toBe("#120");
     expect(first).toMatchObject({ total: 120, more: true });
-    const all = changesOf(world, "in-flight", 150);
+    const all = changesOf(world, "open", 150);
     expect(all.rows).toHaveLength(120);
     expect(all.more).toBe(false);
   });
@@ -227,11 +231,11 @@ describe("what the tabs count", () => {
     });
   });
 
-  it("counts a bounced change as open: it is in flight, parked or bounced, and nothing else", async () => {
+  it("[lists.open-count] counts a bounced change as open, and the tab counts what the Open filter lists", async () => {
     const world = await worldAt("s2", 200);
-    const { counts } = changesOf(world, "in-flight");
+    const { counts } = changesOf(world, "open");
     expect(counts.bounced).toBe(1);
-    expect(openCounts(world).changes).toBe(counts["in-flight"] + counts.parked + counts.bounced);
+    expect(openCounts(world).changes).toBe(counts.open);
   });
 });
 
@@ -265,7 +269,7 @@ describe("finding a thing by what an address calls it", () => {
     ]);
     expect(changeNamed(world, "ab12")).toBeUndefined();
     expect(changeNamed(world, "chg_a_ab12")?.id).toBe("chg_a_ab12");
-    expect(changesOf(world, "in-flight").rows.map((row) => row.name)).toEqual([
+    expect(changesOf(world, "open").rows.map((row) => row.name)).toEqual([
       "7",
       "chg_b_ab12",
       "chg_a_ab12",
@@ -285,7 +289,7 @@ describe("finding a thing by what an address calls it", () => {
       { id: "chg_e_0007" },
       { id: "7" },
     ]);
-    const rows = changesOf(world, "in-flight").rows;
+    const rows = changesOf(world, "open").rows;
     expect(rows).toHaveLength(5);
     expect(rows.map((row) => changeNamed(world, row.name)?.id)).toEqual(rows.map((row) => row.id));
     expect(new Set(rows.map((row) => row.name)).size).toBe(rows.length);

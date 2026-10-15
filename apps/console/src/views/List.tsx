@@ -4,12 +4,10 @@
 
 import {
   CheckCircleIcon,
-  CircleDashedIcon,
   HandPalmIcon,
   MinusCircleIcon,
   ShieldCheckIcon,
   WarningDiamondIcon,
-  XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { ChangeState, ConflictState } from "../domain/state.ts";
@@ -119,11 +117,13 @@ export function More({
   );
 }
 
-export function Nothing({ title, children }: { title: string; children: ReactNode }) {
+export function Nothing({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="a-list flex flex-col items-center gap-1.5 px-6 py-12 text-center">
       <h2 className="text-lg font-semibold text-kumo-strong">{title}</h2>
-      <p className="max-w-[60ch] text-base text-kumo-subtle">{children}</p>
+      {children !== undefined && (
+        <p className="max-w-[60ch] text-base text-kumo-subtle">{children}</p>
+      )}
     </div>
   );
 }
@@ -136,45 +136,6 @@ export const CHANGE_TONE: Partial<Record<ChangeState, string>> = {
   landed: "guarded",
   bounced: "proven",
 };
-
-export function ChangeMark({ state, size = 18 }: { state: ChangeState; size?: number }) {
-  if (state === "parked")
-    return (
-      <HandPalmIcon
-        size={size}
-        weight="fill"
-        style={{ color: "var(--a-person)" }}
-        aria-label="Parked: a person is being asked"
-      />
-    );
-  if (state === "landed")
-    return (
-      <CheckCircleIcon
-        size={size}
-        weight="fill"
-        style={{ color: "var(--a-pass)" }}
-        aria-label="Landed"
-      />
-    );
-  if (state === "bounced")
-    return (
-      <XCircleIcon
-        size={size}
-        weight="fill"
-        style={{ color: "var(--a-fail)" }}
-        aria-label="Bounced"
-      />
-    );
-  if (state === "withdrawn" || state === "superseded")
-    return (
-      <MinusCircleIcon
-        size={size}
-        className="text-kumo-subtle"
-        aria-label={state === "withdrawn" ? "Withdrawn" : "Superseded"}
-      />
-    );
-  return <CircleDashedIcon size={size} className="text-kumo-default" aria-label="In flight" />;
-}
 
 /** As everywhere in the console: a conflict a person is being asked about is proven, and reads so. */
 export const CONFLICT_TONE: Partial<Record<ConflictState, string>> = {

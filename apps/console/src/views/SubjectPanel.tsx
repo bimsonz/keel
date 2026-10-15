@@ -237,11 +237,7 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
                       <span
                         className="a-chip ml-auto"
                         data-tone={
-                          change.state === "parked"
-                            ? "person"
-                            : change.state === "bounced"
-                              ? "proven"
-                              : "quiet"
+                          change.ruling ? "person" : change.state === "bounced" ? "proven" : "quiet"
                         }
                       >
                         {change.state}
@@ -268,7 +264,7 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
             {unlisted > 0 && (
               <p className="pt-2 text-sm text-kumo-subtle">
                 and {plural(unlisted, "more change")}, in{" "}
-                <Link to={{ at: "changes", filter: "in-flight", shown: PAGE }} className="a-link">
+                <Link to={{ at: "changes", filter: "open", shown: PAGE }} className="a-link">
                   Changes
                 </Link>
               </p>

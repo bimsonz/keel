@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/tabs.test.ts
+# kills: tabs.of
+# why: a conflict's page lights no tab, though it is a change's
+diff --git a/apps/console/src/tabs.ts b/apps/console/src/tabs.ts
+index 2130ed24..e451d558 100644
+--- a/apps/console/src/tabs.ts
++++ b/apps/console/src/tabs.ts
+@@ -17,7 +17,6 @@ export function tabOf(route: Route): TabId | undefined {
+       return "code";
+     case "changes":
+     case "change":
+-    case "conflict":
+     case "escalation":
+       return "changes";
+     case "pipeline":

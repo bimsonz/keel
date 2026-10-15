@@ -21,13 +21,10 @@ const ADDRESSES: [string, Route][] = [
   ["/acme/demo/commits", { at: "commits", ref: "trunk" }],
   ["/acme/demo/commits/2e7f0b9", { at: "commits", ref: "2e7f0b9" }],
   ["/acme/demo/commit/2e7f0b9", { at: "commit", sha: "2e7f0b9" }],
-  ["/acme/demo/changes", { at: "changes", filter: "in-flight", shown: 50 }],
+  ["/acme/demo/changes", { at: "changes", filter: "open", shown: 50 }],
   ["/acme/demo/changes?state=landed", { at: "changes", filter: "landed", shown: 50 }],
   ["/acme/demo/changes?state=bounced", { at: "changes", filter: "bounced", shown: 50 }],
-  [
-    "/acme/demo/changes?state=not-landed&shown=150",
-    { at: "changes", filter: "not-landed", shown: 150 },
-  ],
+  ["/acme/demo/changes?state=closed&shown=150", { at: "changes", filter: "closed", shown: 150 }],
   ["/acme/demo/changes/7", { at: "change", name: "7", tab: "overview" }],
   ["/acme/demo/changes/7/checks", { at: "change", name: "7", tab: "checks" }],
   ["/acme/demo/changes/chg_01JABC/files", { at: "change", name: "chg_01JABC", tab: "files" }],
@@ -160,7 +157,7 @@ describe("the console's addresses", () => {
   it("ignores a filter or a count it does not know, and never shows less than a page", () => {
     expect(read("/acme/demo/changes?state=sideways&shown=abc").route).toEqual({
       at: "changes",
-      filter: "in-flight",
+      filter: "open",
       shown: 50,
     });
     expect(read("/acme/demo/conflicts?state=landed").route).toEqual({

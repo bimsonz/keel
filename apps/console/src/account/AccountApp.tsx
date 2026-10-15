@@ -23,6 +23,7 @@ import {
 import type { KeelCredentials, KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { HomeLink } from "../views/HomeLink.tsx";
+import { ReaderMenu } from "../views/ReaderMenu.tsx";
 import { Switch } from "../views/Switch.tsx";
 import { TabSlot } from "../views/TabBar.tsx";
 import {
@@ -813,21 +814,17 @@ function Shell({
             )}
           </div>
           {reader.is === "user" && (
-            <a
-              href={hrefOf({ at: "settings" })}
-              className="text-sm text-kumo-default hover:underline"
-            >
-              {nameOf(reader.who)}
-            </a>
+            <ReaderMenu
+              reader={{
+                is: "user",
+                name: nameOf(reader.who),
+                ...(reader.who.handle === undefined ? {} : { handle: reader.who.handle }),
+              }}
+            />
           )}
           {/* A visitor at a namespace's page is offered the way in, and comes back to where they were. */}
           {reader.is === "visitor" && handle !== undefined && (
-            <a
-              href={hrefOf({ at: "login" }, `${window.location.pathname}${window.location.search}`)}
-              className="text-sm text-kumo-default hover:underline"
-            >
-              Sign in
-            </a>
+            <ReaderMenu reader={{ is: "visitor" }} />
           )}
         </div>
         <div ref={setSlot} className="contents" />

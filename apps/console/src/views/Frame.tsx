@@ -6,37 +6,25 @@ import { Badge } from "@cloudflare/kumo";
 import {
   ChartBarIcon,
   CodeIcon,
-  GavelIcon,
   GearIcon,
-  GitDiffIcon,
+  GitPullRequestIcon,
   FlowArrowIcon,
   GraphIcon,
-  HandPalmIcon,
   type Icon,
-  ScalesIcon,
 } from "@phosphor-icons/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { PAGE } from "../engine/lists.ts";
 import { hrefOf } from "../places.ts";
 import { type Route, TRUNK, href } from "../route.ts";
 import { Link, carriedParams, useWhere } from "../router.tsx";
+import { type TabId, tabOf, titleOf } from "../tabs.ts";
 import { Footer } from "./Footer.tsx";
 import { HomeLink } from "./HomeLink.tsx";
+import { ReaderMenu } from "./ReaderMenu.tsx";
 import { TabBar, TabFace } from "./TabBar.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
 
 export type { Sibling } from "./Switch.tsx";
-
-export type TabId =
-  | "code"
-  | "changes"
-  | "conflicts"
-  | "escalations"
-  | "decisions"
-  | "mission-control"
-  | "pipeline"
-  | "insights"
-  | "settings";
 
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 
@@ -45,22 +33,9 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
   {
     id: "changes",
     label: "Changes",
-    Icon: GitDiffIcon,
-    to: { at: "changes", filter: "in-flight", shown: PAGE },
+    Icon: GitPullRequestIcon,
+    to: { at: "changes", filter: "open", shown: PAGE },
   },
-  {
-    id: "conflicts",
-    label: "Conflicts",
-    Icon: ScalesIcon,
-    to: { at: "conflicts", filter: "open", shown: PAGE },
-  },
-  {
-    id: "escalations",
-    label: "Escalations",
-    Icon: HandPalmIcon,
-    to: { at: "escalations", filter: "open", shown: PAGE },
-  },
-  { id: "decisions", label: "Decisions", Icon: GavelIcon, to: { at: "decisions" } },
   { id: "pipeline", label: "Pipeline", Icon: FlowArrowIcon, to: { at: "pipeline" } },
   {
     id: "mission-control",
@@ -72,55 +47,33 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
   { id: "settings", label: "Settings", Icon: GearIcon, to: { at: "settings" } },
 ];
 
-/** The tab a place belongs to. A place that names nothing belongs to none. */
-export function tabOf(route: Route): TabId | undefined {
-  switch (route.at) {
-    case "code":
-    case "commits":
-    case "commit":
-      return "code";
-    case "changes":
-    case "change":
-      return "changes";
-    case "conflicts":
-    case "conflict":
-      return "conflicts";
-    case "escalations":
-    case "escalation":
-      return "escalations";
-    case "decisions":
-    case "decision":
-      return "decisions";
-    case "mission-control":
-      return "mission-control";
-    case "pipeline":
-      return "pipeline";
-    case "insights":
-      return "insights";
-    case "settings":
-      return "settings";
-    default:
-      return undefined;
-  }
-}
-
 export interface OpenCounts {
   changes: number;
   conflicts: number;
   escalations: number;
 }
 
+/**
+ * The Changes tab's counts: how many are open, and beside it, in orange, how many questions wait on a person.
+ * Orange is for one thing: a person is being asked. What each number counts is said to whoever cannot see it.
+ */
 function Count({ tab, counts }: { tab: TabId; counts: OpenCounts }) {
-  if (tab !== "changes" && tab !== "conflicts" && tab !== "escalations") return null;
-  const count = counts[tab];
-  if (count === 0) return null;
-  // Orange is for one thing: a person is being asked.
-  // The number is what is seen; what it counts is said to whoever cannot see where it stands.
+  if (tab !== "changes") return null;
   return (
-    <span className={tab === "escalations" ? "a-person-count" : "a-count"}>
-      {count.toLocaleString("en-US")}
-      <span className="sr-only">{tab === "escalations" ? " waiting for a person" : " open"}</span>
-    </span>
+    <>
+      {counts.changes > 0 && (
+        <span className="a-count">
+          {counts.changes.toLocaleString("en-US")}
+          <span className="sr-only"> open</span>
+        </span>
+      )}
+      {counts.escalations > 0 && (
+        <span className="a-person-count">
+          {counts.escalations.toLocaleString("en-US")}
+          <span className="sr-only"> waiting for a person</span>
+        </span>
+      )}
+    </>
   );
 }
 
@@ -131,51 +84,20 @@ export interface SourceMark {
   unread?: number;
 }
 
-/** Where what is on screen comes from: Keel, or in development a test fixture, which is never passed off as Keel. */
+/** In development a test fixture can stand in for Keel, and is never passed off as Keel. Keel itself is not marked. */
 function Source({ source }: { source: SourceMark }) {
-  if (source.mode === "fixture")
-    return <Badge variant="outline">{`Test fixture · seed ${source.seed}`}</Badge>;
-  const unread = source.unread ?? 0;
-  return (
-    <span className="flex items-center gap-2 text-sm text-kumo-default">
-      <span className="a-live-dot" aria-hidden />
-      Live
-      {unread > 0 && (
-        <span
-          className="text-kumo-subtle"
-          title="Entries of Keel's log that this console could not read. They are left out of what is shown."
-        >
-          · {unread.toLocaleString("en-US")} {unread === 1 ? "event" : "events"} not read
-        </span>
-      )}
-    </span>
-  );
+  if (source.mode !== "fixture") return null;
+  return <Badge variant="outline">{`Test fixture · seed ${source.seed}`}</Badge>;
 }
 
 /** Who is reading, where Keel serves accounts: a visitor, or a user by what a page calls them. */
 export interface ReaderMark {
   /** Absent for a visitor. */
   name?: string;
+  /** The reader's own handle, once they have chosen one. */
+  handle?: string;
   /** The reader's orgs, once Keel has listed them. */
   orgs?: Sibling[];
-}
-
-/** The way in for a visitor, which brings them back to this page; for a user, the way to their own settings. */
-function ReaderLink({ reader }: { reader: ReaderMark }) {
-  if (reader.name !== undefined)
-    return (
-      <a href={hrefOf({ at: "settings" })} className="text-sm text-kumo-default hover:underline">
-        {reader.name}
-      </a>
-    );
-  return (
-    <a
-      href={hrefOf({ at: "login" }, `${window.location.pathname}${window.location.search}`)}
-      className="text-sm text-kumo-default hover:underline"
-    >
-      Sign in
-    </a>
-  );
 }
 
 export function Frame({
@@ -186,7 +108,6 @@ export function Frame({
   projects,
   reader,
   settings = false,
-  decisions = false,
   children,
 }: {
   /** The projects this reader may go to, where Keel has named them. */
@@ -202,12 +123,14 @@ export function Frame({
   counts?: OpenCounts;
   /** Whether the project's settings are this reader's to change: the Settings tab is offered to them alone. */
   settings?: boolean;
-  /** Whether the source holds Keel's memory of the project's decisions: the Decisions tab is offered where it does. */
-  decisions?: boolean;
   children: ReactNode;
 }) {
   const { namespace, project, route } = useWhere();
   const active = tabOf(route);
+  // A project's page is titled as a code host titles a repository's. The pages above every project title their own.
+  useEffect(() => {
+    if (project !== "") document.title = titleOf(route, namespace, project);
+  }, [route, namespace, project]);
   return (
     <div className="a-root flex h-screen w-screen flex-col overflow-hidden bg-kumo-canvas text-base text-kumo-default">
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
@@ -271,25 +194,26 @@ export function Frame({
             )}
           </div>
           <span className="flex items-center gap-4">
-            {/* A project Keel read this reader may be forked by them: Keel says into where. A visitor signs in first. */}
-            {project !== "" && visibility !== undefined && reader !== undefined && (
-              <a
-                href={hrefOf({ at: "fork", namespace, project })}
-                className="text-sm text-kumo-default hover:underline"
-              >
-                Fork
-              </a>
-            )}
             <Source source={source} />
-            {reader !== undefined && <ReaderLink reader={reader} />}
+            {reader !== undefined && (
+              <ReaderMenu
+                reader={
+                  reader.name === undefined
+                    ? { is: "visitor" }
+                    : {
+                        is: "user",
+                        name: reader.name,
+                        ...(reader.handle === undefined ? {} : { handle: reader.handle }),
+                      }
+                }
+              />
+            )}
           </span>
         </div>
         {/* A project's tabs are drawn as soon as it is found: their counts come once its log has been read. */}
         {project !== "" && (
           <TabBar label="Project">
-            {TABS.filter(
-              (tab) => (tab.id !== "settings" || settings) && (tab.id !== "decisions" || decisions),
-            ).map((tab) => (
+            {TABS.filter((tab) => tab.id !== "settings" || settings).map((tab) => (
               // The tab's own page is its list. On a thing in that list, the tab is where the reader is, and not the page they are on.
               <Link
                 key={tab.id}

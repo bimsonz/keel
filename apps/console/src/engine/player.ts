@@ -451,11 +451,12 @@ export class Player {
   }
 
   /** Answer a question. The answer is never applied here: its effect arrives through the log. */
-  async rule(escalationId: string, option: string): Promise<void> {
+  async rule(escalationId: string, option: string, rationale?: string): Promise<void> {
     await this.source.giveRuling({
       escalationId,
       option,
       idempotencyKey: `console:${escalationId}:${option}`,
+      ...(rationale === undefined ? {} : { rationale }),
     });
     await this.#drain();
     this.#reveal();

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/tabs.test.ts
+# kills: tabs.title
+# why: a page's title names its place and not the project, so two projects' tabs read the same
+diff --git a/apps/console/src/tabs.ts b/apps/console/src/tabs.ts
+index 2130ed24..3b6d7d18 100644
+--- a/apps/console/src/tabs.ts
++++ b/apps/console/src/tabs.ts
+@@ -79,5 +79,5 @@ function placeTitle(route: Route): string | undefined {
+ export function titleOf(route: Route, namespace: string, project: string): string {
+   const repository = `${namespace}/${project}`;
+   const place = placeTitle(route);
+-  return place === undefined ? repository : `${place} · ${repository}`;
++  return place ?? repository;
+ }

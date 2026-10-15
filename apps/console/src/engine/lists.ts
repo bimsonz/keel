@@ -10,6 +10,7 @@
 // A change is open while it may still land: in flight, parked on a question,
 // or bounced and waiting for its agent to revise it.
 
+import type { ParkReason } from "../contract/keel/index.ts";
 import type { EscalationCategory } from "../contract/events.ts";
 import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
 import { agentName } from "./audience.ts";
@@ -20,27 +21,31 @@ import type { ChangeEntry, ConflictEntry, DecisionEntry, EscalationEntry, World 
 /** How many rows a list shows before it is asked for more. */
 export const PAGE = 50;
 
-export type ChangeFilter = "in-flight" | "parked" | "bounced" | "landed" | "not-landed";
+/**
+ * A code host's pull request list: open and closed, then the open ones parked on a ruling or bounced back to
+ * their agent, and the closed ones that landed.
+ */
+export type ChangeFilter = "open" | "closed" | "landed" | "parked" | "bounced";
 export type ConflictFilter = "open" | "settled";
 /** Closed: answered by a person, or withdrawn before anyone answered. */
 export type EscalationFilter = "open" | "closed";
 
-/** The one filter each state of a change is filed under. */
-export const FILTER_OF_CHANGE: Record<ChangeState, ChangeFilter> = {
-  declared: "in-flight",
-  working: "in-flight",
-  submitted: "in-flight",
-  deriving: "in-flight",
-  drifted: "in-flight",
-  verifying: "in-flight",
-  queued: "in-flight",
-  integrating: "in-flight",
-  parked: "parked",
+/** The filters each state of a change is filed under: open or closed, and where it is one, the narrower one. */
+export const FILTERS_OF_CHANGE: Record<ChangeState, readonly ChangeFilter[]> = {
+  declared: ["open"],
+  working: ["open"],
+  submitted: ["open"],
+  deriving: ["open"],
+  drifted: ["open"],
+  verifying: ["open"],
+  queued: ["open"],
+  integrating: ["open"],
+  parked: ["open", "parked"],
   // Refused by a verdict, and not the end of it: its agent may revise it.
-  bounced: "bounced",
-  landed: "landed",
-  withdrawn: "not-landed",
-  superseded: "not-landed",
+  bounced: ["open", "bounced"],
+  landed: ["closed", "landed"],
+  withdrawn: ["closed"],
+  superseded: ["closed"],
 };
 
 const FILTER_OF_CONFLICT: Record<ConflictState, ConflictFilter> = {
@@ -68,6 +73,8 @@ export interface Named {
 export interface ChangeRow extends Named {
   goal: string;
   state: ChangeState;
+  /** Why Keel parked it, where it is parked. */
+  parkedOn?: ParkReason;
   agent: string;
   agentClass: ShownClass;
   /** Its holder's page in this project, and the run it is held under. */
@@ -203,7 +210,7 @@ function question(
 function listing<Entry, Row, Filter extends string>(
   entries: Iterable<Entry>,
   filters: readonly Filter[],
-  filterOf: (entry: Entry) => Filter,
+  filtersOf: (entry: Entry) => readonly Filter[],
   filter: Filter,
   shown: number,
   row: (entry: Entry) => Row,
@@ -211,9 +218,9 @@ function listing<Entry, Row, Filter extends string>(
   const counts = new Map<Filter, number>(filters.map((each) => [each, 0]));
   const under: Entry[] = [];
   for (const entry of entries) {
-    const filed = filterOf(entry);
-    counts.set(filed, (counts.get(filed) ?? 0) + 1);
-    if (filed === filter) under.push(entry);
+    const filed = filtersOf(entry);
+    for (const each of filed) counts.set(each, (counts.get(each) ?? 0) + 1);
+    if (filed.includes(filter)) under.push(entry);
   }
   const newest = under.toReversed();
   // `counts` holds every filter, so it is the whole record.
@@ -228,12 +235,28 @@ function listing<Entry, Row, Filter extends string>(
   };
 }
 
+/**
+ * The filters a change is filed under. A parked change waits on a person only where Keel parked it for a ruling:
+ * one parked because its agent's lease lapsed waits on its agent, and is open and nothing narrower.
+ */
+export function filtersOfChange(
+  change: Pick<ChangeEntry, "state" | "parkedOn">,
+): readonly ChangeFilter[] {
+  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling") return ["open"];
+  return FILTERS_OF_CHANGE[change.state];
+}
+
+/** Whether a change waits on a person's ruling: parked, and for that. */
+export function waitsOnARuling(change: Pick<ChangeEntry, "state" | "parkedOn">): boolean {
+  return filtersOfChange(change).includes("parked");
+}
+
 export const CHANGE_FILTERS = [
-  "in-flight",
+  "open",
+  "closed",
+  "landed",
   "parked",
   "bounced",
-  "landed",
-  "not-landed",
 ] as const satisfies readonly ChangeFilter[];
 export const CONFLICT_FILTERS = ["open", "settled"] as const satisfies readonly ConflictFilter[];
 export const ESCALATION_FILTERS = ["open", "closed"] as const satisfies readonly EscalationFilter[];
@@ -248,7 +271,7 @@ export function changesOf(
   return listing(
     world.changes.values(),
     CHANGE_FILTERS,
-    (change) => FILTER_OF_CHANGE[change.state],
+    (change) => filtersOfChange(change),
     filter,
     shown,
     (change): ChangeRow => {
@@ -278,6 +301,9 @@ export function changesOf(
             : [];
         }),
         ...(escalation === undefined ? {} : { escalation }),
+        ...(change.state === "parked" && change.parkedOn !== undefined
+          ? { parkedOn: change.parkedOn }
+          : {}),
       };
     },
   );
@@ -292,7 +318,7 @@ export function conflictsOf(
   return listing(
     world.conflicts.values(),
     CONFLICT_FILTERS,
-    (conflict) => FILTER_OF_CONFLICT[conflict.state],
+    (conflict) => [FILTER_OF_CONFLICT[conflict.state]],
     filter,
     shown,
     (conflict): ConflictRow => {
@@ -335,7 +361,7 @@ export function escalationsOf(
   return listing(
     world.escalations.values(),
     ESCALATION_FILTERS,
-    (escalation) => FILTER_OF_ESCALATION[escalation.state],
+    (escalation) => [FILTER_OF_ESCALATION[escalation.state]],
     filter,
     shown,
     (escalation): EscalationRow => {
@@ -374,10 +400,8 @@ export function openCounts(world: World): {
   escalations: number;
 } {
   let changes = 0;
-  for (const change of world.changes.values()) {
-    const filed = FILTER_OF_CHANGE[change.state];
-    if (filed === "in-flight" || filed === "parked" || filed === "bounced") changes += 1;
-  }
+  for (const change of world.changes.values())
+    if (FILTERS_OF_CHANGE[change.state].includes("open")) changes += 1;
   let conflicts = 0;
   for (const conflict of world.conflicts.values())
     if (FILTER_OF_CONFLICT[conflict.state] === "open") conflicts += 1;

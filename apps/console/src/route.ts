@@ -119,7 +119,7 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       if (first === undefined)
         return {
           at: "changes",
-          ...(listed(CHANGE_FILTERS, query) ?? { filter: "in-flight", shown: PAGE }),
+          ...(listed(CHANGE_FILTERS, query) ?? { filter: "open", shown: PAGE }),
         };
       const change = tabbed(CHANGE_TABS, rest);
       return change === undefined ? MISSING : { at: "change", ...change };
@@ -245,7 +245,8 @@ function queryOf(route: Route): string {
       ? ""
       : new URLSearchParams({ subject: route.subject }).toString();
   if (route.at !== "changes" && route.at !== "conflicts" && route.at !== "escalations") return "";
-  const first: string = route.at === "changes" ? "in-flight" : "open";
+  // Each list's first filter is its open things, and needs no parameter.
+  const first = "open";
   const query = new URLSearchParams();
   if (route.filter !== first) query.set("state", route.filter);
   if (route.shown > PAGE) query.set("shown", String(route.shown));

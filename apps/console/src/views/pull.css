@@ -126,3 +126,60 @@
     animation: none;
   }
 }
+
+/* A code host's list of pull requests: one bordered box, its header the open and closed counts and filters. */
+:root .a-boxed {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  overflow: hidden;
+}
+
+:root .a-boxed > .a-list {
+  border: 0;
+  border-radius: 0;
+}
+
+:root .a-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-kumo-line);
+  background: var(--color-kumo-tint);
+}
+
+:root .a-list-head a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-color-kumo-subtle);
+  font-size: 14px;
+}
+
+:root .a-list-head a:hover {
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-list-head a[aria-current="true"] {
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+}
+
+:root .a-list-head a[data-tone="person"] {
+  color: var(--a-person-ink);
+}
+
+:root .a-mark-open {
+  color: light-dark(oklch(52% 0.15 150), oklch(68% 0.16 150));
+}
+
+:root .a-mark-landed {
+  color: var(--a-landed);
+}
+
+:root .a-mark-closed {
+  color: light-dark(oklch(52% 0.19 25), oklch(65% 0.18 25));
+}

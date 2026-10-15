@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/why.test.ts
+# kills: why.decisions
+# why: a file's Decisions bar lists every record of why's chain, premises included, as decisions
+diff --git a/apps/console/src/source/why.ts b/apps/console/src/source/why.ts
+index 706e48f7..41283672 100644
+--- a/apps/console/src/source/why.ts
++++ b/apps/console/src/source/why.ts
+@@ -35,7 +35,7 @@ export async function readWhy(
+   const answer = (await response.json()) as WhyAnswer;
+   return (answer.result?.chain ?? []).flatMap((item) => {
+     const { record } = item;
+-    return record?.message?.kind === "decision" &&
++    return record !== undefined &&
+       typeof record.id === "string" &&
+       typeof record.at === "string" &&
+       typeof item.summary === "string"

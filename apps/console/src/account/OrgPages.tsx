@@ -49,6 +49,7 @@ import {
   type Who,
   nameOf,
 } from "./account.ts";
+import { KEEL_QUICKSTART } from "../own.ts";
 import { NamespaceCredentials } from "./Credentials.tsx";
 import { JoinedAgents } from "./OrgAgents.tsx";
 import { People } from "./People.tsx";
@@ -154,8 +155,8 @@ function NoProjects({
             Import a repository
           </a>
         </div>
-        <a className="a-link text-sm" href="/start">
-          Read the quickstart
+        <a className="a-link text-sm" href={KEEL_QUICKSTART}>
+          Quickstart
         </a>
       </div>
     );
@@ -188,7 +189,7 @@ function ProjectsPanel({
   signedIn: boolean;
 }) {
   return (
-    <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
+    <section className="flex flex-col gap-2" aria-label="Projects">
       <h2 className="a-h">Projects</h2>
       {projects !== undefined &&
         (projects.length === 0 ? (
@@ -342,25 +343,41 @@ function useNamespace(
   return namespace;
 }
 
+/** A namespace's projects as a code host lists an owner's repositories: one bordered row each, its name a link. */
 function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
   return (
-    <ul className="flex flex-col gap-1.5" aria-label="Projects">
+    <ul className="a-list" aria-label="Projects">
       {projects.map((project) => (
-        <li key={project.id} className="flex items-center justify-between gap-3 text-sm">
-          <a
-            className="font-semibold text-kumo-strong hover:underline"
-            href={href(project.namespace.handle, project.name, {
-              at: "code",
-              kind: "tree",
-              ref: TRUNK,
-              path: "",
-            })}
-          >
-            {project.name}
-          </a>
-          <span className="a-chip" data-tone="quiet">
-            {project.visibility}
+        <li key={project.id}>
+          <span className="a-list-mark">
+            <BookBookmarkIcon size={18} aria-hidden />
           </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <a
+                className="a-link text-base font-semibold"
+                href={href(project.namespace.handle, project.name, {
+                  at: "code",
+                  kind: "tree",
+                  ref: TRUNK,
+                  path: "",
+                })}
+              >
+                {project.name}
+              </a>
+              <span className="a-chip" data-tone="quiet">
+                {project.visibility === "public" ? "Public" : "Private"}
+              </span>
+            </span>
+            {(project.forkedFrom !== undefined || project.createdAt !== undefined) && (
+              <span className="text-sm text-kumo-subtle">
+                {project.forkedFrom !== undefined &&
+                  `Forked from ${project.forkedFrom.namespace}/${project.forkedFrom.name}`}
+                {project.forkedFrom !== undefined && project.createdAt !== undefined && " · "}
+                {project.createdAt !== undefined && `Created ${project.createdAt.slice(0, 10)}`}
+              </span>
+            )}
+          </div>
         </li>
       ))}
     </ul>

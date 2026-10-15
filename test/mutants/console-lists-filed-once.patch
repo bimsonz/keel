@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lists.test.ts
+# kills: lists.filed
+# why: a narrower filter lists nothing: each change is listed under its first filter alone
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 60937411..0ea12977 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -217,7 +217,7 @@ function listing<Entry, Row, Filter extends string>(
+   for (const entry of entries) {
+     const filed = filtersOf(entry);
+     for (const each of filed) counts.set(each, (counts.get(each) ?? 0) + 1);
+-    if (filed.includes(filter)) under.push(entry);
++    if (filed[0] === filter) under.push(entry);
+   }
+   const newest = under.toReversed();
+   // `counts` holds every filter, so it is the whole record.

@@ -28,26 +28,15 @@ const FILTERS: { id: ConflictFilter; label: string }[] = [
   { id: "settled", label: "Settled" },
 ];
 
-const EMPTY: Record<ConflictFilter, [string, string]> = {
-  open: [
-    "No conflict is open",
-    "Every disagreement so far has been settled: proven and resolved, or dismissed by its probe.",
-  ],
-  settled: [
-    "No conflict has been settled yet",
-    "A conflict is settled when it is resolved, or when its probe shows the disagreement was not real.",
-  ],
+const EMPTY: Record<ConflictFilter, string> = {
+  open: "No open conflicts",
+  settled: "No settled conflicts",
 };
 
 export function ConflictsPage({ filter, shown }: { filter: ConflictFilter; shown: number }) {
   const list = useSelected((world) => conflictsOf(world, filter, shown), [filter, shown]);
   const any = list.counts.open + list.counts.settled > 0;
-  const [title, body] = any
-    ? EMPTY[filter]
-    : [
-        "No conflict yet",
-        "A conflict opens when two changes hold incompatible propositions about one subject. Keel then drafts a probe and runs it in each change's world and in the combined world.",
-      ];
+  const title = any ? EMPTY[filter] : "No conflicts";
   return (
     <Column>
       <h1 className="sr-only">Conflicts</h1>
@@ -58,7 +47,7 @@ export function ConflictsPage({ filter, shown }: { filter: ConflictFilter; shown
         to={(next) => ({ at: "conflicts", filter: next, shown: PAGE })}
       />
       {list.rows.length === 0 ? (
-        <Nothing title={title}>{body}</Nothing>
+        <Nothing title={title} />
       ) : (
         <Rows label="Conflicts, newest first">
           {list.rows.map((row) => (
@@ -67,12 +56,12 @@ export function ConflictsPage({ filter, shown }: { filter: ConflictFilter; shown
               mark={<ConflictMark state={row.state} guarded={row.guard !== undefined} />}
               title={
                 <ConflictLink id={row.id}>
-                  {row.summary === "" ? `Conflict ${row.label}` : row.summary}
+                  {row.summary === "" ? `Conflict ${row.label}` : `Conflict on ${row.summary}`}
                 </ConflictLink>
               }
               meta={
                 <>
-                  <b className="font-semibold text-kumo-default">{row.label}</b>
+                  <span className="text-kumo-subtle">{row.label}</span>
                   <span>{row.kind}</span>
                   {row.subject !== undefined && (
                     <SubjectLink subject={row.subject} className="a-mono a-link-quiet">

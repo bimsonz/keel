@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/asked.test.ts
+# kills: subject.person-open
+# why: a visitor is told a person is being asked though no question is shown them
+diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
+index 61cf91d7..ee3606b8 100644
+--- a/apps/console/src/engine/subject.ts
++++ b/apps/console/src/engine/subject.ts
+@@ -133,8 +133,7 @@ export function subjectDetailOf(
+     tone: open.some(
+       (conflict) =>
+         conflict.state === "escalated" &&
+-        conflict.escalationId !== undefined &&
+-        world.escalations.get(conflict.escalationId)?.state === "open",
++        conflict.escalationId !== undefined,
+     )
+       ? "person"
+       : open.some((conflict) => conflict.state === "proven" || conflict.state === "escalated")

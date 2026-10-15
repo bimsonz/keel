@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/parked.test.ts
+# kills: parked.reason
+# why: a change parked because its agent's lease lapsed is shown as waiting on a person's ruling
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 96e119ca..5b48c94e 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -242,7 +242,6 @@ function listing<Entry, Row, Filter extends string>(
+ export function filtersOfChange(
+   change: Pick<ChangeEntry, "state" | "parkedOn">,
+ ): readonly ChangeFilter[] {
+-  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling") return ["open"];
+   return FILTERS_OF_CHANGE[change.state];
+ }
+ 

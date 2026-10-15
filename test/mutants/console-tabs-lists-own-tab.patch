@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/tabs.test.ts
+# kills: tabs.of
+# why: the lists of conflicts and questions light no tab, though they are Insights' pages
+diff --git a/apps/console/src/tabs.ts b/apps/console/src/tabs.ts
+index 2130ed24..d7c02526 100644
+--- a/apps/console/src/tabs.ts
++++ b/apps/console/src/tabs.ts
+@@ -27,8 +27,6 @@ export function tabOf(route: Route): TabId | undefined {
+     case "insights":
+     case "decisions":
+     case "decision":
+-    case "conflicts":
+-    case "escalations":
+       return "insights";
+     case "settings":
+       return "settings";

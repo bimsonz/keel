@@ -1,0 +1,25 @@
+/* The frame's own marks: the reader's avatar at the top right of every header. */
+:root .a-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 14px;
+  background: var(--color-kumo-tint);
+  color: var(--text-color-kumo-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Over a project's home, what waits on a person: lit as a person is, in orange. */
+:root .a-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--a-person);
+  border-radius: 10px;
+  background: var(--a-person-tint);
+}

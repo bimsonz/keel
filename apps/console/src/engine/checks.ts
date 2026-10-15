@@ -43,8 +43,10 @@ export interface Checks {
   steps: { id: string; result?: StepResult }[];
 }
 
-/** The states in which a change's batch is being verified, or its candidate is going onto trunk. */
-const RUNNING: ReadonlySet<ChangeState> = new Set(["verifying", "integrating"]);
+/** The state in which a change's batch is being verified. */
+const RUNNING: ReadonlySet<ChangeState> = new Set(["verifying"]);
+/** The state in which a change's checks have passed and its candidate is going onto trunk. */
+const PASSED: ReadonlySet<ChangeState> = new Set(["integrating"]);
 /** The states in which a change has pushed and waits for Keel to verify it. */
 const QUEUED: ReadonlySet<ChangeState> = new Set(["submitted", "deriving", "drifted", "queued"]);
 
@@ -58,7 +60,13 @@ export function checksOf(
   });
   if (verdict === undefined)
     return {
-      state: RUNNING.has(change.state) ? "running" : QUEUED.has(change.state) ? "queued" : "none",
+      state: RUNNING.has(change.state)
+        ? "running"
+        : PASSED.has(change.state)
+          ? "passed"
+          : QUEUED.has(change.state)
+            ? "queued"
+            : "none",
       steps,
     };
   if (steps.some((step) => step.result === "fail") || verdict.outcome === "bounce")

@@ -156,15 +156,13 @@ export function HolderLink({ held, children, ...rest }: { held: HeldUnder } & An
 }
 
 /**
- * The run a change is held under. The label is the agent's own word for the run, so it is quoted. Nothing where
+ * The run a change is held under, by the agent's own word for the run. Nothing where
  * the holder's token named no run.
  */
 export function HeldRun({ held, ...rest }: { held: HeldUnder } & Omit<Anchor, "children">) {
   if (held.run === undefined) return null;
   return (
-    <span {...rest}>
-      {held.run.label === undefined ? "in a run it gave no name" : `in its run “${held.run.label}”`}
-    </span>
+    <span {...rest}>{held.run.label === undefined ? "unnamed run" : `run ${held.run.label}`}</span>
   );
 }
 

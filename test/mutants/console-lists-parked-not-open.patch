@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lists.test.ts
+# kills: lists.open-or-closed
+# why: a change parked on a ruling leaves the open list, though it may still land
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 60937411..7c08afcf 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -39,7 +39,7 @@ export const FILTERS_OF_CHANGE: Record<ChangeState, readonly ChangeFilter[]> = {
+   verifying: ["open"],
+   queued: ["open"],
+   integrating: ["open"],
+-  parked: ["open", "parked"],
++  parked: ["parked"],
+   // Refused by a verdict, and not the end of it: its agent may revise it.
+   bounced: ["open", "bounced"],
+   landed: ["closed", "landed"],

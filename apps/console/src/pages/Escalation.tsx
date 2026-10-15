@@ -58,7 +58,7 @@ export function EscalationPage({ name }: { name: string }) {
           : "This fixture's own operator answers this one, a few seconds after it is asked."
       }
       {...(phoneUrl === undefined ? {} : { phoneUrl })}
-      onRule={(escalationId, option) => player.rule(escalationId, option)}
+      onRule={(escalationId, option, rationale) => player.rule(escalationId, option, rationale)}
     />
   );
 }

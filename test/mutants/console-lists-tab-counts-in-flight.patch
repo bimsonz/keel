@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lists.test.ts
+# kills: lists.open-count
+# why: the Changes tab leaves parked and bounced changes out of its open count
+diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
+index 60937411..74675362 100644
+--- a/apps/console/src/engine/lists.ts
++++ b/apps/console/src/engine/lists.ts
+@@ -379,7 +379,7 @@ export function openCounts(world: World): {
+ } {
+   let changes = 0;
+   for (const change of world.changes.values())
+-    if (FILTERS_OF_CHANGE[change.state].includes("open")) changes += 1;
++    if (FILTERS_OF_CHANGE[change.state].join() === "open") changes += 1;
+   let conflicts = 0;
+   for (const conflict of world.conflicts.values())
+     if (FILTER_OF_CONFLICT[conflict.state] === "open") conflicts += 1;

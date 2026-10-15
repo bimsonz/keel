@@ -32,7 +32,7 @@ import type {
   UnsealObservation,
 } from "../contract/observations.ts";
 import type { EscalationCategory, EscalationOption } from "../contract/events.ts";
-import type { ChangeRequeued } from "../contract/keel/index.ts";
+import type { ChangeRequeued, ParkReason } from "../contract/keel/index.ts";
 import type { EvidenceItem } from "../domain/state.ts";
 import type {
   AgentClass,
@@ -132,6 +132,8 @@ export interface ChangeEntry {
   commit?: string;
   /** Keel's latest reason for putting it back in its queue, when, and how many times it has. */
   requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
+  /** Why Keel parked it, the last time it did: a person's ruling to wait on, or its agent's lapsed lease. */
+  parkedOn?: ParkReason;
   /** The run that holds the change, where its holder's token named one. Whoever adopts the change replaces it. */
   run?: RunRef;
   declaredAt: string;
@@ -970,7 +972,9 @@ export class World {
       }
       case "ChangeParked": {
         const change = this.#change(event.payload.changeId, "parked");
-        if (change !== undefined && event.payload.escalationId !== undefined)
+        if (change === undefined) break;
+        change.parkedOn = event.payload.reason;
+        if (event.payload.escalationId !== undefined)
           change.escalationId = event.payload.escalationId;
         break;
       }
@@ -1268,7 +1272,9 @@ export class World {
           conflict.id,
           event,
           t,
-          `A person is asked: ${escalation?.label ?? ""}`,
+          escalation === undefined
+            ? "Escalated to a person"
+            : `Escalated to a person · ${escalation.label}`,
           escalation?.question,
         );
         break;

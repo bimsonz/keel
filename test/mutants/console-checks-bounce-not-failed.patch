@@ -2,11 +2,11 @@
 # kills: checks.failed
 # why: a change Keel bounced with no step's result to read is said to have its checks held, not failed
 diff --git a/apps/console/src/engine/checks.ts b/apps/console/src/engine/checks.ts
-index 600718d8..bb2805ef 100644
+index e2f34878..ddc3fc99 100644
 --- a/apps/console/src/engine/checks.ts
 +++ b/apps/console/src/engine/checks.ts
-@@ -61,7 +61,7 @@ export function checksOf(
-       state: RUNNING.has(change.state) ? "running" : QUEUED.has(change.state) ? "queued" : "none",
+@@ -69,7 +69,7 @@ export function checksOf(
+             : "none",
        steps,
      };
 -  if (steps.some((step) => step.result === "fail") || verdict.outcome === "bounce")

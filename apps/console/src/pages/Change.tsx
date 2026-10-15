@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { changeNamed } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
+import { rulingWords } from "../engine/ruling.ts";
 import { changePageOf } from "../engine/select.ts";
 import type { ChangeTab } from "../route.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -28,11 +29,39 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
   useHolderCards(
     id === undefined ? [] : [id, ...(state?.sameIntent?.others.map((row) => row.id) ?? [])],
   );
+  // A question this change waits on, in words, and whether this reader may rule on it here.
+  const escalationId = state?.escalation?.state === "open" ? state.escalation.id : undefined;
+  useEffect(() => {
+    if (escalationId !== undefined) player.wantAsked();
+  }, [player, escalationId]);
+  const words = useSelected(
+    (world) => {
+      const entry = escalationId === undefined ? undefined : world.escalations.get(escalationId);
+      return entry === undefined ? undefined : rulingWords(world, entry);
+    },
+    [escalationId],
+  );
   if (state === null)
     return (
       <Notice title={`There is no change ${name} in what Keel has said so far`}>
         A change is here once an agent has declared its intent.
       </Notice>
     );
-  return <Change state={state} mode={mode} tab={tab} />;
+  return (
+    <Change
+      state={state}
+      mode={mode}
+      tab={tab}
+      {...(escalationId === undefined || words === undefined
+        ? {}
+        : {
+            ruling: {
+              words,
+              answerable: player.canRule(escalationId),
+              onRule: (option: string, rationale?: string) =>
+                player.rule(escalationId, option, rationale),
+            },
+          })}
+    />
+  );
 }

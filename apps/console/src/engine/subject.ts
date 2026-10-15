@@ -2,6 +2,7 @@
 // guards it, what has been decided about it, and the changes and conflicts
 // on it right now. This is what Mission Control opens beside the graph when a subject is selected.
 
+import { waitsOnARuling } from "./lists.ts";
 import type {
   ChangeState,
   ConflictKind,
@@ -67,6 +68,8 @@ export interface SubjectDetail {
       agent: string;
       agentClass: ShownClass;
       /** Its premises on this subject Keel put in doubt. */
+      /** Parked for a person's ruling, not for its agent's lapsed lease. */
+      ruling: boolean;
       doubts: Doubt[];
     }[];
   };
@@ -126,9 +129,15 @@ export function subjectDetailOf(
     id: entry.id,
     key: entry.key,
     gloss: glossOf(entry),
-    tone: open.some((conflict) => conflict.state === "escalated")
+    // A person is asked only while an escalated conflict's question is open; an escalated one is proven either way.
+    tone: open.some(
+      (conflict) =>
+        conflict.state === "escalated" &&
+        conflict.escalationId !== undefined &&
+        world.escalations.get(conflict.escalationId)?.state === "open",
+    )
       ? "person"
-      : open.some((conflict) => conflict.state === "proven")
+      : open.some((conflict) => conflict.state === "proven" || conflict.state === "escalated")
         ? "proven"
         : open.length > 0
           ? "suspected"
@@ -185,6 +194,7 @@ export function subjectDetailOf(
             label: change.label,
             goal: change.goal,
             state: change.state,
+            ruling: waitsOnARuling(change),
             agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
             agentClass: by?.class ?? "unnamed",
             doubts: doubtsOf(world, change, entry.id),

@@ -155,7 +155,7 @@ expectEqual(
 // Changes go by the numbers Keel gives them.
 expectEqual(
   "the parked changes, by Keel's numbers",
-  String(await page.getByText("parked on this: #1 and #2").count()),
+  String(await page.getByText("Parked: #1, #2").count()),
   "1",
 );
 // An open question has a QR code beside it, of its own address: the way to it from a phone.
@@ -236,7 +236,7 @@ expectEqual(
     (await page.locator(".a-list > li").allInnerTexts())
       .map(squash)
       .join(" | ")
-      .includes("2 changes are parked on this"),
+      .includes("Parked: #1, #2"),
   ),
   "true",
 );
@@ -262,7 +262,7 @@ await page.locator(".a-option", { hasText: "Cache allowed if revocation invalida
 await page
   .getByRole("heading", { name: "Ruled: Cache allowed if revocation invalidates it" })
   .waitFor({ timeout: 10_000 });
-await page.getByText("Recorded as decision D-1").waitFor({ timeout: 10_000 });
+await page.getByText("Decision D-1").waitFor({ timeout: 10_000 });
 // The answer was given on one page and is read on another, with no page load between: what was ruled is still ruled.
 await tabs.filter({ hasText: "Insights" }).click();
 await page.waitForFunction(
@@ -1794,7 +1794,7 @@ expectEqual(
       { timeout: 10_000 },
     )
     .catch(() => "no such section"),
-  "Keel | An agent-first Git platform. Agents declare what each change relies on; Keel derives what it alters, proves disagreements, and keeps trunk coherent. | 3 points | Source on GitHub → https://github.com/bimsonz/keel | Quickstart → /start | API → /v1/openapi.json | Sign up → /signup | first: What Keel is",
+  "Keel | An agent-first Git platform. Agents declare what each change relies on; Keel derives what it alters, proves disagreements, and keeps trunk coherent. | 3 points | Source → https://keel.town/keel/keel | Quickstart → https://keel.town/keel/keel/blob/trunk/docs/quickstart.md | API → /v1/openapi.json | Sign up → /signup | first: What Keel is",
 );
 expectEqual(
   "visitor: the home lists the public projects, each under its org",
@@ -3299,7 +3299,7 @@ expectEqual(
 );
 expectEqual(
   "built: the parked changes, by Keel's numbers",
-  String(await person.getByText("parked on this: #1 and #2").count()),
+  String(await person.getByText("Parked: #1, #2").count()),
   "1",
 );
 expectEqual(
@@ -4513,12 +4513,12 @@ await newcomer
 expectEqual(
   "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
   squash(await newcomer.getByRole("main").innerText()),
-  "turing Your account Projects No projects yet New project Import a repository Read the quickstart",
+  "turing Your account Projects No projects yet New project Import a repository Quickstart",
 );
 expectEqual(
   "namespace: a person's own page has their tabs, and with no project yet the two ways to start one and the quickstart",
   `${await namespaceTabsOf(newcomer)} || ${await startsOf(newcomer)}`,
-  "*Overview → /turing | Projects0 → /turing?tab=projects | Organizations0 → /turing?tab=orgs | Settings → /settings || New project → /new?owner=turing | Import a repository → /new?owner=turing&start=import | Read the quickstart → /start",
+  "*Overview → /turing | Projects0 → /turing?tab=projects | Organizations0 → /turing?tab=orgs | Settings → /settings || New project → /new?owner=turing | Import a repository → /new?owner=turing&start=import | Quickstart → https://keel.town/keel/keel/blob/trunk/docs/quickstart.md",
 );
 await shot(newcomer, "own-empty");
 await newcomer

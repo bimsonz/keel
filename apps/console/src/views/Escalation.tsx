@@ -3,19 +3,16 @@
 // answer becomes a decision.
 
 import { CheckCircleIcon, HandPalmIcon } from "@phosphor-icons/react";
-import { useState } from "react";
 import type { EscalationCategory } from "../contract/events.ts";
+import { rulingWords } from "../engine/ruling.ts";
 import { choicesOf } from "../engine/select.ts";
-import { KeelRefused } from "../source/types.ts";
 import type { EscalationEntry, World } from "../engine/world.ts";
 import { Detail, Head, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import { Qr } from "./Qr.tsx";
-import { ChangeLink, ConflictLink, Said, SubjectLink } from "./links.tsx";
+import { RulingActions, RulingLines } from "./Ruling.tsx";
+import { ChangeLink, ConflictLink, SubjectLink } from "./links.tsx";
 import { EvidenceList, Panel, clockTime, dateTime } from "./parts.tsx";
-
-/** Keel's refusals of a ruling that say the question takes no answer any more. */
-const CLOSED: ReadonlySet<string> = new Set(["escalation.state_refused", "escalation.not_found"]);
 
 export const CATEGORY: Record<EscalationCategory, string> = {
   "permission-semantics": "Permission semantics",
@@ -68,15 +65,8 @@ export function Escalation({
   readOnly: string;
   /** Where a phone can answer this question, when there is a way for it to. */
   phoneUrl?: string;
-  onRule: (escalationId: string, option: string) => Promise<void>;
+  onRule: (escalationId: string, option: string, rationale?: string) => Promise<void>;
 }) {
-  const [sending, setSending] = useState<string | null>(null);
-  const [refused, setRefused] = useState<{
-    said: string;
-    next: readonly string[];
-    /** Whether the question still takes an answer: not where Keel says it was answered, or is not there. */
-    open: boolean;
-  } | null>(null);
   const open = escalation.state === "open";
   const conflict =
     escalation.about.kind === "conflict" ? world.conflicts.get(escalation.about.id) : undefined;
@@ -87,34 +77,17 @@ export function Escalation({
   );
   const waiting = tied.filter((change) => change.state === "parked");
   const { choices, standing } = choicesOf(escalation);
+  const words = rulingWords(world, escalation);
   const precedents = escalation.precedents.flatMap((id) => world.decisions.get(id) ?? []);
   const chosen = escalation.options.find((option) => option.id === escalation.ruling?.option);
   const decision =
     (conflict?.decisionId === undefined ? undefined : world.decisions.get(conflict.decisionId)) ??
     [...world.decisions.values()].find((candidate) => candidate.question === escalation.question);
 
-  const rule = async (option: string): Promise<void> => {
-    setSending(option);
-    setRefused(null);
-    try {
-      await onRule(escalation.id, option);
-    } catch (error) {
-      // A ruling Keel would not take is said in Keel's words, with the ways forward it gave. The question stays
-      // open to be answered again unless Keel says it is closed or gone.
-      setRefused({
-        said: error instanceof Error ? error.message : "The answer could not be sent.",
-        next: error instanceof KeelRefused ? error.next : [],
-        open: !(error instanceof KeelRefused && CLOSED.has(error.code)),
-      });
-    } finally {
-      setSending(null);
-    }
-  };
-
   return (
     <Detail>
       <Head
-        title={escalation.question}
+        title={words.title}
         label={escalation.label}
         state={
           <span className="a-chip" data-tone={open ? "person" : "quiet"}>
@@ -124,7 +97,6 @@ export function Escalation({
         }
         meta={
           <>
-            <span>{CATEGORY[escalation.category]}</span>
             {subject !== undefined && (
               <span>
                 on{" "}
@@ -144,71 +116,33 @@ export function Escalation({
         <div className="flex min-w-0 flex-col gap-4">
           {open ? (
             <section className="a-question flex flex-col gap-4 p-5" aria-label="Answer">
-              <p className="text-base text-kumo-default">
-                {waiting.length === 0
-                  ? "Nothing is parked on this."
-                  : `${waiting.length} ${waiting.length === 1 ? "change is" : "changes are"} parked on this: ${waiting.map((change) => change.label).join(" and ")}.`}{" "}
-                Until someone answers: <b className="font-semibold text-kumo-strong">{standing}</b>
-              </p>
-              <ul className="flex flex-col gap-2.5">
-                {choices.map((option) => (
-                  <li key={option.id}>
-                    <button
-                      type="button"
-                      className="a-option"
-                      disabled={!answerable || sending !== null}
-                      aria-busy={sending === option.id}
-                      onClick={() => void rule(option.id)}
-                    >
-                      <span className="text-lg font-semibold leading-snug text-kumo-strong">
-                        {option.label}
-                      </span>
-                      <span className="text-base leading-snug text-kumo-default">
-                        {option.consequence}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {refused !== null && (
-                <p
-                  role="alert"
-                  className="text-base font-medium"
-                  style={{ color: "var(--a-fail-ink)" }}
-                >
-                  Keel did not take that answer: {refused.said}
-                  {refused.open && " The question is still open."}
+              <RulingLines words={words} />
+              <RulingActions
+                words={words}
+                answerable={answerable}
+                readOnly={readOnly}
+                onRule={(option, rationale) => onRule(escalation.id, option, rationale)}
+              />
+              {waiting.length > 0 && (
+                <p className="text-sm text-kumo-subtle">
+                  Parked: {waiting.map((change) => change.label).join(", ")} · until answered:{" "}
+                  {standing}
                 </p>
               )}
-              {refused !== null && refused.next.length > 0 && (
-                <ul
-                  aria-label="What Keel says to do next"
-                  className="flex list-disc flex-col gap-1 pl-5 text-sm text-kumo-default"
-                >
-                  {refused.next.map((title) => (
-                    <li key={title}>
-                      <Said text={title} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {!answerable && <p className="text-sm text-kumo-subtle">{readOnly}</p>}
               {phoneUrl !== undefined && (
-                <div className="flex items-center gap-4 rounded-lg border border-kumo-hairline p-3">
-                  <Qr
-                    text={phoneUrl}
-                    size={132}
-                    label="QR code: answer this question from a phone"
-                  />
-                  <p className="text-base leading-snug text-kumo-default">
-                    <b className="font-semibold text-kumo-strong">Answer from a phone.</b> Scan this
-                    to open the question there. It is this page's own address and nothing more:
-                    whoever opens it signs in, and Keel decides whether they may answer.{" "}
+                <details className="text-sm text-kumo-subtle">
+                  <summary className="cursor-pointer">Answer from a phone</summary>
+                  <div className="mt-2 flex items-center gap-4">
+                    <Qr
+                      text={phoneUrl}
+                      size={132}
+                      label="QR code: answer this question from a phone"
+                    />
                     <a className="a-link break-all" href={phoneUrl}>
                       {phoneUrl}
                     </a>
-                  </p>
-                </div>
+                  </div>
+                </details>
               )}
             </section>
           ) : (
@@ -216,7 +150,7 @@ export function Escalation({
               <h2 className="text-2xl font-semibold leading-tight text-kumo-strong">
                 {escalation.state === "ruled"
                   ? `Ruled: ${chosen?.label ?? escalation.ruling?.option ?? ""}`
-                  : "Withdrawn before anyone answered"}
+                  : "Withdrawn"}
               </h2>
               {chosen !== undefined && (
                 <p className="text-lg text-kumo-default">{chosen.consequence}</p>
@@ -224,11 +158,11 @@ export function Escalation({
               <p className="text-sm text-kumo-subtle">
                 {escalation.ruling !== undefined && (
                   <>
-                    Answered <time className="a-num">{dateTime(escalation.ruling.at)}</time>.{" "}
+                    Answered <time className="a-num">{dateTime(escalation.ruling.at)}</time>
+                    {decision !== undefined && " · "}
                   </>
                 )}
-                {decision !== undefined &&
-                  `Recorded as decision ${decision.label}: later changes meet it as precedent.`}
+                {decision !== undefined && `Decision ${decision.label}`}
               </p>
               {escalation.state === "ruled" && (
                 <ul className="mt-2 flex flex-col gap-1 border-t border-kumo-line pt-3 text-base">
@@ -263,7 +197,12 @@ export function Escalation({
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Evidence" aside="by class" bodyClassName="p-3.5">
+          <details className="a-panel p-3.5">
+            <summary className="cursor-pointer text-sm font-semibold text-kumo-strong">
+              Details
+            </summary>
+            <p className="mt-2 text-sm text-kumo-subtle">{escalation.question}</p>
+            <p className="mt-1 text-sm text-kumo-subtle">{CATEGORY[escalation.category]}</p>
             {escalation.evidence.length === 0 ? (
               <p className="text-base text-kumo-subtle">
                 Keel gave no evidence with this question.
@@ -271,7 +210,7 @@ export function Escalation({
             ) : (
               <EvidenceList items={escalation.evidence} />
             )}
-          </Panel>
+          </details>
           <aside className="a-side">
             {conflict !== undefined && (
               <Tied title="Raised by">

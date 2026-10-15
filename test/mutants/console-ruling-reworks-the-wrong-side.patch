@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/ruling.test.ts
+# kills: ruling.words
+# why: keeping the premise is said to make the change that relies on it rework
+diff --git a/apps/console/src/engine/ruling.ts b/apps/console/src/engine/ruling.ts
+index b883f6e9..60a67162 100644
+--- a/apps/console/src/engine/ruling.ts
++++ b/apps/console/src/engine/ruling.ts
+@@ -83,7 +83,7 @@ export function rulingWords(world: World, escalation: EscalationEntry): RulingWo
+     if (option.id === "premise-holds" && changes !== undefined)
+       return {
+         id: option.id,
+-        label: `${pure ? `Keep ${name} pure` : "Keep the premise"} · ${changes.label} reworks`,
++        label: `${pure ? `Keep ${name} pure` : "Keep the premise"} · ${relies?.label ?? ""} reworks`,
+         consequence: option.consequence,
+       };
+     if (option.id === "effect-stands" && changes !== undefined && relies !== undefined)

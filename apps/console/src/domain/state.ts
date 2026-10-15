@@ -18,6 +18,7 @@ import type {
   Drift,
   ProbeDiscard,
   ChangeRequeued,
+  ParkReason,
   SuspectEvidence,
   VerdictPlanStep,
 } from "../contract/keel/index.ts";
@@ -352,6 +353,10 @@ export interface ChangePageState {
   };
   /** Keel's latest reason for putting it back in its queue, when, and how many times it has. */
   requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
+  /** Why Keel parked it, where it is parked: a person's ruling to wait on, or its agent's lapsed lease. */
+  parkedOn?: ParkReason;
+  /** What the page calls a step whose id is not a name: a guard's step, by the guard's label. */
+  stepNames: Record<string, string>;
   agent: { label: string; class: ShownClass; harness: string; model: string };
   /** Its holder's page in this project, and the run it is held under. */
   held: HeldUnder;

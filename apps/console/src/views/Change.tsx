@@ -32,14 +32,23 @@ import {
   stepResultOf,
 } from "../engine/checks.ts";
 import { noneDerived } from "../engine/judged.ts";
+import type { RulingWords } from "../engine/ruling.ts";
+import { RulingActions, RulingLines } from "./Ruling.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./pull.css";
+
+/** A question the change waits on, in words, whether this reader may rule on it, and the way to. */
+export interface ChangeRuling {
+  words: RulingWords;
+  answerable: boolean;
+  onRule: (option: string, rationale?: string) => Promise<void>;
+}
 import type { ChangeTab } from "../route.ts";
 import { Link, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { DoubtSaid, doubtKey } from "./Doubt.tsx";
-import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
+import { CHANGE_TONE } from "./List.tsx";
 import {
   ChangeLink,
   ConflictLink,
@@ -143,8 +152,8 @@ function renderNote(annotation: DiffAnnotation): ReactNode {
 
 /** Why Artifacts would not take a push, as a clause. */
 const REFUSED = {
-  "pack-too-large": "this change's pack is too large to push",
-  "repo-bytes-quota": "the repository is at its size quota",
+  "pack-too-large": "pack too large",
+  "repo-bytes-quota": "repository size quota reached",
 } as const;
 
 const OUTCOME_WORD = {
@@ -219,18 +228,18 @@ function IntentRowLine({ row, self }: { row: IntentRow; self: boolean }) {
 function RuledAgainst({ ruling }: { ruling: RulingBounce }) {
   return (
     <>
-      A ruling went against this change
+      Ruled against
       {ruling.decision !== undefined &&
-        `: decision ${ruling.decision.label} chose “${ruling.decision.chosen}”`}
+        ` · ${ruling.decision.label} chose “${ruling.decision.chosen}”`}
       {ruling.conflict !== undefined && (
         <>
-          , on{" "}
+          {" · "}
           <ConflictLink id={ruling.conflict.id} className="a-link">
-            conflict {ruling.conflict.label}
+            {ruling.conflict.label}
           </ConflictLink>
         </>
       )}
-      . It bounced on the ruling: no verdict was issued.
+      {" · no verdict"}
     </>
   );
 }
@@ -248,16 +257,13 @@ function BounceCause({ bounce }: { bounce: ChangeBounce }) {
     <RuledAgainst ruling={bounce.ruling} />
   ) : bounce.conflict !== undefined ? (
     <>
-      Keel proved{" "}
       <ConflictLink id={bounce.conflict.id} className="a-link">
-        conflict {bounce.conflict.label}
+        {bounce.conflict.label}
       </ConflictLink>{" "}
-      against this change, and its plan blocks on{" "}
-      {bounce.conflict.predicate ?? "that conflict's predicate"}. It bounced on the conflict itself:
-      no verdict was issued.
+      proven · plan blocks on {bounce.conflict.predicate ?? "its predicate"} · no verdict
     </>
   ) : bounce.refused !== undefined ? (
-    `Its batch was verified, and the push to trunk was refused: ${REFUSED[bounce.refused]}. Nothing landed, and no verdict was issued for the bounce.`
+    `Batch passed · push to trunk refused: ${REFUSED[bounce.refused]} · no verdict`
   ) : null;
 }
 
@@ -286,11 +292,10 @@ function BounceSaid({ bounce }: { bounce: ChangeBounce }) {
       {bounce.cites !== undefined && (
         // The decision is the one Keel's next action names, by its id: no sentence is read for it.
         <p className="mt-2 text-base text-kumo-default" data-part="cited-decision">
-          This bounce cites{" "}
+          Cites{" "}
           <DecisionLink id={bounce.cites.id} className="a-link font-semibold">
-            decision {bounce.cites.label}
+            {bounce.cites.label}
           </DecisionLink>
-          .
         </p>
       )}
     </>
@@ -299,24 +304,34 @@ function BounceSaid({ bounce }: { bounce: ChangeBounce }) {
 
 /** What became of a change after a bounce it moved on from. */
 const AFTER_BOUNCE = {
-  withdrawn: " and was withdrawn after.",
-  landed: " and landed on a later try.",
-  "taken-on": ", and has been taken on again since.",
+  withdrawn: "withdrawn after",
+  landed: "landed on a later try",
+  "taken-on": "taken on again",
 } as const;
 
 /** A bounce the change has moved on from, as Keel recorded it: a withdrawal or another try does not undo it. */
-function Bounced({ bounce }: { bounce: NonNullable<ChangePageState["bounced"]> }) {
+function Bounced({
+  bounce,
+  failed,
+}: {
+  bounce: NonNullable<ChangePageState["bounced"]>;
+  /** The steps that failed, by the page's names for them, where the verdict's evidence says. */
+  failed: readonly string[];
+}) {
   return (
-    <div className="mt-2 border-t border-kumo-line pt-3" data-part="past-bounce">
+    <div className="flex flex-col gap-1" data-part="past-bounce">
+      <p className="text-sm text-kumo-subtle">
+        <time className="a-num">{dateTime(bounce.at)}</time> · {AFTER_BOUNCE[bounce.after]}
+      </p>
       <p className="text-base text-kumo-default">
-        It bounced at <time className="a-num">{dateTime(bounce.at)}</time>
-        {AFTER_BOUNCE[bounce.after]}{" "}
         {causeNamed(bounce) ? (
           <BounceCause bounce={bounce} />
+        ) : failed.length > 0 ? (
+          `Failed: ${failed.join(", ")}`
         ) : bounce.verdict === undefined ? (
-          "It bounced on the verdict above."
+          "Verdict: bounce"
         ) : (
-          `It bounced on a verdict issued at ${dateTime(bounce.verdict.issuedAt)}: ${bounce.verdict.said}`
+          `Verdict ${dateTime(bounce.verdict.issuedAt)}: bounce`
         )}
       </p>
       <BounceSaid bounce={bounce} />
@@ -344,44 +359,29 @@ function StatePill({ state }: { state: ChangeState }) {
 
 /** Where a change stands while Keel has issued no verdict on it, in a few words and a sentence. */
 const WAITING_ON: Record<ChangeState, { title: string; said: string }> = {
-  declared: {
-    title: "Not pushed yet",
-    said: "Its agent has said what it will do, and has pushed no commit.",
-  },
-  working: {
-    title: "Not pushed yet",
-    said: "Its agent is working in its workspace, and has pushed no commit.",
-  },
-  submitted: {
-    title: "Reading the commit",
-    said: "Keel is working out what the pushed commit does.",
-  },
-  deriving: {
-    title: "Reading the commit",
-    said: "Keel is working out what the pushed commit does.",
-  },
-  drifted: { title: "Drifted", said: "Its commit does something its intent did not say." },
-  queued: { title: "Queued", said: "Waiting for Keel to batch it and run its checks." },
-  verifying: {
-    title: "Checks running",
-    said: "Keel is running the checks on a candidate with this change in it.",
-  },
-  integrating: { title: "Landing", said: "Its checks passed, and Keel is putting it onto trunk." },
-  parked: { title: "Parked", said: "Held until a person rules." },
-  bounced: { title: "Bounced", said: "Sent back to its agent." },
-  landed: { title: "Landed on trunk", said: "Keel put it onto trunk." },
-  withdrawn: { title: "Withdrawn", said: "Its agent withdrew it. It will not land." },
-  superseded: { title: "Superseded", said: "Another change replaced it. It will not land." },
+  declared: { title: "Not pushed", said: "No commit yet" },
+  working: { title: "Not pushed", said: "Agent working · no commit yet" },
+  submitted: { title: "Deriving effects", said: "Reading the pushed commit" },
+  deriving: { title: "Deriving effects", said: "Reading the pushed commit" },
+  drifted: { title: "Drifted", said: "Commit differs from its intent" },
+  queued: { title: "Queued", said: "Waiting for a batch" },
+  verifying: { title: "Checks running", said: "Verifying a candidate with this change" },
+  integrating: { title: "Landing", said: "Checks passed · going onto trunk" },
+  parked: { title: "Waiting for a member's ruling", said: "Parked until a person rules" },
+  bounced: { title: "Bounced", said: "Returned to its agent" },
+  landed: { title: "Landed on trunk", said: "" },
+  withdrawn: { title: "Withdrawn", said: "Closed by its agent" },
+  superseded: { title: "Superseded", said: "Replaced by another change" },
 };
 
 /** Why Keel put a change back in its queue, as it gives the reason. */
 const REQUEUED: Record<NonNullable<ChangePageState["requeued"]>["reason"], string> = {
-  "infra-failure": "its checks could not run",
-  bisection: "its batch failed, and Keel is splitting the batch to find the change that broke it",
-  invalidated: "the candidate it was in no longer stood on trunk",
-  "co-member-failed": "another change in its batch failed",
-  textual: "it no longer applies cleanly beside another change in its batch",
-  interaction: "it fails only together with another change in its batch",
+  "infra-failure": "infra failure",
+  bisection: "bisecting its batch",
+  invalidated: "candidate invalidated",
+  "co-member-failed": "co-member failed",
+  textual: "textual conflict in batch",
+  interaction: "fails with a co-member",
 };
 
 /** The title of a bounce: what it bounced on, where Keel named something other than a verdict. */
@@ -426,7 +426,15 @@ function Row({
 }
 
 /** Where the change stands, and the one thing a person may do about it, where there is one. */
-function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
+function Status({
+  state,
+  checks,
+  ruling,
+}: {
+  state: ChangePageState;
+  checks: Checks;
+  ruling?: ChangeRuling;
+}) {
   const { change, verdict, escalation } = state;
   if (change.state === "landed")
     return (
@@ -448,15 +456,11 @@ function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
               ),
             })}
       >
-        <p className="text-base text-kumo-default">
-          {change.landedAs === undefined ? (
-            "Keel put it onto trunk."
-          ) : (
-            <>
-              As commit <span className="a-mono">{change.landedAs.slice(0, 7)}</span>.
-            </>
-          )}
-        </p>
+        {change.landedAs !== undefined && (
+          <p className="text-sm text-kumo-subtle">
+            Commit <span className="a-mono">{change.landedAs.slice(0, 7)}</span>
+          </p>
+        )}
       </Row>
     );
   if (escalation !== undefined && escalation.state === "open")
@@ -465,21 +469,39 @@ function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
         lead
         tone="person"
         icon={<HandPalmIcon size={20} weight="fill" />}
-        title="Waiting for a ruling"
+        title={
+          <>
+            {ruling?.answerable === true ? "Your ruling needed" : "Waiting for a member's ruling"}
+            {ruling !== undefined && (
+              <span className="font-normal text-kumo-default"> · {ruling.words.title}</span>
+            )}
+          </>
+        }
         action={
-          <EscalationLink id={escalation.id} className={buttonVariants({ variant: "primary" })}>
-            Answer {escalation.label}
+          <EscalationLink id={escalation.id} className={buttonVariants({ variant: "secondary" })}>
+            Question <span className="text-kumo-subtle">{escalation.label}</span>
           </EscalationLink>
         }
       >
-        <p className="text-base text-kumo-default">
-          {escalation.label}:{" "}
-          <b className="font-semibold text-kumo-strong">{escalation.question}</b>
-        </p>
+        {ruling === undefined ? (
+          <p className="text-base text-kumo-default">{escalation.question}</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <RulingLines words={ruling.words} />
+            <RulingActions
+              words={ruling.words}
+              answerable={ruling.answerable}
+              readOnly="A member of the project rules on this."
+              onRule={ruling.onRule}
+            />
+          </div>
+        )}
       </Row>
     );
   if (change.state === "bounced" || state.bounce !== undefined) {
-    const failed = checks.steps.filter((step) => step.result === "fail").map((step) => step.id);
+    const failed = checks.steps
+      .filter((step) => step.result === "fail")
+      .map((step) => state.stepNames[step.id] ?? step.id);
     return (
       <Row
         lead
@@ -491,7 +513,7 @@ function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
           {state.bounce !== undefined && causeNamed(state.bounce) ? (
             <BounceCause bounce={state.bounce} />
           ) : failed.length > 0 ? (
-            `${failed.join(", ")} failed. Sent back to its agent.`
+            `Failed: ${failed.join(", ")}`
           ) : (
             (verdict?.said ?? WAITING_ON.bounced.said)
           )}
@@ -519,21 +541,24 @@ function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
         icon={<CheckCircleIcon size={20} weight="fill" />}
         title="Checks passed"
       >
-        <p className="text-base text-kumo-default">{WAITING_ON.integrating.said}</p>
+        <p className="text-sm text-kumo-subtle">{WAITING_ON.integrating.said}</p>
       </Row>
     );
   const requeued = change.state === "queued" ? state.requeued : undefined;
-  const waiting =
-    requeued === undefined
+  // A change parked because its agent's lease lapsed waits on its agent: no person is asked anything.
+  const lapsed = change.state === "parked" && state.parkedOn === "lease-lapsed";
+  const waiting = lapsed
+    ? { title: "Waiting on its agent", said: "Lease lapsed" }
+    : requeued === undefined
       ? WAITING_ON[change.state]
       : {
-          title: requeued.times === 1 ? "Queued again" : `Queued again (${requeued.times} times)`,
-          said: `Keel put it back in its queue at ${clockTime(requeued.at)}: ${REQUEUED[requeued.reason]}.`,
+          title: "Requeued",
+          said: `${clockTime(requeued.at)} · ${REQUEUED[requeued.reason]}${requeued.times > 1 ? ` (×${requeued.times})` : ""}`,
         };
   return (
     <Row
       lead
-      tone={change.state === "parked" ? "person" : "quiet"}
+      tone={change.state === "parked" && !lapsed ? "person" : "quiet"}
       icon={
         change.state === "verifying" || change.state === "integrating" ? (
           <CircleNotchIcon size={20} weight="bold" className="a-spin" />
@@ -541,10 +566,10 @@ function Status({ state, checks }: { state: ChangePageState; checks: Checks }) {
           <ClockIcon size={20} weight="bold" />
         )
       }
-      title={verdict === undefined ? waiting.title : OUTCOME_WORD[verdict.outcome]}
+      title={verdict === undefined || lapsed ? waiting.title : OUTCOME_WORD[verdict.outcome]}
     >
       <p className="text-base text-kumo-default">
-        {verdict === undefined ? waiting.said : verdict.said}
+        {verdict === undefined || lapsed ? waiting.said : verdict.said}
       </p>
     </Row>
   );
@@ -610,7 +635,15 @@ function ChecksMark({ state }: { state: ChecksState }) {
 }
 
 /** The checks, as the merge box lists them: how many, how each went, and the way to their logs. */
-function ChecksRow({ checks, name }: { checks: Checks; name: string }) {
+function ChecksRow({
+  checks,
+  name,
+  names,
+}: {
+  checks: Checks;
+  name: string;
+  names: Record<string, string>;
+}) {
   const count = (result: StepResult): number =>
     checks.steps.filter((step) => step.result === result).length;
   const said = [
@@ -645,7 +678,7 @@ function ChecksRow({ checks, name }: { checks: Checks; name: string }) {
                   {...(step.result === undefined ? {} : { result: step.result })}
                   running={checks.state === "running"}
                 />
-                <span className="a-mono text-kumo-strong">{step.id}</span>
+                <span className="a-mono text-kumo-strong">{names[step.id] ?? step.id}</span>
               </li>
             ))}
           </ul>
@@ -664,7 +697,11 @@ function ConflictsRow({ state }: { state: ChangePageState }) {
         tone={conflict.state === "dismissed" || conflict.state === "resolved" ? "quiet" : "fail"}
         icon={<ScalesIcon size={20} weight="bold" />}
         title={
-          conflict.with === "" ? `Conflict ${conflict.label}` : `Conflicts with ${conflict.with}`
+          conflict.state === "dismissed" || conflict.state === "resolved"
+            ? `Conflict with ${conflict.with === "" ? conflict.label : conflict.with} · ${conflict.state}`
+            : conflict.with === ""
+              ? `Conflict ${conflict.label}`
+              : `Conflicts with ${conflict.with}`
         }
         action={
           <ConflictLink id={conflict.id} className={buttonVariants({ variant: "secondary" })}>
@@ -691,15 +728,13 @@ function ConflictsRow({ state }: { state: ChangePageState }) {
               on {note.predicate}
             </span>
           ))}
-          . Its plan does not block on {state.noted.length === 1 ? "it" : "them"}, so it went on.
+          {" · plan does not block"}
         </p>
       </Row>
     );
   if (change.commit === "") return null;
   return (
-    <Row tone="pass" icon={<CheckCircleIcon size={20} weight="fill" />} title="No conflicts">
-      <p className="text-base text-kumo-default">Keel found no conflict with another change.</p>
-    </Row>
+    <Row tone="pass" icon={<CheckCircleIcon size={20} weight="fill" />} title="No conflicts" />
   );
 }
 
@@ -708,20 +743,27 @@ function MergeBox({
   state,
   checks,
   name,
+  ruling,
 }: {
   state: ChangePageState;
   checks: Checks;
   name: string;
+  ruling?: ChangeRuling;
 }) {
   const shown = checks.state !== "none" || checks.steps.length > 0;
   return (
     <section className="a-merge" aria-label="Status">
-      <Status state={state} checks={checks} />
-      {shown && <ChecksRow checks={checks} name={name} />}
+      <Status state={state} checks={checks} {...(ruling === undefined ? {} : { ruling })} />
+      {shown && <ChecksRow checks={checks} name={name} names={state.stepNames} />}
       <ConflictsRow state={state} />
       {state.bounced !== undefined && (
         <Row tone="quiet" icon={<XCircleIcon size={20} weight="bold" />} title="Bounced before">
-          <Bounced bounce={state.bounced} />
+          <Bounced
+            bounce={state.bounced}
+            failed={checks.steps
+              .filter((step) => step.result === "fail")
+              .map((step) => state.stepNames[step.id] ?? step.id)}
+          />
         </Row>
       )}
     </section>
@@ -761,7 +803,7 @@ const TIER_WHERE: Record<PlanStepRow["tier"], string> = {
  * host lists a run's checks, each with how it went and its log, the lines of the verdict's evidence that name it.
  * A step no line names says nothing of how it went: Keel's evidence says only what it says.
  */
-function PlanSteps({ steps }: { steps: PlanStepRow[] }) {
+function PlanSteps({ steps, names }: { steps: PlanStepRow[]; names: Record<string, string> }) {
   return (
     <ol className="flex flex-col" aria-label="Checks">
       {steps.map((step) => {
@@ -775,7 +817,7 @@ function PlanSteps({ steps }: { steps: PlanStepRow[] }) {
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <ResultMark {...(result === undefined ? {} : { result })} running={false} />
               <span className="a-mono font-semibold text-kumo-strong [overflow-wrap:anywhere]">
-                {step.id}
+                {names[step.id] ?? step.id}
               </span>
               <span className="text-sm text-kumo-subtle">
                 {step.kind} · tier {step.tier}, in {TIER_WHERE[step.tier]}
@@ -816,16 +858,34 @@ function PlanSteps({ steps }: { steps: PlanStepRow[] }) {
   );
 }
 
+/** How many of a footprint's files a change's page lists before "Show all". */
+const FOOTPRINT_SHOWN = 8;
+
+function FootprintLine({ entry }: { entry: ChangePageState["intent"]["footprint"][number] }) {
+  return (
+    <li className="flex items-center gap-2 text-sm">
+      <span className="a-chip w-[58px] justify-center">{entry.op}</span>
+      <span className="a-mono text-kumo-strong">{entry.path}</span>
+      {entry.symbol !== undefined && (
+        <span className="a-mono text-kumo-subtle">{entry.symbol}</span>
+      )}
+    </li>
+  );
+}
+
 export function Change({
   state,
   mode,
   tab,
+  ruling,
 }: {
   state: ChangePageState;
   mode: Mode;
   tab: ChangeTab;
+  /** A question the change waits on, where the page has it in words. */
+  ruling?: ChangeRuling;
 }) {
-  const { change, intent, verdict, escalation, conflict, plan, diff } = state;
+  const { change, intent, verdict, escalation, plan, diff } = state;
   const { route } = useWhere();
   const name = route.at === "change" ? route.name : change.id;
   const waiting = escalation?.state === "open";
@@ -857,7 +917,14 @@ export function Change({
           <>
             <StatePill state={change.state} />
             {pill === "open" && (
-              <span className="a-chip" data-tone={CHANGE_TONE[change.state] ?? "quiet"}>
+              <span
+                className="a-chip"
+                data-tone={
+                  state.parkedOn === "lease-lapsed"
+                    ? "quiet"
+                    : (CHANGE_TONE[change.state] ?? "quiet")
+                }
+              >
                 {waiting && <HandPalmIcon size={13} weight="fill" />}
                 {change.state}
               </span>
@@ -919,31 +986,42 @@ export function Change({
         <Split
           main={
             <>
-              <MergeBox state={state} checks={checks} name={name} />
+              <MergeBox
+                state={state}
+                checks={checks}
+                name={name}
+                {...(ruling === undefined ? {} : { ruling })}
+              />
 
               {intent.footprint.length > 0 && (
                 <Panel
                   title="Footprint"
-                  aside="the files its agent said it would touch"
+                  aside={`${intent.footprint.length} ${intent.footprint.length === 1 ? "file" : "files"} · declared`}
                   bodyClassName="px-4 py-3"
                 >
                   <ul className="flex flex-col gap-1">
-                    {intent.footprint.map((entry) => (
-                      <li key={entry.path} className="flex items-center gap-2 text-sm">
-                        <span className="a-chip w-[58px] justify-center">{entry.op}</span>
-                        <span className="a-mono text-kumo-strong">{entry.path}</span>
-                        {entry.symbol !== undefined && (
-                          <span className="a-mono text-kumo-subtle">{entry.symbol}</span>
-                        )}
-                      </li>
+                    {intent.footprint.slice(0, FOOTPRINT_SHOWN).map((entry) => (
+                      <FootprintLine key={entry.path} entry={entry} />
                     ))}
                   </ul>
+                  {intent.footprint.length > FOOTPRINT_SHOWN && (
+                    <details className="mt-1">
+                      <summary className="a-link cursor-pointer text-sm">
+                        Show all {intent.footprint.length}
+                      </summary>
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {intent.footprint.slice(FOOTPRINT_SHOWN).map((entry) => (
+                          <FootprintLine key={entry.path} entry={entry} />
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </Panel>
               )}
 
               <Panel
                 title="Premises and effects"
-                aside="premises are declared; effects are derived from the diff"
+                aside="premises declared · effects derived from the diff"
                 bodyClassName="flex flex-col"
               >
                 {headline !== undefined && (
@@ -1080,7 +1158,7 @@ export function Change({
                 />
                 {state.session.messages > 0 && (
                   <span className="text-kumo-subtle">
-                    Session of {state.session.messages.toLocaleString("en-US")} messages
+                    {state.session.messages.toLocaleString("en-US")} messages
                   </span>
                 )}
               </Tied>
@@ -1095,46 +1173,6 @@ export function Change({
                       {subject}
                     </SubjectLink>
                   ))}
-                </Tied>
-              )}
-              {conflict !== undefined && (
-                <Tied title="Conflict">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <ConflictLink id={conflict.id} className="a-link font-semibold">
-                      {conflict.label}
-                    </ConflictLink>
-                    <span className="a-chip" data-tone={CONFLICT_TONE[conflict.state] ?? "quiet"}>
-                      {conflict.state === "escalated" ? "proven" : conflict.state}
-                    </span>
-                    {conflict.with !== "" && (
-                      <span className="text-kumo-subtle">with {conflict.with}</span>
-                    )}
-                  </span>
-                  {conflict.summary !== "" && (
-                    <span className="leading-snug">{conflict.summary}</span>
-                  )}
-                </Tied>
-              )}
-              {state.noted.length > 0 && (
-                <Tied title="Noted">
-                  {state.noted.map((note) => (
-                    <span key={note.conflict.id} className="flex flex-wrap items-center gap-2">
-                      <ConflictLink id={note.conflict.id} className="a-link font-semibold">
-                        {note.conflict.label}
-                      </ConflictLink>
-                      <span className="a-chip" data-tone="quiet">
-                        {note.policy}
-                      </span>
-                      <span className="text-kumo-subtle">on {note.predicate}</span>
-                    </span>
-                  ))}
-                  <span className="leading-snug">
-                    Proven against this change, which went on: its plan does not block on{" "}
-                    {state.noted.length === 1 ? "that predicate" : "those predicates"}.{" "}
-                    {state.noted.some((note) => note.next.length > 0)
-                      ? "Keel told its agent, and held nothing."
-                      : "Nobody was told."}
-                  </span>
                 </Tied>
               )}
               {state.doubts.length > 0 && (
@@ -1169,13 +1207,9 @@ export function Change({
                       <span className="min-w-0 truncate text-kumo-subtle">“{other.goal}”</span>
                     </span>
                   ))}
-                  <span className="leading-snug">
-                    Declared to do the same thing as this change. Keel shows them to each other and
-                    picks none.{" "}
-                    <ChangeLink id={change.id} tab="alternatives" className="a-link">
-                      Compare
-                    </ChangeLink>
-                  </span>
+                  <ChangeLink id={change.id} tab="alternatives" className="a-link">
+                    Compare
+                  </ChangeLink>
                 </Tied>
               )}
               {escalation !== undefined && (
@@ -1255,9 +1289,7 @@ export function Change({
                   </span>
                 )}
                 {change.commit === "" && change.workspace === "" && change.lane === undefined && (
-                  <span className="text-kumo-subtle">
-                    Declared, and not yet forked into a workspace.
-                  </span>
+                  <span className="text-kumo-subtle">No workspace yet</span>
                 )}
               </Tied>
             </>
@@ -1367,25 +1399,22 @@ export function Change({
               bodyClassName=""
             >
               {plan.stepCount === undefined ? (
-                <p className="px-4 py-3 text-base text-kumo-subtle">
-                  No checks yet. Keel plans them once the change pushes a commit.
-                </p>
+                <p className="px-4 py-3 text-base text-kumo-subtle">No checks yet</p>
               ) : verdict?.plan === undefined ? (
                 <p className="px-4 py-3 text-base text-kumo-default">
-                  {plan.stepCount} {plan.stepCount === 1 ? "check" : "checks"} planned.{" "}
+                  {plan.stepCount} {plan.stepCount === 1 ? "check" : "checks"} planned
                   {verdict === undefined
-                    ? "Each is listed with its log once Keel issues a verdict."
-                    : "Keel listed no steps with this verdict."}
+                    ? " · no verdict yet"
+                    : " · no steps listed with the verdict"}
                 </p>
               ) : (
                 <>
                   {!verdict.plan.own && (
                     <p className="px-4 pt-3 text-sm text-kumo-subtle [overflow-wrap:anywhere]">
-                      Run as part of its batch, under the batch&apos;s plan{" "}
-                      <span className="a-mono">{verdict.plan.hash.slice(0, 19)}</span>.
+                      Batch plan <span className="a-mono">{verdict.plan.hash.slice(0, 19)}</span>
                     </p>
                   )}
-                  <PlanSteps steps={verdict.plan.steps} />
+                  <PlanSteps steps={verdict.plan.steps} names={state.stepNames} />
                 </>
               )}
             </Panel>

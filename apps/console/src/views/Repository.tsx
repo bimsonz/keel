@@ -11,6 +11,7 @@ import {
   FolderOpenIcon,
   FolderSimpleIcon,
   GitCommitIcon,
+  GitForkIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
@@ -24,7 +25,9 @@ import type {
 } from "../engine/repository.ts";
 import { directoryOf } from "../engine/readme.ts";
 import { TRUNK } from "../route.ts";
-import { Link } from "../router.tsx";
+import { buttonVariants } from "@cloudflare/kumo";
+import { hrefOf } from "../places.ts";
+import { Link, useWhere } from "../router.tsx";
 import type { RepoNote } from "../contract/provisional.ts";
 import type { Mode } from "../theme/mode.ts";
 import { Notice } from "./Frame.tsx";
@@ -156,7 +159,10 @@ function Crumbs({ state, at }: { state: Ready; at: string }) {
         return (
           <span key={crumb.path} className="flex items-center gap-1.5">
             {index > 0 && <span className="text-kumo-subtle">/</span>}
-            {last ? (
+            {last && state.crumbs.length === 1 ? (
+              // The project's home is headed by its name, as a code host heads a repository's.
+              <b className="text-xl font-semibold text-kumo-strong">{crumb.name}</b>
+            ) : last ? (
               <b className="a-mono font-semibold text-kumo-strong">{crumb.name}</b>
             ) : (
               <Link
@@ -477,17 +483,37 @@ function Commit({
   );
 }
 
+/** Forking the project: a visitor signs in first, and comes back to the form. */
+function Fork() {
+  const { namespace, project } = useWhere();
+  return (
+    <a
+      href={hrefOf({ at: "fork", namespace, project })}
+      className={`${buttonVariants({ variant: "secondary", size: "sm" })} ml-auto`}
+    >
+      <GitForkIcon size={15} />
+      Fork
+    </a>
+  );
+}
+
 export function Repository({
   state,
   address,
   mode,
   onToggle,
+  banner,
+  aside,
 }: {
   state: RepositoryState;
   address: RepoAddress;
   mode: Mode;
   /** Opens or closes a directory in the list of files beside the code. */
   onToggle: (directory: string, open: boolean) => void;
+  /** What leads the project's home: what waits on a person there. */
+  banner?: ReactNode;
+  /** Beside the project's home, its About column. */
+  aside?: ReactNode;
 }) {
   if (state.status === "refused") {
     return (
@@ -504,6 +530,7 @@ export function Repository({
   const at = address.ref ?? TRUNK;
   const page = (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-4 px-6 py-5">
+      {banner}
       {view.kind !== "commit" && (
         <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="sr-only">{address.view === "code" ? "Code" : "Commits"}</h1>
@@ -546,6 +573,8 @@ export function Repository({
               Browse the files
             </Link>
           )}
+          {/* The project's own actions are on its home, as a code host has Fork on a repository's. */}
+          {address.view === "code" && address.path === "" && <Fork />}
         </header>
       )}
 
@@ -553,7 +582,17 @@ export function Repository({
       {view.kind === "absent" && (
         <p className="text-base text-kumo-default">There is no {view.what} at this commit.</p>
       )}
-      {view.kind === "tree" && <Tree view={view} at={at} state={state} />}
+      {view.kind === "tree" &&
+        (aside === undefined ? (
+          <Tree view={view} at={at} state={state} />
+        ) : (
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <Tree view={view} at={at} state={state} />
+            </div>
+            {aside}
+          </div>
+        ))}
       {view.kind === "file" && <FileView view={view} mode={mode} />}
       {view.kind === "history" && <History view={view} />}
       {view.kind === "commit" && <Commit view={view} mode={mode} at={at} />}

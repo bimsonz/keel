@@ -1,5 +1,6 @@
 // The questions Keel has put to a person, listed.
 
+import { rulingWords } from "../engine/ruling.ts";
 import { HandPalmIcon } from "@phosphor-icons/react";
 import { membersOf } from "../engine/audience.ts";
 import { type EscalationFilter, PAGE, escalationsOf } from "../engine/lists.ts";
@@ -15,15 +16,9 @@ const FILTERS: { id: EscalationFilter; label: string }[] = [
   { id: "closed", label: "Closed" },
 ];
 
-const EMPTY: Record<EscalationFilter, [string, string]> = {
-  open: [
-    "Nothing is waiting for a person",
-    "Keel settles almost everything itself. A question arrives here only when proof exists and the answer is a matter of judgement: permission semantics, a destructive migration, an ambiguous requirement.",
-  ],
-  closed: [
-    "No question has been closed yet",
-    "A question is closed when a person answers it, and the answer is recorded as a decision that later changes meet as precedent; or when Keel withdraws it before anyone has.",
-  ],
+const EMPTY: Record<EscalationFilter, string> = {
+  open: "No open questions",
+  closed: "No closed questions",
 };
 
 /**
@@ -36,18 +31,28 @@ export function ForMembers({ what }: { what: "list" | "question" }) {
   // An org has members to sign in as. A person's namespace, or an agent's, is its owner's alone.
   const way = kind === "org" ? ` Sign in as a member of ${namespace} to ` : null;
   return (
-    <Nothing title={`Keel shows a project's questions to its members`}>
-      {what === "list"
-        ? `A question put to a person, its options and the answer given are read by ${members} and by nobody else, so this page cannot say whether one is waiting.${way === null ? "" : `${way}read them and to answer.`}`
-        : `A question, its options and the answer given are read by ${members} and by nobody else.${way === null ? "" : `${way}read this one and to answer it.`}`}
+    <Nothing title={what === "list" ? "Questions are visible to members" : "Visible to members"}>
+      {`Readers: ${members}.${way === null ? "" : `${way}${what === "list" ? "read and answer them" : "answer"}.`}`}
     </Nothing>
   );
+}
+
+/** A question as a person reads it: in words, where Keel says which changes it is about. */
+function QuestionTitle({ id, fallback }: { id: string; fallback: string }) {
+  const title = useSelected(
+    (world) => {
+      const entry = world.escalations.get(id);
+      return entry === undefined ? undefined : rulingWords(world, entry).title;
+    },
+    [id],
+  );
+  return <>{title ?? fallback}</>;
 }
 
 export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; shown: number }) {
   const list = useSelected((world) => escalationsOf(world, filter, shown), [filter, shown]);
   const hidden = usePublicOnly();
-  const [title, body] = EMPTY[filter];
+  const title = EMPTY[filter];
   if (hidden)
     return (
       <Column>
@@ -65,17 +70,21 @@ export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; s
         to={(next) => ({ at: "escalations", filter: next, shown: PAGE })}
       />
       {list.rows.length === 0 ? (
-        <Nothing title={title}>{body}</Nothing>
+        <Nothing title={title} />
       ) : (
         <Rows label="Escalations, newest first">
           {list.rows.map((row) => (
             <Row
               key={row.id}
               mark={<EscalationMark state={row.state} />}
-              title={<EscalationLink id={row.id}>{row.question}</EscalationLink>}
+              title={
+                <EscalationLink id={row.id}>
+                  <QuestionTitle id={row.id} fallback={row.question} />
+                </EscalationLink>
+              }
               meta={
                 <>
-                  <b className="font-semibold text-kumo-default">{row.label}</b>
+                  <span className="text-kumo-subtle">{row.label}</span>
                   <span>{CATEGORY[row.category]}</span>
                   {row.subject !== undefined && (
                     <SubjectLink subject={row.subject} className="a-mono a-link-quiet">

@@ -1,7 +1,9 @@
+import { buttonVariants } from "@cloudflare/kumo";
 import { BookBookmarkIcon, UsersThreeIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type { Org } from "../account/account.ts";
 import { followTurns, waitingRows } from "../engine/waiting.ts";
+import { KEEL_QUICKSTART, KEEL_SOURCE } from "../own.ts";
 import { hrefOf } from "../places.ts";
 import { TRUNK, href } from "../route.ts";
 import { Anchor, carriedParams } from "../router.tsx";
@@ -14,10 +16,19 @@ import { dateTime } from "../views/parts.tsx";
 
 /** Where Keel's source, its walk from a key to a first change and its API's description are, for a visitor. */
 const ABOUT: readonly { label: string; href: string }[] = [
-  { label: "Source on GitHub", href: "https://github.com/bimsonz/keel" },
-  { label: "Quickstart", href: "/start" },
+  { label: "Source", href: KEEL_SOURCE },
+  { label: "Quickstart", href: KEEL_QUICKSTART },
   { label: "API", href: "/v1/openapi.json" },
 ];
+
+/** Whether a project is Keel's own: where Keel's own code is kept, by Keel. */
+const keelsOwn = (project: ProjectView): boolean =>
+  project.namespace.handle === "keel" && project.name === "keel";
+
+/** Keel's own project leads the list. */
+function keelFirst(projects: readonly ProjectView[]): readonly ProjectView[] {
+  return [...projects.filter(keelsOwn), ...projects.filter((project) => !keelsOwn(project))];
+}
 
 /** Projects, each under its owner, as a code host lists repositories. */
 function ProjectRows({ label, projects }: { label: string; projects: readonly ProjectView[] }) {
@@ -48,9 +59,10 @@ function ProjectRows({ label, projects }: { label: string; projects: readonly Pr
               </Anchor>
             </span>
           }
-          meta={
+          meta={null}
+          tied={
             <span className="a-chip" data-tone="quiet">
-              {project.visibility}
+              {project.visibility === "public" ? "Public" : "Private"}
             </span>
           }
         />
@@ -146,7 +158,7 @@ function Waiting({ directory }: { directory: KeelDirectory }) {
           Keel did not list your questions: {listed.failed}
         </p>
       ) : listed !== undefined && rows.length === 0 ? (
-        <p className="text-base text-kumo-subtle">No question is waiting for you.</p>
+        <p className="text-base text-kumo-subtle">No questions waiting</p>
       ) : (
         rows.length > 0 && (
           <Rows label="Questions waiting for you, newest first">
@@ -168,7 +180,7 @@ function Waiting({ directory }: { directory: KeelDirectory }) {
                 }
                 meta={
                   <>
-                    <b className="font-semibold text-kumo-default">{row.label}</b>
+                    <span className="text-kumo-subtle">{row.label}</span>
                     <Anchor
                       href={href(
                         row.namespace,
@@ -246,7 +258,7 @@ export function HomePage({
           ) : projects.length === 0 ? (
             <p className="text-base text-kumo-subtle">No project is public yet.</p>
           ) : (
-            <ProjectRows label="Public projects" projects={projects} />
+            <ProjectRows label="Public projects" projects={keelFirst(projects)} />
           )}
         </section>
       </Column>
@@ -272,47 +284,78 @@ export function HomePage({
   const joined = orgs;
   const mine = projects.filter((project) => project.namespace.handle === handle);
   const rest = projects.filter((project) => project.namespace.handle !== handle);
+  // A code host's dashboard: the reader's projects down the left with the way to a new one, what waits for them
+  // and every project they may read beside it.
   return (
-    <Column>
-      {handle !== undefined && <Waiting directory={directory} />}
-      {handle !== undefined && (
-        <>
-          <h1 className="text-xl font-semibold text-kumo-strong">Your projects</h1>
-          {mine.length === 0 ? (
-            <p className="text-base text-kumo-subtle">You have no project yet.</p>
-          ) : (
-            <ProjectRows label="Your projects" projects={mine} />
+    <div className="a-scroll h-full overflow-y-auto">
+      <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-8 px-6 py-6 md:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="flex flex-col gap-6" aria-label="Your projects and orgs">
+          <section className="flex flex-col gap-2">
+            <header className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-kumo-strong">Top projects</h2>
+              <a
+                href={hrefOf({ at: "new-project" })}
+                className={buttonVariants({ variant: "primary", size: "sm" })}
+              >
+                <BookBookmarkIcon size={14} aria-hidden />
+                New
+              </a>
+            </header>
+            {mine.length + rest.length === 0 ? (
+              <p className="text-sm text-kumo-subtle">No projects</p>
+            ) : (
+              <ul className="flex flex-col gap-1.5" aria-label="Top projects">
+                {[...mine, ...rest].slice(0, 12).map((project) => (
+                  <li key={project.id} className="flex min-w-0 items-center gap-2 text-sm">
+                    <BookBookmarkIcon size={14} className="shrink-0 text-kumo-subtle" aria-hidden />
+                    <Anchor
+                      href={href(
+                        project.namespace.handle,
+                        project.name,
+                        { at: "code", kind: "tree", ref: TRUNK, path: "" },
+                        carriedParams(),
+                      )}
+                      className="truncate text-kumo-strong hover:underline"
+                    >
+                      {project.namespace.handle}/{project.name}
+                    </Anchor>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          {joined.length > 0 && (
+            <section className="flex flex-col gap-2 border-t border-kumo-line pt-4">
+              <h2 className="text-sm font-semibold text-kumo-strong">Your orgs</h2>
+              <ul className="flex flex-col gap-1.5" aria-label="Your orgs">
+                {joined.map((org) => (
+                  <li key={org.id} className="flex items-center gap-2 text-sm">
+                    <UsersThreeIcon size={14} className="text-kumo-subtle" aria-hidden />
+                    <a
+                      href={hrefOf({ at: "namespace", handle: org.handle })}
+                      className="text-kumo-strong hover:underline"
+                    >
+                      {org.handle}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
-        </>
-      )}
-      {joined.length > 0 && (
-        <>
-          <h2 className="text-xl font-semibold text-kumo-strong">Your orgs</h2>
-          <Rows label="Your orgs">
-            {joined.map((org) => (
-              <Row
-                key={org.id}
-                mark={<UsersThreeIcon size={18} aria-hidden />}
-                title={
-                  <a
-                    href={hrefOf({ at: "namespace", handle: org.handle })}
-                    className="hover:underline"
-                  >
-                    {org.handle}
-                  </a>
-                }
-                meta={org.name === org.handle ? null : org.name}
-              />
-            ))}
-          </Rows>
-        </>
-      )}
-      {(handle === undefined || rest.length > 0) && (
-        <>
-          <h2 className="text-xl font-semibold text-kumo-strong">Projects</h2>
-          <ProjectRows label="Projects" projects={rest} />
-        </>
-      )}
-    </Column>
+        </aside>
+        <div className="flex min-w-0 flex-col gap-6">
+          <h1 className="sr-only">Home</h1>
+          {handle !== undefined && <Waiting directory={directory} />}
+          <section aria-label="Projects" className="flex flex-col gap-3">
+            <h2 className="text-xl font-semibold text-kumo-strong">Projects</h2>
+            {projects.length === 0 ? (
+              <p className="text-base text-kumo-subtle">No projects</p>
+            ) : (
+              <ProjectRows label="Projects" projects={[...mine, ...rest]} />
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }
