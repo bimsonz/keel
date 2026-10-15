@@ -1,4 +1,5 @@
-// Sponsoring an agent, as the sponsor's page does it: one tap is a passkey touch and then the approval.
+// Sponsoring an agent, as the sponsor's page does it and as a request on the home is approved: one tap is a
+// passkey touch and then the approval.
 
 import { KeelRefused } from "../source/types.ts";
 import type { Who } from "./account.ts";
@@ -26,6 +27,30 @@ export async function sponsorAgent(
   const signedIn = await sponsoring.signIn();
   if (reader !== null && signedIn.id !== reader.id) return { is: "changed", to: signedIn };
   await sponsoring.approve(link.agentId, link.code);
+  return { is: "approved", as: signedIn };
+}
+
+/** What Approve on a request waiting for the reader needs of the page: a passkey sign-in, and Keel's approval. */
+export interface Answering {
+  signIn(): Promise<Who>;
+  approve(agentId: string, key: string): Promise<void>;
+}
+
+/**
+ * Approve on a request on the reader's own list, as GitHub accepts an invitation from its dashboard, with the one
+ * step GitHub's sudo mode adds: Keel takes an approval only from a passkey sign-in of the last ten minutes, so the
+ * tap is a passkey touch and then the approval. A passkey that is another account's sends nothing: the request
+ * was to the reader, by their handle, and the page then reads as whoever touched.
+ */
+export async function approveRequest(
+  answering: Answering,
+  agentId: string,
+  reader: string,
+  key: string,
+): Promise<Stood> {
+  const signedIn = await answering.signIn();
+  if (signedIn.handle !== reader) return { is: "changed", to: signedIn };
+  await answering.approve(agentId, key);
   return { is: "approved", as: signedIn };
 }
 

@@ -14,7 +14,7 @@ import { EscalationPage } from "./pages/Escalation.tsx";
 import { EscalationsPage } from "./pages/Escalations.tsx";
 import { DecisionPage } from "./pages/Decision.tsx";
 import { DecisionsPage } from "./pages/Decisions.tsx";
-import { HomePage } from "./pages/Home.tsx";
+import { type HomeAccount, HomePage } from "./pages/Home.tsx";
 import { InsightsFrame, InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
@@ -22,7 +22,8 @@ import { PipelinePage } from "./pages/Pipeline.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
 import { type Route, TRUNK, href } from "./route.ts";
 import { WhereProvider, carriedParams, useAddress } from "./router.tsx";
-import { createHttpDirectory, createHttpSource } from "./source/http.ts";
+import { createHttpDirectory, createHttpSource, createHttpSponsorship } from "./source/http.ts";
+import { createHttpSponsorRequests } from "./source/sponsorRequests.ts";
 import type { ProjectView } from "./contract/keel/index.ts";
 import type { KeelDirectory } from "./source/types.ts";
 import { type Mode, applyMode } from "./theme/mode.ts";
@@ -402,6 +403,16 @@ function Project({
   );
 }
 
+/** What the home asks of a live Keel beyond its projects: agents' cards, the reader's sponsor requests, a passkey. */
+function liveHome(): HomeAccount {
+  const account = createAccount({ origin: window.location.origin });
+  return {
+    agents: createHttpSponsorship(),
+    requests: createHttpSponsorRequests(),
+    signIn: () => account.signInWithPasskey(),
+  };
+}
+
 function Unreachable({ said }: { said: string }) {
   return (
     <Notice title="The console could not reach Keel">
@@ -421,6 +432,7 @@ export function App() {
   const [failure, setFailure] = useState<string | null>(null);
   const { namespace, project, route } = useAddress();
   const reader = useReader(reading?.mode === "live");
+  const home = useMemo(() => (reading?.mode === "live" ? liveHome() : undefined), [reading?.mode]);
 
   useEffect(() => {
     applyMode(mode);
@@ -472,6 +484,7 @@ export function App() {
         ) : (
           <HomePage
             directory={reading.directory}
+            {...(home === undefined ? {} : { account: home })}
             orgs={reader?.orgs ?? []}
             {...(reader?.handle === undefined ? {} : { handle: reader.handle })}
           />

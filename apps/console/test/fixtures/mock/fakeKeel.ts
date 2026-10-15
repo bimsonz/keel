@@ -40,6 +40,8 @@ import type {
   ProjectView,
   SponsorRequest,
   SponsoredAgents,
+  PendingSponsorRequests,
+  DeclinedSponsorRequest,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
@@ -203,6 +205,11 @@ export interface FakeKeel {
   /** A person sponsors an agent, as approving its code makes them: a test's way to a sponsorship already made. */
   sponsors(agentId: string, userId: string): void;
   /**
+   * An agent asks a person by their handle to sponsor it, as Keel's `askSponsor` naming a person does: the request
+   * waits on that person's own list for seven days. A test's way to a request; the agent's own call is no page's.
+   */
+  asksPerson(agentId: string, userId: string): void;
+  /**
    * An agent accepts the invitation it has into an org, as its own call to Keel does: a test's way to an agent
    * that has joined. The agent's own three calls are no page's.
    */
@@ -306,6 +313,18 @@ const staleSignIn = (): Response =>
     [{ kind: "escalate", title: "Sign in again with your passkey, then retry" }],
     "This needs a fresh sign-in: a passkey sign-in from the last ten minutes.",
   );
+
+/** Keel's answer to a move on a request that is not on the person's list: `noRequestFromAgent`. */
+const noRequestFromAgent = (): Response =>
+  problem(
+    404,
+    "resource.not_found",
+    [{ kind: "call", title: "List the sponsor requests waiting for you" }],
+    "No request from that agent waits for you.",
+  );
+
+/** How long a request waits on a person's list before it lapses: Keel's seven days. */
+export const SPONSOR_REQUEST_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Keel's one answer to an approval that finds no live request, `noSuchRequest`: the code is wrong, used or run
@@ -682,6 +701,15 @@ export function createFakeKeel(
   /** Each agent's live request for a sponsor, and who sponsors each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
+  /** The requests waiting on each person's list, by their account and then by agent, oldest first. */
+  const waiting = new Map<string, Map<string, { askedAt: number; until: number }>>();
+  /** The agents each person has blocked from asking them again. */
+  const blocked = new Map<string, Set<string>>();
+  /** A person's requests that have not lapsed, from agents Keel knows, oldest first. */
+  const waitingFor = (userId: string | undefined) =>
+    [...(waiting.get(userId ?? "") ?? new Map<string, { askedAt: number; until: number }>())]
+      .filter(([agentId, one]) => agents.has(agentId) && now() <= one.until)
+      .map(([agentId, one]) => ({ agentId, ...one }));
   /** How each agent stands, where it is not active, and the reason its pause was given. */
   const standing = new Map<string, NonNullable<AgentProfile["state"]>>();
   const pauses = new Map<string, string>();
@@ -721,6 +749,16 @@ export function createFakeKeel(
     pausedFor: (agentId) => pauses.get(agentId),
     sponsors(agentId, userId) {
       behind.set(agentId, userId);
+    },
+    asksPerson(agentId, userId) {
+      // Keel refuses an agent that has a sponsor, and one the person has blocked. A new request replaces the last.
+      if (behind.has(agentId)) throw new Error(`${agentId} ${SPONSOR_HELD}`);
+      if (blocked.get(userId)?.has(agentId) === true)
+        throw new Error(`${agentId} is blocked by ${userId}`);
+      const mine = waiting.get(userId) ?? new Map();
+      mine.delete(agentId);
+      mine.set(agentId, { askedAt: now(), until: now() + SPONSOR_REQUEST_FOR_MS });
+      waiting.set(userId, mine);
     },
     accepts(org, agentId) {
       const row = invited.get(org.toLowerCase())?.get(agentId);
@@ -781,6 +819,43 @@ export function createFakeKeel(
             .filter((agent) => reader.id !== undefined && behind.get(agent.id) === reader.id)
             .map(profileOf),
         } satisfies SponsoredAgents);
+      }
+
+      // The requests waiting for the person signed in, oldest first, and their answer to one: Keel's
+      // `listSponsorRequests`, `approveSponsorRequest` and `declineSponsorRequest`. An approval wants a fresh
+      // sign-in before Keel looks for the request; a decline wants none. A lapsed request is on no list.
+      if (url.pathname === "/v1/users/me/sponsor-requests" && request.method === "GET") {
+        if (reader === null) return problem(401, "auth.required");
+        return Response.json({
+          items: waitingFor(reader.id).map((one) => ({
+            agent: agents.get(one.agentId) ?? { id: one.agentId, name: one.agentId },
+            askedAt: new Date(one.askedAt).toISOString(),
+            expiresAt: new Date(one.until).toISOString(),
+          })),
+        } satisfies PendingSponsorRequests);
+      }
+      const answering = /^\/v1\/users\/me\/sponsor-requests\/([^/]+)$/.exec(url.pathname);
+      if (answering !== null && (request.method === "PUT" || request.method === "DELETE")) {
+        if (reader === null) return problem(401, "auth.required");
+        if (!keyed128(request.headers.get("idempotency-key") ?? ""))
+          return problem(400, "request.invalid");
+        if (request.method === "PUT" && reader.fresh !== true) return staleSignIn();
+        const agentId = decodeURIComponent(answering[1] ?? "");
+        const known = agents.get(agentId);
+        if (known === undefined || !waitingFor(reader.id).some((one) => one.agentId === agentId))
+          return noRequestFromAgent();
+        const mine = reader.id ?? "";
+        if (request.method === "DELETE") {
+          waiting.get(mine)?.delete(agentId);
+          const block = url.searchParams.get("block") === "true";
+          if (block) blocked.set(mine, new Set([...(blocked.get(mine) ?? []), agentId]));
+          return Response.json({ agent: known, blocked: block } satisfies DeclinedSponsorRequest);
+        }
+        // Somebody else came to sponsor it first.
+        if (behind.has(agentId)) return problem(409, "agent.state_refused");
+        waiting.get(mine)?.delete(agentId);
+        behind.set(agentId, mine);
+        return Response.json(profileOf(known));
       }
 
       // Who an agent is, Keel answers anyone: its card, and never who sponsors it. The card names the orgs

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/requests.test.ts -t "owner.name"
+# kills: owner.name
+# why: every owner's namespace is read again for a card, a person's and an org's too, one read per owner on every home
+diff --git a/apps/console/src/engine/owners.ts b/apps/console/src/engine/owners.ts
+index 952cd8e2..bd9c6186 100644
+--- a/apps/console/src/engine/owners.ts
++++ b/apps/console/src/engine/owners.ts
+@@ -18,7 +18,6 @@ export async function agentNames(
+ ): Promise<ReadonlyMap<string, string>> {
+   const handles = new Set(
+     projects
+-      .filter((project) => project.namespace.kind === "agent")
+       .map((project) => project.namespace.handle),
+   );
+   const named = await Promise.all(

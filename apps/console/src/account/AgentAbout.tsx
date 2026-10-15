@@ -8,10 +8,10 @@
 import { useEffect, useState } from "react";
 import type { AgentCard } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
-import type { KeelSponsorship } from "../source/types.ts";
+import type { KeelAgents, KeelSponsorship } from "../source/types.ts";
 
 /** Keel's card of an agent: undefined while it is asked for, null where Keel has none or would not say. */
-function useCard(sponsorship: KeelSponsorship, agentId: string): AgentCard | null | undefined {
+export function useCard(sponsorship: KeelAgents, agentId: string): AgentCard | null | undefined {
   const [card, setCard] = useState<AgentCard | null>();
   useEffect(() => {
     const stop = new AbortController();

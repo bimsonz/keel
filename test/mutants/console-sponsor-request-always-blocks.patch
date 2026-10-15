@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/requests.test.ts -t "requests.decline"
+# kills: requests.decline
+# why: Decline on the home blocks the agent too, so it can never ask the person again
+diff --git a/apps/console/src/source/sponsorRequests.ts b/apps/console/src/source/sponsorRequests.ts
+index 53ec9d28..102ef838 100644
+--- a/apps/console/src/source/sponsorRequests.ts
++++ b/apps/console/src/source/sponsorRequests.ts
+@@ -52,7 +52,7 @@ export function createHttpSponsorRequests(options: HttpOptions = {}): KeelSponso
+         block: blocking,
+         "idempotency-key": attempt,
+       }: Users_declineSponsorRequestInput = { agentId, block, "idempotency-key": key };
+-      const query = blocking ? "?block=true" : "";
++      const query = "?block=true";
+       const response = await request(`${MINE}/${encodeURIComponent(named)}${query}`, {
+         method: "DELETE",
+         headers: { "idempotency-key": attempt },

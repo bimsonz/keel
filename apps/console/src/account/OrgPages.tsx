@@ -3,7 +3,7 @@
 // other. Whose the handle is (a person's, an agent's or an org's) is Keel's to say, and the page is worded
 // from its answer.
 
-import { AgentAbout } from "./AgentAbout.tsx";
+import { AgentAbout, useCard } from "./AgentAbout.tsx";
 import { isOwn } from "./accounts.ts";
 import { Button, Input, buttonVariants } from "@cloudflare/kumo";
 import {
@@ -517,6 +517,40 @@ function OrgSettings({
 }
 
 /**
+ * A namespace's heading, as GitHub heads a profile: its name, and under it in grey its handle where the name is
+ * another. A person's handle is their account and needs no label; an agent's and an org's are named as that.
+ */
+function Heading({ namespace, name }: { namespace: NamespaceView; name?: string }) {
+  return (
+    <header className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h1 className="text-[22px] font-semibold text-kumo-strong">{name ?? namespace.handle}</h1>
+        {namespace.kind !== "user" && (
+          <span className="a-chip" data-tone="quiet">
+            {KIND[namespace.kind]}
+          </span>
+        )}
+      </div>
+      {name !== undefined && name !== namespace.handle && (
+        <p className="a-mono text-base text-kumo-subtle">{namespace.handle}</p>
+      )}
+    </header>
+  );
+}
+
+/** An agent's heading: the name on its card, which Keel reads anyone, by the namespace's id, which is the agent's. */
+function AgentHeading({
+  sponsorship,
+  namespace,
+}: {
+  sponsorship: KeelSponsorship;
+  namespace: NamespaceView;
+}) {
+  const card = useCard(sponsorship, namespace.id);
+  return <Heading namespace={namespace} {...(card ? { name: card.name } : {})} />;
+}
+
+/**
  * A namespace as anyone may see it: its handle, whose Keel says it is, and the projects of it that Keel names
  * to this reader. For a visitor those are its public ones. That a handle is someone's is no secret, so one with
  * no project to show is still there, and a page says so; a handle nobody has is told as that.
@@ -559,15 +593,11 @@ export function NamespacePublic({
   const open = tab === "projects" ? "projects" : "overview";
   return (
     <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5 px-6 py-8">
-      <header className="flex flex-wrap items-center gap-2.5">
-        <h1 className="text-[22px] font-semibold text-kumo-strong">{namespace.handle}</h1>
-        {/* A person's handle is their account and needs no label; an agent's and an org's are named as that. */}
-        {namespace.kind !== "user" && (
-          <span className="a-chip" data-tone="quiet">
-            {KIND[namespace.kind]}
-          </span>
-        )}
-      </header>
+      {namespace.kind === "agent" ? (
+        <AgentHeading sponsorship={sponsorship} namespace={namespace} />
+      ) : (
+        <Heading namespace={namespace} />
+      )}
       <NamespaceTabs
         handle={namespace.handle}
         kind={namespace.kind}

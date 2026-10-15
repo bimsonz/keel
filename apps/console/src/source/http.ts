@@ -170,7 +170,7 @@ interface Problem {
 }
 
 /** Keel's refusal, as it words one: its detail or its title, its code, and the ways forward it gave. */
-async function refusalOf(response: Response): Promise<KeelRefused> {
+export async function refusalOf(response: Response): Promise<KeelRefused> {
   const problem: Problem = await response.json().catch(() => ({}));
   const said = [problem.detail, problem.title].find(
     (words): words is string => typeof words === "string" && words !== "",
@@ -192,7 +192,7 @@ async function refusalOf(response: Response): Promise<KeelRefused> {
 }
 
 /** Keel's answer to a read, as the JSON it is. Whatever answers under /v1 with anything else is not Keel. */
-async function answered<Body>(response: Response): Promise<Body> {
+export async function answered<Body>(response: Response): Promise<Body> {
   try {
     const body: Body = await response.json();
     return body;
