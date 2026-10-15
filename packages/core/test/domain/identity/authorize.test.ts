@@ -253,7 +253,7 @@ const inside = (p: Principal, org: NamespaceId): boolean =>
   (p._tag === "User" && p.memberships.some((m) => m.org === org)) ||
   (p._tag === "Agent" && p.namespace === org && p.standing._tag !== "None");
 
-const READS: ReadonlySet<Need> = new Set(["read", "readMembers"]);
+const READS: ReadonlySet<Need> = new Set(["read", "readMembers", "readMembersOrSponsor"]);
 const GOVERNING: ReadonlySet<Need> = new Set([
   "member",
   "invite",
@@ -1119,6 +1119,7 @@ describe("authorize", () => {
     const NEEDED: Partial<Record<Need, number>> = {
       member: 1,
       readMembers: 1,
+      readMembersOrSponsor: 1,
       maintain: 2,
       workOrMaintain: 2,
       invite: 1,
@@ -1938,6 +1939,61 @@ describe("authorize: a namespace by its kind", () => {
     ]);
     expect(refusalsAt(ADA)).toEqual([1, 2, 3].map(() => `role: ${nobodyToAsk("a person's own")}`));
     expect(refusalsAt(BOT)).toEqual([1, 2, 3].map(() => `role: ${nobodyToAsk("an agent's own")}`));
+  });
+
+  it("[authz.sponsor-own-namespace] in an agent's own namespace, where no person holds a role, the sponsor Keel asks sees what it is asked and answers it, of a private project too, and gains nothing else there; in an org a sponsor answers only as a member", () => {
+    const PROJECT_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) === "Project");
+    let answered = 0;
+    fc.assert(
+      fc.property(
+        userArb,
+        fc.constantFrom(...PROJECT_ACTIONS),
+        fc.option(fc.constantFrom(...USERS), { nil: undefined }),
+        fc.constantFrom("private", "public"),
+        rare(6),
+        (drawn, action, sponsor, visibility, suspended) => {
+          const bare = project(PRJ_1, visibility, {
+            namespace: BOT,
+            personOwned: false,
+            namespaceSuspended: suspended,
+          });
+          const asked = sponsor === undefined ? bare : { ...bare, sponsor };
+          const got = outcome(decide(drawn, action, asked));
+          const need = needOf(action);
+          const answers =
+            (need === "sponsorOrMaintain" ||
+              need === "sponsorOrMaintainAsUser" ||
+              need === "readMembersOrSponsor") &&
+            sponsor === drawn.userId &&
+            !drawn.suspended &&
+            drawn.handle !== undefined &&
+            !suspended;
+          if (!answers) return got === outcome(decide(drawn, action, bare));
+          answered++;
+          return got === (need === "readMembersOrSponsor" ? "ok:members" : "ok:");
+        },
+      ),
+    );
+    expect(answered).toBeGreaterThan(0);
+    // The two Keel asks of the sponsor: the list of what it is asked, and the ruling.
+    const theirs = project(PRJ_1, "private", { namespace: BOT, personOwned: false, sponsor: ADA });
+    expect(outcome(decide(ada, "Operator_listEscalations", theirs))).toBe("ok:members");
+    expect(outcome(decide(ada, "Operator_giveRuling", theirs))).toBe("ok:");
+    expect(outcome(decide(ada, "Operator_getSettings", theirs))).toBe("404");
+    expect(outcome(decide(bea, "Operator_giveRuling", theirs))).toBe("404");
+    // A suspended namespace is not there for its sponsor, who is outside it.
+    const suspended = { ...theirs, namespaceSuspended: true };
+    expect(outcome(decide(ada, "Operator_giveRuling", suspended))).toBe("404");
+    expect(outcome(decide(ada, "Operator_listEscalations", suspended))).toBe("404");
+    // In an org, the sponsor of the agent concerned answers as a member, and is refused as anyone else is when not one.
+    const inOrg = project(PRJ_1, "public", { sponsor: ADA });
+    expect(outcome(decide(ada, "Operator_giveRuling", inOrg))).toBe("403:role");
+    expect(outcome(decide(ada, "Operator_listEscalations", inOrg))).toBe("403:role");
+    const member = user({
+      userId: ADA,
+      memberships: [{ org: asOrg(inOrg.namespace), role: "member" }],
+    });
+    expect(outcome(decide(member, "Operator_giveRuling", inOrg))).toBe("ok:");
   });
 
   it("[authz.person-owns] a person owns a person's namespace and an org, and an agent's own namespace is the agent's", () => {

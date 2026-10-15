@@ -417,24 +417,26 @@ const sourceOf = (caller: Caller, source: ProjectId) =>
 /**
  * A project's place for one item of a person's or an agent's list of
  * escalations: answered only where the policy lets the caller read what the
- * project's members see (the list's own rule), and decided once a project a
- * request.
+ * project's members see, or what is asked of the sponsor the item names (the
+ * list's own rule), and decided once a project and sponsor a request.
  */
 const escalationPlaces = (caller: Caller) => {
-  const seen = new Map<ProjectId, ProjectRef | undefined>();
-  return (project: ProjectId) =>
-    seen.has(project)
-      ? Effect.succeed(seen.get(project))
+  const seen = new Map<string, ProjectRef | undefined>();
+  return (project: ProjectId, sponsor: UserId | undefined) => {
+    const key = `${project} ${sponsor ?? ""}`;
+    return seen.has(key)
+      ? Effect.succeed(seen.get(key))
       : Effect.gen(function* () {
-          const resource = yield* projectResource(project);
+          const resource = yield* projectResource(project, sponsor);
           const place = Result.isSuccess(
             authorize(caller.principal, "Operator_listEscalations", resource),
           )
             ? yield* placeOf(project)
             : undefined;
-          seen.set(project, place);
+          seen.set(key, place);
           return place;
         });
+  };
 };
 
 /**

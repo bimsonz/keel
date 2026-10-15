@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sponsor-own-namespace
+# kills: authz.sponsor-own-namespace
+# why: the sponsor asked in an agent's own namespace is held to a role nobody has there, so a private project's question is not there for them and a public one's is refused
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 8d00f3f9..82f299d0 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -634,9 +634,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+   // In an agent's own namespace no person holds a role, and Keel asks the agent's sponsor first: the sponsor
+   // sees what it is asked and answers it, private project or not, and nothing else there.
+   if (
+-    (need === "sponsorOrMaintain" ||
+-      need === "sponsorOrMaintainAsUser" ||
+-      need === "readMembersOrSponsor") &&
++    false &&
+     asksSponsor(principal, resource)
+   )
+     return resource.namespaceSuspended

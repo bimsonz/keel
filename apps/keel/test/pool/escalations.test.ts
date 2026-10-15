@@ -57,7 +57,9 @@ import {
   BASE,
   drainAfter,
   drainOutbox,
+  establishProject,
   OTHER_ORG,
+  placeProject,
   POOL_ORG,
   POOL_SPONSOR,
   seedAgent,
@@ -976,5 +978,47 @@ describe("[t35.widened-real] a question passing to its namespace's maintainers, 
     // The one still waiting is answered too, so no deadline outlives the case.
     ok(await ruling(early.id));
     expect(await wideningsOf(ns, [early.id, waiting.id])).toEqual([]);
+  });
+});
+
+describe("[escalation.sponsor-own-namespace] the person asked first in an agent's own namespace, through the doorway", () => {
+  it("[escalation.sponsor-own-namespace] in an agent's own namespace, where no person holds a role, the sponsor asked lists the question on a private project and rules on it, and reads nothing else members-only there; another person neither lists it nor rules", async () => {
+    const bot = makeId("agt", ulid());
+    const projectId = makeId("prj", ulid());
+    await establishProject(projectId);
+    await placeProject(projectId, bot);
+    const sponsor = await seedUser(uniqueHandle("sponsor"), { role: null });
+    const stranger = await seedUser(uniqueHandle("stranger"), { role: null });
+    const ns = namespaceObject(namespaceAddress(bot));
+    const raised = await raisedAgo(ns, 0, {
+      project: projectId,
+      raisedBy: `subj:${projectId}:${LEAF}`,
+      sponsor: sponsor.userId,
+    });
+    await drainOutbox(ns);
+
+    // Listed to the sponsor, with the project it is about, though the sponsor is no member of anything there.
+    await vi.waitFor(async () => {
+      const listed = await questions(sponsor.token);
+      expect(listed.status).toBe(200);
+      expect(listed.items.map((item) => [item.id, item.project.id])).toEqual([
+        [raised.id, projectId],
+      ]);
+    }, WAIT);
+    // Asked of nobody else: another person lists nothing, and the question is not there for them to rule.
+    expect(await questions(stranger.token)).toEqual({ status: 200, items: [] });
+    expect((await rule(stranger.token, raised.id, "ruling-stranger", EFFECT_STANDS)).status).toBe(
+      404,
+    );
+    // The sponsor answers it.
+    const ruled = await rule(sponsor.token, raised.id, "ruling-sponsor", EFFECT_STANDS);
+    expect(ruled.status).toBe(200);
+    expect(await ruled.json<Question>()).toMatchObject({
+      id: raised.id,
+      project: { id: projectId },
+      state: "ruled",
+    });
+    // And reads nothing else members-only there: the project's settings are not there for them.
+    expect((await get(`/v1/projects/${projectId}/settings`, sponsor.token)).status).toBe(404);
   });
 });

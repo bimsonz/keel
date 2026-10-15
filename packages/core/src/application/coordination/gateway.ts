@@ -500,7 +500,10 @@ export interface PlacedEscalationPage {
 export const readEscalationList = <R>(
   reader: EscalationReader,
   read: Omit<EscalationListRead, "reader" | "now">,
-  placeOf: (project: ProjectId) => Effect.Effect<ProjectRef | undefined, never, R>,
+  placeOf: (
+    project: ProjectId,
+    sponsor: UserId | undefined,
+  ) => Effect.Effect<ProjectRef | undefined, never, R>,
 ): Effect.Effect<PlacedEscalationPage, never, Escalations | Clock | R> =>
   Effect.gen(function* () {
     const now = yield* (yield* Clock).now;
@@ -508,7 +511,7 @@ export const readEscalationList = <R>(
       escalations.list({ ...read, reader, now }),
     );
     const placed = yield* Effect.forEach(page.items, (record) =>
-      Effect.map(placeOf(record.project), (project) =>
+      Effect.map(placeOf(record.project, record.sponsor), (project) =>
         project === undefined ? [] : [{ record, project }],
       ),
     );

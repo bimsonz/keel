@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sponsor-own-namespace
+# kills: authz.sponsor-own-namespace
+# why: a sponsor who is no member of an org sees and rules on what the org asks, as if it were the agent's own namespace
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 85affd46..577408ad 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -592,8 +592,7 @@ const asksSponsor = (
+   resource: ProjectResource | NamespaceResource,
+ ): resource is ProjectResource =>
+   resource._tag === "Project" &&
+-  resource.sponsor === principal.userId &&
+-  namespaceKind(resource.namespace) === "agent";
++  resource.sponsor === principal.userId;
+ 
+ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decision => {
+   if (principal.suspended) return refused("user-suspended");

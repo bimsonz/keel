@@ -2,19 +2,19 @@
 # kills: t67.session-list
 # why: an item's place is served without the policy's decision, so a person who has left a namespace still reads the question they were asked first there
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index a182ac69..68d93066 100644
+index 7b9b2571..acec978c 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -259,11 +259,7 @@ const escalationPlaces = (caller: Caller) => {
-       ? Effect.succeed(seen.get(project))
+@@ -407,11 +407,7 @@ const escalationPlaces = (caller: Caller) => {
+       ? Effect.succeed(seen.get(key))
        : Effect.gen(function* () {
-           const resource = yield* projectResource(project);
+           const resource = yield* projectResource(project, sponsor);
 -          const place = Result.isSuccess(
 -            authorize(caller.principal, "Operator_listEscalations", resource),
 -          )
 -            ? yield* placeOf(project)
 -            : undefined;
 +          const place = resource._tag === "Project" ? yield* placeOf(project) : undefined;
-           seen.set(project, place);
+           seen.set(key, place);
            return place;
          });

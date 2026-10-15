@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sponsor-own-namespace
+# kills: authz.sponsor-own-namespace
+# why: the sponsor asked in an agent's own namespace reads everything members-only there, its settings among them, not only what it is asked
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 8d00f3f9..733d8307 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -636,7 +636,8 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+   if (
+     (need === "sponsorOrMaintain" ||
+       need === "sponsorOrMaintainAsUser" ||
+-      need === "readMembersOrSponsor") &&
++      need === "readMembersOrSponsor" ||
++      need === "readMembers") &&
+     asksSponsor(principal, resource)
+   )
+     return resource.namespaceSuspended

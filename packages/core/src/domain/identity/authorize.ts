@@ -34,12 +34,14 @@ import type {
  *   one without a handle yet;
  * - `read`: reads the resource (public projects to anyone, private ones to their
  *   org's members, an agent's account to anyone as the public); `readMembers`:
- *   reads what only members see;
+ *   reads what only members see; `readMembersOrSponsor`: that, or, in an
+ *   agent's own namespace, what is asked of the sponsor of the agent concerned;
  * - `work`: an agent's work on its token's project (agents only);
  *   `workOrMaintain`: that, or a maintainer's;
  * - `member`, `maintain`, `own`: that role or above in the resource's org, or
  *   an agent where it governs and no person owns; `sponsorOrMaintain`: the
- *   sponsor of the agent concerned, or whoever holds `maintain`;
+ *   sponsor of the agent concerned (a member, or anyone in the agent's own
+ *   namespace, where no person holds a role), or whoever holds `maintain`;
  *   `sponsorOrMaintainAsUser`: that, and a person: a question Keel puts to
  *   people is answered by one, so no agent rules, whatever it maintains;
  *   `invite`: a member, and a person: an invitation names the person who
@@ -61,6 +63,7 @@ export type Need =
   | "handle"
   | "read"
   | "readMembers"
+  | "readMembersOrSponsor"
   | "work"
   | "workOrMaintain"
   | "member"
@@ -154,7 +157,7 @@ export const SPEC_ACTIONS = {
   Agents_getAgent: rule("Agent", "read"),
 
   Operator_getSettings: rule("Project", "readMembers"),
-  Operator_listEscalations: rule("Project", "readMembers"),
+  Operator_listEscalations: rule("Project", "readMembersOrSponsor"),
 
   declare: rule("Project", "work"),
   adopt: rule("Project", "work"),
@@ -592,6 +595,15 @@ const fork = (user: UserPrincipal, resource: ForkResource): Decision => {
   return granted();
 };
 
+/** Whether the person is the sponsor of the agent concerned, on a project of an agent's own namespace. */
+const asksSponsor = (
+  principal: UserPrincipal,
+  resource: ProjectResource | NamespaceResource,
+): resource is ProjectResource =>
+  resource._tag === "Project" &&
+  resource.sponsor === principal.userId &&
+  namespaceKind(resource.namespace) === "agent";
+
 const user = (principal: UserPrincipal, need: Need, resource: Resource): Decision => {
   if (principal.suspended) return refused("user-suspended");
   if (need === "handle") return granted();
@@ -619,6 +631,17 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   // An agent that exists is there for anyone to read, as the public: who it is, never who sponsors it.
   if (resource._tag === "Agent") return need === "read" ? granted("public") : hidden();
   if (resource._tag !== "Project" && resource._tag !== "Namespace") return hidden();
+  // In an agent's own namespace no person holds a role, and Keel asks the agent's sponsor first: the sponsor
+  // sees what it is asked and answers it, private project or not, and nothing else there.
+  if (
+    (need === "sponsorOrMaintain" ||
+      need === "sponsorOrMaintainAsUser" ||
+      need === "readMembersOrSponsor") &&
+    asksSponsor(principal, resource)
+  )
+    return resource.namespaceSuspended
+      ? hidden()
+      : granted(need === "readMembersOrSponsor" ? "members" : undefined);
   const unseen = notSeen(principal, resource);
   if (unseen !== undefined) return unseen;
   const rights = rightsOf(principal, resource);
@@ -627,6 +650,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "read":
       return granted(rights.has("member") ? "members" : "public");
     case "readMembers":
+    case "readMembersOrSponsor":
       return rights.has("member") ? granted("members") : lacksRole("member", kind);
     case "member":
     case "invite":
@@ -731,6 +755,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
           : whyNoWork(principal, resource),
       );
     case "readMembers":
+    case "readMembersOrSponsor":
       return rights.has("read") && asMember
         ? granted("members")
         : refused(whyNoWork(principal, resource));

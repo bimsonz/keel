@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sponsor-own-namespace
+# kills: authz.sponsor-own-namespace
+# why: the list of escalations is members-only again, so the sponsor asked in an agent's own namespace is not shown what it is asked
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 85affd46..045c58e8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -148,7 +148,7 @@ export const SPEC_ACTIONS = {
+   Agents_getAgent: rule("Agent", "read"),
+ 
+   Operator_getSettings: rule("Project", "readMembers"),
+-  Operator_listEscalations: rule("Project", "readMembersOrSponsor"),
++  Operator_listEscalations: rule("Project", "readMembers"),
+ 
+   declare: rule("Project", "work"),
+   adopt: rule("Project", "work"),

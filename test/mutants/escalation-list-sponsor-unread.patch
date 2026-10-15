@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts -t escalation.sponsor-own-namespace
+# kills: escalation.sponsor-own-namespace
+# why: a list item's project is decided without the sponsor the item names, so the sponsor asked in an agent's own namespace is shown nothing
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 7b9b2571..153fe947 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -406,7 +406,7 @@ const escalationPlaces = (caller: Caller) => {
+     return seen.has(key)
+       ? Effect.succeed(seen.get(key))
+       : Effect.gen(function* () {
+-          const resource = yield* projectResource(project, sponsor);
++          const resource = yield* projectResource(project);
+           const place = Result.isSuccess(
+             authorize(caller.principal, "Operator_listEscalations", resource),
+           )

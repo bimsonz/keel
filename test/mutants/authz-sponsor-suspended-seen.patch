@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.sponsor-own-namespace
+# kills: authz.sponsor-own-namespace
+# why: a suspended agent namespace's questions are still there for its sponsor, who is outside it
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 8d00f3f9..b03aacd6 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -639,9 +639,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+       need === "readMembersOrSponsor") &&
+     asksSponsor(principal, resource)
+   )
+-    return resource.namespaceSuspended
+-      ? hidden()
+-      : granted(need === "readMembersOrSponsor" ? "members" : undefined);
++    return granted(need === "readMembersOrSponsor" ? "members" : undefined);
+   const unseen = notSeen(principal, resource);
+   if (unseen !== undefined) return unseen;
+   const rights = rightsOf(principal, resource);
