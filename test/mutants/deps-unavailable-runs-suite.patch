@@ -2,13 +2,13 @@
 # kills: suite-runtime.deps-unavailable
 # why: A Tier 2 step handed unavailable deps, or none, goes on to its runner with no deps bundle to give it
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index a4560ee7..1dbf0a0d 100644
+index 9fef6946..3d095348 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -443,7 +443,7 @@ export const SuiteRuntimeCi = (deps: {
+@@ -571,7 +571,7 @@ export const SuiteRuntimeCi = (deps: {
            Effect.gen(function* () {
              const tier2 = tier2RunnerFor(step);
-             if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+             if (tier2 === undefined || step.tier.tier !== 2) return abstained(step, "no-runner");
 -            if (handed._tag !== "DepsReady") {
 +            if (handed._tag === "DepsRefused") {
                const stop = depsStop(step, handed);

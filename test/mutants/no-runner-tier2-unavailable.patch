@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "no-runner.tier2"
+# kills: no-runner.tier2
+# why: a Tier 2 step with no command abstains unavailable, so a rule that waits for boxes requeues a plan gap for ever
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 9fef6946..637834f2 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -570,7 +570,7 @@ export const SuiteRuntimeCi = (deps: {
+         (namespace: NamespaceId, bundle: ContentHash, handed: DepsAnswer) => (step: PlanStep) =>
+           Effect.gen(function* () {
+             const tier2 = tier2RunnerFor(step);
+-            if (tier2 === undefined || step.tier.tier !== 2) return abstained(step, "no-runner");
++            if (tier2 === undefined || step.tier.tier !== 2) return abstained(step, "unavailable");
+             if (handed._tag !== "DepsReady") {
+               const stop = depsStop(step, handed);
+               const stopRef = yield* deps.durable(

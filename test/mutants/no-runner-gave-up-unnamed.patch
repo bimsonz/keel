@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "no-runner.gave-up"
+# kills: no-runner.gave-up
+# why: a box the engine gave up on reads as a step with no runner, so a capacity outage is counted against the change
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 9fef6946..a48e9f44 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -605,7 +605,7 @@ export const SuiteRuntimeCi = (deps: {
+               Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
+               Effect.catch(() => Effect.succeed(undefined)),
+             );
+-            if (stdout === undefined) return abstained(step, "unavailable");
++            if (stdout === undefined) return abstained(step, "no-runner");
+             const judged = yield* tier2.judge(step, stdout, deps.literals);
+             const resultRef = yield* deps.durable(
+               `${step.id}:evidence`,

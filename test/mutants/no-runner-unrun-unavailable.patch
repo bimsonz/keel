@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts -t "no-runner.world"
+# kills: no-runner.world
+# why: a step asked for a world at a lane abstains unavailable, as if a box might come for it
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index d352d461..f443ceba 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -102,7 +102,7 @@ export type DurableReport = (
+ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport => ({
+   stepId: step.id,
+   outcome: "abstain",
+-  failure: "no-runner",
++  failure: "unavailable",
+   evidenceClass: step.evidenceCeiling,
+   tier:
+     world === undefined

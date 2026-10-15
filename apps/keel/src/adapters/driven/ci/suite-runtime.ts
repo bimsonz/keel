@@ -32,7 +32,13 @@ import {
   WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
 import type { ContentHash, Json, NamespaceId } from "@keeltown/core/kernel";
-import type { PlanStep, StepResult, StepRun } from "@keeltown/core/domain/verification";
+import type {
+  InfraFailure,
+  PlanStep,
+  StepReport,
+  StepResult,
+  StepRun,
+} from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import {
   BUNDLE_URL_TTL_SECONDS,
@@ -563,9 +569,10 @@ export const tier2RunnerFor = (
       };
 };
 
-const abstained = (step: PlanStep): StepResult => ({
+const abstained = (step: PlanStep, failure: InfraFailure): StepReport => ({
   stepId: step.id,
   outcome: "abstain",
+  failure,
   evidenceClass: step.evidenceCeiling,
   tier: step.tier,
   durationMs: 0,
@@ -580,7 +587,8 @@ const abstained = (step: PlanStep): StepResult => ({
  * cites it. A step handed no deps bundle asks no runner: it stores why and
  * answers as core's `depsStop` says, a fail for dependencies that were
  * refused and an abstain for ones that are unavailable. A runner the engine
- * gave up on abstains, and so does any step this runtime has no runner for.
+ * gave up on abstains `unavailable`, and a step this runtime has no runner
+ * for abstains `no-runner`.
  *
  * `literals` are secret values to redact wherever they appear (the account id).
  * `signingKey` signs the URLs each runner is handed, its own bundle's and its
@@ -600,7 +608,7 @@ export const SuiteRuntimeCi = (deps: {
         (namespace: NamespaceId, bundle: ContentHash, handed: DepsAnswer) => (step: PlanStep) =>
           Effect.gen(function* () {
             const tier2 = tier2RunnerFor(step);
-            if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
+            if (tier2 === undefined || step.tier.tier !== 2) return abstained(step, "no-runner");
             if (handed._tag !== "DepsReady") {
               const stop = depsStop(step, handed);
               const stopRef = yield* deps.durable(
@@ -635,7 +643,7 @@ export const SuiteRuntimeCi = (deps: {
               Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
               Effect.catch(() => Effect.succeed(undefined)),
             );
-            if (stdout === undefined) return abstained(step);
+            if (stdout === undefined) return abstained(step, "unavailable");
             const judged = yield* tier2.judge(step, stdout, deps.literals);
             const resultRef = yield* deps.durable(
               `${step.id}:evidence`,

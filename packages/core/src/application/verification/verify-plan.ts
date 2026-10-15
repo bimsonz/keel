@@ -86,7 +86,7 @@ export const StoredStepReport = Schema.Struct({
   ...StepResult.fields,
   outcome: Schema.String,
   failure: Schema.optionalKey(
-    Schema.Literals(["timeout", "rate-limited", "schema", "truncated", "unavailable"]),
+    Schema.Literals(["timeout", "rate-limited", "schema", "truncated", "unavailable", "no-runner"]),
   ),
 });
 
@@ -102,7 +102,7 @@ export type DurableReport = (
 const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport => ({
   stepId: step.id,
   outcome: "abstain",
-  failure: "unavailable",
+  failure: "no-runner",
   evidenceClass: step.evidenceCeiling,
   tier:
     world === undefined

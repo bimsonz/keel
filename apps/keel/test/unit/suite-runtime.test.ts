@@ -346,7 +346,7 @@ describe("the Tier 2 suite runtime", () => {
   );
 
   it.effect(
-    "abstains when the engine gives up, when the log is a stream, and on an empty log",
+    "[no-runner.gave-up] abstains when the engine gives up (unavailable), when the log is a stream, and on an empty log",
     () =>
       Effect.gen(function* () {
         for (const runner of [
@@ -361,6 +361,17 @@ describe("the Tier 2 suite runtime", () => {
           ).pipe(Effect.provide(runtime(runner).layer));
           expect(result?.outcome).toBe("abstain");
         }
+        // A runner the engine gave up on had a runner: its box was unavailable.
+        const [gaveUp] = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, job(), READY),
+        ).pipe(
+          Effect.provide(
+            runtime(async () => {
+              throw new Error("runner failed after its retries");
+            }).layer,
+          ),
+        );
+        expect(gaveUp?.failure).toBe("unavailable");
       }),
   );
 
@@ -395,15 +406,17 @@ describe("the Tier 2 suite runtime", () => {
     expect(Object.keys(TIER2_RUNNERS).toSorted()).toEqual([...TIER2_STEP_IDS].toSorted());
   });
 
-  it.effect("abstains on a step it has no command for, without starting a runner", () =>
-    Effect.gen(function* () {
-      const rt = runtime(stdoutRunner(""));
-      const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
-        v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }, READY),
-      ).pipe(Effect.provide(rt.layer));
-      expect(results.map((r) => r.outcome)).toEqual(["abstain"]);
-      expect(rt.calls).toEqual([]);
-    }),
+  it.effect(
+    "[no-runner.tier2] abstains as no runner's on a step it has no command for, without starting a runner",
+    () =>
+      Effect.gen(function* () {
+        const rt = runtime(stdoutRunner(""));
+        const results = yield* Effect.flatMap(VerifierRuntime, (v) =>
+          v.run(sampleNamespace, { ...job(), steps: [{ ...step, id: "other.suite" }] }, READY),
+        ).pipe(Effect.provide(rt.layer));
+        expect(results.map((r) => [r.outcome, r.failure])).toEqual([["abstain", "no-runner"]]);
+        expect(rt.calls).toEqual([]);
+      }),
   );
 });
 

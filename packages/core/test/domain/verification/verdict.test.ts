@@ -35,6 +35,7 @@ const failures: readonly InfraFailure[] = [
   "schema",
   "truncated",
   "unavailable",
+  "no-runner",
 ];
 
 type Cell = { readonly step: PlanStep; readonly world: FlowWorld | undefined };

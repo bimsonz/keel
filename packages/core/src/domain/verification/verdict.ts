@@ -5,8 +5,20 @@ import { UnknownVerdictVersion } from "./errors.ts";
 import type { Condition, Flow, FlowPlan } from "./flow.ts";
 import type { PlanStep, StepOutcome, StepResult, VerdictOutcome } from "./plan.ts";
 
-/** Why a runner gave no usable answer. Each becomes `abstain`, never a skip, a pass or a fail. */
-export type InfraFailure = "timeout" | "rate-limited" | "schema" | "truncated" | "unavailable";
+/**
+ * Why a runner gave no usable answer. Each becomes `abstain`, never a skip, a
+ * pass or a fail. `no-runner` is a step no runner here can run (a plan that
+ * names a runner this verifier lacks, a world a lane has none of, a deploy
+ * with no deploy runner): a gap in the plan or a bug, never capacity, so a
+ * park on it is counted, where an `unavailable` box may be waited for.
+ */
+export type InfraFailure =
+  | "timeout"
+  | "rate-limited"
+  | "schema"
+  | "truncated"
+  | "unavailable"
+  | "no-runner";
 
 /** What a runner or plugin reports, before Keel trusts it: the outcome may be anything. */
 export type StepReport = Omit<StepResult, "outcome"> & {

@@ -178,7 +178,7 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
   );
 
   it.effect(
-    "[d21.world-unrun] a step asked for a world abstains unrun: a lane verifies one candidate",
+    "[d21.world-unrun] [no-runner.world] a step asked for a world abstains unrun, as no runner's: a lane verifies one candidate",
     () =>
       Effect.gen(function* () {
         const runtime = makeVerifierRuntimeMemory();
@@ -195,7 +195,12 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
             Layer.mergeAll(runtime.layer, probes.layer, makeEvidenceStoreMemory().layer),
           ),
         );
-        expect(report).toMatchObject({ stepId: step.id, outcome: "abstain", world: "A" });
+        expect(report).toMatchObject({
+          stepId: step.id,
+          outcome: "abstain",
+          failure: "no-runner",
+          world: "A",
+        });
         expect(runtime.jobs).toEqual([]);
         expect(probes.requests).toEqual([]);
       }),
