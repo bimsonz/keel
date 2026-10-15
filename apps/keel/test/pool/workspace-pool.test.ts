@@ -498,11 +498,14 @@ describe("the WorkspacePool DO", () => {
     followed.head = head;
     const before = Date.now();
     await stub.receive([landedFor(projectId, changeId)]);
-    await runDurableObjectAlarm(stub);
-    expect(followed.relays.length).toBeGreaterThanOrEqual(2);
-    // Unless the platform ran it already, the next pass is due now, not after a back-off.
-    const next = (await refreshArmed(projectId))?.at ?? Number.POSITIVE_INFINITY;
-    expect(followed.relays.length === 3 || next < before + 1_000).toBe(true);
+    // The pass is armed for now, so the platform may run it before this line does: wait either way.
+    await vi.waitFor(async () => {
+      await runDurableObjectAlarm(stub);
+      expect(followed.relays.length).toBeGreaterThanOrEqual(2);
+      // Unless the platform ran it already, the next pass is due now, not after a back-off.
+      const next = (await refreshArmed(projectId))?.at ?? Number.POSITIVE_INFINITY;
+      expect(followed.relays.length === 3 || next < before + 1_000).toBe(true);
+    }, WAIT);
     await vi.waitFor(async () => {
       await runDurableObjectAlarm(stub);
       expect(followed.relays).toHaveLength(3);
