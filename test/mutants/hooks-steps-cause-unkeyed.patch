@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "steps.lane"
+# kills: steps.lane
+# why: every step's start after the first is taken for a repeat of it, so the feed shows one step of each batch
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cdf72053..7d37a70b 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1892,7 +1892,7 @@ export const recordStep = Effect.fn("integration/recordStep")(function* (
+   yield* onBatch(
+     laneId,
+     batch.id,
+-    `${reported.instanceId}:step:${phase}:${step.stepId}@${step.world ?? ""}`,
++    `${reported.instanceId}:step:${phase}`,
+     (_, lane) => ({
+       moves: [{ command: { _tag: "RecordStep", step, ...fence } }],
+       lane: () => lane,

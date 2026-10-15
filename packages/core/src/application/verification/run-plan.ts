@@ -1,4 +1,4 @@
-import { Deferred, Effect } from "effect";
+import { Deferred, Effect, Fiber } from "effect";
 import { canBlock } from "../../domain/kernel/index.ts";
 import {
   type Budget,
@@ -18,6 +18,26 @@ export type StepRunner<R> = (
   step: PlanStep,
   world: FlowWorld | undefined,
 ) => Effect.Effect<StepReport, never, R>;
+
+/**
+ * Told of each step the flow runs, as it runs: that it started, then its
+ * result, the one `verdict/1` reads, with the report it was coerced from.
+ * Each step and world is told once, a step a union shares too; a step already
+ * run or skipped is never told, and one its spent budget leaves unrun is told
+ * both, abstaining in 0 ms. Telling is off the steps' path: a step runs while
+ * it is told it started, its finish is told after its start, and the run ends
+ * once every finish is told. Neither call may fail the run.
+ */
+export interface StepObserver<R> {
+  readonly started: (step: PlanStep, world: FlowWorld | undefined) => Effect.Effect<void, never, R>;
+  readonly finished: (
+    step: PlanStep,
+    result: StepResult,
+    reported: StepReport,
+  ) => Effect.Effect<void, never, R>;
+}
+
+const UNHEARD: StepObserver<never> = { started: () => Effect.void, finished: () => Effect.void };
 
 type Status = "pass" | "pending" | "escalate" | "fail";
 const severity: Record<Status, number> = { pass: 0, pending: 1, escalate: 2, fail: 3 };
@@ -50,6 +70,8 @@ type State = {
   readonly overridden: Set<string>;
   /** Steps started and not yet reported: a branch that reaches one waits for its result. */
   readonly running: Map<string, Deferred.Deferred<StepResult>>;
+  /** Each step's telling, from its start to its finish: the run joins them all before it ends. */
+  readonly telling: Fiber.Fiber<void>[];
 };
 
 const combine = (values: readonly Value[]): Value => {
@@ -162,6 +184,7 @@ const unrun = (step: PlanStep, world: FlowWorld | undefined): StepReport => ({
 const evaluate = <R>(
   s: State,
   runner: StepRunner<R>,
+  observer: StepObserver<R>,
   flow: Flow,
   world: FlowWorld | undefined,
   accounts: readonly Account[],
@@ -182,31 +205,37 @@ const evaluate = <R>(
       const started = Deferred.makeUnsafe<StepResult>();
       s.running.set(key, started);
       const spent = accounts.some((a) => a.spentMs > a.limit.cpuMs);
-      return (spent ? Effect.succeed(unrun(step, world)) : runner(step, world)).pipe(
-        Effect.flatMap((reported) => {
-          // The step and world are the ones asked for, whatever the runner wrote.
-          const { world: _world, ...rest } = reported;
-          const report: StepReport = {
-            ...rest,
-            stepId: step.id,
-            ...(world === undefined ? {} : { world }),
-          };
-          const result = coerce(s.plan, report);
-          s.reports.set(key, report);
-          s.results.set(key, result);
-          for (const skipped of result.skips ?? []) s.skipped.add(skipped);
-          for (const overridden of result.overrides ?? []) s.overridden.add(overridden);
-          for (const a of accounts) a.spentMs += report.durationMs;
-          s.running.delete(key);
-          return Deferred.succeed(started, result).pipe(Effect.as(valueOf(s, step, result)));
-        }),
-      );
+      return Effect.gen(function* () {
+        const telling = yield* Effect.forkDetach(observer.started(step, world));
+        const reported = yield* spent ? Effect.succeed(unrun(step, world)) : runner(step, world);
+        // The step and world are the ones asked for, whatever the runner wrote.
+        const { world: _world, ...rest } = reported;
+        const report: StepReport = {
+          ...rest,
+          stepId: step.id,
+          ...(world === undefined ? {} : { world }),
+        };
+        const result = coerce(s.plan, report);
+        s.reports.set(key, report);
+        s.results.set(key, result);
+        for (const skipped of result.skips ?? []) s.skipped.add(skipped);
+        for (const overridden of result.overrides ?? []) s.overridden.add(overridden);
+        for (const a of accounts) a.spentMs += report.durationMs;
+        s.running.delete(key);
+        s.telling.push(
+          yield* Effect.forkDetach(
+            Fiber.join(telling).pipe(Effect.andThen(observer.finished(step, result, report))),
+          ),
+        );
+        yield* Deferred.succeed(started, result);
+        return valueOf(s, step, result);
+      });
     }
     case "seq":
       return Effect.gen(function* () {
         const values: Value[] = [];
         for (const item of flow.items) {
-          const v = yield* evaluate(s, runner, item, world, accounts);
+          const v = yield* evaluate(s, runner, observer, item, world, accounts);
           values.push(v);
           if (v.status === "fail" && v.overridable !== true) break;
         }
@@ -214,13 +243,13 @@ const evaluate = <R>(
       });
     case "par":
       return Effect.all(
-        flow.items.map((item) => evaluate(s, runner, item, world, accounts)),
+        flow.items.map((item) => evaluate(s, runner, observer, item, world, accounts)),
         { concurrency: "unbounded" },
       ).pipe(Effect.map(combine));
     case "cascade":
       return Effect.gen(function* () {
         for (const item of flow.items) {
-          const v = yield* evaluate(s, runner, item, world, accounts);
+          const v = yield* evaluate(s, runner, observer, item, world, accounts);
           if (v.status === "pending") return v;
           if (flow.accept.includes(statusOutcome(v))) return v;
         }
@@ -228,7 +257,7 @@ const evaluate = <R>(
       });
     case "worlds":
       return Effect.all(
-        flow.over.map((w) => evaluate(s, runner, flow.body, w, accounts)),
+        flow.over.map((w) => evaluate(s, runner, observer, flow.body, w, accounts)),
         { concurrency: "unbounded" },
       ).pipe(Effect.map(combine));
     case "when": {
@@ -236,19 +265,21 @@ const evaluate = <R>(
       // in each world it runs in, so the condition reads what verdict/1 reads.
       const demanded = conditionSteps(flow.condition).flatMap((id) =>
         (s.steps.get(id)?.worlds ?? [undefined]).map(
-          (w) => () => evaluate(s, runner, { _tag: "step", step: id }, w, accounts),
+          (w) => () => evaluate(s, runner, observer, { _tag: "step", step: id }, w, accounts),
         ),
       );
       return Effect.forEach(demanded, (run) => run(), { discard: true }).pipe(
         Effect.flatMap(() => {
           const v = holds(s, flow.condition, world);
           if (v === "unknown") return Effect.succeed(PENDING);
-          return v ? evaluate(s, runner, flow.body, world, accounts) : Effect.succeed(PASS);
+          return v
+            ? evaluate(s, runner, observer, flow.body, world, accounts)
+            : Effect.succeed(PASS);
         }),
       );
     }
     default:
-      return evaluate(s, runner, flow.body, world, [
+      return evaluate(s, runner, observer, flow.body, world, [
         ...accounts,
         { limit: flow.limit, spentMs: 0 },
       ]);
@@ -283,12 +314,14 @@ const order = (flow: Flow, world: FlowWorld | undefined): string[] => {
  * shares between branches runs once, and every branch reads its result. Once
  * a budget's body has spent more time than its limit, its remaining steps
  * abstain unrun, so the change parks. Each step runs at most once per world,
- * and the reports come back in the flow's order.
+ * and the reports come back in the flow's order. An `observer` is told of
+ * each step as it runs, and the run ends once it has been told every finish.
  */
-export const runPlan = <R>(
+export const runPlan = <R, O = never>(
   plan: FlowPlan,
   runner: StepRunner<R>,
-): Effect.Effect<readonly StepReport[], never, R> => {
+  observer: StepObserver<O> = UNHEARD,
+): Effect.Effect<readonly StepReport[], never, R | O> => {
   const s: State = {
     plan,
     steps: new Map(plan.steps.map((step) => [step.id, step])),
@@ -297,8 +330,10 @@ export const runPlan = <R>(
     skipped: new Set(),
     overridden: new Set(),
     running: new Map(),
+    telling: [],
   };
-  return evaluate(s, runner, plan.flow, undefined, []).pipe(
+  return evaluate<R | O>(s, runner, observer, plan.flow, undefined, []).pipe(
+    Effect.andThen(Effect.suspend(() => Fiber.joinAll(s.telling))),
     Effect.map(() =>
       [...new Set(order(plan.flow, undefined))].flatMap((key) => {
         const report = s.reports.get(key);

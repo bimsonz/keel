@@ -24,7 +24,10 @@ import {
   CandidateBisected,
   CandidateInvalidated,
   CandidatePromoted,
+  type StepReported,
   VerificationStarted,
+  VerificationStepFinished,
+  VerificationStepStarted,
 } from "./events.ts";
 
 /** The events a Lane DO commits for one batch and its candidate. */
@@ -37,6 +40,8 @@ export const CandidateEvent = Schema.Union([
   CandidateBisected,
   CandidatePromoted,
   CandidateInvalidated,
+  VerificationStepStarted,
+  VerificationStepFinished,
 ]);
 export type CandidateEvent = typeof CandidateEvent.Type;
 
@@ -99,6 +104,7 @@ export type CandidateCommand =
       readonly verdictId: VerdictId;
       readonly attribution: BatchAttribution;
     } & Fence)
+  | ({ readonly _tag: "RecordStep"; readonly step: StepReported } & Fence)
   | { readonly _tag: "Bisect"; readonly into: readonly BatchId[] }
   | { readonly _tag: "Promote"; readonly trunkSha: CommitSha }
   | { readonly _tag: "Invalidate" };
@@ -257,6 +263,22 @@ export const decideCandidate = (
         }),
       ]);
 
+    case "RecordStep": {
+      if (batch.state !== "verifying" || batch.candidateId === undefined)
+        return refuse(batchId, batch.state, command);
+      if (fenced(command))
+        return Result.fail(
+          new ResultFenced({ batchId, attempt: command.attempt, chainEpoch: command.chainEpoch }),
+        );
+      const ids = { batchId, candidateId: batch.candidateId };
+      if (command.step._tag === "Started") {
+        const { _tag: _, ...started } = command.step;
+        return Result.succeed([VerificationStepStarted.make({ ...ids, ...started })]);
+      }
+      const { _tag: _, ...finished } = command.step;
+      return Result.succeed([VerificationStepFinished.make({ ...ids, ...finished })]);
+    }
+
     case "Failed": {
       if (batch.state !== "verifying" || batch.candidateId === undefined)
         return refuse(batchId, batch.state, command);
@@ -397,6 +419,9 @@ export const evolveCandidate = (
         : illegal(batch, event);
     case "VerificationStarted":
       return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
+    case "VerificationStepStarted":
+    case "VerificationStepFinished":
+      return batch.state === "verifying" ? batch : illegal(batch, event);
     case "BatchVerified":
       return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
     case "BatchFailed":

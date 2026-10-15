@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts -t "steps.run-plan"
+# kills: steps.run-plan.told-once, steps.run-plan.coerced
+# why: a step is told finished with the runner's own outcome, not the one the verdict reads, so the canvas shows a pass the verdict counted as an abstain
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 73e1aa4b..26abcc46 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -224,7 +224,7 @@ const evaluate = <R>(
+         s.running.delete(key);
+         s.telling.push(
+           yield* Effect.forkDetach(
+-            Fiber.join(telling).pipe(Effect.andThen(observer.finished(step, result, report))),
++            Fiber.join(telling).pipe(Effect.andThen(observer.finished(step, { ...result, outcome: report.outcome } as StepResult, report))),
+           ),
+         );
+         yield* Deferred.succeed(started, result);

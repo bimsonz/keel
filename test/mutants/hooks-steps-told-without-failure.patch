@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts -t "steps.lane-steps"
+# kills: steps.lane-steps
+# why: a step that timed out finishes as a bare abstain, so nobody reading the feed can tell a box that timed out from a step with nothing to say
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index 21c17415..83b317a9 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -265,7 +265,6 @@ export const laneSteps = (
+         durationMs: result.durationMs,
+         ...(result.world === undefined ? {} : { world: result.world }),
+         ...(result.resultRef === undefined ? {} : { resultRef: result.resultRef }),
+-        ...(reported.failure === undefined ? {} : { failure: reported.failure }),
+       }),
+   };
+ };

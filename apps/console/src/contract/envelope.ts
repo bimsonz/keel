@@ -88,6 +88,8 @@ export const EVENT_TYPES = [
   "BatchFormed",
   "CandidateAssembled",
   "VerificationStarted",
+  "VerificationStepStarted",
+  "VerificationStepFinished",
   "BatchVerified",
   "BatchFailed",
   "CandidateBisected",

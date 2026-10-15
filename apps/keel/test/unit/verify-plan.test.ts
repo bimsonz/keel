@@ -2,6 +2,8 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   candidateRunner,
   type DurableReport,
+  type DurableTell,
+  laneSteps,
   readStoredPlan,
   resolvePlan,
   runPlan,
@@ -13,6 +15,7 @@ import { ContentHash } from "@keeltown/core/kernel";
 import { PlanStore } from "@keeltown/core/ports";
 import {
   freshId,
+  makeBatchVerdictsMemory,
   makeEvidenceStoreMemory,
   makeIdsMemory,
   makePlanStoreMemory,
@@ -203,6 +206,89 @@ describe("KeelVerify's plan: the compiled plan, resolved and run", () => {
         });
         expect(runtime.jobs).toEqual([]);
         expect(probes.requests).toEqual([]);
+      }),
+  );
+
+  it.effect(
+    "[steps.lane-steps] tells the lane of each step in durable steps beside it: its start as the plan has it, its result as the verdict reads it with the runner's failure; a lane that refuses them leaves the run's reports as they were",
+    () =>
+      Effect.gen(function* () {
+        const plan = workerAppPlan();
+        const candidateId = freshId("cnd");
+        const fence = { ...job.fence, batchId: freshId("bat") };
+        const told = { laneId: "lane:prj:main", instanceId: "keel-verify-1", fence, candidateId };
+        const names: string[] = [];
+        const durable: DurableTell = (name, tell) =>
+          Effect.suspend(() => {
+            names.push(name);
+            return tell;
+          });
+        const resultRef = `sha256:${"e".repeat(64)}`;
+        const runner = (step: (typeof plan.steps)[number]) =>
+          Effect.succeed(
+            step.id === "js-ts.suite"
+              ? {
+                  stepId: step.id,
+                  outcome: "pass",
+                  evidenceClass: step.evidenceCeiling,
+                  tier: step.tier,
+                  durationMs: 61_250,
+                  resultRef,
+                }
+              : {
+                  stepId: step.id,
+                  outcome: "pass",
+                  failure: "timeout" as const,
+                  evidenceClass: step.evidenceCeiling,
+                  tier: step.tier,
+                  durationMs: 300_000,
+                },
+          );
+        const lane = makeBatchVerdictsMemory(
+          new Map([[fence.batchId, { members: [], candidateId, ...fence }]]),
+        );
+        const reports = yield* runPlan(plan, runner, laneSteps(told, durable)).pipe(
+          Effect.provide(lane.layer),
+        );
+        expect(names.toSorted()).toEqual(
+          plan.steps.flatMap((p) => [`finished ${p.id}`, `started ${p.id}`]).toSorted(),
+        );
+        const ids = plan.steps.map((p) => p.id);
+        const sent = lane.steps.map((s) => s.report.step);
+        // Each under the instance, so a retried report is the one the lane already holds.
+        expect(
+          lane.steps.every(
+            (s) => s.laneId === told.laneId && s.report.instanceId === told.instanceId,
+          ),
+        ).toBe(true);
+        expect(sent.filter((s) => s._tag === "Started")).toEqual(
+          plan.steps.map((p) => ({ _tag: "Started", stepId: p.id, kind: p.kind, tier: p.tier })),
+        );
+        const finished = (id: string) => sent.find((s) => s._tag === "Finished" && s.stepId === id);
+        const suite = plan.steps.find((p) => p.id === "js-ts.suite");
+        expect(finished("js-ts.suite")).toEqual({
+          _tag: "Finished",
+          stepId: "js-ts.suite",
+          outcome: "pass",
+          evidenceClass: suite?.evidenceCeiling,
+          tier: suite?.tier,
+          durationMs: 61_250,
+          resultRef,
+        });
+        const other = ids.find((id) => id !== "js-ts.suite") ?? "";
+        expect(finished(other)).toMatchObject({
+          outcome: "abstain",
+          failure: "timeout",
+          durationMs: 300_000,
+        });
+        // A lane that holds no such batch refuses every step: the run reports what it would have.
+        const refusing = makeBatchVerdictsMemory();
+        expect(
+          yield* runPlan(plan, runner, laneSteps(told, durable)).pipe(
+            Effect.provide(refusing.layer),
+          ),
+        ).toEqual(reports);
+        expect(refusing.steps).toEqual([]);
       }),
   );
 });

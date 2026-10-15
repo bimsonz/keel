@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t "steps.pool.keel-verify"
+# kills: steps.pool.keel-verify
+# why: KeelVerify runs its plan without telling the lane, so no step event ever reaches the feed
+diff --git a/apps/keel/src/adapters/driving/workflow/keel-verify.ts b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+index f67249a7..7e07c45d 100644
+--- a/apps/keel/src/adapters/driving/workflow/keel-verify.ts
++++ b/apps/keel/src/adapters/driving/workflow/keel-verify.ts
+@@ -125,15 +125,6 @@ export class KeelVerify extends CIWorkflow<Env> {
+                 ),
+                 deploy,
+               ),
+-              laneSteps(
+-                {
+-                  laneId: job.laneId,
+-                  instanceId: event.instanceId,
+-                  fence: job.fence,
+-                  candidateId: job.candidateId,
+-                },
+-                durableTell(step),
+-              ),
+             ),
+           )
+         : [];

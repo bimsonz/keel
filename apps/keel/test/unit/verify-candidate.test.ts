@@ -201,6 +201,7 @@ describe("KeelVerify's use-cases", () => {
             sent.push(command);
             return encodeExit(LaneCodecs.recordVerdict, Exit.void);
           },
+          recordStep: async () => encodeExit(LaneCodecs.recordStep, Exit.void),
         }),
       };
       const nextActions = [

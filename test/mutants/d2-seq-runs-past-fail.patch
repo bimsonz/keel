@@ -2,12 +2,12 @@
 # kills: run-plan.seq-stops
 # why: A seq keeps running after a blocking fail, spending containers on a change already bounced
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 5106de1..48d8502 100644
+index 73e1aa4b..fbc3af8b 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -189,7 +189,6 @@ const evaluate = <R>(
+@@ -237,7 +237,6 @@ const evaluate = <R>(
          for (const item of flow.items) {
-           const v = yield* evaluate(s, runner, item, world, accounts);
+           const v = yield* evaluate(s, runner, observer, item, world, accounts);
            values.push(v);
 -          if (v.status === "fail" && v.overridable !== true) break;
          }

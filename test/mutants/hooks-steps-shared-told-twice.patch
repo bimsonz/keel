@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts -t "steps.run-plan.told-once"
+# kills: steps.run-plan.told-once
+# why: a step a union shares is told it started once for each branch that reaches it, so the feed shows one step starting twice
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 73e1aa4b..c3cc2d55 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -199,7 +199,10 @@ const evaluate = <R>(
+       // A union shares steps between its members' branches: a step runs once, and every branch reads it.
+       const running = s.running.get(key);
+       if (running !== undefined)
+-        return Deferred.await(running).pipe(Effect.map((r) => valueOf(s, step, r)));
++        return observer.started(step, world).pipe(
++          Effect.andThen(Deferred.await(running)),
++          Effect.map((r) => valueOf(s, step, r)),
++        );
+       // Only optional steps can be skipped (coerce drops any other skip), and verdict/1 passes them.
+       if (s.skipped.has(step.id)) return Effect.succeed(PASS);
+       const started = Deferred.makeUnsafe<StepResult>();

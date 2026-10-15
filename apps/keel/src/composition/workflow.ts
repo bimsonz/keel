@@ -1,5 +1,9 @@
 import type { WorkflowStep } from "cloudflare:workers";
-import { type DurableReport, StoredStepReport } from "@keeltown/core/application/verification";
+import {
+  type DurableReport,
+  type DurableTell,
+  StoredStepReport,
+} from "@keeltown/core/application/verification";
 import { ContentHash, type ProjectId } from "@keeltown/core/kernel";
 import type {
   AdmittedGuards,
@@ -195,6 +199,26 @@ export function keelVerifyRuntime(
     ),
   );
 }
+
+/** A lane busy for a moment is asked again twice; one still not answering is dropped, never waited on. */
+const TELL_RETRIES = {
+  retries: { limit: 2, delay: "1 second", backoff: "constant" },
+  timeout: "30 seconds",
+} as const;
+
+/**
+ * A telling as a durable Workflow step: the first run tells and persists what
+ * came of it, and a replay reads that back, telling nothing again. A step that
+ * still fails after its retries is dropped, saying why.
+ */
+export const durableTell =
+  (step: WorkflowStep): DurableTell =>
+  (name, tell) =>
+    Effect.promise(() =>
+      step
+        .do(name, TELL_RETRIES, async (): Promise<string> => Effect.runPromise(tell))
+        .catch((error: unknown) => `dropped: ${String(error)}`),
+    );
 
 /**
  * A step's report as a durable Workflow step: the first run reports and

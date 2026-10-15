@@ -9,6 +9,7 @@ import {
   candidateRunner,
   type DeployStepRunner,
   ensureDeps,
+  laneSteps,
   readStoredPlan,
   recordBatchVerdict,
   ResolvedPlan,
@@ -19,7 +20,7 @@ import {
   settleVerdict,
 } from "@keeltown/core/application/verification";
 import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
-import { durableReport, keelVerifyRuntime } from "../../../composition/workflow.ts";
+import { durableReport, durableTell, keelVerifyRuntime } from "../../../composition/workflow.ts";
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
@@ -46,6 +47,8 @@ const RECORD_RETRIES = {
  * the plan's own steps as `runPlan` reaches them: a Tier 2 step is its runner's step (which persists its raw
  * logs, so a runner may hold nothing secret) and `<step>:evidence`, a guard
  * step is `guard <step>`, and one of Keel's deploy steps is `deploy <step>`,
+ * each told to the lane as it runs (`started <step>` beside it, `finished
+ * <step>` after it, for the public feed's step events),
  * run here in the Worker: the token of the target's account is opened inside
  * that step for Cloudflare's call and is never in what it returns, which is
  * persisted; then `verdict` and `record`. A plan the store does
@@ -121,6 +124,15 @@ export class KeelVerify extends CIWorkflow<Env> {
                   ensureDeps(namespace, job.bundle, plan.success.steps, depsSteps(step)),
                 ),
                 deploy,
+              ),
+              laneSteps(
+                {
+                  laneId: job.laneId,
+                  instanceId: event.instanceId,
+                  fence: job.fence,
+                  candidateId: job.candidateId,
+                },
+                durableTell(step),
               ),
             ),
           )

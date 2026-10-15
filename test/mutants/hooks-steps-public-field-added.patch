@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts -t "steps.public-fields"
+# kills: steps.public-fields
+# why: a step's result carries what its command printed onto a public project's feed, where anyone reads it forever
+diff --git a/packages/core/src/domain/integration/events.ts b/packages/core/src/domain/integration/events.ts
+index 8d0beaed..8cd322a8 100644
+--- a/packages/core/src/domain/integration/events.ts
++++ b/packages/core/src/domain/integration/events.ts
+@@ -85,6 +85,8 @@ const stepFinished = {
+   resultRef: Schema.optional(Schema.String),
+   /** Why the runner gave no judgement: the step abstained for it. */
+   failure: Schema.optional(InfraFailure),
++  /** The tail of what the step printed. */
++  output: Schema.optional(Schema.String),
+ };
+ /**
+  * A step of the batch's plan started on its candidate, in `world` inside a

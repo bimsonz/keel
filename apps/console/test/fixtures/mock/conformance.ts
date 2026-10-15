@@ -178,6 +178,9 @@ const RULES: Record<EventType, Rule[]> = {
     { kind: "candidate", idField: "candidateId", from: ["assembled"], to: "verifying" },
     { kind: "batch", idField: "batchId", from: ["assembled"], to: "verifying" },
   ],
+  // A step's start and result are the candidate's, and move neither it nor its batch.
+  VerificationStepStarted: [{ kind: "candidate", idField: "candidateId" }],
+  VerificationStepFinished: [{ kind: "candidate", idField: "candidateId" }],
   BatchVerified: [{ kind: "batch", idField: "batchId", from: ["verifying"], to: "green" }],
   BatchFailed: [{ kind: "batch", idField: "batchId", from: ["forming", "verifying"], to: "red" }],
   CandidateBisected: [

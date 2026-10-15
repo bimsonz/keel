@@ -2,15 +2,15 @@
 # kills: run-plan.budget
 # why: A budget never stops its body, however much it has spent
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 5106de1..0f3049c 100644
+index 73e1aa4b..f2fa0f29 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -162,7 +162,7 @@ const evaluate = <R>(
+@@ -204,7 +204,7 @@ const evaluate = <R>(
        if (s.skipped.has(step.id)) return Effect.succeed(PASS);
        const started = Deferred.makeUnsafe<StepResult>();
        s.running.set(key, started);
 -      const spent = accounts.some((a) => a.spentMs > a.limit.cpuMs);
 +      const spent = false;
-       return (spent ? Effect.succeed(unrun(step, world)) : runner(step, world)).pipe(
-         Effect.flatMap((reported) => {
-           // The step and world are the ones asked for, whatever the runner wrote.
+       return Effect.gen(function* () {
+         const telling = yield* Effect.forkDetach(observer.started(step, world));
+         const reported = yield* spent ? Effect.succeed(unrun(step, world)) : runner(step, world);

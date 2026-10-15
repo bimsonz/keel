@@ -2,16 +2,16 @@
 # kills: run-plan.asked-step
 # why: A runner's report counts for whatever step and world it names, not the one asked
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 5106de1..36409f1 100644
+index 73e1aa4b..3e4eb3c7 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -169,8 +169,7 @@ const evaluate = <R>(
-           const { world: _world, ...rest } = reported;
-           const report: StepReport = {
-             ...rest,
--            stepId: step.id,
--            ...(world === undefined ? {} : { world }),
-+            ...reported,
-           };
-           const result = coerce(s.plan, report);
-           s.reports.set(key, report);
+@@ -212,8 +212,7 @@ const evaluate = <R>(
+         const { world: _world, ...rest } = reported;
+         const report: StepReport = {
+           ...rest,
+-          stepId: step.id,
+-          ...(world === undefined ? {} : { world }),
++          ...reported,
+         };
+         const result = coerce(s.plan, report);
+         s.reports.set(key, report);

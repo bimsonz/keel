@@ -27,6 +27,9 @@ const events = [
   });
 });
 
+/** An event's payload fields, sorted. */
+const fields = (type: string) => events.find((event) => event.type === type)?.fields.toSorted();
+
 describe("[b12.event-audience] who an event on a public project's feed is for", () => {
   it("[b12.event-audience] keeps operator data, settings, escalations, rulings and sessions to the project's members, and every other event public", () => {
     const members = events.filter((event) => audienceOf(event.type) === "members");
@@ -99,6 +102,31 @@ describe("[b12.event-audience] who an event on a public project's feed is for", 
         "provider",
         "url",
         "aliasUrl",
+      ].toSorted(),
+    );
+  });
+
+  it("[steps.public-fields] a verification step's events, which a public project's visitor reads, say which step ran where and what it came to, and carry nothing of its command, its output or its box", () => {
+    expect([audienceOf("VerificationStepStarted"), audienceOf("VerificationStepFinished")]).toEqual(
+      ["public", "public"],
+    );
+    expect(fields("VerificationStepStarted")).toEqual(
+      ["_tag", "batchId", "candidateId", "stepId", "kind", "tier", "world"].toSorted(),
+    );
+    expect(fields("VerificationStepFinished")).toEqual(
+      [
+        "_tag",
+        "batchId",
+        "candidateId",
+        "stepId",
+        "world",
+        "outcome",
+        "evidenceClass",
+        "tier",
+        "durationMs",
+        // The stored evidence's hash, as the verdict cites it: never the evidence itself.
+        "resultRef",
+        "failure",
       ].toSorted(),
     );
   });

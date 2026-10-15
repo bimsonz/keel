@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t "steps.contract"
+# kills: steps.contract
+# why: the in-memory lane takes a step from another attempt, so a test of KeelVerify on it would pass where the Lane DO refuses
+diff --git a/packages/testing/src/memory/verification.ts b/packages/testing/src/memory/verification.ts
+index e590ebd1..e50b55b2 100644
+--- a/packages/testing/src/memory/verification.ts
++++ b/packages/testing/src/memory/verification.ts
+@@ -290,8 +290,6 @@ export function makeBatchVerdictsMemory(batches: ReadonlyMap<string, LaneBatch>
+     const batch = batches.get(s.fence.batchId);
+     if (batch === undefined || batch.candidateId !== s.candidateId)
+       return Effect.fail(new CandidateNotFound({ candidateId: s.candidateId }));
+-    if (batch.attempt !== s.fence.attempt || batch.chainEpoch !== s.fence.chainEpoch)
+-      return Effect.fail(new ResultFenced(s.fence));
+     return Effect.sync(() => {
+       steps.push({ laneId, report: s });
+     });

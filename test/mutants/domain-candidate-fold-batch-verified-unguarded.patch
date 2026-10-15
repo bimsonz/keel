@@ -2,12 +2,12 @@
 # kills: candidate.fold-table
 # why: the fold takes BatchVerified with its guard gone: `batch.state === "verifying"`.
 diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
-index 46ee4c8c..aadf7c01 100644
+index ccd43e56..aa41fa9f 100644
 --- a/packages/core/src/domain/integration/candidate-machine.ts
 +++ b/packages/core/src/domain/integration/candidate-machine.ts
-@@ -389,7 +389,7 @@ export const evolveCandidate = (
-     case "VerificationStarted":
-       return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
+@@ -429,7 +429,7 @@ export const evolveCandidate = (
+     case "VerificationStepFinished":
+       return batch.state === "verifying" ? batch : illegal(batch, event);
      case "BatchVerified":
 -      return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
 +      return { ...batch, state: "green" };

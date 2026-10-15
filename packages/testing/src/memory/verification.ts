@@ -22,6 +22,7 @@ import {
 } from "@keeltown/core/domain/verification";
 import {
   AdmittedGuards,
+  type BatchStepReport,
   type BatchVerdict,
   BatchVerdicts,
   ChangePrecheck,
@@ -283,6 +284,18 @@ export function makeBatchVerdictsMemory(batches: ReadonlyMap<string, LaneBatch> 
   const outbox = makeEventOutboxMemory();
   const clock = makeClockMemory();
   const recorded: { laneId: string; verdict: BatchVerdict }[] = [];
+  const steps: { laneId: string; report: BatchStepReport }[] = [];
+  /** A step is taken for a batch it knows, at its attempt and epoch, as the lane takes one. */
+  const recordStep = (laneId: string, s: BatchStepReport) => {
+    const batch = batches.get(s.fence.batchId);
+    if (batch === undefined || batch.candidateId !== s.candidateId)
+      return Effect.fail(new CandidateNotFound({ candidateId: s.candidateId }));
+    if (batch.attempt !== s.fence.attempt || batch.chainEpoch !== s.fence.chainEpoch)
+      return Effect.fail(new ResultFenced(s.fence));
+    return Effect.sync(() => {
+      steps.push({ laneId, report: s });
+    });
+  };
   const record = (laneId: string, v: BatchVerdict) =>
     commit(
       { entity: { kind: "batch", id: v.fence.batchId }, cause: `${v.instanceId}:recordVerdict` },
@@ -329,8 +342,9 @@ export function makeBatchVerdictsMemory(batches: ReadonlyMap<string, LaneBatch> 
     ).pipe(Effect.asVoid, Effect.provide(outbox.layer), Effect.provide(clock.layer));
   return {
     recorded,
+    steps,
     outbox,
-    layer: Layer.succeed(BatchVerdicts, BatchVerdicts.of({ record })),
+    layer: Layer.succeed(BatchVerdicts, BatchVerdicts.of({ record, recordStep })),
   };
 }
 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts -t "steps.run-plan.unrun"
+# kills: steps.run-plan.unrun
+# why: a step its spent budget leaves unrun finishes with no start, so the feed holds a finish for a step that never appeared
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 73e1aa4b..2883f75e 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -206,7 +206,7 @@ const evaluate = <R>(
+       s.running.set(key, started);
+       const spent = accounts.some((a) => a.spentMs > a.limit.cpuMs);
+       return Effect.gen(function* () {
+-        const telling = yield* Effect.forkDetach(observer.started(step, world));
++        const telling = yield* Effect.forkDetach(spent ? Effect.void : observer.started(step, world));
+         const reported = yield* spent ? Effect.succeed(unrun(step, world)) : runner(step, world);
+         // The step and world are the ones asked for, whatever the runner wrote.
+         const { world: _world, ...rest } = reported;

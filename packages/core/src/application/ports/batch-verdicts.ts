@@ -1,5 +1,9 @@
 import { Context, type Effect } from "effect";
-import type { CandidateNotFound, ResultFenced } from "../../domain/integration/index.ts";
+import type {
+  CandidateNotFound,
+  ResultFenced,
+  StepReported,
+} from "../../domain/integration/index.ts";
 import type {
   BatchId,
   CandidateId,
@@ -39,11 +43,21 @@ export interface BatchVerdict {
   readonly unrun?: true;
 }
 
+/** KeelVerify's report of one step of a batch's plan, as it runs: that it started, or its result. */
+export interface BatchStepReport {
+  /** The KeelVerify instance: a replayed report records nothing new. */
+  readonly instanceId: string;
+  readonly fence: CandidateFence;
+  readonly candidateId: CandidateId;
+  readonly step: StepReported;
+}
+
 /**
  * Where KeelVerify reports a verdict: the Lane DO that formed the batch, which
  * commits VerdictIssued with BatchVerified or BatchFailed, attributing a
  * failure itself. A result for a stale attempt or chain epoch is ResultFenced,
- * which is terminal.
+ * which is terminal. Each step is reported there too, as it starts and as it
+ * finishes; one for a batch no longer verifying is ResultFenced as well.
  */
 export class BatchVerdicts extends Context.Service<
   BatchVerdicts,
@@ -51,6 +65,10 @@ export class BatchVerdicts extends Context.Service<
     readonly record: (
       laneId: string,
       verdict: BatchVerdict,
+    ) => Effect.Effect<void, ResultFenced | CandidateNotFound>;
+    readonly recordStep: (
+      laneId: string,
+      step: BatchStepReport,
     ) => Effect.Effect<void, ResultFenced | CandidateNotFound>;
   }
 >()("keel/BatchVerdicts") {}

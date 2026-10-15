@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts -t "candidate.fold-table"
+# kills: candidate.fold-table
+# why: the fold takes a step's event onto a batch in any state, so a replay accepts a log the machine would never write
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index ccd43e56..7ab16a5c 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -427,7 +427,7 @@ export const evolveCandidate = (
+       return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
+     case "VerificationStepStarted":
+     case "VerificationStepFinished":
+-      return batch.state === "verifying" ? batch : illegal(batch, event);
++      return batch;
+     case "BatchVerified":
+       return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
+     case "BatchFailed":

@@ -2,15 +2,17 @@
 # kills: run-plan.when
 # why: A when runs its body whether or not its condition holds
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 504928d..cac01d1 100644
+index 73e1aa4b..3b3f2ae8 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -236,7 +236,7 @@ const evaluate = <R>(
+@@ -272,9 +272,7 @@ const evaluate = <R>(
          Effect.flatMap(() => {
            const v = holds(s, flow.condition, world);
            if (v === "unknown") return Effect.succeed(PENDING);
--          return v ? evaluate(s, runner, flow.body, world, accounts) : Effect.succeed(PASS);
-+          return evaluate(s, runner, flow.body, world, accounts);
+-          return v
+-            ? evaluate(s, runner, observer, flow.body, world, accounts)
+-            : Effect.succeed(PASS);
++          return evaluate(s, runner, observer, flow.body, world, accounts);
          }),
        );
      }

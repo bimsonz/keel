@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-audience.test.ts -t "steps.public-fields|b12.event-audience"
+# kills: steps.public-fields, b12.event-audience
+# why: a public project's visitor sees each step finish but never start, so the canvas cannot draw a running step
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 41e484f6..b155a751 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -94,7 +94,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   BatchFormed: "public",
+   CandidateAssembled: "public",
+   VerificationStarted: "public",
+-  VerificationStepStarted: "public",
++  VerificationStepStarted: "members",
+   VerificationStepFinished: "public",
+   BatchVerified: "public",
+   BatchFailed: "public",

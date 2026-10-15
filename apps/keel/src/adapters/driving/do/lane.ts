@@ -6,6 +6,7 @@ import {
   laneStanding,
   laneStep,
   laneStepFailed,
+  recordStep,
   recordVerdict,
   reofferDue,
   reofferVerified,
@@ -18,6 +19,7 @@ import { type LaneServices, laneServices } from "../../../composition/do.ts";
 import {
   LaneCodecs,
   type LaneRpc,
+  RecordStepCommand,
   RecordVerdictCommand,
   VerificationEndedCommand,
 } from "../../../rpc/lane.ts";
@@ -32,6 +34,7 @@ export const LANE_REOFFER = "lane reoffer";
 export const LANE_VERIFY = "lane verification";
 
 const decodeVerdict = Schema.decodeUnknownEffect(RecordVerdictCommand);
+const decodeStep = Schema.decodeUnknownEffect(RecordStepCommand);
 const decodeEnded = Schema.decodeUnknownEffect(VerificationEndedCommand);
 
 /** A Lane DO is addressed as `lane:<projectId>:<name>`. */
@@ -92,6 +95,16 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements LaneRpc {
     const answer = await this.answer(LaneCodecs.recordVerdict, program);
     await this.step(Date.now());
     return answer;
+  }
+
+  /** A step changes no lane state, so it arms no step of the lane's own. */
+  async recordStep(command: unknown) {
+    const laneId = this.laneId;
+    const program = decodeStep(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((reported) => recordStep(laneId, reported)),
+    );
+    return this.answer(LaneCodecs.recordStep, program);
   }
 
   async destroy(by: string) {

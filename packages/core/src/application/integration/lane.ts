@@ -53,6 +53,7 @@ import {
 } from "../../domain/verification/index.ts";
 import {
   AgentDirectory,
+  type BatchStepReport,
   type BatchVerdict,
   BatchVerification,
   CandidateBundles,
@@ -1870,6 +1871,44 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
           ? Effect.fail(new ResultFenced({ batchId: batch.id, ...fence }))
           : Effect.die(refused);
       },
+      InvalidBatch: (invalid) => Effect.die(invalid),
+    }),
+  );
+});
+
+/**
+ * KeelVerify's report of one step of the batch it verifies, committed through
+ * the Candidate machine as VerificationStepStarted or VerificationStepFinished,
+ * fenced on `(batchId, attempt, chainEpoch)`. Idempotent by the instance, the
+ * step, its world and which of the two it is. A step for a batch no longer
+ * verifying (its verdict in, cancelled, settled at its budget), or for another
+ * attempt or epoch, is ResultFenced; one for a candidate the lane does not
+ * hold is CandidateNotFound. The lane's queue is untouched either way.
+ */
+export const recordStep = Effect.fn("integration/recordStep")(function* (
+  laneId: string,
+  reported: BatchStepReport,
+) {
+  const store = yield* EntityStore;
+  const found = laneDestroyed(store, laneId) ? undefined : batchOf(store, reported.fence.batchId);
+  const batch =
+    found !== undefined && found.candidateId === reported.candidateId
+      ? found
+      : yield* new CandidateNotFound({ candidateId: reported.candidateId });
+  const fence = { attempt: reported.fence.attempt, chainEpoch: reported.fence.chainEpoch };
+  const { step } = reported;
+  const phase = step._tag === "Started" ? "started" : "finished";
+  yield* onBatch(
+    laneId,
+    batch.id,
+    `${reported.instanceId}:step:${phase}:${step.stepId}@${step.world ?? ""}`,
+    (_, lane) => ({
+      moves: [{ command: { _tag: "RecordStep", step, ...fence } }],
+      lane: () => lane,
+    }),
+  ).pipe(
+    Effect.catchTags({
+      CandidateStateRefused: () => Effect.fail(new ResultFenced({ batchId: batch.id, ...fence })),
       InvalidBatch: (invalid) => Effect.die(invalid),
     }),
   );

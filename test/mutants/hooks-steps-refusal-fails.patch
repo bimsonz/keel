@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts -t "steps.lane-steps"
+# kills: steps.lane-steps
+# why: a lane that refuses a step's event fails the whole verification, so a batch settled at its budget takes its late instance down with it
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index 21c17415..fbf5b384 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -234,11 +234,6 @@ export const laneSteps = (
+           })
+           .pipe(
+             Effect.as("recorded"),
+-            Effect.catchTags({
+-              ResultFenced: () =>
+-                Effect.succeed("refused: the batch is no longer verifying at this attempt"),
+-              CandidateNotFound: () => Effect.succeed("refused: the lane holds no such candidate"),
+-            }),
+           ),
+       );
+       if (told !== "recorded")

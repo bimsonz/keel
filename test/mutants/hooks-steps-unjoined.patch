@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts -t "steps.run-plan.off-path"
+# kills: steps.run-plan.off-path
+# why: the run ends before every finish is told, so KeelVerify settles its verdict while a step's finish may never be recorded
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 73e1aa4b..7ee1be8c 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -333,7 +333,6 @@ export const runPlan = <R, O = never>(
+     telling: [],
+   };
+   return evaluate<R | O>(s, runner, observer, plan.flow, undefined, []).pipe(
+-    Effect.andThen(Effect.suspend(() => Fiber.joinAll(s.telling))),
+     Effect.map(() =>
+       [...new Set(order(plan.flow, undefined))].flatMap((key) => {
+         const report = s.reports.get(key);

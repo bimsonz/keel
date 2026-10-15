@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts -t "steps.machine|candidate.transitions|candidate.fenced"
+# kills: steps.machine, candidate.transitions, candidate.fenced
+# why: a step reported by an instance of another attempt or chain epoch is taken as this batch's
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index ccd43e56..a5c3d12d 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -272,10 +272,6 @@ export const decideCandidate = (
+     case "RecordStep": {
+       if (batch.state !== "verifying" || batch.candidateId === undefined)
+         return refuse(batchId, batch.state, command);
+-      if (fenced(command))
+-        return Result.fail(
+-          new ResultFenced({ batchId, attempt: command.attempt, chainEpoch: command.chainEpoch }),
+-        );
+       const ids = { batchId, candidateId: batch.candidateId };
+       if (command.step._tag === "Started") {
+         const { _tag: _, ...started } = command.step;

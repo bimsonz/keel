@@ -1282,6 +1282,90 @@ model VerificationStarted {
   planHash: ContentHash;
 }
 
+/** A world a plan step runs in, inside a conflict's world matrix. */
+union FlowWorld {
+  trunk: "trunk",
+  a: "A",
+  b: "B",
+  ab: "AB",
+}
+
+/** What a step reported, as `verdict/1` reads it: only proof and rulings may fail. */
+union StepOutcome {
+  pass: "pass",
+  fail: "fail",
+  escalate: "escalate",
+  annotate: "annotate",
+  abstain: "abstain",
+}
+
+/** Why a runner gave no usable answer: the step abstains for it. */
+union StepInfraFailure {
+  timeout: "timeout",
+  rateLimited: "rate-limited",
+  schema: "schema",
+  truncated: "truncated",
+  unavailable: "unavailable",
+  noRunner: "no-runner",
+}
+
+/** Where a step runs, and why there. */
+model StepTier {
+  tier: Tier;
+
+  @minLength(1)
+  reason: string;
+}
+
+/**
+ * A step of the batch's plan started on its candidate, in `world` inside a
+ * worlds node. Committed by the Lane DO while the batch verifies, fenced on its
+ * attempt and chain epoch; the record's own `at` is when.
+ */
+model VerificationStepStarted {
+  _tag: "VerificationStepStarted";
+  batchId: BatchId;
+  candidateId: CandidateId;
+
+  @minLength(1)
+  stepId: string;
+
+  kind: StepKind;
+
+  /** Where it runs: tier 2 is a box, tier 0 the Worker. */
+  tier: StepTier;
+
+  world?: FlowWorld;
+}
+
+/**
+ * The step's result, the one `verdict/1` reads, so it equals the verdict's
+ * line for the step. A step started and never finished (its batch cancelled,
+ * or its instance stopped) is closed by the event that ended its batch.
+ */
+model VerificationStepFinished {
+  _tag: "VerificationStepFinished";
+  batchId: BatchId;
+  candidateId: CandidateId;
+
+  @minLength(1)
+  stepId: string;
+
+  world?: FlowWorld;
+  outcome: StepOutcome;
+  evidenceClass: EvidenceClass;
+  tier: StepTier;
+
+  /** The runner's own measure of the step. */
+  durationMs: float64;
+
+  /** The evidence the step stored, as the verdict cites it. */
+  resultRef?: string;
+
+  /** Why the runner gave no judgement: the step abstained for it. */
+  failure?: StepInfraFailure;
+}
+
 model BatchVerified {
   _tag: "BatchVerified";
   batchId: BatchId;
@@ -1939,6 +2023,8 @@ union KeelEvent {
   TrunkSyncStarted,
   TrunkSynced,
   BatchDropped,
+  VerificationStepStarted,
+  VerificationStepFinished,
   ProjectCreated,
   ProjectDeleted,
   ProjectSettingsChanged,

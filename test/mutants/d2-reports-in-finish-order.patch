@@ -2,12 +2,12 @@
 # kills: run-plan.flow-order
 # why: Reports come back in the order runners finished, so a replay can order them differently
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 5106de1..0fda715 100644
+index 73e1aa4b..81038d5d 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -267,7 +267,7 @@ export const runPlan = <R>(
-   };
-   return evaluate(s, runner, plan.flow, undefined, []).pipe(
+@@ -335,7 +335,7 @@ export const runPlan = <R, O = never>(
+   return evaluate<R | O>(s, runner, observer, plan.flow, undefined, []).pipe(
+     Effect.andThen(Effect.suspend(() => Fiber.joinAll(s.telling))),
      Effect.map(() =>
 -      [...new Set(order(plan.flow, undefined))].flatMap((key) => {
 +      [...s.reports.keys()].flatMap((key) => {

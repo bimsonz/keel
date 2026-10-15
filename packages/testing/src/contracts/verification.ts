@@ -886,6 +886,53 @@ export function describeBatchVerdictsContract(
         expect(error._tag).toBe("CandidateNotFound");
       }).pipe(Effect.provide(h.layer));
     });
+
+    it.effect(
+      "[steps.contract] takes a step's start and result, again on a replay; fences a step for another attempt or chain epoch, and refuses one for a candidate the batch does not hold",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const verdicts = yield* BatchVerdicts;
+          const tier = { tier: 2 as const, reason: "a suite runs in a box" };
+          const started = {
+            instanceId: `keel-verify-${random(6)}`,
+            fence: h.fence,
+            candidateId: h.candidateId,
+            step: {
+              _tag: "Started" as const,
+              stepId: "js-ts.suite",
+              kind: "deterministic" as const,
+              tier,
+            },
+          };
+          yield* verdicts.recordStep(h.laneId, started);
+          yield* verdicts.recordStep(h.laneId, started);
+          yield* verdicts.recordStep(h.laneId, {
+            ...started,
+            step: {
+              _tag: "Finished",
+              stepId: "js-ts.suite",
+              outcome: "pass",
+              evidenceClass: "proof",
+              tier,
+              durationMs: 4210,
+            },
+          });
+          for (const fence of [
+            { ...h.fence, attempt: h.fence.attempt + 1 },
+            { ...h.fence, chainEpoch: h.fence.chainEpoch + 1 },
+          ]) {
+            const error = yield* Effect.flip(verdicts.recordStep(h.laneId, { ...started, fence }));
+            expect(error._tag).toBe("ResultFenced");
+          }
+          const stranger = makeId("cnd", ulid());
+          const error = yield* Effect.flip(
+            verdicts.recordStep(h.laneId, { ...started, candidateId: stranger }),
+          );
+          expect(error._tag).toBe("CandidateNotFound");
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
   });
 }
 

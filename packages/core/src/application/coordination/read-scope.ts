@@ -94,6 +94,8 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   BatchFormed: "public",
   CandidateAssembled: "public",
   VerificationStarted: "public",
+  VerificationStepStarted: "public",
+  VerificationStepFinished: "public",
   BatchVerified: "public",
   BatchFailed: "public",
   CandidateBisected: "public",

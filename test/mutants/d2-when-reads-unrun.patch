@@ -2,11 +2,11 @@
 # kills: run-plan.when-demands
 # why: A when whose condition reads a step a cascade stopped short of holds the change forever, though every step it needs could run
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 504928d..1ea85ff 100644
+index 73e1aa4b..55793fbb 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -232,7 +232,7 @@ const evaluate = <R>(
-           (w) => () => evaluate(s, runner, { _tag: "step", step: id }, w, accounts),
+@@ -268,7 +268,7 @@ const evaluate = <R>(
+           (w) => () => evaluate(s, runner, observer, { _tag: "step", step: id }, w, accounts),
          ),
        );
 -      return Effect.forEach(demanded, (run) => run(), { discard: true }).pipe(

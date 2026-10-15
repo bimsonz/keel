@@ -1,4 +1,4 @@
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { type ChangeId, canBlock, type ContentHash, weakest } from "../kernel/index.ts";
 import type { World } from "./conflict.ts";
 import { UnknownVerdictVersion } from "./errors.ts";
@@ -12,13 +12,15 @@ import type { PlanStep, StepOutcome, StepResult, VerdictOutcome } from "./plan.t
  * with no deploy runner): a gap in the plan or a bug, never capacity, so a
  * park on it is counted, where an `unavailable` box may be waited for.
  */
-export type InfraFailure =
-  | "timeout"
-  | "rate-limited"
-  | "schema"
-  | "truncated"
-  | "unavailable"
-  | "no-runner";
+export const InfraFailure = Schema.Literals([
+  "timeout",
+  "rate-limited",
+  "schema",
+  "truncated",
+  "unavailable",
+  "no-runner",
+]);
+export type InfraFailure = typeof InfraFailure.Type;
 
 /** What a runner or plugin reports, before Keel trusts it: the outcome may be anything. */
 export type StepReport = Omit<StepResult, "outcome"> & {

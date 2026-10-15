@@ -8,6 +8,8 @@ import {
   decideCandidate,
   evolveCandidate,
   replayCandidate,
+  VerificationStepFinished,
+  VerificationStepStarted,
 } from "../../../src/domain/integration/index.ts";
 import {
   canonicalJson,
@@ -34,6 +36,7 @@ const PROJECT = makeId("prj", ulid(1));
 const STRANGER = makeId("chg", ulid(999));
 const SHA = CommitSha.make("a".repeat(40));
 const PLAN = ContentHash.make(`sha256:${"0".repeat(64)}`);
+const SUITE_TIER = { tier: 2 as const, reason: "a suite runs in a box" };
 
 type Kind = CandidateCommand["_tag"];
 type Key = "none" | Batch["state"];
@@ -50,6 +53,7 @@ const KINDS: readonly Kind[] = [
   "Bisect",
   "Promote",
   "Invalidate",
+  "RecordStep",
 ];
 
 /** The happy path out of each state, and the table's other exits (state-machines.md § Candidate). */
@@ -229,6 +233,24 @@ const build = (
       return { _tag: "Promote", trunkSha: CommitSha.make("c".repeat(40)) };
     case "Invalidate":
       return { _tag: "Invalidate" };
+    case "RecordStep":
+      // A step's start and its result by turn, now and then in a world.
+      return {
+        _tag: "RecordStep",
+        step:
+          n % 4 === 0
+            ? { _tag: "Started", stepId: "keel.test", kind: "deterministic", tier: SUITE_TIER }
+            : {
+                _tag: "Finished",
+                stepId: "keel.test",
+                outcome: "pass",
+                evidenceClass: "proof",
+                tier: SUITE_TIER,
+                durationMs: n,
+                ...(n % 3 === 0 ? { world: "AB" as const } : {}),
+              },
+        ...fence,
+      };
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -352,6 +374,8 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
       return before.state === "green" ? "promoted" : "refused";
     case "Invalidate":
       return before.state === "green" ? "invalidated" : "refused";
+    case "RecordStep":
+      return before.state === "verifying" && fresh(command) ? "verifying" : "refused";
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -530,7 +554,8 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
             .filter(() => r.before?.state === "verifying")
             .every((p) => {
               const c = p.command;
-              if (c._tag !== "Verified" && c._tag !== "Failed") return true;
+              if (c._tag !== "Verified" && c._tag !== "Failed" && c._tag !== "RecordStep")
+                return true;
               if (c.attempt === r.before?.attempt && c.chainEpoch === r.before.chainEpoch)
                 return true;
               fencedSeen++;
@@ -541,6 +566,59 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
     );
     expect(fencedSeen).toBeGreaterThan(0);
     const late = drive([form([A]), assemble, start, { ...verified, chainEpoch: 1 }]);
+    expect(failureTag(late.results[3])).toBe("ResultFenced");
+    expect(late.state?.state).toBe("verifying");
+  });
+
+  it("[steps.machine] a verifying batch records its steps' starts and results as its own candidate's, and goes on verifying; a step before it verifies, once it is settled, or for another attempt is refused", () => {
+    const fence = { attempt: 1, chainEpoch: 0 };
+    const started: CandidateCommand = {
+      _tag: "RecordStep",
+      step: { _tag: "Started", stepId: "keel.test", kind: "deterministic", tier: SUITE_TIER },
+      ...fence,
+    };
+    const finished: CandidateCommand = {
+      _tag: "RecordStep",
+      step: {
+        _tag: "Finished",
+        stepId: "keel.test",
+        outcome: "fail",
+        evidenceClass: "proof",
+        tier: SUITE_TIER,
+        durationMs: 61_250,
+        resultRef: `sha256:${"e".repeat(64)}`,
+      },
+      ...fence,
+    };
+    const candidateId = makeId("cnd", ulid(1));
+    const ran = drive([form([A]), assemble, start, started, finished, verified, finished]);
+    expect(eventsOf(ran.results[3] ?? Result.succeed([]))).toEqual([
+      VerificationStepStarted.make({
+        batchId: BATCH,
+        candidateId,
+        stepId: "keel.test",
+        kind: "deterministic",
+        tier: SUITE_TIER,
+      }),
+    ]);
+    expect(eventsOf(ran.results[4] ?? Result.succeed([]))).toEqual([
+      VerificationStepFinished.make({
+        batchId: BATCH,
+        candidateId,
+        stepId: "keel.test",
+        outcome: "fail",
+        evidenceClass: "proof",
+        tier: SUITE_TIER,
+        durationMs: 61_250,
+        resultRef: `sha256:${"e".repeat(64)}`,
+      }),
+    ]);
+    expect(failureTag(ran.results[6])).toBe("CandidateStateRefused");
+    expect(ran.state?.state).toBe("green");
+    expect(failureTag(drive([form([A]), assemble, started]).results[2])).toBe(
+      "CandidateStateRefused",
+    );
+    const late = drive([form([A]), assemble, start, { ...started, attempt: 2 }]);
     expect(failureTag(late.results[3])).toBe("ResultFenced");
     expect(late.state?.state).toBe("verifying");
   });
@@ -829,6 +907,9 @@ const folds = (from: Folded | undefined, event: CandidateEvent): Folded | "illeg
       return moves("green", "promoted");
     case "CandidateInvalidated":
       return moves("green", "invalidated");
+    case "VerificationStepStarted":
+    case "VerificationStepFinished":
+      return from.state === "verifying" ? from : "illegal";
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -908,16 +989,16 @@ describe("the Candidate fold", () => {
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
     // Twenty-two rows: a batch of two and a batch of one in every state each reaches, and a batch
-    // of one red with nobody blamed. Each meets the same 355 forms of the events the walks
+    // of one red with nobody blamed. Each meets the same 379 forms of the events the walks
     // committed: 2 formings in 7 forms (14); 12 assemblies in 2 (24); 12 starts and 12
     // verifications in 3 (72); 6 bisections in 3 (18); 2 promotions and 2 invalidations in 3,
-    // the pair's forms as another candidate's one form (10); and 28 failures, 27 pairs of verdict
-    // and candidate in each of 6 blames (162), each failure as another batch's (28) and as
-    // another candidate's, where two that differ only in candidate meet (27). 22 × 355 = 7810
-    // folds, 834 of them taken and 6976 refused.
+    // the pair's forms as another candidate's one form (10); 2 step starts and 6 step results in
+    // 3, the starts' forms as another candidate's one form (23); and 28 failures, 27 pairs of
+    // verdict and candidate in each of 6 blames (162), each failure as another batch's (28) and as
+    // another candidate's (28). 22 × 379 = 8338 folds, 869 of them taken and 7469 refused.
     expect(foldShape(cases)).toEqual({
-      folds: 7810,
-      refused: 6976,
+      folds: 8338,
+      refused: 7469,
       rows: [
         "none",
         `${BATCH} forming of 2${HOME}`,

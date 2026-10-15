@@ -2,10 +2,10 @@
 # kills: candidate.fold-table
 # why: the fold takes CandidateAssembled with its guard gone: `batch.state === "forming"`.
 diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
-index 46ee4c8c..966ef783 100644
+index ccd43e56..92298cae 100644
 --- a/packages/core/src/domain/integration/candidate-machine.ts
 +++ b/packages/core/src/domain/integration/candidate-machine.ts
-@@ -383,9 +383,7 @@ export const evolveCandidate = (
+@@ -420,9 +420,7 @@ export const evolveCandidate = (
      case "BatchFormed":
        return illegal(batch, event);
      case "CandidateAssembled":
@@ -15,4 +15,4 @@ index 46ee4c8c..966ef783 100644
 +      return { ...batch, state: "assembled", candidateId: event.candidateId };
      case "VerificationStarted":
        return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
-     case "BatchVerified":
+     case "VerificationStepStarted":

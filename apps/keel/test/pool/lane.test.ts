@@ -341,6 +341,101 @@ describe("the Lane DO", () => {
     await drainOutbox(stub);
   });
 
+  it("[steps.lane] a verifying batch takes each step's start and result once, however often they are sent, as its candidate's events; a step for another attempt, or once the verdict is in, is ResultFenced", async () => {
+    const { stub, laneId, verification, pushCandidate } = await lane();
+    decodeExit(EventCodecs.receive, await stub.receive([queued(laneId, 1)]));
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    const [started] = [...verification.started.entries()];
+    const [instanceId, job] = started ?? [];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    const tier = { tier: 2 as const, reason: "a suite runs in a box" };
+    const resultRef = `sha256:${"e".repeat(64)}`;
+    const report = (step: unknown, fence = job.fence) => ({
+      instanceId,
+      fence,
+      candidateId: job.candidateId,
+      step,
+    });
+    const send = async (command: ReturnType<typeof report>) =>
+      decodeExit(
+        LaneCodecs.recordStep,
+        await stub.recordStep(command as Parameters<typeof stub.recordStep>[0]),
+      );
+    const refusal = (exit: Awaited<ReturnType<typeof send>>) =>
+      Exit.isFailure(exit) ? JSON.stringify(exit.cause) : "recorded";
+    const suiteStarted = report({
+      _tag: "Started",
+      stepId: "js-ts.suite",
+      kind: "deterministic",
+      tier,
+    });
+    const suiteFinished = report({
+      _tag: "Finished",
+      stepId: "js-ts.suite",
+      outcome: "pass",
+      evidenceClass: "proof",
+      tier,
+      durationMs: 4210,
+      resultRef,
+    });
+    // A replayed or retried report is sent again: the lane keeps the first.
+    for (const command of [suiteStarted, suiteStarted, suiteFinished, suiteFinished])
+      expect(await send(command)).toEqual(Exit.void);
+    const otherAttempt = report(
+      { _tag: "Started", stepId: "js-ts.typecheck", kind: "deterministic", tier },
+      { ...job.fence, attempt: job.fence.attempt + 1 },
+    );
+    expect(refusal(await send(otherAttempt))).toContain("ResultFenced");
+    await pushCandidate(job.candidateId);
+    expect(
+      decodeExit(
+        LaneCodecs.recordVerdict,
+        await stub.recordVerdict(landing(job, instanceId, job.fence.attempt)),
+      ),
+    ).toEqual(Exit.void);
+    const late = report({ _tag: "Started", stepId: "keel.docs", kind: "deterministic", tier });
+    expect(refusal(await send(late))).toContain("ResultFenced");
+    const events = await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "batch", id: job.fence.batchId })),
+      ),
+    );
+    const ids = { batchId: job.fence.batchId, candidateId: job.candidateId };
+    expect(events.map((e) => e.type)).toEqual([
+      "BatchFormed",
+      "CandidateAssembled",
+      "VerificationStarted",
+      "VerificationStepStarted",
+      "VerificationStepFinished",
+      "BatchVerified",
+    ]);
+    const steps = events.filter((e) => e.type.startsWith("VerificationStep"));
+    expect(steps.map((e) => e.payload)).toEqual([
+      {
+        _tag: "VerificationStepStarted",
+        ...ids,
+        stepId: "js-ts.suite",
+        kind: "deterministic",
+        tier,
+      },
+      {
+        _tag: "VerificationStepFinished",
+        ...ids,
+        stepId: "js-ts.suite",
+        outcome: "pass",
+        evidenceClass: "proof",
+        tier,
+        durationMs: 4210,
+        resultRef,
+      },
+    ]);
+    // Each names the batch's members, as its VerificationStarted does, so a member's own feed has them.
+    const verifying = events.find((e) => e.type === "VerificationStarted");
+    expect(steps.map((e) => e.affected)).toEqual([verifying?.affected, verifying?.affected]);
+    await drainOutbox(stub);
+  });
+
   it("[lane.do.group-commit] four queued changes form one batch, verified once on their plan, and one trunk advance lands all four, each at its own commit of the candidate's chain", async () => {
     const { stub, laneId, verification, writer, pushCandidate, trunkEvents } = await lane({
       maxBatchSize: 4,

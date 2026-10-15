@@ -1,4 +1,4 @@
-import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
+import { CandidateNotFound, ResultFenced, StepReported } from "@keeltown/core/domain/integration";
 import { VerdictOutcome } from "@keeltown/core/domain/verification";
 import { BatchId, CandidateId, ContentHash, NextAction, VerdictId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -27,6 +27,21 @@ export const RecordVerdictCommand = Schema.Struct({
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 
+/**
+ * KeelVerify's report of one step of the batch's plan, as it runs: the lane
+ * commits VerificationStepStarted or VerificationStepFinished through the
+ * Candidate machine. Idempotent by the instance, step, world and phase. A step
+ * for a batch no longer verifying, or for another attempt or chain epoch, is
+ * ResultFenced, which is terminal.
+ */
+export const RecordStepCommand = Schema.Struct({
+  instanceId: Schema.NonEmptyString,
+  fence: Schema.Struct({ batchId: BatchId, attempt: Schema.Int, chainEpoch: Schema.Int }),
+  candidateId: CandidateId,
+  step: StepReported,
+});
+export type RecordStepCommand = typeof RecordStepCommand.Type;
+
 /** The platform's report that a KeelVerify instance ended without completing: the instance, nothing more. */
 export const VerificationEndedCommand = Schema.Struct({ instanceId: Schema.NonEmptyString });
 export type VerificationEndedCommand = typeof VerificationEndedCommand.Type;
@@ -37,6 +52,7 @@ export const LaneStandingAnswer = Schema.Struct({ queued: Schema.Int, inFlight: 
 export const LaneCodecs = {
   status: exitCodec(LaneStandingAnswer, Schema.Never),
   recordVerdict: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
+  recordStep: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
   destroy: exitCodec(Schema.Void, Schema.Never),
   verificationEnded: exitCodec(Schema.Void, Schema.Never),
 };
@@ -54,6 +70,7 @@ export interface LaneRpc {
    */
   status(): Promise<ExitJson>;
   recordVerdict(command: typeof RecordVerdictCommand.Encoded): Promise<ExitJson>;
+  recordStep(command: typeof RecordStepCommand.Encoded): Promise<ExitJson>;
   /**
    * Stops the lane for good, when its project is deleted: it drops its queue
    * and its batch in flight and cancels its deadlines, so it forms no batch

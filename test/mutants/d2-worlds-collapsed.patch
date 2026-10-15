@@ -2,15 +2,15 @@
 # kills: run-plan.worlds, run-plan.verdict-as-if-all-ran
 # why: A step under worlds runs once with no world, so A, B and AB are never told apart
 diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
-index 5106de1..32278dd 100644
+index 73e1aa4b..d782af21 100644
 --- a/packages/core/src/application/verification/run-plan.ts
 +++ b/packages/core/src/application/verification/run-plan.ts
-@@ -209,7 +209,7 @@ const evaluate = <R>(
+@@ -257,7 +257,7 @@ const evaluate = <R>(
        });
      case "worlds":
        return Effect.all(
--        flow.over.map((w) => evaluate(s, runner, flow.body, w, accounts)),
-+        flow.over.map(() => evaluate(s, runner, flow.body, undefined, accounts)),
+-        flow.over.map((w) => evaluate(s, runner, observer, flow.body, w, accounts)),
++        flow.over.map(() => evaluate(s, runner, observer, flow.body, undefined, accounts)),
          { concurrency: "unbounded" },
        ).pipe(Effect.map(combine));
      case "when": {

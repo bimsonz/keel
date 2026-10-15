@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "steps.lane"
+# kills: steps.lane
+# why: a step reported after its batch's verdict breaks the lane's answer instead of being refused, so KeelVerify retries it and the lane logs a defect
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cdf72053..73103686 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1899,7 +1899,7 @@ export const recordStep = Effect.fn("integration/recordStep")(function* (
+     }),
+   ).pipe(
+     Effect.catchTags({
+-      CandidateStateRefused: () => Effect.fail(new ResultFenced({ batchId: batch.id, ...fence })),
++      CandidateStateRefused: (refused) => Effect.die(refused),
+       InvalidBatch: (invalid) => Effect.die(invalid),
+     }),
+   );

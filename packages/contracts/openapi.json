@@ -16358,6 +16358,16 @@
         },
         "description": "Something Keel found that the agent should know about."
       },
+      "FlowWorld": {
+        "type": "string",
+        "enum": [
+          "trunk",
+          "A",
+          "B",
+          "AB"
+        ],
+        "description": "A world a plan step runs in, inside a conflict's world matrix."
+      },
       "ForkSource": {
         "type": "object",
         "required": [
@@ -17086,6 +17096,12 @@
           },
           {
             "$ref": "#/components/schemas/BatchDropped"
+          },
+          {
+            "$ref": "#/components/schemas/VerificationStepStarted"
+          },
+          {
+            "$ref": "#/components/schemas/VerificationStepFinished"
           },
           {
             "$ref": "#/components/schemas/ProjectCreated"
@@ -23390,6 +23406,18 @@
         },
         "description": "The agents a person stands behind."
       },
+      "StepInfraFailure": {
+        "type": "string",
+        "enum": [
+          "timeout",
+          "rate-limited",
+          "schema",
+          "truncated",
+          "unavailable",
+          "no-runner"
+        ],
+        "description": "Why a runner gave no usable answer: the step abstains for it."
+      },
       "StepKind": {
         "type": "string",
         "enum": [
@@ -23401,6 +23429,37 @@
           "deploy"
         ],
         "description": "What kind of check a plan step is."
+      },
+      "StepOutcome": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "escalate",
+          "annotate",
+          "abstain"
+        ],
+        "description": "What a step reported, as `verdict/1` reads it: only proof and rulings may fail."
+      },
+      "StepTier": {
+        "type": "object",
+        "required": [
+          "tier",
+          "reason"
+        ],
+        "properties": {
+          "tier": {
+            "$ref": "#/components/schemas/Tier"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Where a step runs, and why there."
       },
       "SubjectId": {
         "type": "string",
@@ -24806,6 +24865,117 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "VerificationStepFinished": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "batchId",
+          "candidateId",
+          "stepId",
+          "outcome",
+          "evidenceClass",
+          "tier",
+          "durationMs"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "VerificationStepFinished"
+            ]
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "stepId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "world": {
+            "$ref": "#/components/schemas/FlowWorld"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/StepOutcome"
+          },
+          "evidenceClass": {
+            "$ref": "#/components/schemas/EvidenceClass"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/StepTier"
+          },
+          "durationMs": {
+            "type": "number",
+            "format": "double",
+            "description": "The runner's own measure of the step."
+          },
+          "resultRef": {
+            "type": "string",
+            "description": "The evidence the step stored, as the verdict cites it."
+          },
+          "failure": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StepInfraFailure"
+              }
+            ],
+            "description": "Why the runner gave no judgement: the step abstained for it."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The step's result, the one `verdict/1` reads, so it equals the verdict's\nline for the step. A step started and never finished (its batch cancelled,\nor its instance stopped) is closed by the event that ended its batch."
+      },
+      "VerificationStepStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "batchId",
+          "candidateId",
+          "stepId",
+          "kind",
+          "tier"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "VerificationStepStarted"
+            ]
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "stepId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StepKind"
+          },
+          "tier": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StepTier"
+              }
+            ],
+            "description": "Where it runs: tier 2 is a box, tier 0 the Worker."
+          },
+          "world": {
+            "$ref": "#/components/schemas/FlowWorld"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A step of the batch's plan started on its candidate, in `world` inside a\nworlds node. Committed by the Lane DO while the batch verifies, fenced on its\nattempt and chain epoch; the record's own `at` is when."
       },
       "Viewer": {
         "type": "object",

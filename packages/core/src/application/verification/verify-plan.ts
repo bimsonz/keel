@@ -1,5 +1,11 @@
 import { Effect, Result, Schema } from "effect";
-import type { ContentHash, NextAction, NamespaceId } from "../../domain/kernel/index.ts";
+import type { StepReported } from "../../domain/integration/index.ts";
+import type {
+  CandidateId,
+  ContentHash,
+  NextAction,
+  NamespaceId,
+} from "../../domain/kernel/index.ts";
 import {
   type FlowWorld,
   type PlanStep,
@@ -7,11 +13,19 @@ import {
   StepResult,
   type VerificationJob,
 } from "../../domain/verification/index.ts";
-import { EvidenceStore, Ids, PlanStore, ProbeRunner, VerifierRuntime } from "../ports/index.ts";
+import {
+  BatchVerdicts,
+  type CandidateFence,
+  EvidenceStore,
+  Ids,
+  PlanStore,
+  ProbeRunner,
+  VerifierRuntime,
+} from "../ports/index.ts";
 import type { DepsAnswer } from "./deps.ts";
 import { withGuards } from "./guard-step.ts";
 import { storedPlanText } from "./plan-codec.ts";
-import type { StepRunner } from "./run-plan.ts";
+import type { StepObserver, StepRunner } from "./run-plan.ts";
 import { runJob, type SettledVerdict } from "./verify-candidate.ts";
 
 /**
@@ -181,4 +195,79 @@ export const candidateRunner = (
   };
   return (step, world) =>
     world === undefined ? Effect.tap(run(step, world), keep(step)) : run(step, world);
+};
+
+/** A step's name among the instance's durable steps: its id, and its world inside a worlds node. */
+const named = (id: string, world: FlowWorld | undefined) =>
+  world === undefined ? id : `${id}@${world}`;
+
+/**
+ * Makes one telling durable: a Workflow step named `name`, so a replay never
+ * tells the lane again. It answers what came of the telling, and never fails.
+ */
+export type DurableTell = (name: string, tell: Effect.Effect<string>) => Effect.Effect<string>;
+
+/**
+ * Tells the lane that formed the batch of each step of its plan as KeelVerify
+ * runs it, for the public feed: one durable step for its start
+ * (`started <step>`) and one for its result (`finished <step>`), `@<world>`
+ * added inside a worlds node. A refusal (the batch settled, fenced, or not the
+ * lane's) is logged and dropped: a step event never fails a verification or
+ * holds up its verdict.
+ */
+export const laneSteps = (
+  job: {
+    readonly laneId: string;
+    readonly instanceId: string;
+    readonly fence: CandidateFence;
+    readonly candidateId: CandidateId;
+  },
+  durable: DurableTell,
+): StepObserver<BatchVerdicts> => {
+  const tell = (name: string, step: StepReported) =>
+    Effect.gen(function* () {
+      const verdicts = yield* BatchVerdicts;
+      const told = yield* durable(
+        name,
+        verdicts
+          .recordStep(job.laneId, {
+            instanceId: job.instanceId,
+            fence: job.fence,
+            candidateId: job.candidateId,
+            step,
+          })
+          .pipe(
+            Effect.as("recorded"),
+            Effect.catchTags({
+              ResultFenced: () =>
+                Effect.succeed("refused: the batch is no longer verifying at this attempt"),
+              CandidateNotFound: () => Effect.succeed("refused: the lane holds no such candidate"),
+            }),
+          ),
+      );
+      if (told !== "recorded")
+        yield* Effect.logWarning(`${name} of batch ${job.fence.batchId}: ${told}`);
+    });
+  return {
+    started: (step, world) =>
+      tell(`started ${named(step.id, world)}`, {
+        _tag: "Started",
+        stepId: step.id,
+        kind: step.kind,
+        tier: step.tier,
+        ...(world === undefined ? {} : { world }),
+      }),
+    finished: (step, result, reported) =>
+      tell(`finished ${named(step.id, result.world)}`, {
+        _tag: "Finished",
+        stepId: result.stepId,
+        outcome: result.outcome,
+        evidenceClass: result.evidenceClass,
+        tier: result.tier,
+        durationMs: result.durationMs,
+        ...(result.world === undefined ? {} : { world: result.world }),
+        ...(result.resultRef === undefined ? {} : { resultRef: result.resultRef }),
+        ...(reported.failure === undefined ? {} : { failure: reported.failure }),
+      }),
+  };
 };

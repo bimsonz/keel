@@ -5,14 +5,17 @@ import {
   ChangeId,
   CommitSha,
   ContentHash,
+  EvidenceClass,
   InstantSchema,
   NextAction,
   ProjectId,
   Tier,
+  TierChoice,
   UserId,
   VerdictId,
 } from "../kernel/index.ts";
 import { PushRefusedReason } from "../coordination/index.ts";
+import { FlowWorld, InfraFailure, StepKind, StepOutcome } from "../verification/index.ts";
 
 /**
  * Who a failed batch is blamed on: one member, a refused composition
@@ -63,6 +66,52 @@ export const VerificationStarted = Schema.TaggedStruct("VerificationStarted", {
   instanceId: Schema.String,
   planHash: ContentHash,
 });
+const stepStarted = {
+  stepId: Schema.NonEmptyString,
+  kind: StepKind,
+  /** Where it runs: tier 2 is a box, tier 0 the Worker. */
+  tier: TierChoice,
+  world: Schema.optional(FlowWorld),
+};
+const stepFinished = {
+  stepId: Schema.NonEmptyString,
+  world: Schema.optional(FlowWorld),
+  outcome: StepOutcome,
+  evidenceClass: EvidenceClass,
+  tier: TierChoice,
+  /** The runner's own measure of the step. */
+  durationMs: Schema.Finite,
+  /** The evidence the step stored, as the verdict cites it. */
+  resultRef: Schema.optional(Schema.String),
+  /** Why the runner gave no judgement: the step abstained for it. */
+  failure: Schema.optional(InfraFailure),
+};
+/**
+ * A step of the batch's plan started on its candidate, in `world` inside a
+ * worlds node. Committed by the Lane DO while the batch verifies, fenced on its
+ * attempt and chain epoch; the record's own `at` is when.
+ */
+export const VerificationStepStarted = Schema.TaggedStruct("VerificationStepStarted", {
+  batchId: BatchId,
+  candidateId: CandidateId,
+  ...stepStarted,
+});
+/**
+ * The step's result, the one `verdict/1` reads, so it equals the verdict's
+ * line for the step. A step started and never finished (its batch cancelled,
+ * or its instance stopped) is closed by the event that ended its batch.
+ */
+export const VerificationStepFinished = Schema.TaggedStruct("VerificationStepFinished", {
+  batchId: BatchId,
+  candidateId: CandidateId,
+  ...stepFinished,
+});
+/** A step's start or its result, as KeelVerify reports it to the lane, which adds the batch and candidate. */
+export const StepReported = Schema.Union([
+  Schema.TaggedStruct("Started", stepStarted),
+  Schema.TaggedStruct("Finished", stepFinished),
+]);
+export type StepReported = typeof StepReported.Type;
 export const BatchVerified = Schema.TaggedStruct("BatchVerified", {
   batchId: BatchId,
   candidateId: CandidateId,
@@ -323,5 +372,7 @@ export const IntegrationEvent = Schema.Union([
   TrunkSyncStarted,
   TrunkSynced,
   BatchDropped,
+  VerificationStepStarted,
+  VerificationStepFinished,
 ]);
 export type IntegrationEvent = typeof IntegrationEvent.Type;

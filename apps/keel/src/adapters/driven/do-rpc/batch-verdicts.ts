@@ -1,10 +1,16 @@
 import { BatchVerdicts } from "@keeltown/core/ports";
 import { Effect, Exit, Layer, Schema } from "effect";
-import { decodeExit, LaneCodecs, type LaneRpc, RecordVerdictCommand } from "../../../rpc/index.ts";
+import {
+  decodeExit,
+  LaneCodecs,
+  type LaneRpc,
+  RecordStepCommand,
+  RecordVerdictCommand,
+} from "../../../rpc/index.ts";
 
 /** The lane DOs, addressed by name (`lane:<project>:<id>`). */
 export interface LaneNamespace {
-  get(id: DurableObjectId): Pick<LaneRpc, "recordVerdict">;
+  get(id: DurableObjectId): Pick<LaneRpc, "recordVerdict" | "recordStep">;
   idFromName(name: string): DurableObjectId;
 }
 
@@ -12,7 +18,7 @@ export interface LaneNamespace {
 export const isLaneNamespace = (value: unknown): value is LaneNamespace =>
   typeof value === "object" && value !== null && "get" in value && "idFromName" in value;
 
-/** `BatchVerdicts` over the Lane DO's `recordVerdict`, decoding its Exit envelope back into tagged errors. */
+/** `BatchVerdicts` over the Lane DO's `recordVerdict` and `recordStep`, decoding each Exit envelope back into tagged errors. */
 export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
   Layer.succeed(
     BatchVerdicts,
@@ -36,6 +42,22 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
         ).pipe(
           Effect.flatMap((answer) => {
             const exit = decodeExit(LaneCodecs.recordVerdict, answer);
+            return Exit.isSuccess(exit) ? Effect.void : Effect.failCause(exit.cause);
+          }),
+        ),
+      recordStep: (laneId, reported) =>
+        Effect.promise(() =>
+          lanes.get(lanes.idFromName(laneId)).recordStep(
+            Schema.encodeSync(RecordStepCommand)({
+              instanceId: reported.instanceId,
+              fence: reported.fence,
+              candidateId: reported.candidateId,
+              step: reported.step,
+            }),
+          ),
+        ).pipe(
+          Effect.flatMap((answer) => {
+            const exit = decodeExit(LaneCodecs.recordStep, answer);
             return Exit.isSuccess(exit) ? Effect.void : Effect.failCause(exit.cause);
           }),
         ),

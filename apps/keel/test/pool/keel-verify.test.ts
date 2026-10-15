@@ -53,7 +53,8 @@ const job = (overrides: Partial<KeelVerifyJob> = {}): KeelVerifyJob => ({
   projectId: PROJECT_ID,
   namespace: POOL_ORG,
   jobId: "job-pool",
-  laneId: "lane:prj:default",
+  // A lane of the project, as Keel names one: the steps are told to its real Lane DO.
+  laneId: `lane:${PROJECT_ID}:main`,
   candidateId: Schema.decodeUnknownSync(CandidateId)("cnd_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
   bundle: Schema.decodeUnknownSync(ContentHash)(`sha256:${"d".repeat(64)}`),
   fence: {
@@ -120,6 +121,27 @@ describe("KeelVerify", () => {
       outcome: "pass",
       totals: { total: 200, failed: 0 },
     });
+  });
+
+  it("[steps.pool.keel-verify] tells the job's lane each step's start and result in durable steps of their own, through the real Lane DO; a lane that refuses them leaves the verdict as it was", async () => {
+    const id = "keel-verify-steps";
+    const params = keelVerifyParams(job({ planHash: (await stored(SUITE)).planHash }));
+    await using instance = await introspectWorkflowInstance(env.CI_WORKFLOW, id);
+    await instance.modify(async (m) => {
+      await mockDepsReady(m);
+      await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(await suiteStdout(200, 0)));
+      await m.mockStepResult({ name: "record" }, "recorded");
+    });
+    await env.CI_WORKFLOW.create({ id, params });
+    // The job's lane holds no such batch, so it refuses both, and the instance goes on.
+    const refused = "refused: the lane holds no such candidate";
+    expect(await instance.waitForStepResult({ name: `started ${SUITE_STEP}` })).toBe(refused);
+    expect(await instance.waitForStepResult({ name: `finished ${SUITE_STEP}` })).toBe(refused);
+    const verdict = Schema.decodeUnknownSync(SettledVerdict)(
+      JSON.parse(String(await instance.waitForStepResult({ name: "verdict" }))),
+    );
+    await instance.waitForStatus("complete");
+    expect(verdict.outcome).toBe("land");
   });
 
   it("bounces a red candidate, naming the failing tests", async () => {

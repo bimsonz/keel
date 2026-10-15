@@ -1,6 +1,10 @@
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { runPlan, type StepRunner } from "../../../src/application/verification/index.ts";
+import {
+  runPlan,
+  type StepObserver,
+  type StepRunner,
+} from "../../../src/application/verification/index.ts";
 import { canBlock, contentHashOf } from "../../../src/domain/kernel/index.ts";
 import {
   coerce,
@@ -516,5 +520,150 @@ describe("run-plan: the compiled plan's flow, executed", () => {
       Effect.sleep(delays[s.id] ?? 0).pipe(Effect.as(report(s, w, "pass")));
     const ran = await run(plan, runner);
     expect(ran.map((r) => r.stepId)).toEqual(["a", "b", "c"]);
+  });
+});
+
+/** a reports an outcome its step never declared; b's runner gave no judgement, timing out. */
+const untrusted: StepRunner<never> = (s, w) =>
+  Effect.succeed(
+    s.id === "a"
+      ? report(s, w, "escalate", { durationMs: 40 })
+      : report(s, w, "pass", { durationMs: 7, failure: "timeout" }),
+  );
+
+/** An observer that writes down what it is told, in the order it is told it. */
+const listening = () => {
+  const told: string[] = [];
+  const finished = new Map<string, { outcome: string; durationMs: number; failure?: string }>();
+  const observer: StepObserver<never> = {
+    started: (step, world) =>
+      Effect.sync(() => {
+        told.push(`started ${step.id}@${world ?? ""}`);
+      }),
+    finished: (step, result, reported) =>
+      Effect.sync(() => {
+        const key = `${step.id}@${result.world ?? ""}`;
+        told.push(`finished ${key}`);
+        finished.set(key, {
+          outcome: result.outcome,
+          durationMs: result.durationMs,
+          ...(reported.failure === undefined ? {} : { failure: reported.failure }),
+        });
+      }),
+  };
+  return { told, finished, observer };
+};
+
+describe("run-plan: the steps it tells an observer of", () => {
+  it("[steps.run-plan.told-once] each step and world the flow runs is told it started, then it finished, once, a step a union shares too; it finishes with the result verdict/1 reads", async () => {
+    await fc.assert(
+      fc.asyncProperty(flowCaseArb(), fc.nat(), async (c, salt) => {
+        const member = planOf(c);
+        const union: FlowPlan = {
+          ...member,
+          flow: { _tag: "par", items: [member.flow, member.flow] },
+        };
+        const answer = scripted(salt);
+        const runner: StepRunner<never> = (step, world) =>
+          Effect.yieldNow.pipe(Effect.andThen(answer(step, world)));
+        const { told, finished, observer } = listening();
+        const ran = await Effect.runPromise(runPlan(union, runner, observer));
+        const keys = ran.map((r) => `${r.stepId}@${r.world ?? ""}`).toSorted();
+        const of = (phase: string) =>
+          told.filter((t) => t.startsWith(`${phase} `)).map((t) => t.slice(phase.length + 1));
+        expect(of("started").toSorted()).toEqual(keys);
+        expect(of("finished").toSorted()).toEqual(keys);
+        for (const key of keys)
+          expect(told.indexOf(`started ${key}`)).toBeLessThan(told.indexOf(`finished ${key}`));
+        for (const r of ran)
+          expect(finished.get(`${r.stepId}@${r.world ?? ""}`)?.outcome).toBe(
+            coerce(union, r).outcome,
+          );
+      }),
+    );
+  });
+
+  it("[steps.run-plan.coerced] a report Keel does not trust finishes as the abstain the verdict reads, saying the runner's failure", async () => {
+    const plan = handPlan([proofStep("a"), proofStep("b")], seq(leaf("a"), leaf("b")));
+    const { finished, observer } = listening();
+    await Effect.runPromise(runPlan(plan, untrusted, observer));
+    expect(finished.get("a@")).toEqual({ outcome: "abstain", durationMs: 40 });
+    expect(finished.get("b@")).toEqual({ outcome: "abstain", durationMs: 7, failure: "timeout" });
+  });
+
+  it("[steps.run-plan.unrun] a step its spent budget never runs is told it started and finished, abstaining in 0 ms; a skipped step is never told", async () => {
+    const budget = handPlan([proofStep("a"), proofStep("b")], {
+      _tag: "budget",
+      limit: { usd: 1, cpuMs: 1000, tokens: 0 },
+      onExhaust: "escalate",
+      body: seq(leaf("a"), leaf("b")),
+    });
+    const spent = listening();
+    await Effect.runPromise(
+      runPlan(
+        budget,
+        (s, w) => Effect.succeed(report(s, w, "pass", { durationMs: 1500 })),
+        spent.observer,
+      ),
+    );
+    expect(spent.told.toSorted()).toEqual([
+      "finished a@",
+      "finished b@",
+      "started a@",
+      "started b@",
+    ]);
+    expect(spent.finished.get("b@")).toEqual({ outcome: "abstain", durationMs: 0 });
+
+    const opinion = proofStep("o", {
+      kind: "decision-model",
+      evidenceCeiling: "opinion",
+      outcomes: ["annotate", "abstain"],
+      mayskip: ["slow"],
+      suite: false,
+    });
+    const skipping = handPlan(
+      [opinion, proofStep("slow", { optional: true }), proofStep("must")],
+      seq(leaf("o"), leaf("slow"), leaf("must")),
+    );
+    const skipped = listening();
+    await Effect.runPromise(
+      runPlan(
+        skipping,
+        (s, w) =>
+          Effect.succeed(
+            report(
+              s,
+              w,
+              s.id === "o" ? "annotate" : "pass",
+              s.id === "o" ? { skips: ["slow"] } : {},
+            ),
+          ),
+        skipped.observer,
+      ),
+    );
+    expect(skipped.told.filter((t) => t.includes("slow"))).toEqual([]);
+    expect(skipped.told).toContain("finished must@");
+  });
+
+  it("[steps.run-plan.off-path] a step runs while it is told it started, and the run ends only once every step is told it finished", async () => {
+    const plan = handPlan([proofStep("a"), proofStep("b")], seq(leaf("a"), leaf("b")));
+    const told: string[] = [];
+    const observer: StepObserver<never> = {
+      // Telling the start takes longer than the step itself: the step must not wait for it.
+      started: (step) =>
+        Effect.sleep(30).pipe(Effect.andThen(Effect.sync(() => told.push(`started ${step.id}`)))),
+      finished: (step) =>
+        Effect.sleep(30).pipe(Effect.andThen(Effect.sync(() => told.push(`finished ${step.id}`)))),
+    };
+    const ran: string[] = [];
+    const runner: StepRunner<never> = (s, w) =>
+      Effect.sync(() => {
+        ran.push(`${s.id} ran with ${told.length} told`);
+        return report(s, w, "pass");
+      });
+    await Effect.runPromise(runPlan(plan, runner, observer));
+    // b runs before a's finish is told: telling is never on the steps' path.
+    expect(ran).toEqual(["a ran with 0 told", "b ran with 0 told"]);
+    expect(told.toSorted()).toEqual(["finished a", "finished b", "started a", "started b"]);
   });
 });

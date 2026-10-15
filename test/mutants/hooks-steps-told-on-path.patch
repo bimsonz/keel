@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts -t "steps.run-plan.off-path"
+# kills: steps.run-plan.off-path
+# why: each step waits for its start to be recorded before it runs, so every step of every verification takes a lane round trip longer
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 73e1aa4b..3aa43a36 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -206,7 +206,8 @@ const evaluate = <R>(
+       s.running.set(key, started);
+       const spent = accounts.some((a) => a.spentMs > a.limit.cpuMs);
+       return Effect.gen(function* () {
+-        const telling = yield* Effect.forkDetach(observer.started(step, world));
++        yield* observer.started(step, world);
++        const telling = yield* Effect.forkDetach(Effect.void);
+         const reported = yield* spent ? Effect.succeed(unrun(step, world)) : runner(step, world);
+         // The step and world are the ones asked for, whatever the runner wrote.
+         const { world: _world, ...rest } = reported;
