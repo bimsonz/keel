@@ -803,12 +803,11 @@ export interface PipelineProps {
   canvas: Canvas;
   now: number;
   mode: Mode;
-  live: boolean;
   /** Whether the log has been read to its end: until it has, nothing is said to be still, and nothing flies. */
   loaded: boolean;
 }
 
-export function Pipeline({ canvas, now, mode, live, loaded }: PipelineProps) {
+export function Pipeline({ canvas, now, mode, loaded }: PipelineProps) {
   const placed = useMemo(() => place(canvas), [canvas]);
   const before = useRef<{ canvas: Canvas; placed: Placed } | undefined>(undefined);
   const [flights, setFlights] = useState<Flight[]>([]);
@@ -885,7 +884,7 @@ export function Pipeline({ canvas, now, mode, live, loaded }: PipelineProps) {
 
   return (
     <div ref={frame} className="a-mc" data-full={isFull || undefined} data-far={far || undefined}>
-      <Header canvas={canvas} live={live} />
+      <Header canvas={canvas} />
       <div className="a-mc-stage">
         <ReactFlow
           nodes={nodes}
@@ -969,15 +968,11 @@ export function Pipeline({ canvas, now, mode, live, loaded }: PipelineProps) {
 
 // ── The header and the inspector ──────────────────────────────────────────
 
-function Header({ canvas, live }: { canvas: Canvas; live: boolean }) {
+function Header({ canvas }: { canvas: Canvas }) {
   const { answers, counts } = canvas;
   const rate = answers.perMinute.toLocaleString("en-US", { maximumFractionDigits: 1 });
   return (
     <div className="a-mc-strip">
-      <p className="a-mc-live" data-live={live || undefined}>
-        <i aria-hidden />
-        {live ? "Live" : "Playback"}
-      </p>
       <dl className="a-mc-answers">
         <div>
           <dt>Green advances</dt>

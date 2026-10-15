@@ -454,12 +454,11 @@ export interface MissionCanvasProps {
   growth: Growth;
   now: number;
   mode: Mode;
-  live: boolean;
   /** Whether the log has been read to its end. */
   loaded: boolean;
 }
 
-export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: MissionCanvasProps) {
+export function MissionCanvas({ canvas, growth, now, mode, loaded }: MissionCanvasProps) {
   const [chosen, setChosen] = useState<string | undefined>();
   const changeAddress = useChangeAddress();
   const frame = useRef<HTMLDivElement>(null);
@@ -526,7 +525,7 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
 
   return (
     <div ref={frame} className="a-mc a-arch" data-full={isFull || undefined}>
-      <Header canvas={canvas} runs={growth.runs} live={live} />
+      <Header canvas={canvas} runs={growth.runs} />
       <div className="a-mc-stage">
         <ReactFlow
           nodes={nodes}
@@ -616,15 +615,11 @@ export function MissionCanvas({ canvas, growth, now, mode, live, loaded }: Missi
 
 // ── The header and the inspector ──────────────────────────────────────────
 
-function Header({ canvas, runs, live }: { canvas: Canvas; runs: number; live: boolean }) {
+function Header({ canvas, runs }: { canvas: Canvas; runs: number }) {
   const { answers, counts } = canvas;
   const rate = answers.perMinute.toLocaleString("en-US", { maximumFractionDigits: 1 });
   return (
     <div className="a-mc-strip">
-      <p className="a-mc-live" data-live={live || undefined}>
-        <i aria-hidden />
-        {live ? "Live" : "Playback"}
-      </p>
       <dl className="a-mc-answers">
         <div>
           <dt>

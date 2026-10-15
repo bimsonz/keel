@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.line
+# why: an agent that declared no kind is said to be declared as undefined
+diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
+index 686d105a..1cc282cf 100644
+--- a/apps/console/src/account/sponsored.ts
++++ b/apps/console/src/account/sponsored.ts
+@@ -46,7 +46,7 @@ export function standingOf(state: AgentProfile["state"]): string {
+ 
+ /** The line under a sponsored agent's name: what it declared itself as, where it declared anything, and its standing. */
+ export const lineOf = (agent: Pick<AgentProfile, "kind" | "state">): string =>
+-  [agent.kind === undefined ? "" : `declared as ${agent.kind}`, standingOf(agent.state)]
++  [`declared as ${agent.kind}`, standingOf(agent.state)]
+     .filter((part) => part !== "")
+     .join(" · ");
+ 

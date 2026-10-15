@@ -16,13 +16,7 @@ export function PipelinePage({ mode }: { mode: Mode }) {
     <div className="flex h-full flex-col">
       <h1 className="sr-only">Pipeline</h1>
       <div className="min-h-0 flex-1">
-        <Pipeline
-          canvas={canvas}
-          now={player.t}
-          mode={mode}
-          live={player.live}
-          loaded={player.loaded}
-        />
+        <Pipeline canvas={canvas} now={player.t} mode={mode} loaded={player.loaded} />
       </div>
     </div>
   );

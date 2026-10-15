@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts -t "sponsored.pause-asks"
+# kills: sponsored.pause-asks
+# why: a pause goes at once with no reason asked, and ending the link waits on a dialog that asks why
+diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
+index a0341b43..12815459 100644
+--- a/apps/console/src/account/sponsored.ts
++++ b/apps/console/src/account/sponsored.ts
+@@ -18,7 +18,7 @@ export const reasonOf = (typed: string): string =>
+  * Whether a control is confirmed first, in a dialog that asks the sponsor why: a pause, whose reason Keel keeps
+  * in its record. Unpausing and ending the link act at once.
+  */
+-export const asksWhy = (control: Control): boolean => control === "pause";
++export const asksWhy = (control: Control): boolean => control === "end";
+ 
+ /**
+  * The controls an agent's standing leaves its sponsor. An active agent is paused and a paused one unpaused.

@@ -59,7 +59,6 @@ export function MissionControlPage({
             growth={growth}
             now={player.t}
             mode={mode}
-            live={player.live}
             loaded={player.loaded}
           />
         </div>

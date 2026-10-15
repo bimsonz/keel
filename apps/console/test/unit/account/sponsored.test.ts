@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   PAUSED_BY_SPONSOR,
   afterMove,
+  asksWhy,
   controlsOf,
+  lineOf,
   reasonOf,
   standingOf,
 } from "../../../src/account/sponsored.ts";
@@ -203,6 +205,11 @@ describe("the agents a person sponsors", () => {
     expect((await ada.listSponsored()).map((agent) => agent.name)).toEqual(["beta"]);
   });
 
+  it("[sponsored.line] says what an agent declared itself as only where it declared a kind, beside its standing", () => {
+    expect(lineOf({ kind: "hosted", state: "active" })).toBe("declared as hosted · Active");
+    expect(lineOf({ state: "suspended" })).toBe("Paused");
+  });
+
   it("[sponsored.controls] offers a sponsor the moves an agent's standing allows: pause an active one, unpause a paused one, and end either", () => {
     expect(controlsOf("active")).toEqual(["pause", "end"]);
     expect(controlsOf("suspended")).toEqual(["unpause", "end"]);
@@ -211,6 +218,12 @@ describe("the agents a person sponsors", () => {
     expect(controlsOf(undefined)).toEqual(["end"]);
     const states: AgentProfile["state"][] = ["active", "suspended", "revoked", undefined];
     expect(states.map((state) => standingOf(state))).toEqual(["Active", "Paused", "Revoked", ""]);
+  });
+
+  it("[sponsored.pause-asks] confirms a pause first, in a dialog that asks why, and unpauses or ends the link at once", () => {
+    expect(asksWhy("pause")).toBe(true);
+    expect(asksWhy("unpause")).toBe(false);
+    expect(asksWhy("end")).toBe(false);
   });
 
   it("[sponsored.reason] sends the reason the sponsor typed, and one sentence of its own where they typed none: Keel keeps a reason with every pause", () => {

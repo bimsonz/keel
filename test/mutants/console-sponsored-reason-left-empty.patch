@@ -2,7 +2,7 @@
 # kills: sponsored.reason
 # why: a pause with no reason typed is sent with an empty one, so Keel's record of the pause says nothing of whose it was
 diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
-index dd38adce..5cbed1b1 100644
+index a0341b43..2d796000 100644
 --- a/apps/console/src/account/sponsored.ts
 +++ b/apps/console/src/account/sponsored.ts
 @@ -12,7 +12,7 @@ export const PAUSED_BY_SPONSOR = "Paused by its sponsor";
@@ -13,4 +13,4 @@ index dd38adce..5cbed1b1 100644
 +  typed.trim();
  
  /**
-  * The controls an agent's standing leaves its sponsor. An active agent is paused and a paused one unpaused.
+  * Whether a control is confirmed first, in a dialog that asks the sponsor why: a pause, whose reason Keel keeps

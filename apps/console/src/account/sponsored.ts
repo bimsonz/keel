@@ -15,6 +15,12 @@ export const reasonOf = (typed: string): string =>
   typed.trim() === "" ? PAUSED_BY_SPONSOR : typed.trim();
 
 /**
+ * Whether a control is confirmed first, in a dialog that asks the sponsor why: a pause, whose reason Keel keeps
+ * in its record. Unpausing and ending the link act at once.
+ */
+export const asksWhy = (control: Control): boolean => control === "pause";
+
+/**
  * The controls an agent's standing leaves its sponsor. An active agent is paused and a paused one unpaused.
  * The link is ended however the agent stands: Keel reinstates a paused agent as its link ends. An agent Keel
  * has revoked, or one whose standing Keel did not say, is neither paused nor unpaused.
@@ -43,6 +49,12 @@ export function standingOf(state: AgentProfile["state"]): string {
       return "";
   }
 }
+
+/** The line under a sponsored agent's name: what it declared itself as, where it declared anything, and its standing. */
+export const lineOf = (agent: Pick<AgentProfile, "kind" | "state">): string =>
+  [agent.kind === undefined ? "" : `declared as ${agent.kind}`, standingOf(agent.state)]
+    .filter((part) => part !== "")
+    .join(" · ");
 
 /**
  * The list once Keel has answered a move with the agent as it now is: its row says what Keel answered, and an

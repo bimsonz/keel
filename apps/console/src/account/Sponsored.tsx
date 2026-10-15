@@ -7,9 +7,9 @@ import type { AgentProfile } from "../contract/keel/index.ts";
 import { hrefOf } from "../places.ts";
 import type { KeelSponsorship } from "../source/types.ts";
 import type { Account, Who } from "./account.ts";
-import { Box } from "./rows.tsx";
+import { Box, FormDialog } from "./rows.tsx";
 import { Refusal, saidOf, useAsking } from "./parts.tsx";
-import { type Control, afterMove, controlsOf, reasonOf, standingOf } from "./sponsored.ts";
+import { type Control, afterMove, asksWhy, controlsOf, lineOf, reasonOf } from "./sponsored.ts";
 
 /** Keel's code, on `/v1`, for a move that wants a passkey sign-in from the last ten minutes. */
 const FRESH_SIGN_IN = "auth.fresh_sign_in_required";
@@ -31,7 +31,9 @@ export function Sponsored({
 }) {
   const [agents, setAgents] = useState<readonly AgentProfile[] | null>(null);
   const [unread, setUnread] = useState<ReturnType<typeof saidOf> | null>(null);
-  const [why, setWhy] = useState<Record<string, string>>({});
+  /** The agent whose pause is being confirmed, and the reason typed for it so far. */
+  const [pausing, setPausing] = useState<AgentProfile | null>(null);
+  const [why, setWhy] = useState("");
   const { busy, refused, ask } = useAsking();
   /** What was last asked of Keel here: asked again, as it was, once the reader has signed in afresh. */
   const last = useRef<(() => Promise<void>) | null>(null);
@@ -61,11 +63,11 @@ export function Sponsored({
     };
   }, [sponsorship]);
 
-  const move = (agent: AgentProfile, control: Control): Promise<void> => {
+  const move = (agent: AgentProfile, control: Control, reason = ""): Promise<void> => {
     const what = async (): Promise<void> => {
       const answered =
         control === "pause"
-          ? await sponsorship.pause(agent.id, reasonOf(why[agent.id] ?? ""))
+          ? await sponsorship.pause(agent.id, reasonOf(reason))
           : control === "unpause"
             ? await sponsorship.unpause(agent.id)
             : await sponsorship.end(agent.id);
@@ -100,31 +102,22 @@ export function Sponsored({
             >
               <div className="flex min-w-0 flex-col text-sm">
                 <span className="font-semibold text-kumo-strong">{agent.name}</span>
-                <span className="text-kumo-subtle">
-                  {[`declared as ${agent.kind}`, standingOf(agent.state)]
-                    .filter((part) => part !== "")
-                    .join(" · ")}
-                </span>
+                <span className="text-kumo-subtle">{lineOf(agent)}</span>
               </div>
               <div className="flex flex-wrap items-end gap-2">
-                {controls.includes("pause") && (
-                  <Input
-                    aria-label={`Why pause ${agent.name} (optional, kept in Keel's record)`}
-                    name={`why-${agent.id}`}
-                    placeholder="Why (optional)"
-                    value={why[agent.id] ?? ""}
-                    onChange={(event) =>
-                      setWhy((typed) => ({ ...typed, [agent.id]: event.target.value }))
-                    }
-                  />
-                )}
                 {controls.map((control) => (
                   <Button
                     key={control}
                     variant="secondary"
                     disabled={busy}
                     aria-label={`${LABEL[control]} ${agent.name}`}
-                    onClick={() => void move(agent, control)}
+                    onClick={() => {
+                      // A pause is confirmed first, with its reason: a code host asks inside the dialog.
+                      if (asksWhy(control)) {
+                        setWhy("");
+                        setPausing(agent);
+                      } else void move(agent, control);
+                    }}
                   >
                     {LABEL[control]}
                   </Button>
@@ -134,6 +127,30 @@ export function Sponsored({
           );
         })}
       </ul>
+      {pausing !== null && (
+        <FormDialog
+          open
+          close={() => setPausing(null)}
+          title={`Pause ${pausing.name}`}
+          action="Pause"
+          busy={busy}
+          ready
+          submit={(event) => {
+            event.preventDefault();
+            const agent = pausing;
+            setPausing(null);
+            void move(agent, "pause", why);
+          }}
+        >
+          <Input
+            label="Why (optional)"
+            description="Kept in Keel's record of the pause"
+            name="why"
+            value={why}
+            onChange={(event) => setWhy(event.target.value)}
+          />
+        </FormDialog>
+      )}
       {(unread !== null || refused !== null) && (
         <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3">
           <Refusal said={unread} />

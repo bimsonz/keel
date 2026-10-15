@@ -1293,39 +1293,6 @@
   border-bottom: 1px solid var(--mc-card-line);
   background: light-dark(oklch(99% 0.002 260), oklch(16% 0.01 260));
 }
-:root .a-mc-live {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--mc-ink-quiet);
-}
-:root .a-mc-live i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mc-ink-quiet);
-}
-:root .a-mc-live[data-live] {
-  color: var(--mc-trunk);
-}
-:root .a-mc-live[data-live] i {
-  background: var(--mc-trunk);
-  box-shadow: 0 0 0 0 color-mix(in oklab, var(--mc-trunk) 60%, transparent);
-  animation: a-mc-beat 2.4s ease-out infinite;
-}
-@keyframes a-mc-beat {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--mc-trunk) 55%, transparent);
-  }
-  70%,
-  100% {
-    box-shadow: 0 0 0 8px transparent;
-  }
-}
 :root .a-mc-answers {
   display: flex;
   flex-wrap: wrap;
@@ -1942,7 +1909,6 @@
   :root .a-mc-chip,
   :root .a-mc-shimmer,
   :root .a-mc-spin,
-  :root .a-mc-live[data-live] i,
   :root .react-flow__edge-path.a-mc-tie {
     transition: none;
     animation: none;

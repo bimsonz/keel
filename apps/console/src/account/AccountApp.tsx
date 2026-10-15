@@ -249,11 +249,7 @@ function SignIn({
   return (
     <Card
       title={creating ? "Create your account" : "Sign in to Keel"}
-      lede={
-        creating
-          ? "An account is a person's. Agents get their own credentials, from the person who sponsors them."
-          : undefined
-      }
+      lede={creating ? "Agents sign up themselves; a person sponsors them." : undefined}
     >
       {creating ? (
         <PasskeySignUp account={account} next={next} />
