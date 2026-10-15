@@ -13,6 +13,7 @@ import {
 import { NamespaceId, type ProjectId } from "@keeltown/core/kernel";
 import type { ProjectNamespaces } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
+import { DEPS_BUILD_STEP } from "./deps-build-step.ts";
 
 /** Reads and ledger writes retry quickly; a draft calls the model up to four times, so it is given long and tried twice. */
 const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
@@ -80,12 +81,6 @@ export const timedOut = (error: unknown) =>
  * replay answers what the first run kept; `waitFor` is `step.waitForEvent`,
  * and `sleep` is `step.sleep`.
  */
-/** A deps build may install for eight minutes, and its answer is data: only a call that threw is tried again. */
-const DEPS_BUILD_STEP = {
-  retries: { limit: 1, delay: "10 seconds", backoff: "constant" },
-  timeout: "15 minutes",
-} as const;
-
 /**
  * The two durable steps `ensureDeps` runs, `deps-need` and `deps:<install>`,
  * each keeping its value as JSON and decoding it on a replay.

@@ -37,11 +37,14 @@ import {
   projectCommand,
   type SuiteRunner,
   type SuiteRunnerOptions,
+  SUITE_CONFIG,
   SuiteRuntimeCi,
   TIER2_RUNNERS,
+  tier2RunnerFor,
   TYPECHECK_COMMAND,
 } from "../../src/adapters/driven/ci/suite-runtime.ts";
 import { checkoutOf, keelBundleSource } from "../../src/adapters/driving/workflow/bundle-source.ts";
+import { DEPS_BUILD_STEP } from "../../src/adapters/driving/workflow/deps-build-step.ts";
 
 const SUITE = suitePlan();
 const step = SUITE.steps[0];
@@ -107,6 +110,20 @@ const stdoutRunner =
 
 PORTS.VerifierRuntime.contract("ci (scripted runner)", () => runtime(stdoutRunner("")).layer);
 
+/** How long a step's retries wait in all, as Workflows spaces them: the delay, then doubled each time for exponential. */
+const retryWaitMs = (retries: {
+  readonly limit: number;
+  readonly delay: number;
+  readonly backoff?: "constant" | "linear" | "exponential";
+}): number =>
+  Array.from({ length: retries.limit }, (_, i) =>
+    retries.backoff === "exponential"
+      ? retries.delay * 2 ** i
+      : retries.backoff === "linear"
+        ? retries.delay * (i + 1)
+        : retries.delay,
+  ).reduce((sum, wait) => sum + wait, 0);
+
 describe("the Tier 2 suite runtime", () => {
   it.effect(
     "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME, the bundle's signed URL and its deps parts' in its env",
@@ -145,7 +162,7 @@ describe("the Tier 2 suite runtime", () => {
         expect(yield* signedFor(X, "b".repeat(64), 1_801)).toBe(false);
         expect(yield* signedFor(Y, "b".repeat(64), 0)).toBe(false);
         expect(yield* signedFor(X, "c".repeat(64), 0)).toBe(false);
-        expect(options.config.retries.limit).toBe(1);
+        expect(options.config.retries).toEqual(SUITE_CONFIG.retries);
       }),
   );
 
@@ -404,6 +421,20 @@ describe("the Tier 2 suite runtime", () => {
     // Precheck refuses a plan whose Tier 2 step core does not list, and the
     // runtime abstains on a step it has no runner for: the two lists are one.
     expect(Object.keys(TIER2_RUNNERS).toSorted()).toEqual([...TIER2_STEP_IDS].toSorted());
+  });
+
+  it("[box.outlasts-deploy] a step in a box is tried again for at least five minutes, so a keel-verify deploy and keel's after it cut no step for good, and at most three times, so a hung command costs four of its deadlines", () => {
+    const runStep = { ...step, run: { command: "pnpm test", timeoutMs: 1_200_000 } };
+    for (const retries of [
+      SUITE_CONFIG.retries,
+      tier2RunnerFor(runStep)?.config.retries,
+      DEPS_BUILD_STEP.retries,
+    ]) {
+      if (retries === undefined) throw new Error("a step with a command has no runner");
+      // On 15 Oct 01:00 the two deploys took 100 s, and a rollout's last step comes after them.
+      expect(retryWaitMs(retries)).toBeGreaterThanOrEqual(5 * 60_000);
+      expect(retries.limit).toBeLessThanOrEqual(3);
+    }
   });
 
   it.effect(

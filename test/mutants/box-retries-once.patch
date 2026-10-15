@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "box.outlasts-deploy"
+# kills: box.outlasts-deploy
+# why: a Tier 2 box step is tried again once, five seconds on, so the deploy that cut it cuts the retry too and the batch parks
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index fbeddc23..f626000a 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -280,7 +280,7 @@ export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
+   // disposed), keel's deploy a minute later can cut the retry, and a container rollout can stop a
+   // box that has just started: retries one, two and four minutes apart outlast all of it (seven
+   // minutes), where one retry five seconds on died in the same deploy and parked the batch.
+-  retries: { limit: 3, delay: 60_000, backoff: "exponential" },
++  retries: { limit: 1, delay: 5_000, backoff: "constant" },
+   timeout: 5 * 60_000,
+   commandTimeoutMs: 4 * 60_000,
+   snapshotRetentionSeconds: 3_600,

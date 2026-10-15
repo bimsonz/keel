@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "box.outlasts-deploy"
+# kills: box.outlasts-deploy
+# why: a deps build is tried again once, ten seconds on, so a keel-verify deploy and keel's after it fail the step for good
+diff --git a/apps/keel/src/adapters/driving/workflow/deps-build-step.ts b/apps/keel/src/adapters/driving/workflow/deps-build-step.ts
+index bd93bda9..333495b0 100644
+--- a/apps/keel/src/adapters/driving/workflow/deps-build-step.ts
++++ b/apps/keel/src/adapters/driving/workflow/deps-build-step.ts
+@@ -6,6 +6,6 @@
+  * one, two and four minutes apart outlast both (seven minutes).
+  */
+ export const DEPS_BUILD_STEP = {
+-  retries: { limit: 3, delay: 60_000, backoff: "exponential" },
++  retries: { limit: 1, delay: 10_000, backoff: "constant" },
+   timeout: "15 minutes",
+ } as const;

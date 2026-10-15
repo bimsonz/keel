@@ -264,7 +264,7 @@ export const buildCommand = (path: string | undefined): string =>
     "finish",
   ].join("\n");
 
-/** What a suite runner is asked: never a credential, one infra retry, bounded time, short-lived snapshots. */
+/** What a suite runner is asked: never a credential, infra retries that outlast a deploy, bounded time, short-lived snapshots. */
 export interface SuiteRunnerOptions {
   readonly name: string;
   readonly command: string;
@@ -273,7 +273,7 @@ export interface SuiteRunnerOptions {
     readonly retries: {
       readonly limit: number;
       readonly delay: number;
-      readonly backoff: "constant";
+      readonly backoff: "constant" | "exponential";
     };
     readonly timeout: number;
     readonly commandTimeoutMs: number;
@@ -299,8 +299,12 @@ export const suiteEnv = (
 });
 
 export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
-  // The command exits 0 whatever the tests do, so a retry only ever follows an infra failure.
-  retries: { limit: 1, delay: 5_000, backoff: "constant" },
+  // The command exits 0 whatever the tests do, so a retry only ever follows an infra failure (or a
+  // command past its deadline). A keel-verify deploy cuts every box in flight (its stream's stub is
+  // disposed), keel's deploy a minute later can cut the retry, and a container rollout can stop a
+  // box that has just started: retries one, two and four minutes apart outlast all of it (seven
+  // minutes), where one retry five seconds on died in the same deploy and parked the batch.
+  retries: { limit: 3, delay: 60_000, backoff: "exponential" },
   timeout: 5 * 60_000,
   commandTimeoutMs: 4 * 60_000,
   snapshotRetentionSeconds: 3_600,
