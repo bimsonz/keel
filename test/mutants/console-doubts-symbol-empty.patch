@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.edit-symbol
+# why: an edit names an empty symbol where the anchor names none
+diff --git a/apps/console/src/engine/doubts.ts b/apps/console/src/engine/doubts.ts
+index f9e03b25..993aee94 100644
+--- a/apps/console/src/engine/doubts.ts
++++ b/apps/console/src/engine/doubts.ts
+@@ -19,7 +19,7 @@ export function doubtsOf(world: World, change: ChangeEntry, subjectId?: string):
+     if (anchor === undefined) return [];
+     const edit = {
+       path: anchor.path,
+-      ...(anchor.symbol === undefined ? {} : { symbol: anchor.symbol }),
++      symbol: anchor.symbol ?? "",
+     };
+     return [{ premise: doubt.premise, by, cause: { edit } }];
+   });

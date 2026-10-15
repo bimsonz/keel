@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.reaffirmed
+# why: the same claim reaffirmed without its gloss is taken for another premise
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..a7658203 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -53,6 +53,7 @@ export const claimOf = (proposition: Proposition): string =>
+     proposition.value,
+     proposition.unit ?? null,
+     proposition.scope ?? null,
++    proposition.gloss ?? null,
+   ]);
+ 
+ export interface AgentEntry {

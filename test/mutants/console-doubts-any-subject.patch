@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.panel
+# why: a subject's panel lists a change's doubts on other subjects as its own
+diff --git a/apps/console/src/engine/doubts.ts b/apps/console/src/engine/doubts.ts
+index f9e03b25..b29b939b 100644
+--- a/apps/console/src/engine/doubts.ts
++++ b/apps/console/src/engine/doubts.ts
+@@ -11,7 +11,6 @@ import { type ChangeEntry, type World, claimOf } from "./world.ts";
+ export function doubtsOf(world: World, change: ChangeEntry, subjectId?: string): Doubt[] {
+   const held = new Set(change.premises.map(claimOf));
+   return change.doubts.flatMap((doubt): Doubt[] => {
+-    if (subjectId !== undefined && doubt.subjectId !== subjectId) return [];
+     if (!held.has(claimOf(doubt.premise))) return [];
+     const { changeId, effect, anchor } = doubt.cause;
+     const by = { id: changeId, label: world.changes.get(changeId)?.label ?? changeId };

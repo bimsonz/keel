@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.page, doubt.panel
+# why: the doubt names the premise's holder as the change that put it in doubt
+diff --git a/apps/console/src/engine/doubts.ts b/apps/console/src/engine/doubts.ts
+index f9e03b25..0a62618d 100644
+--- a/apps/console/src/engine/doubts.ts
++++ b/apps/console/src/engine/doubts.ts
+@@ -14,7 +14,7 @@ export function doubtsOf(world: World, change: ChangeEntry, subjectId?: string):
+     if (subjectId !== undefined && doubt.subjectId !== subjectId) return [];
+     if (!held.has(claimOf(doubt.premise))) return [];
+     const { changeId, effect, anchor } = doubt.cause;
+-    const by = { id: changeId, label: world.changes.get(changeId)?.label ?? changeId };
++    const by = { id: change.id, label: change.label };
+     if (effect !== undefined) return [{ premise: doubt.premise, by, cause: { effect } }];
+     if (anchor === undefined) return [];
+     const edit = {

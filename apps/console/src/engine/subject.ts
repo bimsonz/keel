@@ -2,8 +2,15 @@
 // guards it, what has been decided about it, and the changes and conflicts
 // on it right now. This is what Mission Control opens beside the graph when a subject is selected.
 
-import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
+import type {
+  ChangeState,
+  ConflictKind,
+  ConflictState,
+  Doubt,
+  ShownClass,
+} from "../domain/state.ts";
 import { agentName } from "./audience.ts";
+import { doubtsOf } from "./doubts.ts";
 import type { Cards } from "./holder.ts";
 import { type Tone, glossOf, subjectOf } from "./lanes.ts";
 import type { World } from "./world.ts";
@@ -59,6 +66,8 @@ export interface SubjectDetail {
       state: ChangeState;
       agent: string;
       agentClass: ShownClass;
+      /** Its premises on this subject Keel put in doubt. */
+      doubts: Doubt[];
     }[];
   };
   tenets: number;
@@ -178,6 +187,7 @@ export function subjectDetailOf(
             state: change.state,
             agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
             agentClass: by?.class ?? "unnamed",
+            doubts: doubtsOf(world, change, entry.id),
           };
         }),
     },

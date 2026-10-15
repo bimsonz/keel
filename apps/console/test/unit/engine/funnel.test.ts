@@ -516,7 +516,7 @@ async function logOf(scenario: Scenario): Promise<AnyEvent[]> {
 }
 
 describe("the funnel of changes, held to each fixture's own log", () => {
-  it.each(["s1", "s2", "s3", "s4", "s5", "swarm"] as const)(
+  it.each(["s1", "s2", "s3", "s4", "s5", "s6", "swarm"] as const)(
     "[funnel.whole] in %s, a stage is the changes its event names, and every change is in one place",
     async (scenario) => {
       const events = await logOf(scenario);

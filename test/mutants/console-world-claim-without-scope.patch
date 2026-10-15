@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.reaffirmed
+# why: a premise reaffirmed for another scope clears the doubt on this one
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..e61f5694 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -52,7 +52,6 @@ export const claimOf = (proposition: Proposition): string =>
+     proposition.relation,
+     proposition.value,
+     proposition.unit ?? null,
+-    proposition.scope ?? null,
+   ]);
+ 
+ export interface AgentEntry {

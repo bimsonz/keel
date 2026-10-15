@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.page, doubt.panel
+# why: a premise Keel put in doubt is kept nowhere, so no page lists it
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..479290a9 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -921,7 +921,7 @@ export class World {
+         const change = this.changes.get(event.payload.changeId);
+         if (change === undefined) break;
+         const { subjectId, premise, cause } = event.payload;
+-        change.doubts.push({
++        change.doubts.slice(0, 0).push({
+           subjectId,
+           premise,
+           cause: {

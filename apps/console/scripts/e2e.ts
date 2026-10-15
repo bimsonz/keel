@@ -825,6 +825,61 @@ expectEqual(
   "no alternatives shown | 0",
 );
 
+// A premise put in doubt. Keel tells #1 that #2 edited the code its premise rests on, and that #3's effect may
+// contradict it, and opens no conflict for either: the page lists each as a status line, as a merge box does.
+const DOUBTED = "scenario=s6&t=130&play=0";
+const doubted = page
+  .locator("section", { has: page.getByRole("heading", { name: "Premises in doubt" }) })
+  .last();
+const doubtLines = async (): Promise<string> =>
+  (await doubted.count()) === 0
+    ? "none in doubt"
+    : (await doubted.locator('[data-part="doubt"]').allInnerTexts()).map(squash).join(" | ");
+await page.goto(at("/changes/1", DOUBTED), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: each premise Keel put in doubt, with the change that did and how, in Keel's order",
+  await doubtLines(),
+  "billing.invoices/bound at most 50 ms #2 changed src/billing/total.ts (totalOf), which this premise rests on. | billing.invoices/bound at most 50 ms #3’s effect billing.invoices / bound at most 2000 ms may contradict this premise.",
+);
+await follow(doubted.getByRole("link", { name: "#2" }), 'section[aria-label="Verdict"]');
+expectEqual(
+  "change: the change that put a premise in doubt is a link to it",
+  pathOf(page),
+  "/acme/demo/changes/2",
+);
+// Each arrives when Keel says it, and the changes that put the premise in doubt are told nothing of it.
+const doubtsAt = async (change: string, t: number): Promise<string> => {
+  await page.goto(at(`/changes/${change}`, `scenario=s6&t=${t}&play=0`), {
+    waitUntil: "networkidle",
+  });
+  await standing.getByRole("heading", { level: 2 }).waitFor();
+  return (await doubted.count()) === 0
+    ? "0"
+    : String(await doubted.locator('[data-part="doubt"]').count());
+};
+expectEqual(
+  "change: a premise is in doubt from the moment Keel says so, and only on its holder's page",
+  `#1 at 30s: ${await doubtsAt("1", 30)} | at 50s: ${await doubtsAt("1", 50)} | at 130s: ${await doubtsAt("1", 130)} | #2: ${await doubtsAt("2", 130)} | #3: ${await doubtsAt("3", 130)}`,
+  "#1 at 30s: 0 | at 50s: 1 | at 130s: 2 | #2: 0 | #3: 0",
+);
+// Mission Control's subject panel says the same under the holder's row.
+await page.goto(at("/subjects/billing.invoices", DOUBTED), { waitUntil: "networkidle" });
+const doubtedSubject = page.getByRole("complementary", { name: "Subject billing.invoices" });
+await doubtedSubject.waitFor();
+expectEqual(
+  "subject: under a change's row, each of its premises there that Keel put in doubt",
+  (
+    await doubtedSubject
+      .locator("section", { has: page.getByRole("heading", { name: "Changes" }) })
+      .locator("li")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  "#1 Show each invoice's total as it is edited working hosted-501 · HOSTED bound at most 50 ms: #2 changed src/billing/total.ts (totalOf), which this premise rests on. bound at most 50 ms: #3’s effect billing.invoices / bound at most 2000 ms may contradict this premise.",
+);
+
 // The changes are listed, each under one filter.
 await page.goto(at("/changes?state=landed", "scenario=s1&t=700&play=0"), {
   waitUntil: "networkidle",

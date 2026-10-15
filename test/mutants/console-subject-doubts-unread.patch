@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.panel
+# why: a subject's list of changes says nothing of a premise in doubt
+diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
+index 55e58cfd..b573f6d8 100644
+--- a/apps/console/src/engine/subject.ts
++++ b/apps/console/src/engine/subject.ts
+@@ -187,7 +187,7 @@ export function subjectDetailOf(
+             state: change.state,
+             agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
+             agentClass: by?.class ?? "unnamed",
+-            doubts: doubtsOf(world, change, entry.id),
++            doubts: [],
+           };
+         }),
+     },

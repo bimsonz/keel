@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.page
+# why: a change's page lists none of its premises in doubt
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index df9f7eb5..e55c73bb 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -775,7 +775,7 @@ export function changePageOf(
+               : { verdict: { said: verdictSaid(bouncedOn), issuedAt: bouncedOn.issuedAt } }),
+           },
+         }),
+-    doubts: doubtsOf(world, change),
++    doubts: [],
+     noted: change.noted.flatMap((note) => {
+       const about = world.conflicts.get(note.conflictId);
+       return about === undefined

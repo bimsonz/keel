@@ -16,6 +16,7 @@ import type { ChangeTab } from "../route.ts";
 import { Link, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
+import { DoubtSaid, doubtKey } from "./Doubt.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import {
   ChangeLink,
@@ -818,6 +819,25 @@ export function Change({
                       ? "Keel told its agent, and held nothing."
                       : "Nobody was told."}
                   </span>
+                </Tied>
+              )}
+              {state.doubts.length > 0 && (
+                <Tied title="Premises in doubt">
+                  {state.doubts.map((doubt) => (
+                    <div key={doubtKey(doubt)} className="flex flex-col gap-0.5" data-part="doubt">
+                      <PropositionLine proposition={doubt.premise} />
+                      <p className="leading-snug">
+                        <DoubtSaid
+                          doubt={doubt}
+                          by={
+                            <ChangeLink id={doubt.by.id} className="a-link font-semibold">
+                              {doubt.by.label}
+                            </ChangeLink>
+                          }
+                        />
+                      </p>
+                    </div>
+                  ))}
                 </Tied>
               )}
               {state.sameIntent !== undefined && (

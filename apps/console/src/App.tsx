@@ -394,7 +394,7 @@ function Unreachable({ said }: { said: string }) {
     <Notice title="The console could not reach Keel">
       {said}. Check that Keel is up.
       {import.meta.env.DEV
-        ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4, s5 or swarm."
+        ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4, s5, s6 or swarm."
         : ""}
     </Notice>
   );

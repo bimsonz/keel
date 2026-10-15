@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.reaffirmed
+# why: a premise reaffirmed with another relation clears the doubt on this one
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..7aced084 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -49,7 +49,6 @@ export const claimOf = (proposition: Proposition): string =>
+   JSON.stringify([
+     proposition.subject,
+     proposition.predicate,
+-    proposition.relation,
+     proposition.value,
+     proposition.unit ?? null,
+     proposition.scope ?? null,

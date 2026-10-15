@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.page
+# why: the doubt is kept on the change that put the premise in doubt, not on the premise's holder
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..04897493 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -918,7 +918,7 @@ export class World {
+         break;
+       }
+       case "PremiseSuspected": {
+-        const change = this.changes.get(event.payload.changeId);
++        const change = this.changes.get(event.payload.cause.changeId);
+         if (change === undefined) break;
+         const { subjectId, premise, cause } = event.payload;
+         change.doubts.push({

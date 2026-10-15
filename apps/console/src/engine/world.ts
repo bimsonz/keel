@@ -17,6 +17,7 @@ import type {
   SuspectPremise,
 } from "../contract/keel/index.ts";
 import type {
+  Anchor,
   DerivedEffect,
   FootprintEntry,
   Predicate,
@@ -42,6 +43,17 @@ import type {
   World as WorldId,
 } from "../domain/state.ts";
 import { citedIn } from "./decisions.ts";
+
+/** A proposition as a claim, as Keel keys one: what it says, and not its gloss, its strength or its anchors. */
+export const claimOf = (proposition: Proposition): string =>
+  JSON.stringify([
+    proposition.subject,
+    proposition.predicate,
+    proposition.relation,
+    proposition.value,
+    proposition.unit ?? null,
+    proposition.scope ?? null,
+  ]);
 
 export interface AgentEntry {
   id: string;
@@ -172,6 +184,16 @@ export interface ChangeEntry {
     policy: "advise" | "annotate";
     at: string;
     next: string[];
+  }[];
+  /**
+   * Its premises Keel put in doubt and has not since reaffirmed: by another change's edit to code a premise rests
+   * on (`anchor`), or by another change's effect that may contradict it (`effect`). Keel names one of the two.
+   */
+  doubts: {
+    subjectId: string;
+    premise: Proposition;
+    cause: { changeId: string; effect?: Proposition; anchor?: Anchor };
+    at: string;
   }[];
   /**
    * The changes Keel has told this one have its intent, in the order Keel named them: at its latest preflight,
@@ -638,6 +660,7 @@ export class World {
           bounces: { verdict: 0, conflict: 0, declined: 0, ruling: 0 },
           reached: { precheck: false, verified: false },
           noted: [],
+          doubts: [],
           alternatives: [],
           precedents: [],
           ...(event.payload.run === undefined ? {} : { run: event.payload.run }),
@@ -892,6 +915,30 @@ export class World {
           at: event.at,
         });
         this.#note(conflictId, event, t, `Noted against ${change.label}`, `policy: ${policy}`);
+        break;
+      }
+      case "PremiseSuspected": {
+        const change = this.changes.get(event.payload.changeId);
+        if (change === undefined) break;
+        const { subjectId, premise, cause } = event.payload;
+        change.doubts.push({
+          subjectId,
+          premise,
+          cause: {
+            changeId: cause.changeId,
+            ...(cause.effect === undefined ? {} : { effect: cause.effect }),
+            ...(cause.anchor === undefined ? {} : { anchor: cause.anchor }),
+          },
+          at: event.at,
+        });
+        break;
+      }
+      case "PremiseReaffirmed": {
+        // Keel reaffirms a premise as a claim: its subject, predicate, relation, value, unit and scope.
+        const change = this.changes.get(event.payload.changeId);
+        if (change === undefined) break;
+        const claim = claimOf(event.payload.premise);
+        change.doubts = change.doubts.filter((doubt) => claimOf(doubt.premise) !== claim);
         break;
       }
       case "ChangeParked": {

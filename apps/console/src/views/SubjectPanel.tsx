@@ -8,6 +8,7 @@ import type { Tone } from "../engine/lanes.ts";
 import type { SubjectDetail } from "../engine/subject.ts";
 import { PAGE } from "../engine/lists.ts";
 import { Link } from "../router.tsx";
+import { DoubtSaid, doubtKey, saysOf } from "./Doubt.tsx";
 import { ChangeLink, ConflictLink, DecisionLink, useRemembered } from "./links.tsx";
 import { AgentMark, agentLine, clockTime } from "./parts.tsx";
 
@@ -250,6 +251,16 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
                       <AgentMark agentClass={change.agentClass} size={12} />
                       {agentLine(change.agent, change.agentClass)}
                     </span>
+                    {change.doubts.map((doubt) => (
+                      <span
+                        key={doubtKey(doubt)}
+                        className="text-sm leading-snug text-kumo-default"
+                        data-part="doubt"
+                      >
+                        <span className="a-mono">{saysOf(doubt.premise)}</span>:{" "}
+                        <DoubtSaid doubt={doubt} by={doubt.by.label} />
+                      </span>
+                    ))}
                   </ChangeLink>
                 </li>
               ))}

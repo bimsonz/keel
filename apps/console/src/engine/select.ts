@@ -31,6 +31,7 @@ import { verdictSaid } from "./judged.ts";
 import { laneName } from "./references.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
+import { doubtsOf } from "./doubts.ts";
 import { contradictionsOf } from "./sides.ts";
 import { type ChangeEntry, type ConflictEntry, type EscalationEntry, type World } from "./world.ts";
 
@@ -774,6 +775,7 @@ export function changePageOf(
               : { verdict: { said: verdictSaid(bouncedOn), issuedAt: bouncedOn.issuedAt } }),
           },
         }),
+    doubts: doubtsOf(world, change),
     noted: change.noted.flatMap((note) => {
       const about = world.conflicts.get(note.conflictId);
       return about === undefined

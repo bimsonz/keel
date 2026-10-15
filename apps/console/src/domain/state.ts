@@ -23,6 +23,17 @@ import type {
 
 // ─── Shared vocabulary ──────────────────────────────────────────────────────
 
+/**
+ * One premise of a change that Keel put in doubt: the change that did, and how. By an edit, it changed code the
+ * premise rests on (`path`, and `symbol` where the premise's anchor names one); by an effect, that effect may
+ * contradict the premise. Keel suspects, and does not know.
+ */
+export interface Doubt {
+  premise: Proposition;
+  by: { id: string; label: string };
+  cause: { edit: { path: string; symbol?: string } } | { effect: Proposition };
+}
+
 /** A probe or check outcome. `n/a` means the precondition is absent; it is never a pass. */
 export type Outcome = "pass" | "fail" | "n/a";
 
@@ -413,6 +424,8 @@ export interface ChangePageState {
     at: string;
     next: string[];
   }[];
+  /** Its premises Keel put in doubt, has not reaffirmed, and the change still holds. */
+  doubts: Doubt[];
   escalation?: {
     id: string;
     label: string;

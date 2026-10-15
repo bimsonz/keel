@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/doubt.test.ts
+# kills: doubt.reaffirmed
+# why: reaffirming one premise clears every doubt the change has
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index b794af63..cd7fee35 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -938,7 +938,7 @@ export class World {
+         const change = this.changes.get(event.payload.changeId);
+         if (change === undefined) break;
+         const claim = claimOf(event.payload.premise);
+-        change.doubts = change.doubts.filter((doubt) => claimOf(doubt.premise) !== claim);
++        change.doubts = change.doubts.filter(() => claim === "");
+         break;
+       }
+       case "ChangeParked": {
