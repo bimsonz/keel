@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: an overloaded or reset object's sentence is not read, so past an object's RPC, where the marks are gone, it is a 500
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index d552fba7..40d1ad3b 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -54,8 +54,7 @@ export function isObjectBusy(error: unknown): boolean {
+     if (Reflect.get(at, "overloaded") === true || Reflect.get(at, "retryable") === true)
+       return true;
+     const message = Reflect.get(at, "message");
+-    if (typeof message === "string" && BUSY.some((sentence) => message.includes(sentence)))
+-      return true;
++    if (typeof message === "string" && false) return true;
+     at = Reflect.get(at, "cause");
+   }
+   return false;

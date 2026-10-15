@@ -45,10 +45,11 @@ import {
   ResponseContractError,
   UndeclaredStatusError,
 } from "../../../generated/http/runtime.gen.ts";
-import { describeDefect } from "../../../rpc/index.ts";
+import { describeDefect, isObjectBusy } from "../../../rpc/index.ts";
 import type { Caller } from "./caller.ts";
 import {
   DATABASE_AWAY,
+  KEEL_BUSY,
   notImplemented,
   problem,
   type ProblemBody,
@@ -112,7 +113,7 @@ export type DatabaseAway = (error: unknown) => boolean;
  * A database that was away is logged apart: it is no defect of Keel's.
  */
 export function logDefect(
-  ops: "defect" | "contract-drift" | "d1-unavailable",
+  ops: "defect" | "contract-drift" | "d1-unavailable" | "object-busy",
   requestId: string,
   defect: unknown,
 ) {
@@ -123,9 +124,10 @@ export function logDefect(
  * What a request answers when something was thrown past its handler: logged in
  * one line under the request id, then 500. A response that broke its contract
  * is logged apart from a defect, and thrown on where the tests ask for it. A
- * database that was away is neither: the request is told to come again, 503
- * with a wait. That is where a throw in the gate lands, the session's read
- * and the principal's among them.
+ * database that was away, or an object that could not take the call just
+ * now, is neither: the request is told to come again, 503 with a wait. That
+ * is where a throw in the gate lands, the session's read and the principal's
+ * among them.
  */
 export function answerUnhandled(
   error: unknown,
@@ -136,6 +138,10 @@ export function answerUnhandled(
   if (away(error)) {
     logDefect("d1-unavailable", requestId, error);
     return unavailable(requestId, DATABASE_AWAY);
+  }
+  if (isObjectBusy(error)) {
+    logDefect("object-busy", requestId, error);
+    return unavailable(requestId, KEEL_BUSY);
   }
   const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
   logDefect(drift ? "contract-drift" : "defect", requestId, error);
@@ -157,8 +163,9 @@ export type DefectResult =
  * `never`: every declared error is already mapped to a response. What remains
  * is a defect: `NotImplemented` (recognised by class, never by message) answers
  * the declared 503 `service.not_implemented`; an interruption answers 503; the
- * database being away answers 503 with a wait; any other defect is logged and
- * answers 500 with the request id as incident id.
+ * database being away, or an object that could not take a call just now
+ * (overloaded, or restarted by a deploy), answers 503 with a wait; any other
+ * defect is logged and answers 500 with the request id as incident id.
  */
 export type Runner = <A>(
   caller: Caller,
@@ -185,6 +192,11 @@ export function makeRunner(
     if (away(defect)) {
       logDefect("d1-unavailable", caller.requestId, defect);
       return unavailableResult(caller.requestId, DATABASE_AWAY);
+    }
+    // An object that could not take the call just now (overloaded, or restarted by a deploy) is no defect of Keel's.
+    if (isObjectBusy(defect)) {
+      logDefect("object-busy", caller.requestId, defect);
+      return unavailableResult(caller.requestId, KEEL_BUSY);
     }
     logDefect("defect", caller.requestId, defect);
     return {

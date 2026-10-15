@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: the platform's own marks on an object call that could not be taken are not read, so one it marks as overloaded or retryable but words otherwise is a 500
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index d552fba7..d8a43d76 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -51,8 +51,7 @@ const CAUSES = 4;
+ export function isObjectBusy(error: unknown): boolean {
+   let at = error;
+   for (let depth = 0; depth <= CAUSES && typeof at === "object" && at !== null; depth += 1) {
+-    if (Reflect.get(at, "overloaded") === true || Reflect.get(at, "retryable") === true)
+-      return true;
++    if (false) return true;
+     const message = Reflect.get(at, "message");
+     if (typeof message === "string" && BUSY.some((sentence) => message.includes(sentence)))
+       return true;

@@ -56,6 +56,20 @@ export const GRANT_TTL_SECONDS = 2 * 60 * 60;
 export const STUCK_FORK_MS = 120_000;
 /** A slot still refreshing after this long belonged to a pass that died mid-relay; its main is read back. */
 export const STUCK_REFRESH_MS = 120_000;
+
+/**
+ * How many ready workspaces one refresh pass brings to trunk's head. A relay
+ * is pack work on the pool object's one thread, so the rest wait for the next
+ * pass, armed at once, and the claims queued meanwhile are served between.
+ */
+export const REFRESH_PER_PASS = 2;
+
+/**
+ * Above this many ready workspaces none is refreshed ahead of a claim: a claim
+ * brings the one it takes to trunk's head itself, and a pool that size has
+ * more ready than the next few claims need.
+ */
+export const EAGER_REFRESH_UPTO = 4;
 const MAIN = "refs/heads/main";
 const GRANT_ATTEMPTS = 64;
 
@@ -420,13 +434,16 @@ export const holderOf = Effect.fn("coordination/holderOf")(function* (workspaceI
 /**
  * What a refresh pass did. `refreshed` workspaces now stand on trunk's head;
  * `failed` ones could not follow it and were given up for collection (the
- * refill forks their replacements); `pending` ones are still behind trunk or
- * not yet settled, so the pass must run again.
+ * refill forks their replacements); `pending` ones this pass took are still
+ * behind trunk or not yet settled, so the pass must run again after a wait;
+ * `more` are ready and behind, left for the next pass by `REFRESH_PER_PASS`,
+ * which runs at once.
  */
 export interface RefreshReport {
   readonly refreshed: number;
   readonly failed: number;
   readonly pending: number;
+  readonly more: number;
 }
 
 /** What became of one slot in a refresh pass. `left`: it was not this pass's to touch. `unsettled`: its main could not be read. */
@@ -547,9 +564,11 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
  * starts from it and not from wherever trunk stood when its workspace was
  * forked. Trunk's head is the Trunk DO's own (`Trunks.head`). The ready
  * workspaces behind it are refreshed one at a time, the one that has waited
- * longest first: while one is mid-relay the others stay ready, and a claim
- * that comes for one before its turn brings it to trunk's head itself
- * (`grantWorkspace`). A granted workspace is never touched.
+ * longest first, and at most `REFRESH_PER_PASS` a pass: while one is
+ * mid-relay the others stay ready, and a claim that comes for one before its
+ * turn brings it to trunk's head itself (`grantWorkspace`). With more than
+ * `EAGER_REFRESH_UPTO` ready, none is refreshed ahead of its claim. A granted
+ * workspace is never touched.
  *
  * A slot a dead pass left refreshing is settled first, once it has been so
  * for `STUCK_REFRESH_MS`, by reading its main back. A pool with no ready
@@ -567,6 +586,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
       refreshed: 0,
       failed: 0,
       pending: countIn(store, "refreshing"),
+      more: 0,
     } satisfies RefreshReport;
   const head = yield* (yield* Trunks).head(project);
   let refreshed = 0;
@@ -577,19 +597,21 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
     // Its relay had landed; it counts once it stands on today's head, or it is refreshed again below.
     if (how === "advanced" && slotOf(store, slot.id)?.baseSha === head) refreshed += 1;
   }
-  const outcomes = yield* Effect.forEach(
-    readyBehind(store, head),
-    (slot) => refreshOne(project, slot.id, head),
-    { concurrency: 1 },
-  );
+  const taken = eagerlyBehind(store, head).slice(0, REFRESH_PER_PASS);
+  const outcomes = yield* Effect.forEach(taken, (slot) => refreshOne(project, slot.id, head), {
+    concurrency: 1,
+  });
   for (const how of outcomes) {
     if (how === "advanced") refreshed += 1;
     if (how === "collected") failed += 1;
   }
+  const tried = new Set(taken.map((slot) => slot.id));
+  const behind = eagerlyBehind(store, head);
   return {
     refreshed,
     failed,
-    pending: readyBehind(store, head).length + countIn(store, "refreshing"),
+    pending: behind.filter((slot) => tried.has(slot.id)).length + countIn(store, "refreshing"),
+    more: behind.filter((slot) => !tried.has(slot.id)).length,
   } satisfies RefreshReport;
 });
 
@@ -600,10 +622,15 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
  */
 export const countBehind = Effect.fn("coordination/countBehind")(function* (project: ProjectId) {
   const store = yield* EntityStore;
-  if (countIn(store, "ready") === 0) return 0;
+  const ready = countIn(store, "ready");
+  if (ready === 0 || ready > EAGER_REFRESH_UPTO) return 0;
   const head = yield* (yield* Trunks).head(project);
   return readyBehind(store, head).length;
 });
+
+/** The ready workspaces behind trunk's head that a refresh brings to it: none while more than `EAGER_REFRESH_UPTO` are ready. */
+const eagerlyBehind = (store: Transaction["store"], head: CommitSha) =>
+  countIn(store, "ready") > EAGER_REFRESH_UPTO ? [] : readyBehind(store, head);
 
 /**
  * Destroys the project's pool, for good: it forks and grants nothing from

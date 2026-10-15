@@ -2,11 +2,11 @@
 # kills: http.unhandled-line
 # why: what was thrown past a handler is logged with no request id to find it by and no marks
 diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
-index 2ebfabed..ba7bc92a 100644
+index 082959f1..9df1f26f 100644
 --- a/apps/keel/src/adapters/driving/http/run.ts
 +++ b/apps/keel/src/adapters/driving/http/run.ts
-@@ -118,7 +118,7 @@ export function answerUnhandled(
-     return unavailable(requestId, DATABASE_AWAY);
+@@ -142,7 +142,7 @@ export function answerUnhandled(
+     return unavailable(requestId, KEEL_BUSY);
    }
    const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
 -  logDefect(drift ? "contract-drift" : "defect", requestId, error);

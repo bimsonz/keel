@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: a handler whose object call was refused as overloaded answers 500, and the caller is not told to come again
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index 082959f1..cb41fdb0 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -192,7 +192,7 @@ export function makeRunner(
+       return unavailableResult(caller.requestId, DATABASE_AWAY);
+     }
+     // An object that could not take the call just now (overloaded, or restarted by a deploy) is no defect of Keel's.
+-    if (isObjectBusy(defect)) {
++    if (false) {
+       logDefect("object-busy", caller.requestId, defect);
+       return unavailableResult(caller.requestId, KEEL_BUSY);
+     }

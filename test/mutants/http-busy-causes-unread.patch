@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: only the outermost error is read, so an overloaded object wrapped by whoever caught it is a 500
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index d552fba7..7d18ad0d 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -56,7 +56,7 @@ export function isObjectBusy(error: unknown): boolean {
+     const message = Reflect.get(at, "message");
+     if (typeof message === "string" && BUSY.some((sentence) => message.includes(sentence)))
+       return true;
+-    at = Reflect.get(at, "cause");
++    at = undefined;
+   }
+   return false;
+ }

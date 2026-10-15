@@ -2,7 +2,7 @@
 # kills: rpc.defect-line
 # why: only the nearest cause is named, and the one under it, where the fault began, is lost
 diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
-index ee64819f..70ac9a13 100644
+index d552fba7..a9ba7dff 100644
 --- a/apps/keel/src/rpc/defect.ts
 +++ b/apps/keel/src/rpc/defect.ts
 @@ -28,7 +28,7 @@ const text = (value: unknown): string => {
@@ -13,4 +13,4 @@ index ee64819f..70ac9a13 100644
 +    ? text(cause)
      : text(cause);
  
- export function describeDefect(defect: unknown): DefectLine {
+ /**

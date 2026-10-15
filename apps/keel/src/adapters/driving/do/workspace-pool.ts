@@ -302,6 +302,9 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     this.refreshFailures = settled ? 0 : this.refreshFailures + 1;
     if (armedAlarms(storage).find((armed) => armed.reason === POOL_REFRESH)?.at !== fallback)
       return;
+    // What the pass left for the next is refreshed then, at once: the claims queued meanwhile are served first.
+    if (settled && exit.value.more > 0)
+      return scheduleAlarm(storage, { kind: "deadline", reason: POOL_REFRESH, at: Date.now() });
     if (settled) return cancelAlarm(storage, POOL_REFRESH);
     const delay = redeliveryDelay(this.refreshFailures);
     const line = `pool ${this.project} refresh unfinished ${this.refreshFailures}x, next in ${delay} ms`;

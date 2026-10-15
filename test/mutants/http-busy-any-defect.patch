@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: every defect is answered as an object that could not take the call, so a real fault is a 503 no retry will clear
+diff --git a/apps/keel/src/rpc/defect.ts b/apps/keel/src/rpc/defect.ts
+index d552fba7..08eae542 100644
+--- a/apps/keel/src/rpc/defect.ts
++++ b/apps/keel/src/rpc/defect.ts
+@@ -49,6 +49,7 @@ const CAUSES = 4;
+ 
+ /** Whether an error, or a cause under it, is an object that could not take the call just now: one to make again after a wait. */
+ export function isObjectBusy(error: unknown): boolean {
++  return true;
+   let at = error;
+   for (let depth = 0; depth <= CAUSES && typeof at === "object" && at !== null; depth += 1) {
+     if (Reflect.get(at, "overloaded") === true || Reflect.get(at, "retryable") === true)

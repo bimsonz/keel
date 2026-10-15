@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts -t pool.refresh-eager-upto
+# kills: pool.refresh-eager-upto
+# why: every ready workspace is refreshed ahead of its claim however many are ready, though a claim brings its own to trunk's head
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 53c6faec..baf2c23c 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -630,7 +630,7 @@ export const countBehind = Effect.fn("coordination/countBehind")(function* (proj
+ 
+ /** The ready workspaces behind trunk's head that a refresh brings to it: none while more than `EAGER_REFRESH_UPTO` are ready. */
+ const eagerlyBehind = (store: Transaction["store"], head: CommitSha) =>
+-  countIn(store, "ready") > EAGER_REFRESH_UPTO ? [] : readyBehind(store, head);
++  readyBehind(store, head);
+ 
+ /**
+  * Destroys the project's pool, for good: it forks and grants nothing from

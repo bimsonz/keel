@@ -244,7 +244,12 @@ describe("WorkspacePool refresh", () => {
         const head = yield* w.land(1);
         expect(yield* countBehind(PROJECT)).toBe(2);
 
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 2, failed: 0, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 2,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         for (const slot of yield* slotsHeld) {
           expect(slot).toMatchObject({ state: "ready", baseSha: head });
           expect("advancingTo" in slot).toBe(false);
@@ -265,7 +270,12 @@ describe("WorkspacePool refresh", () => {
 
         // Nothing is behind now: a pass relays nothing and leaves nothing pending.
         expect(yield* countBehind(PROJECT)).toBe(0);
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         expect(w.relays).toHaveLength(2);
       }).pipe(Effect.provide(w.layer));
     },
@@ -285,13 +295,18 @@ describe("WorkspacePool refresh", () => {
         expect(yield* mainOf(mid.repo)).toBe(head);
         expect(mid).toMatchObject({ state: "refreshing", baseSha: base, advancingTo: head });
         yield* w.release;
-        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 1, failed: 0, pending: 0, more: 0 });
         expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: head });
 
         // The next relay fails before it writes: the workspace stays ready on the base it has.
         const next = yield* w.land(2);
         expect(next).not.toBe(head);
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 1 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 0,
+          pending: 1,
+          more: 0,
+        });
         const kept = yield* onlySlot;
         expect(kept).toMatchObject({ state: "ready", baseSha: head });
         expect("advancingTo" in kept).toBe(false);
@@ -355,7 +370,12 @@ describe("WorkspacePool refresh", () => {
         yield* Effect.gen(function* () {
           yield* lost.stock(1);
           const head = yield* lost.land(1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 1,
+            failed: 0,
+            pending: 0,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: head });
         }).pipe(Effect.provide(lost.layer));
 
@@ -364,9 +384,19 @@ describe("WorkspacePool refresh", () => {
         yield* Effect.gen(function* () {
           const base = yield* busy.stock(1);
           const head = yield* busy.land(1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 1 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 0,
+            pending: 1,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: base });
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 1,
+            failed: 0,
+            pending: 0,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "ready", baseSha: head });
         }).pipe(Effect.provide(busy.layer));
 
@@ -377,7 +407,12 @@ describe("WorkspacePool refresh", () => {
           const slot = yield* onlySlot;
           yield* moved.fixture.commit(slot.repo, MAIN, { "README.md": "not trunk's\n" });
           yield* moved.land(1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 1, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 1,
+            pending: 0,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "collecting" });
           expect(yield* collectedAs(slot.id)).toEqual(["expired"]);
           // Its repo is deleted, and the refill forks its replacement.
@@ -392,7 +427,12 @@ describe("WorkspacePool refresh", () => {
           const slot = yield* onlySlot;
           yield* (yield* CodeHost).delete(slot.repo);
           yield* gone.land(1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 1, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 1,
+            pending: 0,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "collecting" });
         }).pipe(Effect.provide(gone.layer));
 
@@ -403,7 +443,12 @@ describe("WorkspacePool refresh", () => {
           const slot = yield* onlySlot;
           yield* blind.land(1);
           blind.unreadable.add(slot.repo.name);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 1 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 0,
+            pending: 1,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "refreshing", baseSha: base });
         }).pipe(Effect.provide(blind.layer));
       }),
@@ -417,7 +462,12 @@ describe("WorkspacePool refresh", () => {
         yield* w.stock(1);
         const slot = yield* onlySlot;
         yield* w.land(1);
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 1, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 1,
+          pending: 0,
+          more: 0,
+        });
         expect(yield* onlySlot).toMatchObject({ state: "collecting" });
         expect(yield* collectedAs(slot.id)).toEqual(["expired"]);
         expect(w.relays).toHaveLength(1);
@@ -426,7 +476,7 @@ describe("WorkspacePool refresh", () => {
   );
 
   it.effect(
-    "[pool.refresh-one-at-a-time] workspaces are refreshed one at a time, the one that has waited longest first, and the others stay ready meanwhile",
+    "[pool.refresh-one-at-a-time] workspaces are refreshed one at a time and two a pass, the one that has waited longest first, and the others stay ready meanwhile",
     () => {
       const w = world(["hold-before", "hold-before", "hold-before"]);
       return Effect.gen(function* () {
@@ -443,10 +493,14 @@ describe("WorkspacePool refresh", () => {
         yield* w.held;
         expect(yield* states).toEqual(["ready", "refreshing", "ready"]);
         yield* w.release;
+        // Two a pass: the third is left for the next, ready meanwhile.
+        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 2, failed: 0, pending: 0, more: 1 });
+        expect(yield* states).toEqual(["ready", "ready", "ready"]);
+        const next = yield* Effect.forkChild(refreshSlots(PROJECT));
         yield* w.held;
         expect(yield* states).toEqual(["ready", "ready", "refreshing"]);
         yield* w.release;
-        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 3, failed: 0, pending: 0 });
+        expect(yield* Fiber.join(next)).toEqual({ refreshed: 1, failed: 0, pending: 0, more: 0 });
 
         expect(w.relays.map((r) => r.workspace)).toEqual([
           first.repo.name,
@@ -468,7 +522,12 @@ describe("WorkspacePool refresh", () => {
         const grant = yield* grantWorkspace(PROJECT, holder(1));
         const head = yield* w.land(1);
 
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 1,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         expect(w.relays.map((r) => r.workspace)).not.toContain(grant.repo.name);
         expect(w.relays).toHaveLength(1);
         const held = (yield* slotsHeld).find((s) => s.id === grant.workspaceId);
@@ -595,13 +654,23 @@ describe("WorkspacePool refresh", () => {
 
           // At two minutes its pass may still be running.
           landed.advance(STUCK_REFRESH_MS);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 1 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 0,
+            pending: 1,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "refreshing", baseSha: base });
           expect(landed.relays).toHaveLength(1);
 
           // Past it, main is read: it stands where the relay was taking it, and from there it follows trunk.
           landed.advance(1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 1,
+            failed: 0,
+            pending: 0,
+            more: 0,
+          });
           expect(landed.relays.map((r) => [r.from, r.to])).toEqual([
             [base, first],
             [first, second],
@@ -620,7 +689,12 @@ describe("WorkspacePool refresh", () => {
           yield* unmoved.held;
           yield* Fiber.interrupt(pass);
           unmoved.advance(STUCK_REFRESH_MS + 1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 1,
+            failed: 0,
+            pending: 0,
+            more: 0,
+          });
           expect(unmoved.relays.map((r) => [r.from, r.to])).toEqual([
             [base, head],
             [base, head],
@@ -639,7 +713,12 @@ describe("WorkspacePool refresh", () => {
           const slot = yield* onlySlot;
           yield* strayed.fixture.commit(slot.repo, MAIN, { "README.md": "not trunk's\n" });
           strayed.advance(STUCK_REFRESH_MS + 1);
-          expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 1, pending: 0 });
+          expect(yield* refreshSlots(PROJECT)).toEqual({
+            refreshed: 0,
+            failed: 1,
+            pending: 0,
+            more: 0,
+          });
           expect(yield* onlySlot).toMatchObject({ state: "collecting" });
           expect(yield* collectedAs(slot.id)).toEqual(["expired"]);
         }).pipe(Effect.provide(strayed.layer));
@@ -703,13 +782,18 @@ describe("WorkspacePool refresh", () => {
         yield* destroyPool(PROJECT);
         expect(yield* onlySlot).toMatchObject({ state: "collecting" });
         yield* w.release;
-        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 0, failed: 0, pending: 0 });
+        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 0, failed: 0, pending: 0, more: 0 });
         expect(yield* onlySlot).toMatchObject({ state: "collecting" });
         expect(yield* collectedAs(slot.id)).toEqual(["withdrawn"]);
 
         yield* w.land(2);
         expect(yield* countBehind(PROJECT)).toBe(0);
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         expect(w.relays).toHaveLength(1);
       }).pipe(Effect.provide(w.layer));
     },
@@ -722,7 +806,12 @@ describe("WorkspacePool refresh", () => {
       return Effect.gen(function* () {
         // No trunk was initialized: asking for its head would die.
         expect(yield* countBehind(PROJECT)).toBe(0);
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 0, failed: 0, pending: 0 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         expect(w.relays).toEqual([]);
       }).pipe(Effect.provide(w.layer));
     },
@@ -778,7 +867,12 @@ describe("WorkspacePool claim", () => {
         const base = yield* w.stock(2);
         const head = yield* w.land(1);
         const [first, second] = yield* twoSlots;
-        expect(yield* refreshSlots(PROJECT)).toEqual({ refreshed: 1, failed: 0, pending: 1 });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 1,
+          failed: 0,
+          pending: 1,
+          more: 0,
+        });
         expect((yield* slotsHeld).map((s) => s.baseSha)).toEqual([base, head]);
 
         const grant = yield* grantWorkspace(PROJECT, holder(1));
@@ -879,7 +973,15 @@ describe("WorkspacePool claim", () => {
         expect((yield* slotsHeld).map((s) => s.state)).toEqual(["refreshing", "granted", "ready"]);
 
         yield* w.release;
-        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 2, failed: 0, pending: 0 });
+        // The pass took the first two: the second was its holder's by then, and the third is the next pass's.
+        expect(yield* Fiber.join(pass)).toEqual({ refreshed: 1, failed: 0, pending: 0, more: 1 });
+        expect(w.relays.map((r) => r.workspace)).toEqual([first.repo.name, second.repo.name]);
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 1,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
         expect(w.relays.map((r) => r.workspace)).toEqual([
           first.repo.name,
           second.repo.name,
@@ -891,6 +993,47 @@ describe("WorkspacePool claim", () => {
           ["granted", head],
           ["ready", head],
         ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[pool.refresh-eager-upto] with more than four ready, no pass refreshes one ahead of its claim and each claim brings its own to trunk's head; at four or fewer a pass takes two and leaves the rest to the next",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.stock(6);
+        const head = yield* w.land(1);
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 0,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
+        expect(yield* countBehind(PROJECT)).toBe(0);
+        expect(w.relays).toEqual([]);
+        // Each claim relays the one it takes.
+        expect(yield* grantWorkspace(PROJECT, holder(1))).toMatchObject({ baseSha: head });
+        expect(yield* grantWorkspace(PROJECT, holder(2))).toMatchObject({ baseSha: head });
+        expect(w.relays).toHaveLength(2);
+        // Four ready now, all behind: two a pass.
+        expect(yield* countBehind(PROJECT)).toBe(4);
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 2,
+          failed: 0,
+          pending: 0,
+          more: 2,
+        });
+        expect(yield* refreshSlots(PROJECT)).toEqual({
+          refreshed: 2,
+          failed: 0,
+          pending: 0,
+          more: 0,
+        });
+        expect(w.relays).toHaveLength(6);
+        expect((yield* slotsHeld).filter((s) => s.state === "ready").map((s) => s.baseSha)).toEqual(
+          [head, head, head, head],
+        );
       }).pipe(Effect.provide(w.layer));
     },
   );

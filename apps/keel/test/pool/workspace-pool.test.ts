@@ -487,6 +487,33 @@ describe("the WorkspacePool DO", () => {
     expect(next.repo.name).toBe(followed.relays[0]?.workspace);
   });
 
+  it("[pool.do.refresh-capped] through the real object, a pass relays two ready workspaces and arms the next pass at once for the rest, not backed off; once every one has followed trunk nothing stays armed", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 4, true);
+    const stub = poolStub(projectId);
+    const changeId = holder();
+    valueOf(WorkspacePoolCodecs.grant, await stub.grant(changeId));
+    // Three ready, every one behind once trunk moves.
+    const head = commitSha("f");
+    followed.head = head;
+    const before = Date.now();
+    await stub.receive([landedFor(projectId, changeId)]);
+    await runDurableObjectAlarm(stub);
+    expect(followed.relays.length).toBeGreaterThanOrEqual(2);
+    // Unless the platform ran it already, the next pass is due now, not after a back-off.
+    const next = (await refreshArmed(projectId))?.at ?? Number.POSITIVE_INFINITY;
+    expect(followed.relays.length === 3 || next < before + 1_000).toBe(true);
+    await vi.waitFor(async () => {
+      await runDurableObjectAlarm(stub);
+      expect(followed.relays).toHaveLength(3);
+    }, WAIT);
+    expect(followed.relays.map((relay) => relay.to)).toEqual([head, head, head]);
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+  });
+
   it("[pool.do.refresh-retry] a pass that leaves a workspace behind re-arms itself for later, not now, and is withdrawn once the workspace has followed trunk", async () => {
     const projectId = freshProject();
     const followed = await stock(projectId, 2, true);

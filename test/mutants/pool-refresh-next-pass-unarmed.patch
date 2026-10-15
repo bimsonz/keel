@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t pool.do.refresh-capped
+# kills: pool.do.refresh-capped
+# why: a pass that leaves ready workspaces for the next arms none, so they stay behind trunk until a claim takes them
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 07f02a9e..22c76c71 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -303,8 +303,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     if (armedAlarms(storage).find((armed) => armed.reason === POOL_REFRESH)?.at !== fallback)
+       return;
+     // What the pass left for the next is refreshed then, at once: the claims queued meanwhile are served first.
+-    if (settled && exit.value.more > 0)
+-      return scheduleAlarm(storage, { kind: "deadline", reason: POOL_REFRESH, at: Date.now() });
+     if (settled) return cancelAlarm(storage, POOL_REFRESH);
+     const delay = redeliveryDelay(this.refreshFailures);
+     const line = `pool ${this.project} refresh unfinished ${this.refreshFailures}x, next in ${delay} ms`;

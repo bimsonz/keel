@@ -2,10 +2,10 @@
 # kills: d1.away-session, d1.away-principal
 # why: what is thrown in the gate is never asked whether the database was away, so a session or a standing that could not be read for a moment answers 500
 diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
-index 2ebfabed..d0ac382c 100644
+index 082959f1..96a70c55 100644
 --- a/apps/keel/src/adapters/driving/http/run.ts
 +++ b/apps/keel/src/adapters/driving/http/run.ts
-@@ -113,10 +113,6 @@ export function answerUnhandled(
+@@ -133,10 +133,6 @@ export function answerUnhandled(
    rethrowContractDrift: boolean,
    away: DatabaseAway = () => false,
  ) {
@@ -13,6 +13,6 @@ index 2ebfabed..d0ac382c 100644
 -    logDefect("d1-unavailable", requestId, error);
 -    return unavailable(requestId, DATABASE_AWAY);
 -  }
-   const drift = error instanceof ResponseContractError || error instanceof UndeclaredStatusError;
-   logDefect(drift ? "contract-drift" : "defect", requestId, error);
-   if (drift && rethrowContractDrift) throw error;
+   if (isObjectBusy(error)) {
+     logDefect("object-busy", requestId, error);
+     return unavailable(requestId, KEEL_BUSY);

@@ -129,6 +129,9 @@ const RETRY_SECONDS = 2;
 export const DATABASE_AWAY =
   "Keel's database did not answer just now. Send the request again after retryAfterMs, with the same Idempotency-Key if it carried one.";
 
+export const KEEL_BUSY =
+  "Keel could not take the request just now. Send it again after retryAfterMs, with the same Idempotency-Key if it carried one.";
+
 /**
  * What Keel answers when it could not serve a request just now and nothing is
  * wrong with what was sent: a 503 that says how long to wait three ways, in

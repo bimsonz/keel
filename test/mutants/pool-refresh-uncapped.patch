@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts -t pool.refresh-one-at-a-time
+# kills: pool.refresh-one-at-a-time
+# why: a pass relays every ready workspace behind trunk, so claims wait behind all their relays on the pool object's one thread
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 53c6faec..ad5e41e8 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -597,7 +597,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+     // Its relay had landed; it counts once it stands on today's head, or it is refreshed again below.
+     if (how === "advanced" && slotOf(store, slot.id)?.baseSha === head) refreshed += 1;
+   }
+-  const taken = eagerlyBehind(store, head).slice(0, REFRESH_PER_PASS);
++  const taken = eagerlyBehind(store, head);
+   const outcomes = yield* Effect.forEach(taken, (slot) => refreshOne(project, slot.id, head), {
+     concurrency: 1,
+   });

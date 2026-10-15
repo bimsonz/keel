@@ -33,7 +33,8 @@ import {
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { makeRunner } from "../../src/adapters/driving/http/run.ts";
+import { KEEL_BUSY } from "../../src/adapters/driving/http/problems.ts";
+import { answerUnhandled, makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const clock = makeClockMemory().layer;
 const directory = makeAgentDirectoryMemory().layer;
@@ -103,12 +104,12 @@ describe("the line a request's defect leaves", () => {
 
   it("[http.defect-line] names the defect a handler's effect died with, under the request id, and answers 500", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    // What a held call is rejected with when the platform resets its object: the marks are the platform's.
+    // What an object's own code threw, as the platform hands it on: the mark is the platform's.
     const defect = Object.assign(
-      new Error("Durable Object reset because its code was updated.", {
+      new Error("Cannot read properties of undefined (reading 'lease')", {
         cause: new TypeError("storage is gone"),
       }),
-      { durableObjectReset: true, retryable: true },
+      { remote: true },
     );
     const result = await run(
       {
@@ -129,10 +130,69 @@ describe("the line a request's defect leaves", () => {
       ops: "defect",
       requestId: "req-defect",
       name: "Error",
-      message: "Durable Object reset because its code was updated.",
+      message: "Cannot read properties of undefined (reading 'lease')",
       stack: defect.stack,
       cause: "TypeError: storage is gone",
-      marks: ["durableObjectReset", "retryable"],
+      marks: ["remote"],
     });
+  });
+
+  it("[http.object-busy] an object that could not take a call just now (overloaded, or restarted by a deploy) answers 503 with a wait, by the platform's marks or, past an object's RPC, by its sentence; logged apart from a defect", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const busy = [
+      // Thrown by the platform at the call: its marks say so.
+      Object.assign(new Error("Durable Object is overloaded. Requests queued for too long."), {
+        overloaded: true,
+      }),
+      Object.assign(new Error("Durable Object reset because its code was updated."), {
+        durableObjectReset: true,
+        retryable: true,
+      }),
+      // The platform's mark alone, whatever it says.
+      Object.assign(new Error("The object moved to another host."), { retryable: true }),
+      Object.assign(new Error("Too many calls at once."), { overloaded: true }),
+      // Past an object's RPC a defect is its name and message alone.
+      new Error("Durable Object is overloaded. Too many requests queued."),
+      new Error("Durable Object reset because its code was updated."),
+      new Error("Your account is generating too much load on Durable Objects. Please back off."),
+      // Wrapped by whoever caught it.
+      new Error("declare failed", {
+        cause: new Error("Durable Object is overloaded. Requests queued for too long."),
+      }),
+    ];
+    for (const [n, defect] of busy.entries()) {
+      // oxlint-disable-next-line no-await-in-loop -- one request at a time, each logged in turn
+      const result = await run(
+        {
+          requestId: `req-busy-${n}`,
+          principal: { _tag: "Anonymous" },
+          signal: new AbortController().signal,
+        },
+        Effect.die(defect),
+      );
+      expect(result).toMatchObject({
+        status: 503,
+        body: { code: "service.unavailable", detail: KEEL_BUSY, retryAfterMs: 2000 },
+        headers: { "retry-after": 2 },
+      });
+      expect(JSON.parse(String(error.mock.calls.at(-1)?.[0]))).toMatchObject({
+        ops: "object-busy",
+        requestId: `req-busy-${n}`,
+      });
+    }
+    // Thrown past every handler, in the gate, it answers the same.
+    const thrown = answerUnhandled(busy[2], "req-gate", false);
+    expect(thrown.status).toBe(503);
+    expect(thrown.headers.get("retry-after")).toBe("2");
+    // Anything else an object says is a defect: 500.
+    const other = await run(
+      {
+        requestId: "req-other",
+        principal: { _tag: "Anonymous" },
+        signal: new AbortController().signal,
+      },
+      Effect.die(new Error("Durable Object storage is full")),
+    );
+    expect(other).toMatchObject({ status: 500, body: { code: "internal.defect" } });
   });
 });

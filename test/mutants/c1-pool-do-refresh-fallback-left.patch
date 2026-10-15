@@ -2,13 +2,13 @@
 # kills: pool.do.refresh
 # why: the deadline armed for a pass is never withdrawn, so a pool with nothing behind wakes again two minutes later
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index da716dd..a14faae 100644
+index 07f02a9e..f51bad05 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -249,7 +249,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
-     this.refreshFailures = settled ? 0 : this.refreshFailures + 1;
-     if (armedAlarms(storage).find((armed) => armed.reason === POOL_REFRESH)?.at !== fallback)
-       return;
+@@ -305,7 +305,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     // What the pass left for the next is refreshed then, at once: the claims queued meanwhile are served first.
+     if (settled && exit.value.more > 0)
+       return scheduleAlarm(storage, { kind: "deadline", reason: POOL_REFRESH, at: Date.now() });
 -    if (settled) return cancelAlarm(storage, POOL_REFRESH);
 +    if (settled) return;
      const delay = redeliveryDelay(this.refreshFailures);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts -t pool.refresh-one-at-a-time
+# kills: pool.refresh-one-at-a-time
+# why: what the cap left for the next pass is counted as a relay that failed, so the next pass backs off as after a failure
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 53c6faec..8bbcf55f 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -610,7 +610,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+   return {
+     refreshed,
+     failed,
+-    pending: behind.filter((slot) => tried.has(slot.id)).length + countIn(store, "refreshing"),
++    pending: behind.length + countIn(store, "refreshing"),
+     more: behind.filter((slot) => !tried.has(slot.id)).length,
+   } satisfies RefreshReport;
+ });

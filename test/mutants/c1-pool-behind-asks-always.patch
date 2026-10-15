@@ -2,14 +2,15 @@
 # kills: pool.refresh-idle
 # why: counting the workspaces behind trunk asks trunk even when the pool has none ready
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 5d3cef4..8612ec3 100644
+index 53c6faec..28b4c881 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -513,7 +513,6 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
-  */
+@@ -623,7 +623,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
  export const countBehind = Effect.fn("coordination/countBehind")(function* (project: ProjectId) {
    const store = yield* EntityStore;
--  if (countIn(store, "ready") === 0) return 0;
+   const ready = countIn(store, "ready");
+-  if (ready === 0 || ready > EAGER_REFRESH_UPTO) return 0;
++  if (ready > EAGER_REFRESH_UPTO) return 0;
    const head = yield* (yield* Trunks).head(project);
    return readyBehind(store, head).length;
  });

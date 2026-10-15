@@ -31,6 +31,36 @@ const causeOf = (cause: unknown, depth = 0): string =>
     ? `${text(cause)} <- ${causeOf(cause.cause, depth + 1)}`
     : text(cause);
 
+/**
+ * What the platform says when an object could not take a call just now and
+ * nothing is wrong with the call: it had more work queued than it could take,
+ * or it restarted under the call (a deploy). The error carries the platform's
+ * marks where it was thrown; a defect that crossed an object's RPC keeps only
+ * its name and message, so the platform's sentences are looked for too.
+ */
+const BUSY = [
+  "Durable Object is overloaded.",
+  "Your account is generating too much load on Durable Objects.",
+  "Durable Object reset because its code was updated.",
+] as const;
+
+/** How many causes under an error are read: enough for a wrapper or two, and an end to a cycle. */
+const CAUSES = 4;
+
+/** Whether an error, or a cause under it, is an object that could not take the call just now: one to make again after a wait. */
+export function isObjectBusy(error: unknown): boolean {
+  let at = error;
+  for (let depth = 0; depth <= CAUSES && typeof at === "object" && at !== null; depth += 1) {
+    if (Reflect.get(at, "overloaded") === true || Reflect.get(at, "retryable") === true)
+      return true;
+    const message = Reflect.get(at, "message");
+    if (typeof message === "string" && BUSY.some((sentence) => message.includes(sentence)))
+      return true;
+    at = Reflect.get(at, "cause");
+  }
+  return false;
+}
+
 export function describeDefect(defect: unknown): DefectLine {
   const marks = MARKS.filter(
     (mark) => typeof defect === "object" && defect !== null && Reflect.get(defect, mark) === true,

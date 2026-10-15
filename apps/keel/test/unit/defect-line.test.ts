@@ -12,6 +12,15 @@ const reset = () =>
     { durableObjectReset: true, retryable: true, remote: false },
   );
 
+/** What an object's own code threw, as the platform hands it on: a defect, not an object that could not take the call. */
+const threw = () =>
+  Object.assign(
+    new Error("Cannot read properties of undefined (reading 'lease')", {
+      cause: new TypeError("storage is gone", { cause: "the instance was replaced" }),
+    }),
+    { remote: true },
+  );
+
 /** Every line `console.error` was given, parsed: one a defect. */
 const errorLines = () => {
   const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -70,7 +79,7 @@ describe("what a defect says of itself in a log line", () => {
 describe("the line something thrown past a handler leaves", () => {
   it("[http.unhandled-line] names what was thrown past a handler the same way, and answers 500", async () => {
     const lines = errorLines();
-    const thrown = reset();
+    const thrown = threw();
     const response = answerUnhandled(thrown, "req-thrown", true);
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({
@@ -82,10 +91,10 @@ describe("the line something thrown past a handler leaves", () => {
         ops: "defect",
         requestId: "req-thrown",
         name: "Error",
-        message: "Durable Object reset because its code was updated.",
+        message: "Cannot read properties of undefined (reading 'lease')",
         stack: thrown.stack,
         cause: "TypeError: storage is gone <- the instance was replaced",
-        marks: ["durableObjectReset", "retryable"],
+        marks: ["remote"],
       },
     ]);
   });

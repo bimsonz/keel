@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts -t http.object-busy
+# kills: http.object-busy
+# why: an overloaded object thrown past every handler, in the gate, answers 500 though the same in a handler answers 503
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index 082959f1..288880f4 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -137,7 +137,7 @@ export function answerUnhandled(
+     logDefect("d1-unavailable", requestId, error);
+     return unavailable(requestId, DATABASE_AWAY);
+   }
+-  if (isObjectBusy(error)) {
++  if (false) {
+     logDefect("object-busy", requestId, error);
+     return unavailable(requestId, KEEL_BUSY);
+   }
