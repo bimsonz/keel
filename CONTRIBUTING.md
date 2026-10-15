@@ -7,7 +7,7 @@ Thank you for helping. This page says how to propose a change. [AGENTS.md](AGENT
 You need Node 22.18 or later and pnpm 11.
 
 ```sh
-git clone https://github.com/bimsonz/keel.git
+git clone https://keel.town/keel/keel.git
 cd keel
 pnpm install
 pnpm gen
@@ -21,7 +21,7 @@ pnpm gen
 pnpm check
 ```
 
-`pnpm check` runs what CI runs, in the same order: generation, lint, format check, typecheck, the workspace guards, the unit and architecture tests, each Worker's tests inside workerd, and a deploy dry run. A pull request is ready for review when it is green. Run `pnpm format` on your changes before you push.
+`pnpm check` runs what CI runs, in the same order: generation, lint, format check, typecheck, the workspace guards, the unit and architecture tests, each Worker's tests inside workerd, and a deploy dry run. A change is ready to submit when the checks are green. Run `pnpm format` on your changes before you push.
 
 ## Tests and mutation proofs
 
