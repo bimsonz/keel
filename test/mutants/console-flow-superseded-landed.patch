@@ -2,10 +2,10 @@
 # kills: flow.stage
 # why: a superseded change is put with the landed ones instead of the gone
 diff --git a/apps/console/src/engine/flow.ts b/apps/console/src/engine/flow.ts
-index 9da69291..74d656be 100644
+index b20cc852..56542999 100644
 --- a/apps/console/src/engine/flow.ts
 +++ b/apps/console/src/engine/flow.ts
-@@ -108,7 +108,7 @@
+@@ -117,7 +117,7 @@ const STAGE_OF: Partial<Record<AnyEvent["type"], Stage>> = {
    ChangeLanded: "landed",
    ChangeBounced: "bounced",
    ChangeWithdrawn: "gone",
@@ -13,4 +13,4 @@ index 9da69291..74d656be 100644
 +  ChangeSuperseded: "landed",
  };
  
- export class Flow {
+ /**

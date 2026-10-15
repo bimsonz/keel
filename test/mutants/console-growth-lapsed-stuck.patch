@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t "growth.lapsed"
+# kills: growth.lapsed
+# why: a change whose agent left hours ago is drawn red as stuck, with a timer of hours, where the list of changes says it waits on its agent
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ce098a4b..274490c0 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -265,7 +265,6 @@ function standingOf(change: FlowChange, now: number): Standing {
+   if (change.stage === "landed") return "done";
+   if (change.stage === "bounced") return "stuck";
+   // Its agent's lease lapsed: it waits on its agent, as the list of changes says, and nothing is stuck.
+-  if (waitsOnItsAgent(change)) return "waiting";
+   if (change.parked !== undefined) return "stuck";
+   if (change.stage === "precheck" || change.stage === "batch" || now - change.since < MOVING_MS)
+     return "moving";

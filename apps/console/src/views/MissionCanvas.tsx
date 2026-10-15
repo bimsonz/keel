@@ -171,9 +171,16 @@ function ForkCard({ data }: NodeProps<FlowNode<ForkNode, "fork">>) {
         <b className="a-mono">{node.label}</b>
         <span className="a-arch-state" data-standing={node.standing}>
           {node.standing === "stuck" && <WarningCircleIcon size={11} weight="fill" aria-hidden />}
-          {node.escalated === true ? "Awaiting ruling" : STAGE_WORD[node.stage]}
+          {node.escalated === true
+            ? "Awaiting ruling"
+            : node.idle === true
+              ? "Waiting on its agent"
+              : STAGE_WORD[node.stage]}
         </span>
-        <span className="a-arch-time a-num">{elapsed(now - node.since)}</span>
+        {/* A change waiting on its agent is on nobody's clock of Keel's: no time is counted for it. */}
+        {node.idle !== true && (
+          <span className="a-arch-time a-num">{elapsed(now - node.since)}</span>
+        )}
       </div>
       <div className="a-arch-goal">{node.goal}</div>
     </div>
@@ -709,7 +716,14 @@ function Inspector({
       </h2>
       <p>{picked.goal}</p>
       <p className="text-kumo-subtle">
-        {STAGE_WORD[picked.stage]} · <span className="a-num">{elapsed(now - picked.since)}</span>
+        {picked.idle === true ? (
+          "Waiting on its agent"
+        ) : (
+          <>
+            {STAGE_WORD[picked.stage]} ·{" "}
+            <span className="a-num">{elapsed(now - picked.since)}</span>
+          </>
+        )}
       </p>
       {picked.why !== undefined && <p className="a-mc-why">{picked.why}</p>}
     </aside>

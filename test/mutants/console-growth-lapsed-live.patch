@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t "growth.lapsed"
+# kills: growth.lapsed
+# why: the project counts every change whose agent has gone as live: Live 44 on keel/swarm, with nothing moving
+diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
+index ce098a4b..7fb496dd 100644
+--- a/apps/console/src/engine/growth.ts
++++ b/apps/console/src/engine/growth.ts
+@@ -286,7 +286,7 @@ export function growthOf(
+   const head = flow.commits[0];
+   let live = 0;
+   for (const change of flow.changes.values())
+-    if (change.stage !== "landed" && change.stage !== "gone" && !waitsOnItsAgent(change)) live += 1;
++    if (change.stage !== "landed" && change.stage !== "gone") live += 1;
+   const project: ProjectNode = {
+     ...box("project", SIZE.project, { x: 0, y: 0 }),
+     fade: 1,

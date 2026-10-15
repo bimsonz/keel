@@ -2,11 +2,11 @@
 # kills: canvas.dense
 # why: a stage holding exactly COLUMN_DENSE_AT changes is already drawn as dots
 diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
-index a78cc246..7357895a 100644
+index 464c3bac..15d9ce62 100644
 --- a/apps/console/src/engine/canvas.ts
 +++ b/apps/console/src/engine/canvas.ts
-@@ -452,7 +452,7 @@
-     live: chips.length,
+@@ -471,7 +471,7 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
+     live: chips.filter((chip) => !waitsOnItsAgent(chip)).length,
      dense: chips.length > DENSE_AT,
      dotted: CHIP_STAGES.filter(
 -      (stage) => chips.length > DENSE_AT || counts[stage] > COLUMN_DENSE_AT,

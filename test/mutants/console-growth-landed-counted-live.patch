@@ -2,15 +2,15 @@
 # kills: growth.centre
 # why: a landed change is counted live
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index ece58765..f9d570f0 100644
+index ce098a4b..01879fed 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -275,7 +275,7 @@ export function growthOf(
+@@ -286,7 +286,7 @@ export function growthOf(
    const head = flow.commits[0];
    let live = 0;
    for (const change of flow.changes.values())
--    if (change.stage !== "landed" && change.stage !== "gone") live += 1;
-+    if (change.stage !== "gone") live += 1;
+-    if (change.stage !== "landed" && change.stage !== "gone" && !waitsOnItsAgent(change)) live += 1;
++    if (change.stage !== "gone" && !waitsOnItsAgent(change)) live += 1;
    const project: ProjectNode = {
      ...box("project", SIZE.project, { x: 0, y: 0 }),
      fade: 1,

@@ -69,6 +69,7 @@ import {
   type Placed,
   place,
 } from "../engine/place.ts";
+import { waitsOnItsAgent } from "../engine/flow.ts";
 import type { Mode } from "../theme/mode.ts";
 import { ChangeLink, EscalationLink, SubjectLink } from "./links.tsx";
 
@@ -145,7 +146,7 @@ function Chip({ data }: NodeProps<ChipNode>) {
       data-stage={change.stage}
       data-member={member || undefined}
       data-quiet={change.quiet || undefined}
-      data-parked={change.parked === undefined ? undefined : true}
+      data-parked={change.parked === undefined || waitsOnItsAgent(change) ? undefined : true}
       data-selected={data.selected || undefined}
     >
       <Handle type="target" position={Position.Left} style={HIDDEN} isConnectable={false} />
@@ -153,12 +154,16 @@ function Chip({ data }: NodeProps<ChipNode>) {
         <Swatch hue={change.hue} />
         <b className="a-mono">{change.label}</b>
         {change.revision > 1 && <span className="a-mc-rev">r{change.revision}</span>}
-        {change.parked !== undefined && (
-          <span className="a-mc-flag" data-tone="person">
-            <HandPalmIcon size={11} weight="fill" aria-hidden />
-            {change.parked.escalationId === undefined ? change.parked.reason : "needs a ruling"}
-          </span>
-        )}
+        {change.parked !== undefined &&
+          (waitsOnItsAgent(change) ? (
+            // Its agent's lease lapsed: it waits on its agent, as the list of changes says, and asks nobody.
+            <span className="a-mc-flag">Waiting on its agent</span>
+          ) : (
+            <span className="a-mc-flag" data-tone="person">
+              <HandPalmIcon size={11} weight="fill" aria-hidden />
+              Needs a ruling
+            </span>
+          ))}
         {change.requeued !== undefined && change.parked === undefined && (
           <span className="a-mc-flag">requeued: {change.requeued}</span>
         )}
@@ -188,7 +193,7 @@ function Agent({ data }: NodeProps<AgentNode>) {
         <div className="min-w-0">
           <b className="block truncate">{agent.name}</b>
           <span className="block truncate text-[12px] text-kumo-subtle">
-            {[agent.handle === undefined ? "" : `@${agent.handle}`, `${count(agent.changes)} live`]
+            {[agent.handle === undefined ? "" : `@${agent.handle}`, `${count(agent.live)} live`]
               .filter((part) => part !== "")
               .join(" · ")}
           </span>
@@ -372,7 +377,7 @@ function Dense({ data }: NodeProps<DenseNode>) {
           <i
             key={change.id}
             data-hue={change.hue}
-            data-parked={change.parked === undefined ? undefined : true}
+            data-parked={change.parked === undefined || waitsOnItsAgent(change) ? undefined : true}
             data-quiet={change.quiet || undefined}
           />
         ))}

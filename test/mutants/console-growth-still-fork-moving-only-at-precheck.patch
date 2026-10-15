@@ -2,13 +2,13 @@
 # kills: growth.standing
 # why: a change that just moved is drawn waiting
 diff --git a/apps/console/src/engine/growth.ts b/apps/console/src/engine/growth.ts
-index ece58765..64028985 100644
+index ce098a4b..1eab6d56 100644
 --- a/apps/console/src/engine/growth.ts
 +++ b/apps/console/src/engine/growth.ts
-@@ -256,7 +256,7 @@ function pileOf(stage: Stage): PileStage | undefined {
- function standingOf(change: FlowChange, now: number): Standing {
-   if (change.stage === "landed") return "done";
-   if (change.stage === "bounced" || change.parked !== undefined) return "stuck";
+@@ -267,7 +267,7 @@ function standingOf(change: FlowChange, now: number): Standing {
+   // Its agent's lease lapsed: it waits on its agent, as the list of changes says, and nothing is stuck.
+   if (waitsOnItsAgent(change)) return "waiting";
+   if (change.parked !== undefined) return "stuck";
 -  if (change.stage === "precheck" || change.stage === "batch" || now - change.since < MOVING_MS)
 +  if (change.stage === "precheck" || change.stage === "batch")
      return "moving";

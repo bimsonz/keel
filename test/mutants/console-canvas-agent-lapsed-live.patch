@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t "growth.lapsed"
+# kills: growth.lapsed
+# why: the pipeline's agent card says 44 live while its header says 2: every change the agent left is counted live
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index daccec27..9d1b0641 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -377,7 +377,7 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
+       agentsById.set(chip.agentId, agent);
+     }
+     agent.changes += 1;
+-    if (!waitsOnItsAgent(chip)) agent.live += 1;
++    agent.live += 1;
+     const run = world.changes.get(chip.id)?.run;
+     if (run !== undefined) {
+       const listed = agent.runs.find((each) => each.id === run.id);

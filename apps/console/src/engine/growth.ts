@@ -10,7 +10,7 @@
 
 import { agentName } from "./audience.ts";
 import { type BatchState, type CanvasStep, batchState, stepsOf, whyOf } from "./canvas.ts";
-import type { FlowBatch, FlowChange, Stage } from "./flow.ts";
+import { type FlowBatch, type FlowChange, type Stage, waitsOnItsAgent } from "./flow.ts";
 import type { Cards } from "./holder.ts";
 import type { World } from "./world.ts";
 
@@ -72,6 +72,8 @@ export interface ForkNode extends Placed {
   why?: string;
   /** Whether it is parked on a question put to a person. */
   escalated?: boolean;
+  /** Whether it waits on its agent, whose lease lapsed: not stuck on anything of Keel's, and not live. */
+  idle?: boolean;
 }
 export interface AgentNode extends Placed {
   kind: "agent";
@@ -253,9 +255,18 @@ function pileOf(stage: Stage): PileStage | undefined {
     : undefined;
 }
 
+/** Why Keel parked a change, in the words the list of changes uses: never its reason's own token. */
+const PARKED_WHY: Readonly<Record<string, string>> = {
+  "lease-lapsed": "Waiting on its agent: its lease lapsed",
+  "awaiting-ruling": "Waiting on a person's ruling",
+};
+
 function standingOf(change: FlowChange, now: number): Standing {
   if (change.stage === "landed") return "done";
-  if (change.stage === "bounced" || change.parked !== undefined) return "stuck";
+  if (change.stage === "bounced") return "stuck";
+  // Its agent's lease lapsed: it waits on its agent, as the list of changes says, and nothing is stuck.
+  if (waitsOnItsAgent(change)) return "waiting";
+  if (change.parked !== undefined) return "stuck";
   if (change.stage === "precheck" || change.stage === "batch" || now - change.since < MOVING_MS)
     return "moving";
   return "waiting";
@@ -275,7 +286,7 @@ export function growthOf(
   const head = flow.commits[0];
   let live = 0;
   for (const change of flow.changes.values())
-    if (change.stage !== "landed" && change.stage !== "gone") live += 1;
+    if (change.stage !== "landed" && change.stage !== "gone" && !waitsOnItsAgent(change)) live += 1;
   const project: ProjectNode = {
     ...box("project", SIZE.project, { x: 0, y: 0 }),
     fade: 1,
@@ -347,8 +358,9 @@ export function growthOf(
       ...(change.parked !== undefined && entry?.escalationId !== undefined
         ? { escalated: true }
         : {}),
+      ...(waitsOnItsAgent(change) && change.stage !== "bounced" ? { idle: true } : {}),
       ...(change.parked !== undefined
-        ? { why: change.parked.reason }
+        ? { why: PARKED_WHY[change.parked.reason] ?? "Parked by Keel" }
         : entry?.bounce?.reasons[0] !== undefined && change.stage === "bounced"
           ? { why: entry.bounce.reasons[0] }
           : {}),

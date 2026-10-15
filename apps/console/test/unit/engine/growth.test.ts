@@ -14,6 +14,7 @@ import {
   growthOf,
   keptAfresh,
 } from "../../../src/engine/growth.ts";
+import { canvasOf } from "../../../src/engine/canvas.ts";
 import { Hand } from "../../fixtures/pipeline.ts";
 
 const forkOf = (growth: Growth, id: string): ForkNode | undefined =>
@@ -446,5 +447,30 @@ describe("at scale", () => {
     for (const [index, a] of cards.entries())
       for (const b of cards.slice(index + 1))
         expect(overlap(a, b), `${a.id} and ${b.id}`).toBe(false);
+  });
+});
+
+describe("a change waiting on its agent", () => {
+  it("[growth.lapsed] draws a change whose agent's lease lapsed as waiting on its agent, grey and not live, and one parked on a question as stuck", () => {
+    const hand = new Hand().declare("chg_gone").declare("chg_asks").declare("chg_busy");
+    hand.at(5).park("chg_gone", "lease-lapsed").park("chg_asks", "awaiting-ruling");
+    // Hours on: a lapsed change is on nobody's clock of Keel's.
+    const growth = growthOf(hand.world(), 3 * 60 * 60 * 1000, "keel/swarm", keptAfresh());
+    expect(forkOf(growth, "chg_gone")).toMatchObject({
+      standing: "waiting",
+      idle: true,
+      why: "Waiting on its agent: its lease lapsed",
+    });
+    expect(forkOf(growth, "chg_asks")).toMatchObject({
+      standing: "stuck",
+      why: "Waiting on a person's ruling",
+    });
+    expect(forkOf(growth, "chg_asks")?.idle).toBeUndefined();
+    // Live is what Keel is moving or asking about: the change waiting on its agent is not among it.
+    expect(growth.nodes.find((node) => node.kind === "project")).toMatchObject({ live: 2 });
+    const canvas = canvasOf(hand.world(), 3 * 60 * 60 * 1000);
+    expect(canvas.live).toBe(2);
+    // The agent holds all three, and two of them are live.
+    expect(canvas.agents.map((agent) => [agent.changes, agent.live])).toEqual([[3, 2]]);
   });
 });

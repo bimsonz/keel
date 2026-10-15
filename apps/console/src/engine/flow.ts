@@ -120,6 +120,14 @@ const STAGE_OF: Partial<Record<AnyEvent["type"], Stage>> = {
   ChangeSuperseded: "gone",
 };
 
+/**
+ * Whether Keel parked a change because its agent's lease lapsed: nothing of Keel's moves it until its agent, or
+ * another, picks it up again. It is waiting on its agent, as the list of changes says, and it is not live.
+ */
+export function waitsOnItsAgent(change: { parked?: { reason: string } | undefined }): boolean {
+  return change.parked?.reason === "lease-lapsed";
+}
+
 export class Flow {
   readonly changes = new Map<string, FlowChange>();
   readonly batches = new Map<string, FlowBatch>();

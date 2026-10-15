@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/growth.test.ts -t "growth.lapsed"
+# kills: growth.lapsed
+# why: the header counts every change whose agent has gone as live
+diff --git a/apps/console/src/engine/canvas.ts b/apps/console/src/engine/canvas.ts
+index 464c3bac..a7b2a0f4 100644
+--- a/apps/console/src/engine/canvas.ts
++++ b/apps/console/src/engine/canvas.ts
+@@ -468,7 +468,7 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
+     counts,
+     answers: answersOf(world, now),
+     // A change waiting on its agent, whose lease lapsed, is drawn where it stands, and is not live.
+-    live: chips.filter((chip) => !waitsOnItsAgent(chip)).length,
++    live: chips.length,
+     dense: chips.length > DENSE_AT,
+     dotted: CHIP_STAGES.filter(
+       (stage) => chips.length > DENSE_AT || counts[stage] > COLUMN_DENSE_AT,

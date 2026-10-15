@@ -6,7 +6,13 @@
 // Where Keel says nothing (a step's own start and end) the canvas says so.
 
 import type { AgentClass } from "../domain/state.ts";
-import type { BatchEnd, FlowBatch, FlowChange, Stage } from "./flow.ts";
+import {
+  type BatchEnd,
+  type FlowBatch,
+  type FlowChange,
+  type Stage,
+  waitsOnItsAgent,
+} from "./flow.ts";
 import type { Cards } from "./holder.ts";
 import type { ChangeEntry, World } from "./world.ts";
 
@@ -115,6 +121,8 @@ export interface CanvasAgent {
   runs: { id: string; label: string; changes: number; hue: number }[];
   moreRuns: number;
   changes: number;
+  /** Of its changes, those live: not waiting on it after its lease lapsed. */
+  live: number;
 }
 
 export interface CanvasCommit {
@@ -364,10 +372,12 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
         runs: [],
         moreRuns: 0,
         changes: 0,
+        live: 0,
       };
       agentsById.set(chip.agentId, agent);
     }
     agent.changes += 1;
+    if (!waitsOnItsAgent(chip)) agent.live += 1;
     const run = world.changes.get(chip.id)?.run;
     if (run !== undefined) {
       const listed = agent.runs.find((each) => each.id === run.id);
@@ -461,7 +471,8 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
     edges,
     counts,
     answers: answersOf(world, now),
-    live: chips.length,
+    // A change waiting on its agent, whose lease lapsed, is drawn where it stands, and is not live.
+    live: chips.filter((chip) => !waitsOnItsAgent(chip)).length,
     dense: chips.length > DENSE_AT,
     dotted: CHIP_STAGES.filter(
       (stage) => chips.length > DENSE_AT || counts[stage] > COLUMN_DENSE_AT,
