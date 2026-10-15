@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.unavailable"
+# kills: change-diff.unavailable
+# why: a change with no diff to serve reads as one that does not exist
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 16528bb9..250b9315 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -762,7 +762,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 onFailure: (error) =>
+                   error._tag === "ChangeNotFound"
+                     ? changeNotFound(caller, error)
+-                    : changeDiffUnavailable(caller, error),
++                    : changeNotFound(caller, error),
+               }),
+             ),
+           );

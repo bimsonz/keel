@@ -3,8 +3,17 @@
 // trunk and lanes as their own objects hold them, read the same way.
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { Principal } from "@keeltown/core/domain/identity";
-import { AgentId, CommitSha, Instant, ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, type ProjectSettings, Trunks } from "@keeltown/core/ports";
+import type { Change } from "@keeltown/core/domain/coordination";
+import {
+  AgentId,
+  ChangeId,
+  CommitSha,
+  Instant,
+  LeaseId,
+  ProjectId,
+  WorkspaceId,
+} from "@keeltown/core/kernel";
+import { CodeHost, type ProjectSettings, type RepoRef, Trunks } from "@keeltown/core/ports";
 import {
   type FixtureFiles,
   makeAgentDirectoryMemory,
@@ -46,7 +55,7 @@ import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
-import { commitsOk } from "../../src/adapters/driving/http/repo.ts";
+import { commitsOk, diffFile, MAX_DIFF_EDITS } from "../../src/adapters/driving/http/repo.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 /** Sign-up is not what these cases are about: a key is never proved here. */
@@ -66,6 +75,7 @@ const clock = makeClockMemory().layer;
 const directory = makeAgentDirectoryMemory().layer;
 const inbox = makeInboxMemory();
 const codeHost = makeCodeHostMemory();
+const changes = makeChangesMemory();
 const projects = makeProjectsMemory();
 const trunks = makeTrunksMemory();
 const lanes = makeLanesMemory();
@@ -90,7 +100,7 @@ const runtime = ManagedRuntime.make(
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
     makeIdsMemory().layer,
-    makeChangesMemory().layer,
+    changes.layer,
     inbox.layer,
     inbox.notifier,
     makeEventFeedMemory().layer,
@@ -426,6 +436,260 @@ describe("the repo read API", () => {
     ]);
     expect(page.body.items[0]?.committer.at).toBe("2026-10-11T00:00:00.000Z");
     expect(page.body).not.toHaveProperty("nextCursor");
+  });
+});
+
+/** Commits `files` as the whole tree on `repo`'s `main`, creating the repo first. */
+async function commitIn(repo: RepoRef, files: FixtureFiles): Promise<CommitSha> {
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const host = yield* CodeHost;
+      yield* host.create(repo).pipe(Effect.catchTag("RepoAlreadyExists", () => Effect.void));
+      return yield* codeHost.fixture.commit(repo, MAIN, files);
+    }).pipe(Effect.provide(codeHost.layer)),
+  );
+}
+
+const changeId = Schema.decodeUnknownSync(ChangeId);
+const workspaceId = Schema.decodeUnknownSync(WorkspaceId);
+/** A change of `projectId` as its DO would hold it, with what a test gives it. */
+function seedChange(
+  id: string,
+  projectId: ProjectId,
+  fields: Partial<Change>,
+  workspace?: string,
+): ChangeId {
+  const at = Instant(Date.UTC(2026, 9, 15));
+  const chg = changeId(id);
+  changes.changes.set(chg, {
+    id: chg,
+    agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+    origin: "agent",
+    state: "queued",
+    intent: { revision: 1, goal: "a diff", footprint: [], premises: [] },
+    lease: {
+      id: Schema.decodeUnknownSync(LeaseId)("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+      agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+      renewedAt: at,
+      state: "active",
+    },
+    createdAt: at,
+    ...fields,
+  });
+  changes.projects.set(chg, projectId);
+  if (workspace !== undefined) changes.workspaces.set(chg, workspaceId(workspace));
+  return chg;
+}
+
+type Diff = {
+  files: {
+    path: string;
+    previousPath?: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    binary?: boolean;
+    tooLarge?: boolean;
+    hunks: {
+      header: string;
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+      lines: { kind: string; oldNumber?: number; newNumber?: number; text: string }[];
+    }[];
+  }[];
+};
+type Problem = { code: string; status: number };
+
+const BASE_FILES: FixtureFiles = {
+  "a.txt": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n",
+  "old/name.txt": "same\n",
+  "bin.dat": new Uint8Array([1, 0, 2]),
+  "gone.txt": "bye\n",
+  "empty-a": "",
+};
+const HEAD_FILES: FixtureFiles = {
+  "a.txt": "1\n2\n3\nfour\n5\n6\n7\n8\n9\n10\n11\n",
+  "new/name.txt": "same\n",
+  "bin.dat": new Uint8Array([1, 0, 3]),
+  "added.txt": "hi\n",
+  "empty-b": "",
+};
+
+describe("a change's diff", () => {
+  it("[change-diff.submitted] a change not landed is its workspace's base to its submitted commit, in path order: hunks numbered on each side, a same-content move a rename, a binary file flagged, two empty files no rename; a visitor reads a public project's", async () => {
+    const repo = { namespace: "memory", name: "wsp_01K0DAFF0000000000000000A0" };
+    const base = await commitIn(repo, BASE_FILES);
+    const head = await commitIn(repo, HEAD_FILES);
+    const id = seedChange(
+      "chg_01K0DAFF0000000000000000A0",
+      HISTORY,
+      { baseSha: base, commitSha: head },
+      repo.name,
+    );
+    const diff = await bodyOf<Diff>(handlers.diff(anonymous, { changeId: id }));
+    expect(
+      diff.files.map((f) => [f.path, f.status, f.previousPath, f.additions, f.deletions]),
+    ).toEqual([
+      ["a.txt", "modified", undefined, 2, 1],
+      ["added.txt", "added", undefined, 1, 0],
+      ["bin.dat", "modified", undefined, 0, 0],
+      ["empty-a", "deleted", undefined, 0, 0],
+      ["empty-b", "added", undefined, 0, 0],
+      ["gone.txt", "deleted", undefined, 0, 1],
+      ["new/name.txt", "renamed", "old/name.txt", 0, 0],
+    ]);
+    const [a, added, bin, , , gone, renamed] = diff.files;
+    expect(a?.hunks).toEqual([
+      {
+        header: "@@ -1,10 +1,11 @@",
+        oldStart: 1,
+        oldLines: 10,
+        newStart: 1,
+        newLines: 11,
+        lines: [
+          { kind: "context", oldNumber: 1, newNumber: 1, text: "1" },
+          { kind: "context", oldNumber: 2, newNumber: 2, text: "2" },
+          { kind: "context", oldNumber: 3, newNumber: 3, text: "3" },
+          { kind: "del", oldNumber: 4, text: "4" },
+          { kind: "add", newNumber: 4, text: "four" },
+          { kind: "context", oldNumber: 5, newNumber: 5, text: "5" },
+          { kind: "context", oldNumber: 6, newNumber: 6, text: "6" },
+          { kind: "context", oldNumber: 7, newNumber: 7, text: "7" },
+          { kind: "context", oldNumber: 8, newNumber: 8, text: "8" },
+          { kind: "context", oldNumber: 9, newNumber: 9, text: "9" },
+          { kind: "context", oldNumber: 10, newNumber: 10, text: "10" },
+          { kind: "add", newNumber: 11, text: "11" },
+        ],
+      },
+    ]);
+    expect(added?.hunks).toEqual([
+      {
+        header: "@@ -0,0 +1 @@",
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 1,
+        newLines: 1,
+        lines: [{ kind: "add", newNumber: 1, text: "hi" }],
+      },
+    ]);
+    expect(gone?.hunks).toEqual([
+      {
+        header: "@@ -1 +0,0 @@",
+        oldStart: 1,
+        oldLines: 1,
+        newStart: 0,
+        newLines: 0,
+        lines: [{ kind: "del", oldNumber: 1, text: "bye" }],
+      },
+    ]);
+    expect(bin).toMatchObject({ binary: true, hunks: [] });
+    expect(renamed?.hunks).toEqual([]);
+  });
+
+  it("[change-diff.landed] a landed change is its commit on trunk against the commit before it, read from trunk, never its workspace", async () => {
+    const before = await commit(HISTORY, { "l.txt": "a\nb\n", "keep.txt": "k\n" });
+    const landed = await commit(HISTORY, { "l.txt": "a\nB\n", "keep.txt": "k\n" });
+    const id = seedChange("chg_01K0DAFF0000000000000000B0", HISTORY, {
+      state: "landed",
+      baseSha: CommitSha.make("e".repeat(40)),
+      commitSha: CommitSha.make("f".repeat(40)),
+      landedCommit: CommitSha.make(landed),
+    });
+    expect(before).not.toBe(landed);
+    const diff = await bodyOf<Diff>(handlers.diff(anonymous, { changeId: id }));
+    expect(diff.files.map((f) => [f.path, f.status, f.additions, f.deletions])).toEqual([
+      ["l.txt", "modified", 1, 1],
+    ]);
+    expect(diff.files[0]?.hunks[0]?.header).toBe("@@ -1,2 +1,2 @@");
+  });
+
+  it("[change-diff.unavailable] a change with no submitted commit, or one whose workspace was let go, is a 404 that says so; a change Keel does not hold is change.not_found", async () => {
+    const unsubmitted = seedChange("chg_01K0DAFF0000000000000000C0", HISTORY, { state: "working" });
+    const released = seedChange("chg_01K0DAFF0000000000000000D0", HISTORY, {
+      state: "withdrawn",
+      baseSha: CommitSha.make("e".repeat(40)),
+      commitSha: CommitSha.make("f".repeat(40)),
+    });
+    const gone = seedChange(
+      "chg_01K0DAFF0000000000000000E0",
+      HISTORY,
+      {
+        state: "bounced",
+        baseSha: CommitSha.make("e".repeat(40)),
+        commitSha: CommitSha.make("f".repeat(40)),
+      },
+      "wsp_01K0DAFF0000000000000000E0",
+    );
+    for (const id of [unsubmitted, released, gone]) {
+      const answer: unknown = await handlers.diff(anonymous, { changeId: id });
+      expect(Reflect.get(Object(answer), "status")).toBe(404);
+      expect(await bodyOf<Problem>(answer)).toMatchObject({ code: "change.diff_unavailable" });
+    }
+    expect(
+      await bodyOf<Problem>(
+        handlers.diff(anonymous, { changeId: "chg_01K0DAFF0000000000000000Z0" }),
+      ),
+    ).toMatchObject({ code: "change.not_found" });
+  });
+
+  it("[change-diff.private] a private project's change diff is read as the change is: a stranger is told no such change, a member of its org reads it", async () => {
+    const repo = { namespace: "memory", name: "wsp_01K0DAFF0000000000000000F0" };
+    const base = await commitIn(repo, { "p.txt": "x\n" });
+    const head = await commitIn(repo, { "p.txt": "y\n" });
+    const id = seedChange(
+      "chg_01K0DAFF0000000000000000F0",
+      PRIVATE,
+      { baseSha: base, commitSha: head },
+      repo.name,
+    );
+    expect(await bodyOf<Problem>(handlers.diff(anonymous, { changeId: id }))).toMatchObject({
+      code: "change.not_found",
+    });
+    const diff = await bodyOf<Diff>(handlers.diff(member, { changeId: id }));
+    expect(diff.files.map((f) => [f.path, f.additions, f.deletions])).toEqual([["p.txt", 1, 1]]);
+  });
+});
+
+/** A modified file with its text on each side, as the use-case hands it to the mapper. */
+const file = (before: string, after: string) => ({
+  path: "f.txt",
+  change: "modified" as const,
+  binary: false,
+  truncated: false,
+  before: new TextEncoder().encode(before),
+  after: new TextEncoder().encode(after),
+});
+/** More distinct lines than the line diff's edit limit. */
+const many = (prefix: string) =>
+  Array.from({ length: MAX_DIFF_EDITS + 1 }, (_, i) => `${prefix}${i}`).join("\n");
+
+describe("a change diff's files", () => {
+  it("[change-diff.lines] no newline at the end is not a line, a CRLF line is its text, and a type change reads as modified", () => {
+    const eof = diffFile(file("x\ny", "x\nz"));
+    expect(eof.hunks[0]?.lines).toEqual([
+      { kind: "context", oldNumber: 1, newNumber: 1, text: "x" },
+      { kind: "del", oldNumber: 2, text: "y" },
+      { kind: "add", newNumber: 2, text: "z" },
+    ]);
+    expect(diffFile(file("a\r\nb\r\n", "a\r\nc\r\n")).hunks[0]?.lines.map((l) => l.text)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect(diffFile({ ...file("a\n", "a\n"), change: "type-changed" }).status).toBe("modified");
+  });
+
+  it("[change-diff.too-large] a file past the inline caps, or past the line diff's edit limit, carries no hunks and zero counts", () => {
+    expect(diffFile({ ...file("a\n", "b\n"), truncated: true })).toMatchObject({
+      tooLarge: true,
+      additions: 0,
+      deletions: 0,
+      hunks: [],
+    });
+    expect(diffFile(file(many("a"), many("b")))).toMatchObject({ tooLarge: true, hunks: [] });
+    expect(diffFile(file("a\n", "b\n")).tooLarge).toBeUndefined();
   });
 });
 

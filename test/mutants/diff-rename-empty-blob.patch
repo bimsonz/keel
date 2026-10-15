@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: two empty files are paired as a rename
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index eabcacd6..dd24fe28 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -300,7 +300,7 @@ const EMPTY_BLOB = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+ 
+ /** A side that may pair into a rename: a file with content, never a submodule. */
+ const pairable = (oid: string | undefined, mode: string | undefined) =>
+-  oid !== undefined && oid !== EMPTY_BLOB && mode !== MODE_GITLINK;
++  oid !== undefined && mode !== MODE_GITLINK;
+ 
+ /**
+  * Each file deleted at one path and added at another with the same content, as

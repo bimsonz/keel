@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.lines"
+# kills: change-diff.lines
+# why: jsdiff's no-newline marker is served as a context line
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..d38b730c 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -242,7 +242,7 @@ function numbered(oldStart: number, newStart: number, lines: readonly string[]):
+     const body = line.slice(1).replace(/\r$/, "");
+     if (line.startsWith("+")) out.push({ kind: "add", newNumber: newNumber++, text: body });
+     else if (line.startsWith("-")) out.push({ kind: "del", oldNumber: oldNumber++, text: body });
+-    else if (line.startsWith(" "))
++    else
+       out.push({ kind: "context", oldNumber: oldNumber++, newNumber: newNumber++, text: body });
+   }
+   return out;

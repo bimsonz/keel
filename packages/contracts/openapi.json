@@ -3198,6 +3198,133 @@
         ]
       }
     },
+    "/changes/{changeId}/diff": {
+      "get": {
+        "operationId": "diff",
+        "summary": "Read a change's diff",
+        "description": "What the change alters, file by file with its hunks: a change not yet landed from its base to the\ncommit it submitted, read from its workspace; a landed change as its commit on trunk against the\ncommit before it. Read as the change is: an observer any, an agent its own project's, anyone a\npublic project's, and any other is 404 `change.not_found`. A change that has submitted no commit,\nor ended without landing once its workspace was let go, is 404 `change.diff_unavailable`.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Changes",
+          "mcp"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/changes/{changeId}/nearby": {
       "get": {
         "operationId": "nearby",
@@ -12303,6 +12430,157 @@
           "not": {}
         },
         "description": "The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, the promotion that declined its batch because the push was refused, or the decision of a ruling that went against it."
+      },
+      "ChangeDiff": {
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeDiffFile"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The files a change alters, in path order, as a code host's \"Files changed\" shows them."
+      },
+      "ChangeDiffFile": {
+        "type": "object",
+        "required": [
+          "path",
+          "status",
+          "additions",
+          "deletions",
+          "hunks"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "previousPath": {
+            "type": "string",
+            "description": "The path it had before: on a `renamed` file only."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "renamed"
+            ]
+          },
+          "additions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines added and deleted across its hunks."
+          },
+          "deletions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "binary": {
+            "type": "boolean",
+            "description": "Either side holds a NUL byte in its first 8,000 bytes."
+          },
+          "tooLarge": {
+            "type": "boolean",
+            "description": "Past what Keel serves inline."
+          },
+          "hunks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeDiffHunk"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One file the change alters. A file deleted at one path and added with the same content at\nanother is `renamed`, with `previousPath`. A binary file, or one past what Keel serves inline (a\nside over 1 MiB, a file past the first 300, the diff past 8 MiB, or more edits than a line diff\ntakes), carries its counts as zero and no hunks."
+      },
+      "ChangeDiffHunk": {
+        "type": "object",
+        "required": [
+          "header",
+          "oldStart",
+          "oldLines",
+          "newStart",
+          "newLines",
+          "lines"
+        ],
+        "properties": {
+          "header": {
+            "type": "string",
+            "description": "`@@ -oldStart,oldLines +newStart,newLines @@`."
+          },
+          "oldStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oldLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newLines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeDiffLine"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A run of changed lines with up to three lines of context on each side, as `git diff` prints it."
+      },
+      "ChangeDiffLine": {
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "context",
+              "add",
+              "del"
+            ]
+          },
+          "oldNumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its line number before the change; absent on an addition."
+          },
+          "newNumber": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its line number after the change; absent on a deletion."
+          },
+          "text": {
+            "type": "string",
+            "description": "The line's text, without its line ending."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One line of a hunk: unchanged context, an addition or a deletion, with its number on each side it is on."
       },
       "ChangeDrifted": {
         "type": "object",
@@ -21426,6 +21704,7 @@
           "service.not_implemented",
           "internal.defect",
           "change.not_found",
+          "change.diff_unavailable",
           "conflict.not_found",
           "conflict.move_refused",
           "escalation.not_found",

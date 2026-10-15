@@ -415,6 +415,9 @@ export function makeChangesMemory(
   };
   return {
     changes,
+    /** Each change's project and workspace: what a test seeds to read a change it never declared. */
+    projects,
+    workspaces,
     committedEdits,
     commits,
     push,

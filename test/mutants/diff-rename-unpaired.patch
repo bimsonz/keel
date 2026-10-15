@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: a same-content delete and add is never paired into a rename
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index eabcacd6..6c66f6a9 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -317,7 +317,7 @@ const withRenames = (files: readonly RepoFileView[]): ChangeFileView[] => {
+   for (const f of files) {
+     if (f.change !== "added" || !pairable(f.newOid, f.newMode)) continue;
+     const from = deleted.get(f.newOid ?? "")?.find((d) => !paired.has(d));
+-    if (from === undefined) continue;
++    if (from === undefined || from !== undefined) continue;
+     paired.add(from);
+     paired.add(f);
+     out.push({

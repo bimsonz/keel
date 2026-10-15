@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.landed"
+# kills: change-diff.landed
+# why: a landed change is read from its workspace, not as its commit on trunk
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index eabcacd6..4d4d7e53 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -352,7 +352,7 @@ export const readChangeDiff = (
+   Effect.gen(function* () {
+     const changes = yield* Changes;
+     const { change, projectId } = yield* changes.get(changeId);
+-    if (change.landedCommit !== undefined) {
++    if (change.landedCommit === undefined && change.commitSha === undefined) {
+       const landed = yield* readRepoCommit(projectId, change.landedCommit).pipe(
+         Effect.catchTags({ ProjectNotFound: Effect.die, RefNotFound: Effect.die }),
+       );

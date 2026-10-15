@@ -862,6 +862,11 @@ export class KeelClient {
     return this.call("change", { changeId }, options);
   }
 
+  /** What the change alters, file by file with its hunks. */
+  diff(changeId: string, options?: CallOptions): Promise<WireOutputs["diff"]> {
+    return this.call("diff", { changeId }, options);
+  }
+
   trunk(projectId: string, options?: CallOptions): Promise<WireOutputs["Views_getTrunk"]> {
     return this.call("Views_getTrunk", { projectId }, options);
   }

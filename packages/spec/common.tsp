@@ -194,6 +194,7 @@ union ProblemCode {
   serviceNotImplemented: "service.not_implemented",
   internalDefect: "internal.defect",
   changeNotFound: "change.not_found",
+  changeDiffUnavailable: "change.diff_unavailable",
   conflictNotFound: "conflict.not_found",
   conflictMoveRefused: "conflict.move_refused",
   escalationNotFound: "escalation.not_found",

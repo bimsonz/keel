@@ -359,6 +359,7 @@ export const RESOLVERS: Resolvers = {
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),
+  diff: (input) => changeProject(input.changeId),
   status: (input) => changeProject(input.changeId),
   nearby: (input) => changeProject(input.changeId),
   abandon: (input) => changeProject(input.changeId),
@@ -415,7 +416,13 @@ const actions = (next: AuthenticationRequired["nextActions"]) =>
   }));
 
 /** The operations keyed by a change: what the caller cannot see reads as that change not found. */
-const CHANGE_KEYED: ReadonlySet<string> = new Set(["change", "status", "nearby", "abandon"]);
+const CHANGE_KEYED: ReadonlySet<string> = new Set([
+  "change",
+  "diff",
+  "status",
+  "nearby",
+  "abandon",
+]);
 
 /** A refusal as the operation answers it. NotVisible reads exactly as the operation's own not-found. */
 export function refusalResult(

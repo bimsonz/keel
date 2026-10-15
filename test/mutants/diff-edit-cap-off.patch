@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.too-large"
+# kills: change-diff.too-large
+# why: a line diff of any number of edits is served
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..256fa6cb 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -255,7 +255,6 @@ function hunksOf(before: string, after: string): DiffHunk[] | undefined {
+   if (lineCount(before) + lineCount(after) > MAX_DIFF_LINES) return undefined;
+   const patch = structuredPatch("a", "b", before, after, "", "", {
+     context: 3,
+-    maxEditLength: MAX_DIFF_EDITS,
+   });
+   return patch?.hunks.map((h) => ({
+     header: `@@ -${gitRange(h.oldStart, h.oldLines)} +${gitRange(h.newStart, h.newLines)} @@`,

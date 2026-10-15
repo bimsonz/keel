@@ -1,7 +1,9 @@
 import { Effect, Option, Schema } from "effect";
+import type { ChangeNotFound } from "../../domain/coordination/index.ts";
 import { ProjectNotFound } from "../../domain/integration/index.ts";
-import { CommitSha, type ProjectId } from "../../domain/kernel/index.ts";
+import { ChangeId, CommitSha, type ProjectId } from "../../domain/kernel/index.ts";
 import {
+  Changes,
   CodeHost,
   type CommitInfo,
   PathNotFound,
@@ -16,7 +18,9 @@ import { projectRepos } from "./project-repos.ts";
  * A project's code, read-only, as a code host shows it. The doorway has already
  * authorised the read on the project. Every read is of the project's trunk:
  * never its staging repo, its mirror or a workspace, so no read reaches a
- * token, a candidate or another project's code.
+ * token, a candidate or another project's code. The one exception is a change
+ * not yet landed, whose diff reads its own base and submitted commit, by their
+ * ids, from its own workspace.
  */
 
 /** The largest file served inline; a larger one answers its size and no content. */
@@ -268,3 +272,105 @@ export const compareRepoCommits = (
     const files = yield* withSides(repo, listed);
     return { base, head, files, truncated: changes.length > listed.length };
   }).pipe(Effect.catchTag("RepoNotFound", projectMissing(projectId)));
+
+/**
+ * A change whose diff Keel cannot serve: it has submitted no commit, or it
+ * ended without landing and its workspace no longer holds its commits.
+ */
+export class ChangeDiffUnavailable extends Schema.TaggedError<ChangeDiffUnavailable>()(
+  "ChangeDiffUnavailable",
+  {
+    changeId: ChangeId,
+    reason: Schema.Literals(["unsubmitted", "released"]),
+  },
+) {}
+
+/** A changed file of a change's diff: a rename names the path it had before. */
+export interface ChangeFileView extends RepoFileView {
+  readonly renamedFrom?: string;
+}
+
+export interface ChangeDiffView {
+  /** In path order. */
+  readonly files: readonly ChangeFileView[];
+}
+
+/** git's id of the empty blob: every empty file has it, so two of them are no rename. */
+const EMPTY_BLOB = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+
+/** A side that may pair into a rename: a file with content, never a submodule. */
+const pairable = (oid: string | undefined, mode: string | undefined) =>
+  oid !== undefined && oid !== EMPTY_BLOB && mode !== MODE_GITLINK;
+
+/**
+ * Each file deleted at one path and added at another with the same content, as
+ * one rename at the new path: paired one to one in path order. A submodule or
+ * an empty file is never paired.
+ */
+const withRenames = (files: readonly RepoFileView[]): ChangeFileView[] => {
+  const deleted = new Map<string, RepoFileView[]>();
+  for (const f of files)
+    if (f.change === "deleted" && pairable(f.oldOid, f.oldMode))
+      deleted.set(f.oldOid ?? "", [...(deleted.get(f.oldOid ?? "") ?? []), f]);
+  const paired = new Set<RepoFileView>();
+  const out: ChangeFileView[] = [];
+  for (const f of files) {
+    if (f.change !== "added" || !pairable(f.newOid, f.newMode)) continue;
+    const from = deleted.get(f.newOid ?? "")?.find((d) => !paired.has(d));
+    if (from === undefined) continue;
+    paired.add(from);
+    paired.add(f);
+    out.push({
+      path: f.path,
+      change: "modified",
+      renamedFrom: from.path,
+      ...(from.oldOid === undefined ? {} : { oldOid: from.oldOid }),
+      ...(from.oldMode === undefined ? {} : { oldMode: from.oldMode }),
+      ...(f.newOid === undefined ? {} : { newOid: f.newOid }),
+      ...(f.newMode === undefined ? {} : { newMode: f.newMode }),
+      binary: from.binary || f.binary,
+      truncated: from.truncated || f.truncated,
+      ...(from.before === undefined ? {} : { before: from.before }),
+      ...(f.after === undefined ? {} : { after: f.after }),
+    });
+  }
+  return [...out, ...files.filter((f) => !paired.has(f))].toSorted((a, b) =>
+    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+  );
+};
+
+/**
+ * What a change alters, each file with its text on each side within the diff's
+ * caps. A landed change is its commit on trunk against the commit before it. A
+ * change not landed is its submitted commit against its base, both read by id
+ * from its workspace; one that has submitted nothing, or whose workspace no
+ * longer holds them, is ChangeDiffUnavailable.
+ */
+export const readChangeDiff = (
+  changeId: ChangeId,
+): Effect.Effect<ChangeDiffView, ChangeNotFound | ChangeDiffUnavailable, Changes | CodeHost> =>
+  Effect.gen(function* () {
+    const changes = yield* Changes;
+    const { change, projectId } = yield* changes.get(changeId);
+    if (change.landedCommit !== undefined) {
+      const landed = yield* readRepoCommit(projectId, change.landedCommit).pipe(
+        Effect.catchTags({ ProjectNotFound: Effect.die, RefNotFound: Effect.die }),
+      );
+      return { files: withRenames(landed.files) };
+    }
+    const released = () => Effect.fail(new ChangeDiffUnavailable({ changeId, reason: "released" }));
+    const head = change.commitSha;
+    if (head === undefined)
+      return yield* Effect.fail(new ChangeDiffUnavailable({ changeId, reason: "unsubmitted" }));
+    const workspace = yield* changes
+      .workspace(changeId)
+      .pipe(Effect.catchTag("ChangeStateRefused", released));
+    const host = yield* CodeHost;
+    const files = yield* host
+      .diffTrees(workspace.repo, change.baseSha ?? workspace.baseSha, head)
+      .pipe(
+        Effect.flatMap((listed) => withSides(workspace.repo, listed)),
+        Effect.catchTags({ RepoNotFound: released, ObjectNotFound: released }),
+      );
+    return { files: withRenames(files) };
+  });

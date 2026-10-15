@@ -61,6 +61,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   declare: (c) => c.declare({ goal: "g", footprint: [], premises: [] }),
   Changes_listChanges: (c) => c.changes({ state: "working", limit: 5 }),
   change: (c) => c.change("chg_1"),
+  diff: (c) => c.diff("chg_1"),
   revise: (c) => c.revise("chg_1", { goal: "g2" }, { ...LEASE, ifMatch: 3 }),
   rely: (c) => c.rely("chg_1", { premise: PROPOSITION }, LEASE),
   nearby: (c) => c.nearby("chg_1"),

@@ -230,6 +230,7 @@ export const ROUTES = {
     method: "POST",
     path: "/projects/{projectId}/deploy-targets/{name}/cloudflare-connect",
   },
+  diff: { method: "GET", path: "/changes/{changeId}/diff" },
 } as const satisfies Record<Exclude<DocumentedOperation, UnroutedOperation>, Route>;
 
 export type RoutedOperation = keyof typeof ROUTES;

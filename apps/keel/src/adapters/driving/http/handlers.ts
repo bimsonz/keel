@@ -41,6 +41,7 @@ import {
   listRepoCommits,
   projectSource,
   readRepoBlob,
+  readChangeDiff,
   readRepoCommit,
   compareRepoCommits,
   readLanes,
@@ -145,6 +146,8 @@ import {
 import { piggyback } from "./piggyback.ts";
 import {
   blobOk,
+  changeDiffOk,
+  changeDiffUnavailable,
   commitOk,
   compareOk,
   commitParam,
@@ -204,6 +207,7 @@ import {
   nearbyOk,
   changeIdInput,
   changeOk,
+  changeNotFound,
   changeReadError,
   declareError,
   declareInput,
@@ -743,6 +747,22 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               Effect.match({
                 onSuccess: ({ change }) => changeOk(change),
                 onFailure: (error) => changeReadError(caller, error),
+              }),
+            ),
+          );
+        },
+        diff: (caller: Caller, input: Input<"diff">) => {
+          const decoded = changeIdInput(input.changeId);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            readChangeDiff(decoded.success).pipe(
+              Effect.match({
+                onSuccess: changeDiffOk,
+                onFailure: (error) =>
+                  error._tag === "ChangeNotFound"
+                    ? changeNotFound(caller, error)
+                    : changeDiffUnavailable(caller, error),
               }),
             ),
           );

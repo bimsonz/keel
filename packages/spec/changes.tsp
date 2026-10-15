@@ -192,6 +192,65 @@ model ChangeSummary {
 
 model ChangeSummaryPage is Page<ChangeSummary>;
 
+/** One line of a hunk: unchanged context, an addition or a deletion, with its number on each side it is on. */
+model ChangeDiffLine {
+  kind: "context" | "add" | "del";
+
+  /** Its line number before the change; absent on an addition. */
+  oldNumber?: int32;
+
+  /** Its line number after the change; absent on a deletion. */
+  newNumber?: int32;
+
+  /** The line's text, without its line ending. */
+  text: string;
+}
+
+/** A run of changed lines with up to three lines of context on each side, as `git diff` prints it. */
+model ChangeDiffHunk {
+  /** `@@ -oldStart,oldLines +newStart,newLines @@`. */
+  header: string;
+
+  oldStart: int32;
+  oldLines: int32;
+  newStart: int32;
+  newLines: int32;
+  lines: ChangeDiffLine[];
+}
+
+/**
+ * One file the change alters. A file deleted at one path and added with the same content at
+ * another is `renamed`, with `previousPath`. A binary file, or one past what Keel serves inline (a
+ * side over 1 MiB, a file past the first 300, the diff past 8 MiB, or more edits than a line diff
+ * takes), carries its counts as zero and no hunks.
+ */
+model ChangeDiffFile {
+  path: string;
+
+  /** The path it had before: on a `renamed` file only. */
+  previousPath?: string;
+
+  status: "added" | "modified" | "deleted" | "renamed";
+
+  /** Lines added and deleted across its hunks. */
+  additions: int32;
+
+  deletions: int32;
+
+  /** Either side holds a NUL byte in its first 8,000 bytes. */
+  binary?: boolean;
+
+  /** Past what Keel serves inline. */
+  tooLarge?: boolean;
+
+  hunks: ChangeDiffHunk[];
+}
+
+/** The files a change alters, in path order, as a code host's "Files changed" shows them. */
+model ChangeDiff {
+  files: ChangeDiffFile[];
+}
+
 @tag("Changes")
 @route("/changes")
 interface Changes {
@@ -251,6 +310,21 @@ interface Changes {
   @route("/{changeId}")
   @get
   getChange(...ChangePath): Change | NotFound | StandardErrors;
+
+  /**
+   * What the change alters, file by file with its hunks: a change not yet landed from its base to the
+   * commit it submitted, read from its workspace; a landed change as its commit on trunk against the
+   * commit before it. Read as the change is: an observer any, an agent its own project's, anyone a
+   * public project's, and any other is 404 `change.not_found`. A change that has submitted no commit,
+   * or ended without landing once its workspace was let go, is 404 `change.diff_unavailable`.
+   */
+  @summary("Read a change's diff")
+  @tag("mcp")
+  @operationId("diff")
+  @useAuth(NoAuth | AgentRead | SessionAuth)
+  @route("/{changeId}/diff")
+  @get
+  diff(...ChangePath): ChangeDiff | NotFound | StandardErrors;
 
   /** Revise the intent. Send the current revision's ETag as If-Match. */
   @summary("Revise a change's intent")

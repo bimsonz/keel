@@ -1,5 +1,8 @@
 import { changeIdOf, type ProjectNotFound } from "@keeltown/core/domain/integration";
 import type {
+  ChangeDiffUnavailable,
+  ChangeDiffView,
+  ChangeFileView,
   RepoBlobView,
   RepoCommitDiffView,
   RepoCompareView,
@@ -15,8 +18,10 @@ import type {
   RefNotFound,
   TreeEntry,
 } from "@keeltown/core/ports";
+import { structuredPatch } from "diff";
 import { Option, Result, Schema } from "effect";
 import type {
+  DiffResult,
   Repo_getBlobResult,
   Repo_compareResult,
   Repo_getCommitResult,
@@ -208,6 +213,108 @@ export function repoError(caller: Caller, error: ProjectNotFound | RefNotFound |
           title: "List the directory",
           operationId: "Repo_getTree",
           args: { ref: error.commit },
+        },
+      ],
+    }),
+  };
+}
+
+type DiffFile = Extract<DiffResult, { readonly status: 200 }>["body"]["files"][number];
+type DiffHunk = DiffFile["hunks"][number];
+type DiffLine = DiffHunk["lines"][number];
+
+/** A line diff past this many edits is not served: it would cost the request more than it shows. */
+export const MAX_DIFF_EDITS = 2000;
+/** A file whose two sides hold more lines than this together is not line-diffed. */
+export const MAX_DIFF_LINES = 40_000;
+
+/** git's range: `start,count`, the count left out when it is one, the start before the hunk when it is zero. */
+const gitStart = (start: number, count: number) => (count === 0 ? start - 1 : start);
+const gitRange = (start: number, count: number) =>
+  count === 1 ? `${start}` : `${gitStart(start, count)},${count}`;
+
+/** A hunk's lines numbered on each side; jsdiff's "no newline at end of file" marker is not a line. */
+function numbered(oldStart: number, newStart: number, lines: readonly string[]): DiffLine[] {
+  let oldNumber = oldStart;
+  let newNumber = newStart;
+  const out: DiffLine[] = [];
+  for (const line of lines) {
+    const body = line.slice(1).replace(/\r$/, "");
+    if (line.startsWith("+")) out.push({ kind: "add", newNumber: newNumber++, text: body });
+    else if (line.startsWith("-")) out.push({ kind: "del", oldNumber: oldNumber++, text: body });
+    else if (line.startsWith(" "))
+      out.push({ kind: "context", oldNumber: oldNumber++, newNumber: newNumber++, text: body });
+  }
+  return out;
+}
+
+const lineCount = (t: string) => (t === "" ? 0 : t.split("\n").length);
+
+/** One file's hunks with three lines of context, or undefined past the line or edit cap. */
+function hunksOf(before: string, after: string): DiffHunk[] | undefined {
+  if (lineCount(before) + lineCount(after) > MAX_DIFF_LINES) return undefined;
+  const patch = structuredPatch("a", "b", before, after, "", "", {
+    context: 3,
+    maxEditLength: MAX_DIFF_EDITS,
+  });
+  return patch?.hunks.map((h) => ({
+    header: `@@ -${gitRange(h.oldStart, h.oldLines)} +${gitRange(h.newStart, h.newLines)} @@`,
+    oldStart: gitStart(h.oldStart, h.oldLines),
+    oldLines: h.oldLines,
+    newStart: gitStart(h.newStart, h.newLines),
+    newLines: h.newLines,
+    lines: numbered(h.oldStart, h.newStart, h.lines),
+  }));
+}
+
+const statusOf = (file: ChangeFileView): DiffFile["status"] =>
+  file.renamedFrom !== undefined
+    ? "renamed"
+    : file.change === "type-changed"
+      ? "modified"
+      : file.change;
+
+/** A changed file as the spec's ChangeDiffFile: binary and over-cap files carry no hunks and zero counts. */
+export function diffFile(file: ChangeFileView): DiffFile {
+  const head = {
+    path: file.path,
+    ...(file.renamedFrom === undefined ? {} : { previousPath: file.renamedFrom }),
+    status: statusOf(file),
+  };
+  const none = { additions: 0, deletions: 0, hunks: [] };
+  if (file.binary) return { ...head, ...none, binary: true };
+  const hunks = file.truncated
+    ? undefined
+    : hunksOf(text(file.before) ?? "", text(file.after) ?? "");
+  if (hunks === undefined) return { ...head, ...none, tooLarge: true };
+  const all = hunks.flatMap((h) => h.lines);
+  return {
+    ...head,
+    additions: all.filter((l) => l.kind === "add").length,
+    deletions: all.filter((l) => l.kind === "del").length,
+    hunks,
+  };
+}
+
+export function changeDiffOk(view: ChangeDiffView): Extract<DiffResult, { readonly status: 200 }> {
+  return { status: 200, body: { files: view.files.map(diffFile) } };
+}
+
+/** A change with no diff to serve: it submitted nothing yet, or it ended unlanded and its workspace was let go. */
+export function changeDiffUnavailable(caller: Caller, error: ChangeDiffUnavailable) {
+  return {
+    status: 404 as const,
+    body: problem(404, "change.diff_unavailable", caller.requestId, {
+      detail:
+        error.reason === "unsubmitted"
+          ? `${error.changeId} has submitted no commit yet, so it has no diff.`
+          : `${error.changeId} ended without landing, and its workspace no longer holds its commits.`,
+      nextActions: [
+        {
+          kind: "read",
+          title: "Read the change",
+          operationId: "change",
+          args: { changeId: error.changeId },
         },
       ],
     }),

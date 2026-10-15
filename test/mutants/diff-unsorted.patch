@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: the files are not in path order: renames come first
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index eabcacd6..ee72b575 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -334,9 +334,7 @@ const withRenames = (files: readonly RepoFileView[]): ChangeFileView[] => {
+       ...(f.after === undefined ? {} : { after: f.after }),
+     });
+   }
+-  return [...out, ...files.filter((f) => !paired.has(f))].toSorted((a, b) =>
+-    a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+-  );
++  return [...out, ...files.filter((f) => !paired.has(f))];
+ };
+ 
+ /**

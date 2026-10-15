@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: an empty side starts at 1, not git's 0 (`@@ -1,0 +1 @@` for an added file)
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..9d52e485 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -229,7 +229,7 @@ export const MAX_DIFF_EDITS = 2000;
+ export const MAX_DIFF_LINES = 40_000;
+ 
+ /** git's range: `start,count`, the count left out when it is one, the start before the hunk when it is zero. */
+-const gitStart = (start: number, count: number) => (count === 0 ? start - 1 : start);
++const gitStart = (start: number, _count: number) => start;
+ const gitRange = (start: number, count: number) =>
+   count === 1 ? `${start}` : `${gitStart(start, count)},${count}`;
+ 

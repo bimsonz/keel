@@ -44,6 +44,7 @@ const TITLES: Record<ProblemCode, string> = {
     "Trunk holds commits its upstream lacks, so it cannot move forward to upstream's head",
   "trunk.busy": "Trunk is promoting, frozen or already syncing",
   "change.not_found": "No such change",
+  "change.diff_unavailable": "Keel holds no diff of this change",
   "conflict.not_found": "No such conflict",
   "conflict.move_refused": "Keel cannot make that move on the conflict",
   "escalation.not_found": "No such escalation",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.too-large"
+# kills: change-diff.too-large
+# why: a file past the inline caps is line-diffed anyway
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..b158320c 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -283,7 +283,7 @@ export function diffFile(file: ChangeFileView): DiffFile {
+   };
+   const none = { additions: 0, deletions: 0, hunks: [] };
+   if (file.binary) return { ...head, ...none, binary: true };
+-  const hunks = file.truncated
++  const hunks = false
+     ? undefined
+     : hunksOf(text(file.before) ?? "", text(file.after) ?? "");
+   if (hunks === undefined) return { ...head, ...none, tooLarge: true };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted|change-diff.private"
+# kills: change-diff.submitted,change-diff.private
+# why: the diff is decided on no project, so nobody reads it, a public project's included
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index fea78d6f..4f54fd4a 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -359,7 +359,7 @@ export const RESOLVERS: Resolvers = {
+ 
+   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
+   change: (input) => changeProject(input.changeId),
+-  diff: (input) => changeProject(input.changeId),
++  diff: () => Effect.succeed(MISSING),
+   status: (input) => changeProject(input.changeId),
+   nearby: (input) => changeProject(input.changeId),
+   abandon: (input) => changeProject(input.changeId),

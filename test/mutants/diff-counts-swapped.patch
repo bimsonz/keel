@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: additions count the deleted lines
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..6bbcccea 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -290,7 +290,7 @@ export function diffFile(file: ChangeFileView): DiffFile {
+   const all = hunks.flatMap((h) => h.lines);
+   return {
+     ...head,
+-    additions: all.filter((l) => l.kind === "add").length,
++    additions: all.filter((l) => l.kind === "del").length,
+     deletions: all.filter((l) => l.kind === "del").length,
+     hunks,
+   };

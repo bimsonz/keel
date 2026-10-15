@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted|change-diff.lines"
+# kills: change-diff.submitted,change-diff.lines
+# why: a context line does not move the old side's numbering
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..180be212 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -243,7 +243,7 @@ function numbered(oldStart: number, newStart: number, lines: readonly string[]):
+     if (line.startsWith("+")) out.push({ kind: "add", newNumber: newNumber++, text: body });
+     else if (line.startsWith("-")) out.push({ kind: "del", oldNumber: oldNumber++, text: body });
+     else if (line.startsWith(" "))
+-      out.push({ kind: "context", oldNumber: oldNumber++, newNumber: newNumber++, text: body });
++      out.push({ kind: "context", oldNumber, newNumber: newNumber++, text: body });
+   }
+   return out;
+ }

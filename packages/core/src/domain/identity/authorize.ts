@@ -127,6 +127,7 @@ export const SPEC_ACTIONS = {
 
   Changes_listChanges: rule("Project", "read"),
   change: rule("Project", "read"),
+  diff: rule("Project", "read"),
   status: rule("Project", "read"),
   nearby: rule("Project", "read"),
   why: rule("Project", "read"),

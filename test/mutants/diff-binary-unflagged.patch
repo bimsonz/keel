@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "change-diff.submitted"
+# kills: change-diff.submitted
+# why: a binary file is not flagged binary
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 50d8de6c..c4cb3cd0 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -282,7 +282,6 @@ export function diffFile(file: ChangeFileView): DiffFile {
+     status: statusOf(file),
+   };
+   const none = { additions: 0, deletions: 0, hunks: [] };
+-  if (file.binary) return { ...head, ...none, binary: true };
+   const hunks = file.truncated
+     ? undefined
+     : hunksOf(text(file.before) ?? "", text(file.after) ?? "");
