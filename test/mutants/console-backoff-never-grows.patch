@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/backoff.test.ts -t "backoff.rule|player.follow-backoff"
+# kills: backoff.rule, player.follow-backoff
+# why: every reader asks a struggling Keel again each second however long it stays away
+diff --git a/apps/console/src/source/backoff.ts b/apps/console/src/source/backoff.ts
+index 22ae10a4..be9a8923 100644
+--- a/apps/console/src/source/backoff.ts
++++ b/apps/console/src/source/backoff.ts
+@@ -35,7 +35,7 @@ export function backoffMs(
+   failures: number,
+   random: () => number = Math.random,
+ ): number {
+-  const step = Math.min(LONGEST_WAIT_MS, FIRST_WAIT_MS * 2 ** Math.max(0, failures - 1));
++  const step = FIRST_WAIT_MS;
+   const jittered = step / 2 + (random() * step) / 2;
+   const asked =
+     error instanceof KeelRefused && error.retryAfterMs !== undefined

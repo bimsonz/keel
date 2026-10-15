@@ -2,14 +2,14 @@
 # kills: waiting.refused
 # why: a feed Keel refuses is asked for again and again, where the refusal is Keel's answer
 diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
-index 4c11fac..e2906c5 100644
+index 01bdb2ef..219485d4 100644
 --- a/apps/console/src/engine/waiting.ts
 +++ b/apps/console/src/engine/waiting.ts
-@@ -80,7 +80,6 @@ export async function followTurns(
-       if (page.items.some((type) => TURNS.has(type))) again();
-       if (movedOn) continue;
+@@ -87,7 +87,6 @@ export async function followTurns(
      } catch (error) {
--      if (error instanceof KeelRefused) return;
-       // The read dropped on the way. It is asked again from the same place, after a pause that grows.
-       dropped = true;
+       // Keel's refusal is its answer, and asking again would not change it; Keel away for a moment, or a read
+       // that dropped on the way, is asked again from the same place, later each time (backoff.ts).
+-      if (!retryable(error)) return;
+       failures += 1;
+       failed = error;
      }

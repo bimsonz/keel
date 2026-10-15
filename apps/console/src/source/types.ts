@@ -302,11 +302,20 @@ export class KeelRefused extends Error {
   readonly code: string;
   readonly status: number;
   readonly next: readonly string[];
-  constructor(said: string, code: string, status: number, next: readonly string[] = []) {
+  /** How long Keel asked to be left before the same request, where it said: its Retry-After. */
+  readonly retryAfterMs: number | undefined;
+  constructor(
+    said: string,
+    code: string,
+    status: number,
+    next: readonly string[] = [],
+    retryAfterMs?: number,
+  ) {
     super(said);
     this.name = "KeelRefused";
     this.code = code;
     this.status = status;
     this.next = next;
+    this.retryAfterMs = retryAfterMs;
   }
 }

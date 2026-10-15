@@ -2,10 +2,10 @@
 # kills: waiting.follow
 # why: the list of questions is read again at every entry of the reader's feed, a change's as much as a question's
 diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
-index 4c11fac..35685a4 100644
+index 01bdb2ef..d4484f5f 100644
 --- a/apps/console/src/engine/waiting.ts
 +++ b/apps/console/src/engine/waiting.ts
-@@ -77,7 +77,7 @@ export async function followTurns(
+@@ -82,7 +82,7 @@ export async function followTurns(
          again();
          continue;
        }
@@ -13,4 +13,4 @@ index 4c11fac..35685a4 100644
 +      if (page.items.length > 0) again();
        if (movedOn) continue;
      } catch (error) {
-       if (error instanceof KeelRefused) return;
+       // Keel's refusal is its answer, and asking again would not change it; Keel away for a moment, or a read

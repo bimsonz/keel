@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/backoff.test.ts -t "backoff.rule"
+# kills: backoff.rule
+# why: the console asks again before the Retry-After Keel gave, in the very moment Keel said it is away
+diff --git a/apps/console/src/source/backoff.ts b/apps/console/src/source/backoff.ts
+index 22ae10a4..6e54292f 100644
+--- a/apps/console/src/source/backoff.ts
++++ b/apps/console/src/source/backoff.ts
+@@ -41,7 +41,7 @@ export function backoffMs(
+     error instanceof KeelRefused && error.retryAfterMs !== undefined
+       ? Math.min(error.retryAfterMs, LONGEST_ASKED_MS)
+       : 0;
+-  return Math.max(asked, jittered);
++  return jittered;
+ }
+ 
+ /** Waits `ms`, or less where `signal` aborts first. */

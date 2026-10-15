@@ -23,12 +23,17 @@ import type {
   KeelEventSource,
   KeelResources,
   ChangeDiff,
+  Page,
 } from "../source/types.ts";
+import { backoffMs, pause, retryable } from "../source/backoff.ts";
 import type { KeelRepository } from "../source/repository.ts";
 import { Projects, type Visibility, projectOf } from "./projects.ts";
 import { RepositoryReader } from "./repository.ts";
 import { provisionalWorld } from "./seed.ts";
 import { World } from "./world.ts";
+
+/** How many times a page of the log is asked for, at most, while Keel is away: about two minutes, backed off. */
+const DRAIN_TRIES = 8;
 
 export type ConsoleSource = KeelEventSource &
   KeelResources &
@@ -280,8 +285,10 @@ export class Player {
    * shows everything that has arrived; paused or scrubbed back, it shows history.
    */
   async follow(signal: AbortSignal): Promise<void> {
+    let failures = 0;
     while (!signal.aborted) {
       const asked = Date.now();
+      let failed: unknown;
       try {
         // oxlint-disable-next-line no-await-in-loop -- a long-poll loop reads one page after another by nature
         const page = await this.source.readEvents({
@@ -289,6 +296,7 @@ export class Player {
           waitSec: 25,
           signal,
         });
+        failures = 0;
         const movedOn = page.nextCursor !== this.#eventCursor;
         this.#append(page.items);
         this.#eventCursor = page.nextCursor;
@@ -302,13 +310,19 @@ export class Player {
         }
         // A stretch of the log that held nothing of this project's: the next is read at once.
         if (movedOn) continue;
-      } catch {
-        // The stream dropped. Wait, then pick up from the same cursor: nothing is lost.
+      } catch (error) {
+        // The stream dropped, or Keel was away for a moment. Pick up from the same cursor, nothing lost, but
+        // later each time it fails again and never sooner than Keel asked (backoff.ts): a struggling Keel is
+        // not asked harder by every reader at once.
+        failures += 1;
+        failed = error;
       }
+      if (signal.aborted) return;
+      // oxlint-disable-next-line no-await-in-loop -- as above
+      if (failures > 0) await pause(backoffMs(failed, failures), signal);
       // An empty answer that came straight back means the wait was not honoured; do not spin.
       // oxlint-disable-next-line no-await-in-loop -- as above
-      if (!signal.aborted && Date.now() - asked < 1_000)
-        await new Promise((resolve) => setTimeout(resolve, 1_000));
+      else if (Date.now() - asked < 1_000) await pause(1_000, signal);
     }
   }
 
@@ -321,7 +335,7 @@ export class Player {
     for (;;) {
       const from = this.#eventCursor;
       // oxlint-disable-next-line no-await-in-loop -- a page names the next one
-      const events = await this.source.readEvents(from === undefined ? {} : { cursor: from });
+      const events = await this.#page(from);
       this.#append(events.items);
       this.#eventCursor = events.nextCursor;
       // oxlint-disable-next-line no-await-in-loop -- as above
@@ -342,6 +356,24 @@ export class Player {
       if (this.live && !this.loaded) this.seek(this.end);
       const movedOn = events.nextCursor !== (from ?? "");
       if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
+    }
+  }
+
+  /**
+   * One page of the log from `from`. Keel away for a moment, or a read that dropped on the way, is asked again
+   * from the same cursor, later each time (backoff.ts), up to `DRAIN_TRIES` times; a refusal is Keel's answer,
+   * and fails the read at once.
+   */
+  async #page(from: string | undefined): Promise<Page<AnyEvent>> {
+    for (let failures = 1; ; failures += 1) {
+      try {
+        // oxlint-disable-next-line no-await-in-loop -- each try waits for the last to fail
+        return await this.source.readEvents(from === undefined ? {} : { cursor: from });
+      } catch (error) {
+        if (!retryable(error) || failures >= DRAIN_TRIES) throw error;
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        await pause(backoffMs(error, failures));
+      }
     }
   }
 

@@ -4,7 +4,8 @@
 // namespace's maintainers); nothing here works that out.
 
 import type { EscalationView } from "../contract/keel/index.ts";
-import { type KeelDirectory, KeelRefused } from "../source/types.ts";
+import { backoffMs, pause, retryable } from "../source/backoff.ts";
+import type { KeelDirectory } from "../source/types.ts";
 
 /**
  * The entries of Keel's log that put a question to a person or close one: after any of them, what Keel lists may
@@ -44,9 +45,6 @@ export function waitingRows(listed: readonly EscalationView[]): WaitingRow[] {
     }));
 }
 
-/** How long a read that failed on the way is left before it is asked again, at most. */
-const LONGEST_PAUSE_MS = 30_000;
-
 /** Keel's word for the head of a feed: asked for as a cursor, it answers no entry and where to read on from. */
 const HEAD = "end";
 
@@ -55,7 +53,7 @@ const HEAD = "end";
  * `again` when an entry that puts or closes a question arrives. The feed is joined at its head in one read,
  * with nothing of what came before, and `again` is called once there, for whatever came between the list's own
  * read and that one. It ends when `signal` aborts, or when Keel refuses the feed: a refusal is Keel's answer,
- * and asking again would not change it.
+ * and asking again would not change it. Keel away for a moment is asked again, later each time.
  */
 export async function followTurns(
   directory: Pick<KeelDirectory, "readOwnFeed">,
@@ -64,10 +62,10 @@ export async function followTurns(
 ): Promise<void> {
   let cursor = HEAD;
   let level = false;
-  let pause = 1_000;
+  let failures = 0;
   while (!signal.aborted) {
     const asked = Date.now();
-    let dropped = false;
+    let failed: unknown;
     try {
       // oxlint-disable-next-line no-await-in-loop -- a long-poll loop reads one page after another by nature
       const page = await directory.readOwnFeed({
@@ -75,7 +73,7 @@ export async function followTurns(
         ...(level ? { waitSec: 25 } : {}),
         signal,
       });
-      pause = 1_000;
+      failures = 0;
       const movedOn = page.nextCursor !== cursor;
       cursor = page.nextCursor;
       if (!level) {
@@ -87,15 +85,17 @@ export async function followTurns(
       if (page.items.some((type) => TURNS.has(type))) again();
       if (movedOn) continue;
     } catch (error) {
-      if (error instanceof KeelRefused) return;
-      // The read dropped on the way. It is asked again from the same place, after a pause that grows.
-      dropped = true;
+      // Keel's refusal is its answer, and asking again would not change it; Keel away for a moment, or a read
+      // that dropped on the way, is asked again from the same place, later each time (backoff.ts).
+      if (!retryable(error)) return;
+      failures += 1;
+      failed = error;
     }
+    if (signal.aborted) return;
+    // oxlint-disable-next-line no-await-in-loop -- as above
+    if (failures > 0) await pause(backoffMs(failed, failures), signal);
     // An answer that came straight back with nothing new means the wait was not honoured: do not spin.
-    if (!signal.aborted && (dropped || Date.now() - asked < 1_000)) {
-      // oxlint-disable-next-line no-await-in-loop -- as above
-      await new Promise((resolve) => setTimeout(resolve, pause));
-      if (dropped) pause = Math.min(pause * 2, LONGEST_PAUSE_MS);
-    }
+    // oxlint-disable-next-line no-await-in-loop -- as above
+    else if (Date.now() - asked < 1_000) await pause(1_000, signal);
   }
 }

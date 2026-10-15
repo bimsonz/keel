@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/backoff.test.ts -t "player.drain-retries"
+# kills: player.drain-retries
+# why: one 503 on a project's first read of its log fails the whole page
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index d1fa4fd0..aae0c2a1 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -370,7 +370,7 @@ export class Player {
+         // oxlint-disable-next-line no-await-in-loop -- each try waits for the last to fail
+         return await this.source.readEvents(from === undefined ? {} : { cursor: from });
+       } catch (error) {
+-        if (!retryable(error) || failures >= DRAIN_TRIES) throw error;
++        throw error;
+         // oxlint-disable-next-line no-await-in-loop -- as above
+         await pause(backoffMs(error, failures));
+       }

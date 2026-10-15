@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/backoff.test.ts -t "player.follow-backoff"
+# kills: player.follow-backoff
+# why: the log's tail asks again once a second per open page while Keel answers 503, as on 15 Oct at 10:28
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index d1fa4fd0..6c936085 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -319,7 +319,7 @@ export class Player {
+       }
+       if (signal.aborted) return;
+       // oxlint-disable-next-line no-await-in-loop -- as above
+-      if (failures > 0) await pause(backoffMs(failed, failures), signal);
++      if (failures > 0) await pause(1_000, signal);
+       // An empty answer that came straight back means the wait was not honoured; do not spin.
+       // oxlint-disable-next-line no-await-in-loop -- as above
+       else if (Date.now() - asked < 1_000) await pause(1_000, signal);

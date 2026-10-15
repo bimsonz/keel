@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/backoff.test.ts -t "http.retry-after"
+# kills: http.retry-after
+# why: Keel's Retry-After is read from nothing, so no read waits as long as Keel asked
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 7ebc3eb4..41ed08a9 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -198,7 +198,7 @@ export async function refusalOf(response: Response): Promise<KeelRefused> {
+         ? [action.title]
+         : [],
+     ),
+-    retryAfterOf(response.headers.get("retry-after"), problem),
++    undefined,
+   );
+ }
+ 

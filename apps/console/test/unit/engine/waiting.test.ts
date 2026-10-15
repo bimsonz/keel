@@ -43,6 +43,10 @@ function scripted(pages: (Page<string> | Error)[]) {
   return { asked, readOwnFeed };
 }
 
+/** Keel away for a moment, asking to be left five seconds: its 503. */
+const away = (): KeelRefused =>
+  new KeelRefused("The database is away", "service.unavailable", 503, [], 5_000);
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -162,5 +166,31 @@ describe("the questions waiting for someone", () => {
     expect(again).toHaveBeenCalledTimes(1);
     stop.abort();
     await following;
+  });
+
+  it("[waiting.turns-503] carries on past Keel being away for a moment, no sooner than Keel asked, and still ends on a refusal", async () => {
+    vi.useFakeTimers();
+    const feed = scripted([away(), away(), { items: [], nextCursor: "1" }]);
+    const stop = new AbortController();
+    const again = vi.fn<() => void>();
+    const following = followTurns(feed, again, stop.signal);
+    // Keel asked for five seconds each time: the head is not asked again before then.
+    await vi.advanceTimersByTimeAsync(4_900);
+    expect(feed.asked).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(5_200);
+    // Past it, the feed is joined at its head as ever, and its tail is waited on.
+    expect(feed.asked).toEqual([
+      { cursor: "end" },
+      { cursor: "end" },
+      { cursor: "end" },
+      { cursor: "1", waitSec: 25 },
+    ]);
+    expect(again).toHaveBeenCalledTimes(1);
+    stop.abort();
+    await following;
+
+    const gone = scripted([new KeelRefused("Not found", "resource.not_found", 404)]);
+    await followTurns(gone, vi.fn<() => void>(), new AbortController().signal);
+    expect(gone.asked).toHaveLength(1);
   });
 });

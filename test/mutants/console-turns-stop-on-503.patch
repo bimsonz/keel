@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts -t "waiting.turns-503"
+# kills: waiting.turns-503
+# why: the home stops following the reader's feed for good once Keel is away for a moment
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index 01bdb2ef..56e3b3ca 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -87,7 +87,7 @@ export async function followTurns(
+     } catch (error) {
+       // Keel's refusal is its answer, and asking again would not change it; Keel away for a moment, or a read
+       // that dropped on the way, is asked again from the same place, later each time (backoff.ts).
+-      if (!retryable(error)) return;
++      if (!retryable(error) || error instanceof Error) return;
+       failures += 1;
+       failed = error;
+     }

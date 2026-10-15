@@ -2,10 +2,10 @@
 # kills: waiting.no-clock
 # why: the list of questions is read again every time a wait on the feed runs out: a read by the clock
 diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
-index 4c11fac..52007ed 100644
+index 01bdb2ef..ce7f8c04 100644
 --- a/apps/console/src/engine/waiting.ts
 +++ b/apps/console/src/engine/waiting.ts
-@@ -77,7 +77,7 @@ export async function followTurns(
+@@ -82,7 +82,7 @@ export async function followTurns(
          again();
          continue;
        }
@@ -13,4 +13,4 @@ index 4c11fac..52007ed 100644
 +      again();
        if (movedOn) continue;
      } catch (error) {
-       if (error instanceof KeelRefused) return;
+       // Keel's refusal is its answer, and asking again would not change it; Keel away for a moment, or a read

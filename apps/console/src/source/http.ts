@@ -83,6 +83,7 @@ import type {
 } from "../contract/keel/index.ts";
 import type { QueryClient } from "@tanstack/react-query";
 import { cachedRead, FOREVER, FRESH_MS, pinned, readCache } from "./cache.ts";
+import { retryAfterOf } from "./backoff.ts";
 import { browserLogPages, type LogPages } from "./log-pages.ts";
 import { type KeelRepository, RepoRefused } from "./repository.ts";
 import {
@@ -172,9 +173,13 @@ interface Problem {
   detail?: unknown;
   code?: unknown;
   nextActions?: unknown;
+  retryAfterMs?: unknown;
 }
 
-/** Keel's refusal, as it words one: its detail or its title, its code, and the ways forward it gave. */
+/**
+ * Keel's refusal, as it words one: its detail or its title, its code, the ways forward it gave, and when it asked
+ * to be asked again, where it did.
+ */
 export async function refusalOf(response: Response): Promise<KeelRefused> {
   const problem: Problem = await response.json().catch(() => ({}));
   const said = [problem.detail, problem.title].find(
@@ -193,6 +198,7 @@ export async function refusalOf(response: Response): Promise<KeelRefused> {
         ? [action.title]
         : [],
     ),
+    retryAfterOf(response.headers.get("retry-after"), problem),
   );
 }
 
