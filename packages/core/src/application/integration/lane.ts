@@ -97,8 +97,21 @@ const MEMBER_EVENTS = [
   "VerdictIssued",
 ];
 
-/** On this many consecutive infra failures of one change the Lane bounces it, so it never loops. */
+/**
+ * On this many consecutive infra failures of one change the Lane bounces it,
+ * so it never loops: at once when another batch of the lane has verified since
+ * they began (the infrastructure works for others), else once INFRA_HOLD_MS
+ * has passed since the first.
+ */
 export const INFRA_FAILURE_LIMIT = 3;
+
+/**
+ * How long a change at INFRA_FAILURE_LIMIT is held for an outage that is
+ * Keel's, not the change's: while no other batch has verified since its infra
+ * failures began, it goes back to the queue's front until this long after the
+ * first, and only then bounces.
+ */
+export const INFRA_HOLD_MS = 2 * 60 * 60 * 1000;
 
 /**
  * A batch whose compose, bundle or start has failed this many times (each a
@@ -214,14 +227,26 @@ export const Lane = Schema.Struct({
   advances: Schema.Array(
     Schema.Struct({ from: CommitSha, to: CommitSha, members: Schema.Array(ChangeId) }),
   ),
-  /** Each change's consecutive infra failures, their reasons oldest first. */
-  infra: Schema.Array(Schema.Struct({ changeId: ChangeId, reasons: Schema.Array(Schema.String) })),
+  /**
+   * Each change's consecutive infra failures, their reasons oldest first, with
+   * when the first came (epoch ms) and how many batches the lane had verified then.
+   */
+  infra: Schema.Array(
+    Schema.Struct({
+      changeId: ChangeId,
+      reasons: Schema.Array(Schema.String),
+      since: Schema.optional(Schema.Number),
+      verifiedBefore: Schema.optional(Schema.Int),
+    }),
+  ),
   /** Trunk's head as the last TrunkAdvanced heard named it: no batch forms on a staging main anywhere else. */
   trunkHead: Schema.optional(CommitSha),
   /** The last candidate bundle this lane stored: the next takes from it what did not change. */
   lastBundle: Schema.optional(ContentHash),
   /** The outcome of each member verified lately, oldest first, at most OUTCOME_WINDOW: the batch size is read from it. */
   outcomes: Schema.optional(Schema.Array(Schema.Literals(["pass", "fail"]))),
+  /** How many batches the lane has verified, landed or bounced on a member: an infra streak reads whether any did since it began. */
+  verified: Schema.optional(Schema.Int),
   /**
    * The changes that run alone in their next batch: each requeued after its
    * members clashed (`runsAlone`), spent on the infrastructure in a batch of
@@ -337,11 +362,15 @@ export const failureRate = (lane: Lane): number =>
 export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
   batchSize(failureRate(lane), Math.min(maxBatchSize, lane.queue.length));
 
-/** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+/** The lane with a verified batch's `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
 const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>
   added.length === 0
     ? lane
-    : { ...lane, outcomes: [...(lane.outcomes ?? []), ...added].slice(-OUTCOME_WINDOW) };
+    : {
+        ...lane,
+        outcomes: [...(lane.outcomes ?? []), ...added].slice(-OUTCOME_WINDOW),
+        verified: (lane.verified ?? 0) + 1,
+      };
 
 /** The batch as its events left it. */
 export const batchOf = (store: Store, batchId: BatchId): Batch | undefined => {
@@ -627,14 +656,14 @@ const onBatch = (
   laneId: string,
   batchId: BatchId,
   cause: string,
-  plan: (batch: Batch, lane: Lane) => BatchStep,
+  plan: (batch: Batch, lane: Lane, at: number) => BatchStep,
 ) =>
   commit({ entity: batchRef(batchId), cause, project: laneProject(laneId) }, (tx) => {
     const batch = batchOf(tx.store, batchId);
     const lane = laneOf(tx.store, laneId);
     if (batch === undefined || lane === undefined)
       throw new Error(`lane ${laneId} holds no batch ${batchId}`);
-    const step = plan(batch, lane);
+    const step = plan(batch, lane, tx.at);
     let state = batch;
     const drafts: EventDraft[] = [];
     for (const move of step.moves) {
@@ -663,33 +692,43 @@ const remedy = (batch: Batch, operationId: "submit" | "rebase", title: string): 
 };
 
 /**
- * An infrastructure failure of the batch, blamed on `infra` (the Change DO
- * requeues its members) until a batch of one fails that way the
+ * An infrastructure failure of the batch at `at`, blamed on `infra` (the
+ * Change DO requeues its members) until a batch of one fails that way the
  * INFRA_FAILURE_LIMIT-th time in a row: then on the change, so it bounces
- * visibly, with every reason, instead of looping. In a batch of several every
- * member counts the failure, and one that reaches the limit runs alone next,
- * where its next such failure bounces it: a forming batch of several can
- * only be failed as `infra` or `textual`, never on one member.
+ * visibly, with every reason, instead of looping, if the infrastructure has
+ * worked for others since its streak began (another batch verified) or the
+ * streak has lasted INFRA_HOLD_MS. Until then the outage is taken to be
+ * Keel's: the change is held, requeued at the front again, and `held` says so
+ * for the operator. In a batch of several every member counts the failure,
+ * and one that reaches the limit runs alone next, where its next such failure
+ * is judged so: a forming batch of several can only be failed as `infra` or
+ * `textual`, never on one member.
  */
 const infraBlame = (
   lane: Lane,
   batch: Batch,
   reason: string,
+  at: number,
 ): {
   readonly attribution: ChangeId | "infra";
   readonly lane: Lane;
   readonly exhausted?: string;
+  readonly held?: string;
 } => {
+  /** A change's streak with this failure added: begun now, when it is the first. */
+  const streak = (changeId: ChangeId) => {
+    const entry = lane.infra.find((held) => held.changeId === changeId);
+    return {
+      changeId,
+      reasons: [...(entry?.reasons ?? []), reason],
+      since: entry?.since ?? at,
+      verifiedBefore: entry?.verifiedBefore ?? lane.verified ?? 0,
+    };
+  };
   const [only] = batch.members;
   const sole = batch.members.length === 1 ? only : undefined;
   if (sole === undefined) {
-    const counted = batch.members.map((changeId) => ({
-      changeId,
-      reasons: [
-        ...(lane.infra.find((entry) => entry.changeId === changeId)?.reasons ?? []),
-        reason,
-      ],
-    }));
+    const counted = batch.members.map(streak);
     const others = withoutInfra(lane, batch.members);
     const spent = counted.filter((entry) => entry.reasons.length >= INFRA_FAILURE_LIMIT);
     return {
@@ -700,17 +739,18 @@ const infraBlame = (
       ),
     };
   }
-  const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
+  const counted = streak(sole);
   const others = withoutInfra(lane, [sole]);
-  if (reasons.length >= INFRA_FAILURE_LIMIT)
-    return {
-      attribution: sole,
-      lane: others,
-      exhausted: `infra-failure x${reasons.length}: ${reasons.join("; ")}`,
-    };
+  const failures = `infra-failure x${counted.reasons.length}: ${counted.reasons.join("; ")}`;
+  const kept = { ...others, infra: [...others.infra, counted] };
+  if (counted.reasons.length < INFRA_FAILURE_LIMIT) return { attribution: "infra", lane: kept };
+  // The infrastructure works for others, or the outage has had its hold: the failure is the change's.
+  if ((lane.verified ?? 0) > counted.verifiedBefore || at - counted.since >= INFRA_HOLD_MS)
+    return { attribution: sole, lane: others, exhausted: failures };
   return {
     attribution: "infra",
-    lane: { ...others, infra: [...others.infra, { changeId: sole, reasons }] },
+    lane: kept,
+    held: `${failures}; held: no batch has verified since ${new Date(counted.since).toISOString()}`,
   };
 };
 
@@ -953,9 +993,11 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
 ) {
   const verdictId = yield* (yield* Ids).next("vrd");
   let exhausted: string | undefined;
-  yield* onBatch(lane.laneId, batch.id, cause, (_, now) => {
-    const infra = capacity ? uncounted(now) : infraBlame(now, batch, refusal);
+  let held: string | undefined;
+  yield* onBatch(lane.laneId, batch.id, cause, (_, now, at) => {
+    const infra = capacity ? uncounted(now) : infraBlame(now, batch, refusal, at);
     exhausted = infra.exhausted;
+    held = infra.held;
     return {
       moves: [
         {
@@ -981,6 +1023,7 @@ const holdOnInfra = Effect.fn("integration/holdOnInfra")(function* (
     };
   }).pipe(Effect.orDie);
   if (exhausted !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${exhausted}`);
+  if (held !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${held}`);
 });
 
 /** A refused composition as evidence: its reason, its paths, and what failed where the composer saw it. */
@@ -1355,15 +1398,17 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
       : yield* bundleBlame(staging, refused.path, batch.base, composed.commits);
   const verdictId = yield* (yield* Ids).next("vrd");
   let exhausted: string | undefined;
-  yield* onBatch(lane.laneId, batch.id, `bundle-refused:${batch.id}`, (_, now) => {
+  let held: string | undefined;
+  yield* onBatch(lane.laneId, batch.id, `bundle-refused:${batch.id}`, (_, now, at) => {
     const evidence = [
       `bundle-refused: ${refused.reason}`,
       ...(blame === "infra" && refused.path !== undefined
         ? [`bundle-refused-in-base: ${refused.path}`]
         : []),
     ];
-    const infra = blame === "infra" ? infraBlame(now, batch, evidence.join("; ")) : undefined;
+    const infra = blame === "infra" ? infraBlame(now, batch, evidence.join("; "), at) : undefined;
     exhausted = infra?.exhausted;
+    held = infra?.held;
     const attribution = infra?.attribution ?? blame;
     const nextActions =
       infra === undefined
@@ -1406,6 +1451,7 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
     yield* Effect.logError(
       `lane ${lane.laneId} bounced ${batch.members.join(", ")} on ${exhausted}`,
     );
+  if (held !== undefined) yield* Effect.logError(`lane ${lane.laneId}: ${held}`);
 });
 
 /** The batch's plan. Composition refuses a batch with none, so one past it always has its plan. */
@@ -1983,6 +2029,7 @@ interface Issued {
   readonly attribution?: BatchAttribution;
   readonly lane: Lane;
   readonly exhausted?: string;
+  readonly held?: string;
 }
 
 /** What a verdict is issued from: KeelVerify's own, or the Lane's for an instance that will send none. */
@@ -1994,7 +2041,7 @@ type Verdict = Pick<
 /** A failure of the infrastructure's capacity (no box, rate-limited): the members are requeued and nothing is counted, since it says nothing about any of them. */
 const uncounted = (lane: Lane): ReturnType<typeof infraBlame> => ({ attribution: "infra", lane });
 
-const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
+const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issued => {
   const cleared = withoutInfra(lane, batch.members);
   if (verdict.outcome === "land")
     return {
@@ -2027,7 +2074,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
   const infra =
     verdict.outcome === "park" && verdict.unrun === true
       ? uncounted(lane)
-      : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`);
+      : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`, at);
   return infra.exhausted === undefined
     ? {
         outcome: verdict.outcome,
@@ -2035,6 +2082,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
         ...verifiersRemedy,
         attribution: "infra",
         lane: infra.lane,
+        ...(infra.held === undefined ? {} : { held: infra.held }),
       }
     : {
         outcome: "bounce",
@@ -2061,13 +2109,15 @@ const issue = Effect.fn("integration/issue")(function* (
 ) {
   // Set inside the transaction when this verdict is the change's last infra failure allowed.
   let exhausted: string | undefined;
+  let held: string | undefined;
   // A failure of several that no one is blamed for splits into batches of one, minted here: each member runs alone.
   const ids = yield* Ids;
   const into =
     batch.members.length > 1 ? yield* Effect.forEach(batch.members, () => ids.next("bat")) : [];
-  const committed = yield* onBatch(laneId, batch.id, cause, (now, lane) => {
-    const issued = issuedFor(verdict, now, lane);
+  const committed = yield* onBatch(laneId, batch.id, cause, (now, lane, at) => {
+    const issued = issuedFor(verdict, now, lane, at);
     exhausted = issued.exhausted;
+    held = issued.held;
     const bisected = issued.attribution === "unattributed";
     return {
       moves: [
@@ -2113,6 +2163,7 @@ const issue = Effect.fn("integration/issue")(function* (
   });
   if (!committed.duplicate && exhausted !== undefined)
     yield* Effect.logError(`lane ${laneId} bounced ${batch.members.join(", ")} on ${exhausted}`);
+  if (!committed.duplicate && held !== undefined) yield* Effect.logError(`lane ${laneId}: ${held}`);
   return committed;
 });
 

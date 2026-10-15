@@ -2,15 +2,15 @@
 # kills: c41.unrun-uncounted
 # why: a park for want of capacity counts toward the members' infra limit, so a busy verifier runs them alone and then bounces them
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e48f8594..ac140192 100644
+index d2797f96..89ed078b 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1745,7 +1745,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane): Issued => {
+@@ -1799,7 +1799,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
    // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row, unless no step could run.
    const infra =
      verdict.outcome === "park" && verdict.unrun === true
 -      ? uncounted(lane)
-+      ? infraBlame(lane, batch, "park: unrun")
-       : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`);
++      ? infraBlame(lane, batch, "park: unrun", at)
+       : infraBlame(lane, batch, `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`, at);
    return infra.exhausted === undefined
      ? {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.infra-held
+# kills: lane.infra-held
+# why: a change at the infra limit bounces though no other batch has verified since its streak began: an outage of Keel's sends every change back to its agent
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d2797f9..515c9d9 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -643,7 +643,7 @@ const infraBlame = (
+   const kept = { ...others, infra: [...others.infra, counted] };
+   if (counted.reasons.length < INFRA_FAILURE_LIMIT) return { attribution: "infra", lane: kept };
+   // The infrastructure works for others, or the outage has had its hold: the failure is the change's.
+-  if ((lane.verified ?? 0) > counted.verifiedBefore || at - counted.since >= INFRA_HOLD_MS)
++  if (true)
+     return { attribution: sole, lane: others, exhausted: failures };
+   return {
+     attribution: "infra",

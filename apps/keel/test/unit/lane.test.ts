@@ -26,6 +26,7 @@ import {
   recordVerdict,
   reofferDue,
   reofferVerified,
+  INFRA_HOLD_MS,
   STEP_FAILURES_BEFORE_INFRA,
   VERIFY_BUDGET_MS,
   verificationDue,
@@ -1199,6 +1200,8 @@ describe("the Lane", () => {
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < 3)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+          // No other batch verifies meanwhile: the third bounces once the hold has passed.
+          if (round === 2) w.clock.advance(INFRA_HOLD_MS);
         }
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
           "infra",
@@ -1242,6 +1245,8 @@ describe("the Lane", () => {
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < 3)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+          // No other batch verifies meanwhile: the third bounces once the hold has passed.
+          if (round === 2) w.clock.advance(INFRA_HOLD_MS);
         }
         const refusal = `composition-refused: box-failed: ${detail}`;
         const issued = yield* payloads("VerdictIssued");
@@ -1700,6 +1705,8 @@ describe("the Lane", () => {
           const failed = (yield* payloads("BatchFailed")).at(-1);
           if (round < INFRA_ROUNDS)
             yield* requeue(change(1), Schema.decodeUnknownSync(BatchId)(failed?.["batchId"]));
+          // No other batch verifies meanwhile: the last bounces once the hold has passed.
+          if (round === INFRA_ROUNDS - 1) w.clock.advance(INFRA_HOLD_MS);
         }
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
           "infra",
@@ -1782,6 +1789,8 @@ describe("the Lane", () => {
           const { batchId, candidateId, instanceId } = yield* toVerifying(w);
           yield* recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "park"));
           yield* requeue(change(1), batchId);
+          // No other batch verifies meanwhile: the third bounces once the hold has passed.
+          if (round === 2) w.clock.advance(INFRA_HOLD_MS);
         }
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
           "infra",
@@ -1799,6 +1808,91 @@ describe("the Lane", () => {
             { kind: "call", operationId: "submit", args: { changeId: change(1) } },
             { kind: "wait" },
           ],
+        });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.infra-held] at the infra limit with no other batch verified since its streak began, the change is held: requeued as infra, not bounced, until two hours after the streak's first failure",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        for (let round = 1; round <= 4; round += 1) {
+          const { batchId, candidateId, instanceId } = yield* toVerifying(w);
+          yield* recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "park"));
+          yield* requeue(change(1), batchId);
+        }
+        // Past the limit, the outage is taken to be Keel's: the park is held, not the change's bounce.
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
+          "infra",
+          "infra",
+          "infra",
+          "infra",
+        ]);
+        expect((yield* payloads("VerdictIssued")).map((p) => p["outcome"])).toEqual([
+          "park",
+          "park",
+          "park",
+          "park",
+        ]);
+        // A minute short of the hold it is still held; once two hours have passed it bounces.
+        w.clock.advance(INFRA_HOLD_MS - 60_000);
+        const short = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(short.batchId, short.candidateId, short.instanceId, "park"),
+        );
+        expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("infra");
+        yield* requeue(change(1), short.batchId);
+        w.clock.advance(60_000);
+        const due = yield* toVerifying(w);
+        yield* recordVerdict(LANE, verdict(due.batchId, due.candidateId, due.instanceId, "park"));
+        expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe(change(1));
+        expect((yield* payloads("VerdictIssued")).at(-1)).toMatchObject({
+          outcome: "bounce",
+          evidence: [expect.stringMatching(/^infra-failure x6: /), "park: the suite said so"],
+        });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.infra-others-verified] at the infra limit after another batch was verified since its streak began, the change bounces at once: the infrastructure works for others",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "park"),
+        );
+        // Before change 1 is back, another change's batch is verified: bounced on its own failure.
+        yield* queue(w, change(2));
+        const other = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(other.batchId, other.candidateId, other.instanceId, "bounce"),
+        );
+        yield* requeue(change(1), first.batchId);
+        for (let round = 2; round <= 3; round += 1) {
+          const { batchId, candidateId, instanceId } = yield* toVerifying(w);
+          yield* recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "park"));
+          if (round < 3) yield* requeue(change(1), batchId);
+        }
+        expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
+          "infra",
+          change(2),
+          "infra",
+          change(1),
+        ]);
+        expect((yield* payloads("VerdictIssued")).at(-1)).toMatchObject({
+          outcome: "bounce",
+          evidence: [expect.stringMatching(/^infra-failure x3: /), "park: the suite said so"],
         });
       }).pipe(Effect.provide(w.layer));
     },
@@ -2012,6 +2106,8 @@ describe("the Lane's verification that sends no verdict", () => {
           w.verification.end(instanceId, { _tag: "Failed", status: "terminated" });
           expect(yield* checkVerification(LANE, instanceId)).toBe("settled");
           yield* requeue(change(1), batchId);
+          // No other batch verifies meanwhile: the third bounces once the hold has passed.
+          if (round === 2) w.clock.advance(INFRA_HOLD_MS);
         }
         expect(new Set(instances).size).toBe(3);
         expect((yield* payloads("BatchFailed")).map((p) => p["attribution"])).toEqual([
@@ -2446,6 +2542,8 @@ describe("the Lane's batches", () => {
           expect((yield* payloads("BatchFailed")).at(-1)?.["attribution"]).toBe("infra");
           for (const id of two.toReversed()) yield* requeuedFor(id, v.batchId, "infra-failure");
         }
+        // No other batch verifies meanwhile: alone, the next bounces once the hold has passed.
+        w.clock.advance(INFRA_HOLD_MS);
         const alone = yield* toVerifying(w);
         expect(yield* membersInFlight).toEqual([change(1)]);
         yield* recordVerdict(

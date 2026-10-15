@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.infra-others-verified
+# kills: lane.infra-others-verified
+# why: a verified batch is not counted, so a streak never sees that the infrastructure worked for others
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d2797f9..0edf6a8 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -321,7 +321,7 @@ const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>
+     : {
+         ...lane,
+         outcomes: [...(lane.outcomes ?? []), ...added].slice(-OUTCOME_WINDOW),
+-        verified: (lane.verified ?? 0) + 1,
++        verified: lane.verified ?? 0,
+       };
+ 
+ /** The batch as its events left it. */

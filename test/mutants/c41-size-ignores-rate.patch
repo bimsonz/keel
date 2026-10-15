@@ -2,15 +2,15 @@
 # kills: c41.size
 # why: the batch size never shrinks as the lane's failures rise, so a failing project keeps paying for large batches
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e48f8594..5e442bcb 100644
+index d2797f96..bde8b3f9 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -287,7 +287,7 @@ export const failureRate = (lane: Lane): number =>
+@@ -312,7 +312,7 @@ export const failureRate = (lane: Lane): number =>
   * project's `maxBatchSize`.
   */
  export const laneBatchSize = (lane: Lane, maxBatchSize: number): number =>
 -  batchSize(failureRate(lane), Math.min(maxBatchSize, lane.queue.length));
 +  Math.max(1, Math.min(maxBatchSize, lane.queue.length));
  
- /** The lane with `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
+ /** The lane with a verified batch's `added` outcomes after its last, keeping the latest OUTCOME_WINDOW. */
  const withOutcomes = (lane: Lane, added: readonly ("pass" | "fail")[]): Lane =>

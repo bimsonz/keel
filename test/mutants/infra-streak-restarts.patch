@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.infra-held
+# kills: lane.infra-held
+# why: each infra failure starts the streak's clock again, so a held change is never past its hold
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d2797f9..d65f2d2 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -619,7 +619,7 @@ const infraBlame = (
+     return {
+       changeId,
+       reasons: [...(entry?.reasons ?? []), reason],
+-      since: entry?.since ?? at,
++      since: at,
+       verifiedBefore: entry?.verifiedBefore ?? lane.verified ?? 0,
+     };
+   };

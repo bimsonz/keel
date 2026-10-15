@@ -2,15 +2,15 @@
 # kills: lane.infra-limit
 # why: A change failing on the infrastructure every time is requeued forever instead of bouncing on the third
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 8b5fe912..64998469 100644
+index d2797f96..bc693aa5 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -581,7 +581,7 @@ const infraBlame = (
-   }
-   const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
+@@ -641,7 +641,7 @@ const infraBlame = (
    const others = withoutInfra(lane, [sole]);
--  if (reasons.length >= INFRA_FAILURE_LIMIT)
-+  if (reasons.length > Number.MAX_SAFE_INTEGER)
-     return {
-       attribution: sole,
-       lane: others,
+   const failures = `infra-failure x${counted.reasons.length}: ${counted.reasons.join("; ")}`;
+   const kept = { ...others, infra: [...others.infra, counted] };
+-  if (counted.reasons.length < INFRA_FAILURE_LIMIT) return { attribution: "infra", lane: kept };
++  if (counted.reasons.length < Number.MAX_SAFE_INTEGER) return { attribution: "infra", lane: kept };
+   // The infrastructure works for others, or the outage has had its hold: the failure is the change's.
+   if ((lane.verified ?? 0) > counted.verifiedBefore || at - counted.since >= INFRA_HOLD_MS)
+     return { attribution: sole, lane: others, exhausted: failures };
