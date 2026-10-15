@@ -2,12 +2,12 @@
 # kills: b1.nudge
 # why: a flush that delivered never nudges the Projector, so projections wait for something else to wake it
 diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
-index ca6c5cd..5ca3c18 100644
+index 1e1a59b4..da59a5a4 100644
 --- a/packages/core/src/application/ports/flush.ts
 +++ b/packages/core/src/application/ports/flush.ts
-@@ -46,7 +46,7 @@ export const flushOutbox = (fanOut: FanOut): Effect.Effect<FlushReport, never, C
-         failed.push(batch.subscriber);
-       }
+@@ -85,7 +85,7 @@ export const flushOutbox = (
+       if ("failed" in outcome) failed.push(outcome.failed);
+       else delivered += outcome.delivered;
      }
 -    if (delivered > 0) yield* fanOut.nudge;
 +    if (delivered < 0) yield* fanOut.nudge;

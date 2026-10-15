@@ -34,8 +34,10 @@ const encodeRemove = Schema.encodeSync(RemoveCredentialCommand);
  * and that id, and sends only the seal to the namespace's object, which keeps
  * it and commits `CredentialStored`. `reveal` takes the seal back and opens it
  * here. The object never holds the KEK, and nothing it stores, answers or
- * commits holds the secret. The KEK is read and imported once for the life of
- * the layer (the isolate's runtime), and read again only after a failure.
+ * commits holds the secret. The KEK is kept for the life of the layer (the
+ * isolate's runtime) once a read of it has been imported; until then each call
+ * reads it for itself, so no request ever waits on a read another request
+ * started, which Workers drops with that request. A failed read keeps nothing.
  */
 export function CredentialStoreSealed(
   kek: CredentialKek,
@@ -48,15 +50,11 @@ export function CredentialStoreSealed(
     CredentialStore,
     Effect.gen(function* () {
       const ids = yield* Ids;
-      let imported: Promise<CryptoKey> | undefined;
-      const key = (): Promise<CryptoKey> => {
-        imported ??= kek
-          .read()
-          .then(importKek)
-          .catch((error: unknown) => {
-            imported = undefined;
-            throw error;
-          });
+      let imported: CryptoKey | undefined;
+      const key = async (): Promise<CryptoKey> => {
+        if (imported !== undefined) return imported;
+        const read = await importKek(await kek.read());
+        imported ??= read;
         return imported;
       };
       return CredentialStore.of({

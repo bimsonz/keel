@@ -2,18 +2,15 @@
 # kills: b1.ack-after-delivery
 # why: each batch is acknowledged before its delivery is attempted, so a failed delivery is never retried
 diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
-index 8d0ed92..f5698dc 100644
+index 1e1a59b4..c6165714 100644
 --- a/packages/core/src/application/ports/flush.ts
 +++ b/packages/core/src/application/ports/flush.ts
-@@ -39,11 +39,18 @@ export const flushOutbox = (
+@@ -45,8 +45,14 @@ export const flushOutbox = (
      const outbox = yield* EventOutbox;
-     const outcomes = yield* Effect.forEach(
+     const settled = yield* Effect.forEach(
        outbox.due(now, FLUSH_BATCH),
 -      (batch) =>
--        Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({
--          batch,
--          outcome,
--        })),
+-        fanOut.deliver(batch.subscriber, batch.events).pipe(
 +      (batch) => {
 +        store.transaction(() =>
 +          outbox.acknowledge(
@@ -21,9 +18,15 @@ index 8d0ed92..f5698dc 100644
 +            batch.events.map((event) => event.eventId),
 +          ),
 +        );
-+        return Effect.map(
-+          Effect.result(fanOut.deliver(batch.subscriber, batch.events)),
-+          (outcome) => ({ batch, outcome }),
++        return fanOut.deliver(batch.subscriber, batch.events).pipe(
+           Effect.timeoutOrElse({
+             duration: boundMs,
+             orElse: () =>
+@@ -76,7 +82,8 @@ export const flushOutbox = (
+             );
+             return { failed: batch.subscriber };
+           }),
+-        ),
 +        );
 +      },
        { concurrency: 8 },

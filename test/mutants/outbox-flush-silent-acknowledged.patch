@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: outbox.flush-silent
+# why: a delivery that went unanswered past the bound is acknowledged as taken, so its events are never delivered
+diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
+index 1e1a59b4..ff6389a1 100644
+--- a/packages/core/src/application/ports/flush.ts
++++ b/packages/core/src/application/ports/flush.ts
+@@ -49,13 +49,7 @@ export const flushOutbox = (
+         fanOut.deliver(batch.subscriber, batch.events).pipe(
+           Effect.timeoutOrElse({
+             duration: boundMs,
+-            orElse: () =>
+-              Effect.fail(
+-                new DeliveryFailed({
+-                  subscriber: batch.subscriber,
+-                  reason: `no answer within ${boundMs} ms`,
+-                }),
+-              ),
++            orElse: () => Effect.void,
+           }),
+           Effect.result,
+           // Each delivery's outcome is written as it returns, so one still in flight holds no other's.

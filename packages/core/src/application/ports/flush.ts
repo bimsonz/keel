@@ -4,6 +4,7 @@ import { Clock } from "./clock.ts";
 import { EntityStore } from "./entity-store.ts";
 import {
   type Backlog,
+  DeliveryFailed,
   EventOutbox,
   type FanOut,
   redeliveryDelay,
@@ -13,6 +14,9 @@ import {
 
 /** At most this many events go to one subscriber per flush; the rest follow at once. */
 export const FLUSH_BATCH = 100;
+
+/** How long one delivery may go unanswered before it counts as failed and waits for its retry. */
+export const DELIVERY_BOUND_MS = 30_000;
 
 export interface FlushReport {
   readonly delivered: number;
@@ -25,46 +29,61 @@ export interface FlushReport {
 
 /**
  * Hands every due delivery to its subscriber, oldest first, one batch per
- * subscriber. A delivery is acknowledged only after its subscriber took it; a
- * failure leaves it owed and pushes its next attempt back (1 s, doubling, to
- * 60 s). A stalled subscriber holds only its own deliveries. Every flush that
- * delivered something nudges the Projector.
+ * subscriber. A delivery is acknowledged as soon as its subscriber took it; a
+ * failure, or no answer within DELIVERY_BOUND_MS, leaves it owed and pushes its
+ * next attempt back (1 s, doubling, to 60 s). A stalled subscriber, failing or
+ * silent, holds only its own deliveries. Every flush that delivered something
+ * nudges the Projector. `boundMs` is DELIVERY_BOUND_MS but where a test sets its own.
  */
 export const flushOutbox = (
   fanOut: FanOut,
+  boundMs: number = DELIVERY_BOUND_MS,
 ): Effect.Effect<FlushReport, never, Clock | EntityStore | EventOutbox> =>
   Effect.gen(function* () {
     const now = yield* (yield* Clock).now;
     const store = yield* EntityStore;
     const outbox = yield* EventOutbox;
-    const outcomes = yield* Effect.forEach(
+    const settled = yield* Effect.forEach(
       outbox.due(now, FLUSH_BATCH),
       (batch) =>
-        Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({
-          batch,
-          outcome,
-        })),
+        fanOut.deliver(batch.subscriber, batch.events).pipe(
+          Effect.timeoutOrElse({
+            duration: boundMs,
+            orElse: () =>
+              Effect.fail(
+                new DeliveryFailed({
+                  subscriber: batch.subscriber,
+                  reason: `no answer within ${boundMs} ms`,
+                }),
+              ),
+          }),
+          Effect.result,
+          // Each delivery's outcome is written as it returns, so one still in flight holds no other's.
+          Effect.map((outcome) => {
+            const eventIds = batch.events.map((event) => event.eventId);
+            if (Result.isSuccess(outcome)) {
+              store.transaction(() => outbox.acknowledge(batch.subscriber, eventIds));
+              return { delivered: eventIds.length };
+            }
+            const attempts = batch.attempts + 1;
+            store.transaction(() =>
+              outbox.defer(
+                batch.subscriber,
+                eventIds,
+                attempts,
+                Instant(now + redeliveryDelay(attempts)),
+              ),
+            );
+            return { failed: batch.subscriber };
+          }),
+        ),
       { concurrency: 8 },
     );
     let delivered = 0;
     const failed: Subscriber[] = [];
-    for (const { batch, outcome } of outcomes) {
-      const eventIds = batch.events.map((event) => event.eventId);
-      if (Result.isSuccess(outcome)) {
-        store.transaction(() => outbox.acknowledge(batch.subscriber, eventIds));
-        delivered += eventIds.length;
-      } else {
-        const attempts = batch.attempts + 1;
-        store.transaction(() =>
-          outbox.defer(
-            batch.subscriber,
-            eventIds,
-            attempts,
-            Instant(now + redeliveryDelay(attempts)),
-          ),
-        );
-        failed.push(batch.subscriber);
-      }
+    for (const outcome of settled) {
+      if ("failed" in outcome) failed.push(outcome.failed);
+      else delivered += outcome.delivered;
     }
     if (delivered > 0) yield* fanOut.nudge;
     const backlog = outbox.backlog();

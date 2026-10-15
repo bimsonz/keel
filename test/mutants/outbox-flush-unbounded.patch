@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: outbox.flush-silent
+# why: a delivery has no bound, so a subscriber that never answers holds the flush and every acknowledgement after it
+diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
+index 1e1a59b4..ee9985eb 100644
+--- a/packages/core/src/application/ports/flush.ts
++++ b/packages/core/src/application/ports/flush.ts
+@@ -47,16 +47,6 @@ export const flushOutbox = (
+       outbox.due(now, FLUSH_BATCH),
+       (batch) =>
+         fanOut.deliver(batch.subscriber, batch.events).pipe(
+-          Effect.timeoutOrElse({
+-            duration: boundMs,
+-            orElse: () =>
+-              Effect.fail(
+-                new DeliveryFailed({
+-                  subscriber: batch.subscriber,
+-                  reason: `no answer within ${boundMs} ms`,
+-                }),
+-              ),
+-          }),
+           Effect.result,
+           // Each delivery's outcome is written as it returns, so one still in flight holds no other's.
+           Effect.map((outcome) => {

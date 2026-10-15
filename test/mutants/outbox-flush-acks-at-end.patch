@@ -1,0 +1,26 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: outbox.flush-ack-each
+# why: the flush writes its acknowledgements only once every delivery has returned, so one in flight holds the others
+diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
+index 1e1a59b4..ca5837c0 100644
+--- a/packages/core/src/application/ports/flush.ts
++++ b/packages/core/src/application/ports/flush.ts
+@@ -59,7 +59,7 @@ export const flushOutbox = (
+           }),
+           Effect.result,
+           // Each delivery's outcome is written as it returns, so one still in flight holds no other's.
+-          Effect.map((outcome) => {
++          Effect.map((outcome) => () => {
+             const eventIds = batch.events.map((event) => event.eventId);
+             if (Result.isSuccess(outcome)) {
+               store.transaction(() => outbox.acknowledge(batch.subscriber, eventIds));
+@@ -81,7 +81,8 @@ export const flushOutbox = (
+     );
+     let delivered = 0;
+     const failed: Subscriber[] = [];
+-    for (const outcome of settled) {
++    for (const write of settled) {
++      const outcome = write();
+       if ("failed" in outcome) failed.push(outcome.failed);
+       else delivered += outcome.delivered;
+     }

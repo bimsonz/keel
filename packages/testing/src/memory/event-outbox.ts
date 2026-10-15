@@ -279,7 +279,10 @@ export function makeEventOutboxMemory() {
   };
 }
 
-/** A fan-out a test scripts: it records every attempt, fails the subscribers in `failing`, and counts nudges. */
+/**
+ * A fan-out a test scripts: it records every attempt, fails the subscribers in
+ * `failing`, never answers the ones in `hanging`, and counts nudges.
+ */
 export function makeScriptedFanOut() {
   const attempts: { readonly subscriber: Subscriber; readonly eventIds: readonly string[] }[] = [];
   const delivered: {
@@ -287,6 +290,7 @@ export function makeScriptedFanOut() {
     readonly events: readonly EventEnvelope[];
   }[] = [];
   const failing = new Set<Subscriber>();
+  const hanging = new Set<Subscriber>();
   let nudges = 0;
   const fanOut: FanOut = {
     deliver: (subscriber, events) =>
@@ -294,6 +298,7 @@ export function makeScriptedFanOut() {
         attempts.push({ subscriber, eventIds: events.map((event) => event.eventId) });
         if (failing.has(subscriber))
           return Effect.fail(new DeliveryFailed({ subscriber, reason: "scripted to fail" }));
+        if (hanging.has(subscriber)) return Effect.never;
         delivered.push({ subscriber, events: [...events] });
         return Effect.void;
       }),
@@ -306,6 +311,7 @@ export function makeScriptedFanOut() {
     attempts,
     delivered,
     failing,
+    hanging,
     nudges: () => nudges,
     /** Every event delivered to `subscriber`, in delivery order. */
     deliveredTo: (subscriber: Subscriber) =>

@@ -12,11 +12,14 @@ import {
   EntityStore,
   type EventDraft,
   EventOutbox,
+  type FlushReport,
   flushOutbox,
   REDELIVERY_CAP_MS,
+  redeliveryDelay,
   STUCK_AFTER_ATTEMPTS,
 } from "@keeltown/core/ports";
-import { Effect, Exit, Layer, Result, Schema } from "effect";
+import { Effect, Exit, Fiber, Layer, Option, Result, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import {
   type ManualClock,
   makeEventOutboxMemory,
@@ -76,11 +79,64 @@ const emit = (entity: EntityRef, count = 1, type?: string) =>
   );
 
 const log = (entity: EntityRef) => Effect.map(EventOutbox, (outbox) => outbox.log(entity));
-const flush = (h: OutboxHarness) => h.run(flushOutbox(h.fanOut.fanOut));
+/**
+ * A delivery's bound in these cases: the test's clock passes it in memory, and
+ * the real clock in an adapter whose programs run in a storage context of
+ * their own, where the test's clock cannot reach.
+ */
+const BOUND_MS = 1000;
+const flush = (h: OutboxHarness) => h.run(flushOutbox(h.fanOut.fanOut, BOUND_MS));
 const ids = (events: readonly EventEnvelope[]) => events.map((event) => event.eventId);
 
 /** An event about `entity` alone, as a scoped subscriber is matched against it. */
 const aboutOnly = (entity: EntityRef) => ({ entity, affected: [] });
+
+/** Waits on the real clock, ten milliseconds at a time for up to two seconds, until `ready` holds. */
+const liveUntil = (ready: () => boolean) =>
+  TestClock.withLive(
+    Effect.gen(function* () {
+      for (let waited = 0; waited < 200 && !ready(); waited += 1) yield* Effect.sleep(10);
+    }),
+  );
+
+/**
+ * A change's event owed to `agent:a`, which never answers, and to `lane:p:b`,
+ * and a flush of it started in the background, once both deliveries are under
+ * way and `lane:p:b` has taken its own.
+ */
+const flushWithSilentAgent = (h: OutboxHarness) =>
+  Effect.gen(function* () {
+    const entity = change();
+    yield* h.run(
+      Effect.gen(function* () {
+        const outbox = yield* EventOutbox;
+        yield* commit({ entity, cause: cause() }, () => {
+          outbox.subscribe("agent:a", "*");
+          outbox.subscribe("lane:p:b", "*");
+          return Result.succeed({ drafts: [started(entity, 1)], value: null });
+        });
+      }),
+    );
+    const events = yield* h.run(log(entity));
+    h.fanOut.hanging.add("agent:a");
+    const at = h.clock.now();
+    const flushing = yield* Effect.forkChild(flush(h));
+    yield* liveUntil(
+      () =>
+        h.fanOut.attempts.some((attempt) => attempt.subscriber === "agent:a") &&
+        h.fanOut.deliveredTo("lane:p:b").length > 0,
+    );
+    // The bound's timer starts with its delivery: let it be armed before the test's clock moves.
+    yield* TestClock.withLive(Effect.sleep(20));
+    return { events, at, flushing };
+  });
+
+/** The flush's end once the bound has passed, on the test's clock or the real one; none if it still waits after three seconds. */
+const pastTheBound = (flushing: Fiber.Fiber<FlushReport>) =>
+  Effect.gen(function* () {
+    yield* TestClock.adjust(BOUND_MS);
+    return yield* TestClock.withLive(Effect.timeoutOption(Fiber.await(flushing), "3 seconds"));
+  });
 
 export function describeEventOutboxContract(adapter: string, harness: () => OutboxHarness) {
   describe(`EventOutbox contract: ${adapter}`, () => {
@@ -446,6 +502,55 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
           h.clock.advance(1000);
           yield* flush(h);
           expect(ids(h.fanOut.deliveredTo("agent:a"))).toEqual(ids(events));
+        }),
+    );
+
+    it.effect(
+      "[outbox.flush-silent] holds back only a subscriber that never answers: the others are acknowledged, and at the bound it is owed again with its retry, its events arriving in order once it answers",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const { events, at, flushing } = yield* flushWithSilentAgent(h);
+          const ended = yield* pastTheBound(flushing);
+          expect(
+            Option.isSome(ended),
+            "the flush still waits on the subscriber that never answers",
+          ).toBe(true);
+          expect(Option.getOrUndefined(ended)).toEqual(
+            Exit.succeed({
+              delivered: events.length,
+              failed: ["agent:a"],
+              stuck: [],
+              nextAttemptAt: at + redeliveryDelay(1),
+            }),
+          );
+          expect(ids(h.fanOut.deliveredTo("lane:p:b"))).toEqual(ids(events));
+          expect(yield* h.run(Effect.map(EventOutbox, (outbox) => outbox.backlog()))).toEqual([
+            {
+              subscriber: "agent:a",
+              pending: events.length,
+              attempts: 1,
+              nextAttemptAt: at + redeliveryDelay(1),
+            },
+          ]);
+          h.fanOut.hanging.delete("agent:a");
+          h.clock.advance(redeliveryDelay(1));
+          yield* flush(h);
+          expect(ids(h.fanOut.deliveredTo("agent:a"))).toEqual(ids(events));
+        }),
+    );
+
+    it.effect(
+      "[outbox.flush-ack-each] acknowledges a delivery as its subscriber takes it, while another of the same flush is still unanswered",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const { events, flushing } = yield* flushWithSilentAgent(h);
+          const owed = yield* h.run(Effect.map(EventOutbox, (outbox) => outbox.backlog()));
+          expect(owed.map((entry) => [entry.subscriber, entry.pending])).toEqual([
+            ["agent:a", events.length],
+          ]);
+          yield* pastTheBound(flushing);
         }),
     );
 
