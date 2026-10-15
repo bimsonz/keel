@@ -300,6 +300,8 @@ describe("a reading's lookups", () => {
 
     expect(unnamed).toEqual([]);
     expect(result).toEqual(await readTree(parser, files, ["src/a.ts"]));
+    // It says which files it read: the seed and every file its imports reached, in path order.
+    expect(result).toHaveProperty("read", ["lib/c.ts", "src/a.ts", "src/b.ts", "src/dir/index.ts"]);
     expect(result).toHaveProperty("facts.calls", [
       {
         from: { path: "src/a.ts", symbol: "a" },

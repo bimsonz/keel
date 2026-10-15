@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts -t d21.derive.followed
+# kills: d21.derive.followed
+# why: the record does not say which files the base was read over beyond the seeds, so what a pass read cannot be seen
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index b79ea08d..c168622f 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -297,7 +297,6 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+       undecided: derivation.undecided,
+       ...(touchedHere.length === 0 ? {} : { touched: touchedHere }),
+       paths: [...new Set(touched)].toSorted().slice(0, DERIVED_PATHS_MAX),
+-      ...(followed.length === 0 ? {} : { followed }),
+     }),
+   );
+   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();

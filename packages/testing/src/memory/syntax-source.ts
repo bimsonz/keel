@@ -55,6 +55,9 @@ export function makeSyntaxSourceMemory() {
             // The fixture's facts carry a commit of their own; the reading's is the one asked for.
             facts: { ...held.parsed, commit },
             skipped,
+            read: [...new Set(seeds)]
+              .filter((path) => held.paths.has(path) && SUPPORTED.test(path))
+              .toSorted(),
             parser: "memory",
           });
         },

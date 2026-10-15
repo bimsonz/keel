@@ -35,6 +35,11 @@ export const SyntaxReading = Schema.Struct({
   facts: SourceFacts,
   /** In path order. A derivation that rests on this reading records them: a skipped file's caches are not in the facts. */
   skipped: Schema.Array(SyntaxSkipped),
+  /**
+   * Every file parsed, in path order: the seeds at the commit and the files
+   * their imports reached. Two readings compare only over the files both read.
+   */
+  read: Schema.Array(Schema.String),
   /** The rules' version and the parser's packages: what a derivation record is stamped with. */
   parser: Schema.NonEmptyString,
 });

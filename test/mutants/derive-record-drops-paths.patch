@@ -2,14 +2,14 @@
 # kills: d21.derive.committed
 # why: The derivation record keeps no paths, so EffectsDerived never says where the change's diff touched and its landing is indexed nowhere
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index 9e4932de..f88a9656 100644
+index b79ea08d..4ad9c5b1 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -265,7 +265,6 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+@@ -296,7 +296,6 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
        effects: derivation.effects,
        undecided: derivation.undecided,
        ...(touchedHere.length === 0 ? {} : { touched: touchedHere }),
 -      paths: [...new Set(touched)].toSorted().slice(0, DERIVED_PATHS_MAX),
+       ...(followed.length === 0 ? {} : { followed }),
      }),
    );
-   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();

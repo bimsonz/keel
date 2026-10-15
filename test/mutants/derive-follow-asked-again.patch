@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts -t d21.derive.followed
+# kills: d21.derive.followed
+# why: files the base was already asked about and found absent are counted as followed and asked for again
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index b79ea08d..c77ee29d 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -262,7 +262,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+   const asked =
+     "unavailable" in first
+       ? undefined
+-      : new Set([...seeds, ...first.read, ...first.skipped.map((skip) => skip.path)]);
++      : new Set(first.read);
+   const followed =
+     "unavailable" in after || asked === undefined
+       ? []

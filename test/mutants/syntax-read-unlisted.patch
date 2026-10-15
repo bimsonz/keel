@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/reading.test.ts -t reading.lookups
+# kills: reading.lookups
+# why: a reading does not say which files it read, so a derivation cannot read the base over the files the head reached
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 81e4cf91..3782f523 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -234,7 +234,7 @@ export function openReading(
+             skipped: [...skipped]
+               .map(([path, reason]) => ({ path, reason }))
+               .toSorted((a, b) => byPath(a.path, b.path)),
+-            read: [...models.keys()].toSorted(byPath),
++            read: [],
+           }
+         : { unavailable },
+   };

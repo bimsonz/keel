@@ -153,6 +153,7 @@ export const SyntaxSourceTreeSitter = (
             return {
               facts: { commit, ...result.facts },
               skipped: result.skipped,
+              read: result.read,
               parser: parser.version,
             };
           }),

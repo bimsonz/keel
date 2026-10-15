@@ -2,15 +2,15 @@
 # kills: d21.derive.parser-starting
 # why: A reading that met the parser while another call was booting it is never asked for again, so a change checked at that moment derives nothing
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index ae2251d..95bf859 100644
+index b79ea08d..11b0d208 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -156,7 +156,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
-   const read = (commit: CommitSha, retry: boolean): Effect.Effect<Reading> =>
-     source.facts(workspace.repo, commit, seeds).pipe(
+@@ -250,7 +250,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+   ): Effect.Effect<Reading> =>
+     source.facts(workspace.repo, commit, over).pipe(
        Effect.catchTag("SyntaxUnavailable", (e): Effect.Effect<Reading> =>
 -        e.reason === "parser-starting" && retry
 +        false
-           ? read(commit, false)
+           ? read(commit, over, false)
            : Effect.succeed({ unavailable: e.reason }),
        ),

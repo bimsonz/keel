@@ -51,7 +51,12 @@ export type SkipReason =
 export type Skipped = { readonly path: string; readonly reason: SkipReason };
 export type UnavailableReason = "too-many-seeds" | "too-many-bytes" | "too-many-failures";
 export type ReadingResult =
-  | { readonly facts: TreeFacts; readonly skipped: readonly Skipped[] }
+  | {
+      readonly facts: TreeFacts;
+      readonly skipped: readonly Skipped[];
+      /** Every file parsed, in path order: the seeds at the commit and the files their imports reached. */
+      readonly read: readonly string[];
+    }
   | { readonly unavailable: UnavailableReason };
 
 /** What a path is at the commit: a regular file, something else (a symlink, a submodule), or nothing. */
@@ -229,6 +234,7 @@ export function openReading(
             skipped: [...skipped]
               .map(([path, reason]) => ({ path, reason }))
               .toSorted((a, b) => byPath(a.path, b.path)),
+            read: [...models.keys()].toSorted(byPath),
           }
         : { unavailable },
   };

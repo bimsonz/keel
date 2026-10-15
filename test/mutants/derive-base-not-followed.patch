@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts -t d21.derive.followed
+# kills: d21.derive.followed
+# why: the base is read from the seeds alone, so a file only a created file imports is read at the head only and everything it already did is derived as the change's effect
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index b79ea08d..274dd1f2 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -266,7 +266,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+   const followed =
+     "unavailable" in after || asked === undefined
+       ? []
+-      : after.read.filter((path) => !asked.has(path));
++      : [];
+   const before =
+     followed.length === 0
+       ? first

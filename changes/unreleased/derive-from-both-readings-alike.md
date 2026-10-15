@@ -1,0 +1,3 @@
+### Fixed
+
+- **An effect a change did not make is no longer derived from code it only reached.** A derivation reads the files a change touches and follows their imports. A file the change created exists only at its head, so the head's reading reached files the base's never read, and what those files already did looked like the change's effect: a test added beside an already-impure function derived "purity is false" for that function's subject on every change, and with it a conflict with each live purity premise. The base is now read over every file the head reached that it was not asked about, so an untouched file says the same at both commits and derives nothing; the derivation record keeps those files as `followed`.

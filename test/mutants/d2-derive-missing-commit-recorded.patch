@@ -2,15 +2,15 @@
 # kills: d21.derive.missing-commit
 # why: A commit the code host lost is recorded as a parser failure and committed as an empty derivation, so a passing host fault lets a change through underived instead of the step retrying
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index ae2251d..2b30617 100644
+index b79ea08d..74a73d7d 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -160,7 +160,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
-           ? read(commit, false)
+@@ -254,7 +254,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+           ? read(commit, over, false)
            : Effect.succeed({ unavailable: e.reason }),
        ),
 -      Effect.orDie,
 +      Effect.catch(() => Effect.succeed({ unavailable: "parser-failed" as const })),
      );
-   const before = yield* read(base, true);
-   const after = yield* read(submission.commitSha, true);
+   const first = yield* read(base, seeds, true);
+   const after = yield* read(submission.commitSha, seeds, true);

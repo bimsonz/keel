@@ -91,6 +91,12 @@ export const DerivationRecord = Schema.Struct({
   touched: Schema.optional(Schema.Array(TouchedAnchor)),
   /** The paths the diff touches, sorted, at most DERIVED_PATHS_MAX; absent from a record kept before they were. */
   paths: Schema.optional(Schema.Array(Schema.String)),
+  /**
+   * The files the head's reading parsed that the base was never asked about,
+   * which the base was read over again, so both readings cover the same code;
+   * absent from a record kept before they were, or when there were none.
+   */
+  followed: Schema.optional(Schema.Array(Schema.String)),
 });
 export type DerivationRecord = typeof DerivationRecord.Type;
 
@@ -208,8 +214,16 @@ const recorded = (reading: Reading): RecordedReading =>
 /**
  * The `derive` step. Reads the project's live anchors here, inside the step,
  * so the anchors and the readings belong to one moment; parses the base and
- * the submitted commit from the same seeds; derives the change's effects
- * against what its intent declared; and keeps the record.
+ * the submitted commit from the same seeds, and the base once more over every
+ * file the head reached that the base was never asked about, so both readings
+ * cover the same code; derives the change's effects against what its intent declared; and
+ * keeps the record.
+ *
+ * A reading follows its seeds' imports, and a seed the change creates exists
+ * only at the head: read from the seeds alone, the base would leave out the
+ * files that seed reaches, and everything those files already do would look
+ * like the change's. Read over the head's files, an untouched file says the
+ * same at both commits and derives nothing.
  *
  * A reading that cannot be made is recorded, never refused and never thrown:
  * a parser's limits are not the change's fault. `parser-starting` is the
@@ -229,17 +243,34 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
   const anchors = yield* (yield* Projects).liveAnchors(workspace.projectId);
   const seeds = derivationSeeds(touched, workspace.subjects, anchors);
   const source = yield* SyntaxSource;
-  const read = (commit: CommitSha, retry: boolean): Effect.Effect<Reading> =>
-    source.facts(workspace.repo, commit, seeds).pipe(
+  const read = (
+    commit: CommitSha,
+    over: readonly string[],
+    retry: boolean,
+  ): Effect.Effect<Reading> =>
+    source.facts(workspace.repo, commit, over).pipe(
       Effect.catchTag("SyntaxUnavailable", (e): Effect.Effect<Reading> =>
         e.reason === "parser-starting" && retry
-          ? read(commit, false)
+          ? read(commit, over, false)
           : Effect.succeed({ unavailable: e.reason }),
       ),
       Effect.orDie,
     );
-  const before = yield* read(base, true);
-  const after = yield* read(submission.commitSha, true);
+  const first = yield* read(base, seeds, true);
+  const after = yield* read(submission.commitSha, seeds, true);
+  // The files the head reached that the base was never asked about: they are read at the base too.
+  const asked =
+    "unavailable" in first
+      ? undefined
+      : new Set([...seeds, ...first.read, ...first.skipped.map((skip) => skip.path)]);
+  const followed =
+    "unavailable" in after || asked === undefined
+      ? []
+      : after.read.filter((path) => !asked.has(path));
+  const before =
+    followed.length === 0
+      ? first
+      : yield* read(base, [...new Set([...seeds, ...followed])].toSorted(byCodePoint), true);
   const derivation: Derivation =
     "unavailable" in before || "unavailable" in after
       ? { effects: [], undecided: [] }
@@ -266,6 +297,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
       undecided: derivation.undecided,
       ...(touchedHere.length === 0 ? {} : { touched: touchedHere }),
       paths: [...new Set(touched)].toSorted().slice(0, DERIVED_PATHS_MAX),
+      ...(followed.length === 0 ? {} : { followed }),
     }),
   );
   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();

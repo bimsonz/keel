@@ -207,7 +207,7 @@ type Committed = { readonly repo: RepoRef; readonly sha: CommitSha };
  * in `asked`, every read of the live anchors in `anchorReads`, and every
  * derivation sent to the change in `committed`, a replay's included.
  */
-function derivingWorld() {
+function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
   const syntax = makeSyntaxSourceMemory();
   const changes = makeChangePrecheckMemory();
   const projects = makeProjectsMemory();
@@ -232,7 +232,7 @@ function derivingWorld() {
           }),
       });
     }),
-  ).pipe(Layer.provide(syntax.layer));
+  ).pipe(Layer.provide(reader ?? syntax.layer));
   const index = Layer.effect(
     Projects,
     Effect.gen(function* () {
@@ -323,6 +323,76 @@ function derivingWorld() {
     /** The record the evidence store holds under `ref` for the submission's namespace, as the JSON it keeps. */
     record: (ref: ContentHash): Record<string, unknown> =>
       JSON.parse(evidence.documents.get(keptAt(ref)) ?? "{}"),
+  };
+}
+
+/** A file as the import-following parser stand-in reads it: the files it imports, and the facts it holds. */
+type FollowedFile = { readonly imports?: readonly string[]; readonly facts?: Partial<ParsedTree> };
+
+const NO_FACTS: ParsedTree = {
+  stores: [],
+  accesses: [],
+  calls: [],
+  subscriptions: [],
+  impurities: [],
+};
+
+/**
+ * A parser stand-in that follows imports as the real reading does: each seed
+ * at the commit, then every file their imports name, to a fixpoint. A
+ * reading's facts are the facts of the files it read, and nothing else.
+ */
+function followingSyntax() {
+  const repo: RepoRef = { namespace: "memory", name: `following-${crypto.randomUUID()}` };
+  const commits = new Map<string, Readonly<Record<string, FollowedFile>>>();
+  return {
+    commit: (files: Readonly<Record<string, FollowedFile>>) =>
+      Effect.sync((): Committed => {
+        const sha = CommitSha.make(
+          [...crypto.getRandomValues(new Uint8Array(20))]
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join(""),
+        );
+        commits.set(sha, files);
+        return { repo, sha };
+      }),
+    layer: Layer.succeed(
+      SyntaxSource,
+      SyntaxSource.of({
+        facts: (_repo, commit, seeds) =>
+          Effect.sync(() => {
+            const tree = commits.get(commit) ?? {};
+            const absent = [...new Set(seeds)]
+              .filter((path) => tree[path] === undefined)
+              .toSorted();
+            const read = new Set<string>();
+            let level = [...new Set(seeds)].filter((path) => tree[path] !== undefined);
+            while (level.length > 0) {
+              for (const path of level) read.add(path);
+              level = [...new Set(level.flatMap((path) => tree[path]?.imports ?? []))].filter(
+                (path) => tree[path] !== undefined && !read.has(path),
+              );
+            }
+            const files = [...read].toSorted();
+            const facts = files.reduce<ParsedTree>((all, path) => {
+              const own = { ...NO_FACTS, ...tree[path]?.facts };
+              return {
+                stores: [...all.stores, ...own.stores],
+                accesses: [...all.accesses, ...own.accesses],
+                calls: [...all.calls, ...own.calls],
+                subscriptions: [...all.subscriptions, ...own.subscriptions],
+                impurities: [...all.impurities, ...own.impurities],
+              };
+            }, NO_FACTS);
+            return {
+              facts: { ...facts, commit },
+              skipped: absent.map((path) => ({ path, reason: "absent" as const })),
+              read: files,
+              parser: "following",
+            };
+          }),
+      }),
+    ),
   };
 }
 
@@ -798,4 +868,56 @@ describe("the live anchors a diff touches", () => {
     // An untouched file's anchors are not touched, whatever the footprint says.
     expect(touchedNames(touchedAnchors(["r.ts"], [editOf("q.ts", "tax")], anchors))).toEqual([]);
   });
+
+  it.effect(
+    "[d21.derive.followed] a file only the head's reading reached, through the import of a file the change created, is read at the base too: what it already did is not the change's effect, and what the change does to it still is",
+    () => {
+      const following = followingSyntax();
+      const world = derivingWorld(following.layer);
+      const NAMES = "src/domain/names.ts";
+      const TEST = "test/names.test.ts";
+      const COLOR = key("domain.check-color");
+      const checkColor: SymbolRef = { path: NAMES, symbol: "checkColor" };
+      const impure = {
+        impurities: [{ in: checkColor, what: "console.info", kind: "output" as const }],
+      };
+      return Effect.gen(function* () {
+        world.anchored(1, [
+          { subject: COLOR, anchors: [{ path: NAMES, symbol: "checkColor", commit: PINNED }] },
+        ]);
+        // checkColor was impure before the change, which adds a test that imports it and touches nothing else.
+        const base = yield* following.commit({ [NAMES]: { facts: impure } });
+        const head = yield* following.commit({
+          [NAMES]: { facts: impure },
+          [TEST]: { imports: [NAMES] },
+        });
+        const { answer } = yield* world.derive(base, head, [TEST]);
+        const record = world.record(answer.derivationRef);
+        expect(record["effects"]).toEqual([]);
+        expect(record["followed"]).toEqual([NAMES]);
+        expect(world.asked).toEqual([
+          { commit: base.sha, seeds: [TEST] },
+          { commit: head.sha, seeds: [TEST] },
+          { commit: base.sha, seeds: [NAMES, TEST] },
+        ]);
+
+        // A change that makes checkColor impure, beside the same test, still derives the effect.
+        const pure = yield* following.commit({ [NAMES]: {} });
+        const made = yield* following.commit({
+          [NAMES]: { facts: impure },
+          [TEST]: { imports: [NAMES] },
+        });
+        const { answer: derived } = yield* world.derive(pure, made, [NAMES, TEST]);
+        expect(world.record(derived.derivationRef)["effects"]).toEqual([
+          expect.objectContaining({
+            proposition: expect.objectContaining({
+              subject: COLOR,
+              predicate: "purity",
+              value: false,
+            }),
+          }),
+        ]);
+      });
+    },
+  );
 });

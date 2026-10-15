@@ -2,15 +2,15 @@
 # kills: d21.derive.seeds, d21.derive.undeclared
 # why: Both readings are of the base, so a change's head is never parsed: no change derives an effect, and a cache added without a word lands unjudged
 diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
-index ae2251d..2d20f58 100644
+index b79ea08d..8f757b30 100644
 --- a/packages/core/src/application/verification/derive-submission.ts
 +++ b/packages/core/src/application/verification/derive-submission.ts
-@@ -163,7 +163,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+@@ -257,7 +257,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
        Effect.orDie,
      );
-   const before = yield* read(base, true);
--  const after = yield* read(submission.commitSha, true);
-+  const after = yield* read(base, true);
-   const derivation: Derivation =
-     "unavailable" in before || "unavailable" in after
-       ? { effects: [], undecided: [] }
+   const first = yield* read(base, seeds, true);
+-  const after = yield* read(submission.commitSha, seeds, true);
++  const after = yield* read(base, seeds, true);
+   // The files the head reached that the base was never asked about: they are read at the base too.
+   const asked =
+     "unavailable" in first
