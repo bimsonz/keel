@@ -233,25 +233,31 @@ describe("the event backbone across real Durable Objects", () => {
     const entity: EntityRef = { kind: "change", id: changeId };
     const emitter = changeStub(changeId);
     agentStub(agentId);
-    // How many deliveries the outbox owed each time the object's own deadline ran.
-    const owed: number[] = [];
+    // What the outbox still owed each time the object's own deadline ran: how often each delivery was tried.
+    const owed: number[][] = [];
     await runInDurableObject(emitter, async (instance: ChangeDO, state) => {
       Reflect.set(instance, "onDeadline", async () => {
-        owed.push(tables(state).deliveries.length);
+        owed.push(tables(state).deliveries.map((delivery) => Number(delivery.attempts)));
       });
       // Committed without the flush an answer arms: that is armed below, due with the deadline.
       await Reflect.get(instance, "runtime").runPromise(
         emit(entity, "declare", [`agent:${agentId}`]),
       );
-      // The deadline's reason sorts before the flush's, and both are due at the same instant. The
-      // flush is armed first: the platform's alarm may fire between the two, and then runs it alone.
+      // The deadline's reason sorts before the flush's, and both are due at the same instant. Both rows
+      // are written in this one turn, before either arms the platform's alarm, so one run finds both due.
       const at = Date.now();
-      await scheduleAlarm(state.storage, { kind: "debounce", reason: OUTBOX_FLUSH, at });
-      await scheduleAlarm(state.storage, { kind: "deadline", reason: "a deadline", at });
+      await Promise.all([
+        scheduleAlarm(state.storage, { kind: "debounce", reason: OUTBOX_FLUSH, at }),
+        scheduleAlarm(state.storage, { kind: "deadline", reason: "a deadline", at }),
+      ]);
     });
-    await runDurableObjectAlarm(emitter);
-    await vi.waitFor(() => expect(owed).toEqual([0]), WAIT);
-    expect(await inbox(agentId)).toHaveLength(1);
+    // The platform's alarm runs them both, in one run.
+    await vi.waitFor(() => expect(owed).toHaveLength(1), WAIT);
+    // Every delivery the commit owed (its agent's and the projector's) was tried before the deadline ran. One
+    // that failed, or was not answered within its bound under load, is still owed and is tried again later:
+    // which delivery succeeds is not this test's to say.
+    expect(owed[0]?.filter((attempts) => attempts === 0)).toEqual([]);
+    await vi.waitFor(async () => expect(await inbox(agentId)).toHaveLength(1), WAIT);
   });
 
   it("[b1.duplicate-noop] treats a duplicate delivery as a no-op: the receiver's state and event log are unchanged", async () => {

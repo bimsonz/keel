@@ -485,8 +485,23 @@ describe("[t694.claim] alternatives by claim key", () => {
         fc.record({ op: fc.constant("preflight" as const), i: fc.nat(4), listed: fc.constant([]) }),
         fc.record({ op: fc.constant("end" as const), i: fc.nat(4), landed: fc.boolean() }),
       );
+      // Every run opens with two changes declaring the same claims, one of them preflighted, so every run tells
+      // someone: alternatives meet seldom by chance (a few runs in 300), and a run that tells nobody compares no
+      // notices. What follows is drawn freely.
+      const opening = fc
+        .tuple(
+          fc.nat(4),
+          fc.nat(3),
+          claimSetArb.filter((claims) => claims.length > 0),
+        )
+        .map(([first, step, claims]) => [
+          { op: "declare" as const, i: first, claims },
+          { op: "declare" as const, i: (first + 1 + step) % 5, claims },
+          { op: "preflight" as const, i: first, listed: [] },
+        ]);
       fc.assert(
-        fc.property(fc.array(op, { minLength: 1, maxLength: 30 }), (ops) => {
+        fc.property(opening, fc.array(op, { maxLength: 30 }), (opened, drawn) => {
+          const ops = [...opened, ...drawn];
           const folded = index();
           const scan = wholeScan();
           for (const o of ops) {
