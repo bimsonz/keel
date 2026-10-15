@@ -10,4 +10,5 @@ export * from "./invitation-machine.ts";
 export * from "./quota.ts";
 export * from "./revocation.ts";
 export * from "./run.ts";
+export * from "./sponsor-request.ts";
 export * from "./tenancy.ts";

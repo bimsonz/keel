@@ -58,6 +58,7 @@ import {
   type PresentedKey,
   type ProjectResource,
   roleOf,
+  SponsorRequestRefused,
 } from "@keeltown/core/domain/identity";
 import type { Change, ChangeNotFound } from "@keeltown/core/domain/coordination";
 import {
@@ -69,15 +70,19 @@ import {
   ProbeId,
   ProjectId as ProjectIdSchema,
   type ProjectId,
+  type AgentId,
+  UserId,
   userActor,
 } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
+  Clock,
   type Changes,
   type EscalationReader,
   Namespaces,
   ProjectNamespaces,
   type Projects,
+  SponsorRequests,
   Sponsorships,
   Trunks,
 } from "@keeltown/core/ports";
@@ -131,7 +136,7 @@ import {
   rulingInput,
   rulingOk,
 } from "./escalations.ts";
-import { eventsInput, eventsOk } from "./events.ts";
+import { EVENT_LINES_PAGE, eventsInput, eventsOk } from "./events.ts";
 import {
   changeListInput,
   changesOk,
@@ -160,16 +165,29 @@ import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
 import { lanesOk, noTrunk, trunkOk } from "./integration-views.ts";
 import {
   approveError,
+  approveFromListError,
   askError,
   askOk,
+  askPersonError,
+  askPersonOk,
+  blockedOk,
   cardNotFound,
   cardOk,
+  declinedOk,
+  declineError,
   decodeLinkAgent,
   endError,
   freshSignInRequired,
   linkOk,
+  type ListedCard,
+  noRequestFromAgent,
   noSuchRequest,
+  notBlocked,
   sponsoredOk,
+  unblockedOk,
+  unblockError,
+  type Waiting,
+  waitingOk,
 } from "./sponsorship.ts";
 import { decisionHandlers } from "./decisions.ts";
 import { verdictHandlers } from "./verdicts.ts";
@@ -489,6 +507,41 @@ const placed = (agent: Agent) =>
     }),
   );
 
+const decodePerson = Schema.decodeUnknownOption(UserId);
+
+/**
+ * The person a handle names, whom an agent may ask to sponsor it: a person's
+ * own namespace, not banned. An agent's or an org's handle, and nobody's, is none.
+ */
+const personNamed = (handle: string) =>
+  Namespaces.use((namespaces) => namespaces.byHandle(handle.toLowerCase())).pipe(
+    Effect.map((found) =>
+      Option.flatMap(found, (record) =>
+        record.kind === "user" && !record.suspended
+          ? decodePerson(record.namespace)
+          : Option.none(),
+      ),
+    ),
+  );
+
+/** An agent's card, as anyone reads it: none when there is no such agent. */
+const cardOf = (agentId: AgentId) =>
+  Effect.gen(function* () {
+    const agent = yield* AgentDirectory.use((directory) => directory.findAgent(agentId));
+    if (Option.isNone(agent)) return Option.none<ListedCard>();
+    const { org } = agent.value;
+    const place =
+      org === undefined
+        ? Option.none()
+        : yield* Namespaces.use((namespaces) => namespaces.byId(org));
+    const card = cardOk(
+      agent.value,
+      Option.match(place, { onNone: () => undefined, onSome: (record) => record.handle }),
+      yield* joinedOrgs(agent.value.id),
+    );
+    return card.status === 200 ? Option.some(card.body) : Option.none<ListedCard>();
+  });
+
 /** A move that a device sign-in approved with a passkey within ten minutes may make too. */
 export interface Touch {
   readonly device: true;
@@ -609,9 +662,35 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   }),
                 ),
               ),
-        askSponsor: (caller: Caller) => {
+        askSponsor: (caller: Caller, input: Input<"askSponsor">) => {
           const { principal } = caller;
           if (principal._tag !== "Agent") return agentsOnly(caller.requestId);
+          const handle = input.person;
+          if (handle !== undefined) {
+            const inRun = caller.token?.run;
+            return run(
+              caller,
+              Effect.gen(function* () {
+                const person = yield* personNamed(handle);
+                if (Option.isNone(person))
+                  return yield* new SponsorRequestRefused({ agentId: principal.agentId });
+                return yield* Sponsorships.use((links) =>
+                  links.askPerson({
+                    agentId: principal.agentId,
+                    person: person.value,
+                    ...(inRun === undefined ? {} : { run: inRun }),
+                    // Asking again while a request waits answers it, so no key is the agent's to give.
+                    idempotencyKey: `ask-${crypto.randomUUID()}`,
+                  }),
+                );
+              }).pipe(
+                Effect.match({
+                  onSuccess: (request) => askPersonOk(handle, request.expiresAt),
+                  onFailure: (error) => askPersonError(caller, handle, error),
+                }),
+              ),
+            );
+          }
           return run(
             caller,
             Sponsorships.use((links) => links.ask(principal.agentId)).pipe(
@@ -987,11 +1066,18 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         Inbox_listEvents: (caller: Caller, input: Input<"Inbox_listEvents">) => {
           const decoded = eventsInput(input);
           if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-          const { project: _named, ...read } = decoded.success;
+          const { project: _named, ...asked } = decoded.success;
+          const view = input.view ?? "full";
+          const read =
+            view === "lines" && asked.limit === undefined
+              ? { ...asked, limit: EVENT_LINES_PAGE }
+              : asked;
           if (caller.resource !== undefined)
             return run(
               caller,
-              readEvents({ _tag: "Project", ...scopeOf(caller) }, read).pipe(Effect.map(eventsOk)),
+              readEvents({ _tag: "Project", ...scopeOf(caller) }, read).pipe(
+                Effect.map((page) => eventsOk(page, view)),
+              ),
             );
           if (caller.principal._tag !== "User")
             return invalid(caller, [
@@ -1021,7 +1107,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                       }),
                       Effect.provideContext(services),
                     );
-              return eventsOk(yield* readEvents({ _tag: "Readable", audienceOf }, read));
+              return eventsOk(yield* readEvents({ _tag: "Readable", audienceOf }, read), view);
             }),
           );
         },
@@ -1048,7 +1134,17 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             readRepoBlob(projectId.success, {
               ...(input.ref === undefined ? {} : { ref: input.ref }),
               path: input.path,
-            }).pipe(Effect.match({ onSuccess: blobOk, onFailure: (e) => repoError(caller, e) })),
+            }).pipe(
+              Effect.match({
+                onSuccess: (view) =>
+                  blobOk(view, {
+                    projectId: projectId.success,
+                    ...(input.ref === undefined ? {} : { ref: input.ref }),
+                    ...(input.startLine === undefined ? {} : { startLine: input.startLine }),
+                  }),
+                onFailure: (e) => repoError(caller, e),
+              }),
+            ),
           );
         },
         Repo_listCommits: (caller: Caller, input: Input<"Repo_listCommits">) => {
@@ -1262,6 +1358,123 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 },
               })),
             ),
+          );
+        },
+        Users_listSponsorRequests: (caller: Caller) => {
+          const { principal } = caller;
+          if (principal._tag !== "User")
+            return Promise.reject(new Error("Users_listSponsorRequests ran without a user"));
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const now = yield* Clock.use((clock) => clock.now);
+              const rows = yield* SponsorRequests.use((requests) =>
+                requests.waitingFor(principal.userId, now),
+              );
+              const items: Waiting[] = [];
+              for (const row of rows) {
+                const card = yield* cardOf(row.agentId);
+                if (Option.isSome(card) && row.askedAt !== undefined && row.expiresAt !== undefined)
+                  items.push({ agent: card.value, askedAt: row.askedAt, expiresAt: row.expiresAt });
+              }
+              return waitingOk(items);
+            }),
+          );
+        },
+        Users_approveSponsorRequest: (
+          caller: Caller,
+          input: Input<"Users_approveSponsorRequest">,
+        ) =>
+          touchedForStanding(caller, () => {
+            const agentId = decodeLinkAgent(input.agentId);
+            if (Option.isNone(agentId)) return noRequestFromAgent(caller);
+            return run(
+              caller,
+              actorOf(caller).pipe(
+                Effect.flatMap((actor) =>
+                  Sponsorships.use((links) =>
+                    links.approve({
+                      agentId: agentId.value,
+                      by: actor.userId,
+                      asked: { _tag: "List" },
+                      idempotencyKey: input["idempotency-key"],
+                    }),
+                  ),
+                ),
+                Effect.flatMap(placed),
+                Effect.match({
+                  onSuccess: linkOk,
+                  onFailure: (error) => approveFromListError(caller, error),
+                }),
+              ),
+            );
+          }),
+        Users_declineSponsorRequest: (
+          caller: Caller,
+          input: Input<"Users_declineSponsorRequest">,
+        ) => {
+          const agentId = decodeLinkAgent(input.agentId);
+          if (Option.isNone(agentId)) return noRequestFromAgent(caller);
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const actor = yield* actorOf(caller);
+              const { blocked } = yield* Sponsorships.use((links) =>
+                links.decline(
+                  {
+                    agentId: agentId.value,
+                    person: actor.userId,
+                    idempotencyKey: input["idempotency-key"],
+                  },
+                  input.block === true,
+                ),
+              );
+              const card = yield* cardOf(agentId.value);
+              if (Option.isNone(card))
+                return yield* new SponsorRequestRefused({ agentId: agentId.value });
+              return declinedOk(card.value, blocked);
+            }).pipe(Effect.catch((error) => Effect.succeed(declineError(caller, error)))),
+          );
+        },
+        Users_listBlockedAgents: (caller: Caller) => {
+          const { principal } = caller;
+          if (principal._tag !== "User")
+            return Promise.reject(new Error("Users_listBlockedAgents ran without a user"));
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const rows = yield* SponsorRequests.use((requests) =>
+                requests.blockedBy(principal.userId),
+              );
+              const items: { agent: ListedCard; blockedAt: number }[] = [];
+              for (const row of rows) {
+                const card = yield* cardOf(row.agentId);
+                if (Option.isSome(card) && row.blockedAt !== undefined)
+                  items.push({ agent: card.value, blockedAt: row.blockedAt });
+              }
+              return blockedOk(items);
+            }),
+          );
+        },
+        Users_unblockAgent: (caller: Caller, input: Input<"Users_unblockAgent">) => {
+          const agentId = decodeLinkAgent(input.agentId);
+          if (Option.isNone(agentId)) return notBlocked(caller);
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const actor = yield* actorOf(caller);
+              yield* Sponsorships.use((links) =>
+                links.unblock({
+                  agentId: agentId.value,
+                  person: actor.userId,
+                  idempotencyKey: input["idempotency-key"],
+                }),
+              );
+              const card = yield* cardOf(agentId.value);
+              if (Option.isNone(card))
+                return yield* new SponsorRequestRefused({ agentId: agentId.value });
+              return unblockedOk(card.value);
+            }).pipe(Effect.catch((error) => Effect.succeed(unblockError(caller, error)))),
           );
         },
         Operator_getSettings: (caller: Caller, input: Input<"Operator_getSettings">) => {

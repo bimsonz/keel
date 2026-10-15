@@ -3,6 +3,7 @@ import { ChangeRequeued, type RequeueReason } from "../../domain/coordination/in
 import {
   AgentInvited,
   AgentInvitedToProject,
+  SponsorRequested,
   AgentLeftNamespace,
   AgentLeftProject,
   type AgentNotice,
@@ -77,6 +78,7 @@ export const inboxDepth = (store: Store, run?: RunId): number => {
 const decodeInvited = Schema.decodeUnknownOption(AgentInvited);
 const decodeLeft = Schema.decodeUnknownOption(AgentLeftNamespace);
 const decodeInvitedTo = Schema.decodeUnknownOption(AgentInvitedToProject);
+const decodeRequested = Schema.decodeUnknownOption(SponsorRequested);
 const decodeLeftProject = Schema.decodeUnknownOption(AgentLeftProject);
 const decodeActionable = Schema.decodeUnknownOption(
   Schema.Struct({ nextActions: Schema.optional(Schema.Array(NextAction)) }),
@@ -250,6 +252,14 @@ export function detailOf(event: EventEnvelope): string | undefined {
       return "a person now stands behind you: your questions go to them, and they may pause you";
     case "AgentUnsponsored":
       return "nobody stands behind you now";
+    case "SponsorRequested":
+      return Option.match(decodeRequested(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `the agent ${p.agentId} asks the person who sponsors you to sponsor it too: they approve or decline it on their own list of sponsor requests`,
+      });
+    case "SponsorRequestDeclined":
+      return "the person you asked declined to sponsor you";
     default:
       return undefined;
   }
@@ -273,6 +283,24 @@ export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefin
   if (event.type === "AgentSponsored" || event.type === "AgentUnsponsored")
     return [
       { kind: "read", title: "Read who you are and who stands behind you", operationId: "whoami" },
+    ];
+  if (event.type === "SponsorRequested")
+    return Option.match(decodeRequested(event.payload), {
+      onNone: () => undefined,
+      onSome: (p) => [
+        {
+          kind: "escalate",
+          title: `Tell the person who sponsors you that ${p.agentId} asks them to sponsor it: they approve or decline it on their own list of sponsor requests`,
+        },
+      ],
+    });
+  if (event.type === "SponsorRequestDeclined")
+    return [
+      {
+        kind: "call",
+        title: "Ask someone else to sponsor you, or ask for a link to show a person",
+        operationId: "askSponsor",
+      },
     ];
   if (event.type === "AgentInvited")
     return Option.match(decodeInvited(event.payload), {

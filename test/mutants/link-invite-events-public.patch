@@ -2,12 +2,12 @@
 # kills: b12.event-audience
 # why: an invitation's event is served to anyone, and it names the member who invited the agent
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index 3e559cfb..289d6bb0 100644
+index e11f72c3..72044c98 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -39,7 +39,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
-   AgentSponsored: "members",
-   AgentUnsponsored: "members",
+@@ -44,7 +44,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   SponsorRequestDeclined: "members",
+   SponsorBlockLifted: "members",
    // An invitation and its end name the member or whoever ended it; that an agent joined names no person.
 -  AgentInvited: "members",
 +  AgentInvited: "public",

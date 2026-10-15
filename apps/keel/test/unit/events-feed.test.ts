@@ -77,4 +77,34 @@ describe("[events.served] the feed serves each event as core reads it now", () =
     expect(items.map((item) => item.run)).toEqual([lane, unlabelled, undefined]);
     expect(items.map((item) => "run" in item)).toEqual([true, true, false]);
   });
+
+  it("[events.lines] a page as lines holds one short line per event and no envelopes, and meets the spec; the whole view is the envelopes", () => {
+    const events = [
+      entry(1, { kind: "agent", id: agentId }, enrolled),
+      entry(2, { kind: "session", id: sessionId }, opened),
+    ];
+    const lines = Reflect.get(eventsOk({ events, cursor: "000000000002" }, "lines"), "body");
+    expect(eventPageSchema.safeParse(lines).success).toBe(true);
+    expect(lines).toEqual({
+      items: [],
+      lines: [
+        {
+          at: new Date(1_760_000_000_001).toISOString(),
+          type: "AgentEnrolled",
+          entity: `agent:${agentId}`,
+          line: `Agent enrolled: ${agentId}`,
+        },
+        {
+          at: new Date(1_760_000_000_002).toISOString(),
+          type: "SessionOpened",
+          entity: `session:${sessionId}`,
+          line: `Session opened: ${sessionId}`,
+        },
+      ],
+      nextCursor: "000000000002",
+    });
+    expect(JSON.stringify(lines).length).toBeLessThan(
+      JSON.stringify(Reflect.get(eventsOk({ events, cursor: "000000000002" }), "body")).length / 2,
+    );
+  });
 });

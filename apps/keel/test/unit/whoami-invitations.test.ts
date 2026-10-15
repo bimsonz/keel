@@ -86,7 +86,7 @@ describe("whoami's answer", () => {
     ]);
   });
 
-  it("[whoami.sponsor-next] tells an agent nobody stands behind to ask a person, askSponsor first, and says nothing of it once someone does", () => {
+  it("[whoami.sponsor-next] tells an agent nobody stands behind to ask a person, askSponsor first unless an invitation waits to be read, and says nothing of it once someone does", () => {
     const { sponsor: _, ...unsponsored } = agent;
     const alone = answer({ agent: unsponsored, session: null, invitations: none, joined: none });
     expect(alone.summary).toBe(
@@ -106,8 +106,8 @@ describe("whoami's answer", () => {
       joined: none,
     });
     expect(invited.next.map((action) => action.operationId)).toEqual([
-      "askSponsor",
       "Agents_listNamespaces",
+      "askSponsor",
     ]);
     const backed = answer({ agent, session: null, invitations: none, joined: none });
     expect(backed.summary).not.toMatch(/sponsor/);
@@ -183,7 +183,7 @@ describe("whoami's answer", () => {
     const backed = whoamiOk({ ...fresh, agent: { ...keyAgent, sponsor: sampleSponsorId } }, here);
     if (backed.status !== 200) throw new Error(`whoami answered ${backed.status}`);
     expect(backed.body.next.map((action) => action.kind)).toEqual(["call", "escalate"]);
-    // Invited into an org and to a project as well, it is still named three steps, the declare first.
+    // Invited into an org and to a project as well, it is still named three steps: the declare, then the invitations.
     const crowded = whoamiOk(
       { agent: keyAgent, session: null, invitations: { namespaces: 1, projects: 1 }, joined: none },
       here,
@@ -191,8 +191,8 @@ describe("whoami's answer", () => {
     if (crowded.status !== 200) throw new Error(`whoami answered ${crowded.status}`);
     expect(crowded.body.next.map((action) => action.operationId)).toEqual([
       "declare",
-      "askSponsor",
       "Agents_listNamespaces",
+      "Agents_listProjects",
     ]);
     for (const declares of [false, undefined]) {
       expect(reads(declares).summary).not.toMatch(/This token is for/);

@@ -2,15 +2,15 @@
 # kills: b12.event-audience
 # why: AgentSponsored is served to the public, so anyone reading a public project's feed learns which person stands behind an agent
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index 7e1781d9..1b4acbe6 100644
+index e11f72c3..b2132fbc 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -36,7 +36,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+@@ -38,7 +38,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
    AgentSuspended: "members",
    AgentReinstated: "members",
    AgentRevoked: "members",
 -  AgentSponsored: "members",
 +  AgentSponsored: "public",
    AgentUnsponsored: "members",
-   // An invitation and its end name the member or whoever ended it; that an agent joined names no person.
-   AgentInvited: "members",
+   SponsorRequested: "members",
+   SponsorRequestDeclined: "members",

@@ -9,8 +9,8 @@ index 50d7087c..92737c07 100644
            ? premise
            : {
                ...premise,
--              anchors: premise.anchors.map((a) => (a.commit === PENDING ? { ...a, commit } : a)),
-+              anchors: premise.anchors.map((a) => a),
+-              anchors: anchorsOf(premise).map((a) => (a.commit === PENDING ? { ...a, commit } : a)),
++              anchors: anchorsOf(premise).map((a) => a),
              },
        ),
      })),

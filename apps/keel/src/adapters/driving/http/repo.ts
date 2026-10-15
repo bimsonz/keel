@@ -98,18 +98,77 @@ export function treeOk(view: RepoTreeView): Extract<Repo_getTreeResult, { readon
   };
 }
 
-export function blobOk(view: RepoBlobView): Extract<Repo_getBlobResult, { readonly status: 200 }> {
+/** The most of a file's text one read answers: a larger file comes a page at a time. */
+export const BLOB_PAGE_BYTES = 64 * 1024;
+
+/**
+ * The page of a file's lines that starts at `start` (1-based): whole lines, as
+ * many as fit in `BLOB_PAGE_BYTES`, and at least one.
+ */
+function pageOf(whole: string, start: number) {
+  const lines = whole.split(/(?<=\n)/);
+  const total = lines.length;
+  const first = Math.min(Math.max(start, 1), total);
+  const encoder = new TextEncoder();
+  let bytes = 0;
+  let end = first - 1;
+  while (end < total) {
+    const size = encoder.encode(lines[end] ?? "").byteLength;
+    if (end >= first && bytes + size > BLOB_PAGE_BYTES) break;
+    bytes += size;
+    end += 1;
+  }
+  return { content: lines.slice(first - 1, end).join(""), start: first, end, total };
+}
+
+/**
+ * A file as the API serves it: whole when its text fits in a page, else the
+ * page `startLine` names, with which lines it holds, where the next starts and
+ * the read that fetches it.
+ */
+export function blobOk(
+  view: RepoBlobView,
+  asked: { readonly projectId: string; readonly ref?: string; readonly startLine?: number },
+): Extract<Repo_getBlobResult, { readonly status: 200 }> {
+  const body = {
+    commit: view.commit,
+    path: view.path,
+    sha: view.oid,
+    mode: view.mode,
+    size: view.size,
+    binary: view.binary,
+    truncated: view.truncated,
+  };
+  if (view.content === undefined) return { status: 200, body };
+  const written = new TextDecoder().decode(view.content);
+  if (view.content.byteLength <= BLOB_PAGE_BYTES && asked.startLine === undefined)
+    return { status: 200, body: { ...body, content: written } };
+  const page = pageOf(written, asked.startLine ?? 1);
+  const nextStartLine = page.end < page.total ? page.end + 1 : undefined;
   return {
     status: 200,
     body: {
-      commit: view.commit,
-      path: view.path,
-      sha: view.oid,
-      mode: view.mode,
-      size: view.size,
-      binary: view.binary,
-      truncated: view.truncated,
-      ...(view.content === undefined ? {} : { content: new TextDecoder().decode(view.content) }),
+      ...body,
+      content: page.content,
+      lines: { start: page.start, end: page.end, total: page.total },
+      ...(nextStartLine === undefined
+        ? {}
+        : {
+            nextStartLine,
+            next: [
+              {
+                kind: "call" as const,
+                title: `Read lines ${nextStartLine} on of ${page.total}`,
+                operationId: "Repo_getBlob",
+                args: {
+                  projectId: asked.projectId,
+                  path: view.path,
+                  ...(asked.ref === undefined ? {} : { ref: asked.ref }),
+                  startLine: nextStartLine,
+                },
+              },
+            ],
+          }),
     },
   };
 }

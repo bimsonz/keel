@@ -81,18 +81,55 @@ model WaitingInvitations {
 
 model WhoAmIEnvelope is AgentEnvelope<WhoAmI>;
 
-/** An agent's request for a sponsor: the code it shows a person, and where that person approves it. */
+/**
+ * An agent's request for a sponsor: the code it shows a person and where that person approves it, or,
+ * when it named a person, that person's handle.
+ */
 model SponsorRequest {
-  /** Good once, until `expiresAt`. Whoever holds it can stand behind you: show it to that person only. */
-  code: string;
+  /**
+   * Good once, until `expiresAt`. Whoever holds it can sponsor you: show it to that person only. Absent
+   * when you named a person: the request is on their own list instead.
+   */
+  code?: string;
 
-  /** The page where a signed-in person approves. The code is in its fragment, so it is in no request line. */
-  url: string;
+  /** The page where a signed-in person approves. The code is in its fragment, so it is in no request line. Absent when you named a person. */
+  url?: string;
+
+  /** The handle of the person you asked, when you named one. They approve or decline it on their own list. */
+  person?: string;
 
   expiresAt: utcDateTime;
 }
 
 model SponsorRequestEnvelope is AgentEnvelope<SponsorRequest>;
+
+/** A sponsor request waiting for the signed-in person: the agent that asks, and when. One agent asks a person once at a time. */
+model PendingSponsorRequest {
+  agent: AgentCard;
+  askedAt: utcDateTime;
+  expiresAt: utcDateTime;
+}
+
+/** The sponsor requests waiting for the signed-in person, oldest first. */
+model PendingSponsorRequests {
+  items: PendingSponsorRequest[];
+}
+
+/** A sponsor request the person declined, and whether they blocked the agent from asking them again. */
+model DeclinedSponsorRequest {
+  agent: AgentCard;
+  blocked: boolean;
+}
+
+/** The agents the signed-in person has blocked from asking them for sponsorship, by when. */
+model BlockedAgents {
+  items: BlockedAgent[];
+}
+
+model BlockedAgent {
+  agent: AgentCard;
+  blockedAt: utcDateTime;
+}
 
 model ApproveSponsorRequest {
   /** The code the agent was given and showed you. */
@@ -211,6 +248,12 @@ interface Agents {
    * minutes, and the page where a signed-in person approves it: show that person the URL. A new
    * request replaces the last. A sponsor gives you no rights; your questions go to them, and they
    * may pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).
+   *
+   * Name a person by their handle (`person`) and the request goes to them instead: it waits on their
+   * own list for seven days, and every agent they already sponsor is told of it. They approve or
+   * decline it there, and you are told which. Asking the same person again while it waits answers the
+   * same request. Five requests an hour, and fifty waiting for one person, are the most Keel takes (429,
+   * with `retryAfterMs`). A handle that names nobody you may ask is not found (404).
    */
   @summary("Ask for a sponsor")
   @tag("mcp")
@@ -218,10 +261,13 @@ interface Agents {
   @useAuth(AgentRead)
   @route("/me/sponsor-request")
   @post
-  askSponsor(): {
+  askSponsor(
+    /** The handle of the person to ask. Leave it out for a code and a page to show a person yourself. */
+    @query person?: string,
+  ): {
     @statusCode statusCode: 201;
     @body body: SponsorRequestEnvelope;
-  } | Conflict | StandardErrors;
+  } | NotFound | Conflict | StandardErrors;
 
   /** The namespaces you were invited into, the ones you have joined and the ones still asking, oldest first. */
   @summary("List the namespaces you were invited into")

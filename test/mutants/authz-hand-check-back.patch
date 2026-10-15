@@ -2,11 +2,12 @@
 # kills: authz.no-hand-checks
 # why: a handler decides by a scope again, beside the policy: two places to change and one to forget
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 26d7e408..a17e518c 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -461,7 +461,7 @@
-               caller,
-               readEvents({ _tag: "Project", ...scopeOf(caller) }, read).pipe(Effect.map(eventsOk)),
+@@ -1059,7 +1059,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                 Effect.map((page) => eventsOk(page, view)),
+               ),
              );
 -          if (caller.principal._tag !== "User")
 +          if (caller.principal._tag !== "User" && caller.token?.scopes.includes("observer") !== true)

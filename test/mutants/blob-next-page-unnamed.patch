@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t repo.blob-pages
+# kills: repo.blob-pages
+# why: a page never says where the next one starts, so the reader cannot get past the first
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 79d2f8cf..328021df 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -146,7 +146,7 @@ export function blobOk(
+       ...body,
+       content: page.content,
+       lines: { start: page.start, end: page.end, total: page.total },
+-      ...(nextStartLine === undefined
++      ...(true
+         ? {}
+         : {
+             nextStartLine,

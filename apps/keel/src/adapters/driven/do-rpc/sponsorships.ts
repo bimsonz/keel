@@ -5,8 +5,11 @@ import { Effect, Layer, Schema } from "effect";
 import {
   AgentSessionCodecs,
   ApproveSponsorCommand,
+  AskPersonCommand,
   AskSponsorCommand,
+  DeclinePersonCommand,
   EndSponsorCommand,
+  UnblockPersonCommand,
 } from "../../../rpc/index.ts";
 import { callObject, fingerprintOf, sha256Of } from "./answer.ts";
 
@@ -15,11 +18,17 @@ export interface SponsorshipsStub {
   askSponsor(command: typeof AskSponsorCommand.Encoded): Promise<unknown>;
   approveSponsor(command: typeof ApproveSponsorCommand.Encoded): Promise<unknown>;
   endSponsorship(command: typeof EndSponsorCommand.Encoded): Promise<unknown>;
+  askPerson(command: typeof AskPersonCommand.Encoded): Promise<unknown>;
+  declinePerson(command: typeof DeclinePersonCommand.Encoded): Promise<unknown>;
+  unblockPerson(command: typeof UnblockPersonCommand.Encoded): Promise<unknown>;
 }
 
 const encodeAsk = Schema.encodeSync(AskSponsorCommand);
 const encodeApprove = Schema.encodeSync(ApproveSponsorCommand);
 const encodeEnd = Schema.encodeSync(EndSponsorCommand);
+const encodeAskPerson = Schema.encodeSync(AskPersonCommand);
+const encodeDecline = Schema.encodeSync(DeclinePersonCommand);
+const encodeUnblock = Schema.encodeSync(UnblockPersonCommand);
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -64,6 +73,7 @@ export function SponsorshipsRpc(
               encodeApprove({
                 by: approval.by,
                 ...(codeHash === undefined ? {} : { codeHash }),
+                ...(asked._tag === "List" ? { fromList: true } : {}),
                 idempotencyKey: approval.idempotencyKey,
                 fingerprint,
               }),
@@ -80,6 +90,49 @@ export function SponsorshipsRpc(
                 by,
                 ...(ending.run === undefined ? {} : { run: ending.run }),
                 idempotencyKey: ending.idempotencyKey,
+                fingerprint,
+              }),
+            ),
+          );
+        }),
+      askPerson: (move) =>
+        Effect.gen(function* () {
+          const fingerprint = yield* Effect.promise(() => fingerprintOf({ ask: move.person }));
+          return yield* callObject(AgentSessionCodecs.askPerson, () =>
+            agentSession(move.agentId).askPerson(
+              encodeAskPerson({
+                person: move.person,
+                ...(move.run === undefined ? {} : { run: move.run }),
+                idempotencyKey: move.idempotencyKey,
+                fingerprint,
+              }),
+            ),
+          );
+        }),
+      decline: (move, block) =>
+        Effect.gen(function* () {
+          const fingerprint = yield* Effect.promise(() =>
+            fingerprintOf({ decline: move.person, block }),
+          );
+          return yield* callObject(AgentSessionCodecs.declinePerson, () =>
+            agentSession(move.agentId).declinePerson(
+              encodeDecline({
+                person: move.person,
+                block,
+                idempotencyKey: move.idempotencyKey,
+                fingerprint,
+              }),
+            ),
+          );
+        }),
+      unblock: (move) =>
+        Effect.gen(function* () {
+          const fingerprint = yield* Effect.promise(() => fingerprintOf({ unblock: move.person }));
+          return yield* callObject(AgentSessionCodecs.unblockPerson, () =>
+            agentSession(move.agentId).unblockPerson(
+              encodeUnblock({
+                person: move.person,
+                idempotencyKey: move.idempotencyKey,
                 fingerprint,
               }),
             ),

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-lenient
+# kills: a11.declare-lenient
+# why: a function's camel-cased name is run together, so checkColor reads as checkcolor and no anchor or other premise on check-color meets it
+diff --git a/apps/keel/src/adapters/driving/http/premise-input.ts b/apps/keel/src/adapters/driving/http/premise-input.ts
+index 34a42586..a9a8ca2d 100644
+--- a/apps/keel/src/adapters/driving/http/premise-input.ts
++++ b/apps/keel/src/adapters/driving/http/premise-input.ts
+@@ -86,7 +86,6 @@ export const subjectKeyOf = (subject: string): string =>
+   subject
+     .trim()
+     .replace(/\([^)]*\)/g, "")
+-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+     .toLowerCase()
+     .replace(/::|[/#\\]/g, ".")
+     .replace(/[^a-z0-9.]+/g, "-")

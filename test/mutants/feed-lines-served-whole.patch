@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/events-feed.test.ts -t events.lines
+# kills: events.lines
+# why: a page asked for as lines comes as whole envelopes, hundreds of tokens an event
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index 129c7fe6..7d59c9e8 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -133,7 +133,7 @@ export function eventsOk(page: EventFeedPage, view: EventsView = "full"): Inbox_
+   return {
+     status: 200,
+     body:
+-      view === "lines"
++      false
+         ? { items: [], lines: page.events.map(eventLine), nextCursor: page.cursor }
+         : { items: page.events.map(eventRecord), nextCursor: page.cursor },
+   };

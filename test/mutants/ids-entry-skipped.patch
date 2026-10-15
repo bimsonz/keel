@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t ids.http-either-case
+# kills: ids.http-either-case
+# why: the Worker routes the request as it was sent, so a lower-cased id is refused as malformed
+diff --git a/apps/keel/src/index.ts b/apps/keel/src/index.ts
+index 81879058..01a12099 100644
+--- a/apps/keel/src/index.ts
++++ b/apps/keel/src/index.ts
+@@ -29,7 +29,7 @@ export default {
+   // An id is read in either case at the API and the MCP door: each is written as Keel writes it first.
+   fetch(request, env, ctx): Response | Promise<Response> {
+     return Promise.all([import("./composition/isolate.ts"), canonicalRequest(request)]).then(
+-      ([{ isolateFor }, read]) => isolateFor(env).app.fetch(read, env, ctx),
++      ([{ isolateFor }]) => isolateFor(env).app.fetch(request, env, ctx),
+     );
+   },
+   queue(batch, env, _ctx): Promise<void> {

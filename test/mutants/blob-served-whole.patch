@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t repo.blob-pages
+# kills: repo.blob-pages
+# why: a large text file comes whole, so an agent that reads a big generated file runs out of room
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 79d2f8cf..97be3831 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -136,7 +136,7 @@ export function blobOk(
+   };
+   if (view.content === undefined) return { status: 200, body };
+   const written = new TextDecoder().decode(view.content);
+-  if (view.content.byteLength <= BLOB_PAGE_BYTES && asked.startLine === undefined)
++  if (true)
+     return { status: 200, body: { ...body, content: written } };
+   const page = pageOf(written, asked.startLine ?? 1);
+   const nextStartLine = page.end < page.total ? page.end + 1 : undefined;

@@ -223,10 +223,11 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult 
         invitations,
       },
       findings: [],
+      // An invitation accepted is what lets the agent work, so its read comes before the sponsor ask.
       next: [
         ...working.next,
-        ...sponsor.next,
         ...waiting.next,
+        ...sponsor.next,
         ...placed.next,
         ...reach(identity).next,
       ].slice(0, MAX_NEXT),

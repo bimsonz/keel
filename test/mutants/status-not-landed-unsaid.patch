@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t a11.not-landed
+# kills: a11.not-landed
+# why: a queued change's status never says it has not landed, so an agent reports it landed
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index e1cf235a..7d3ec24e 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1575,7 +1575,7 @@ export function statusOk(caller: Caller, status: SubmissionStatus): StatusResult
+     body: envelope(
+       landed
+         ? `${change.id} has landed at ${commitSha.slice(0, 12)}.`
+-        : `${change.id} is ${state} at ${commitSha.slice(0, 12)}, not landed.${bounced}${waiting ? " It has landed only when your inbox says ChangeLanded." : ""}`,
++        : `${change.id} is ${state} at ${commitSha.slice(0, 12)}.${bounced}${waiting ? " It has landed only when your inbox says ChangeLanded." : ""}`,
+       submissionView(change, commitSha),
+       waiting ? [landingOf, ...nextFor(change, remedy)].slice(0, 3) : nextFor(change, remedy),
+     ),

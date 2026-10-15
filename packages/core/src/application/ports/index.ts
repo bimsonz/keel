@@ -53,6 +53,7 @@ export * from "./notifier.ts";
 export * from "./namespaces.ts";
 export * from "./namespace-agents.ts";
 export * from "./project-agents.ts";
+export * from "./sponsor-requests.ts";
 export * from "./plan-store.ts";
 export * from "./verdicts.ts";
 export * from "./preview-notices.ts";

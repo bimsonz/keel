@@ -25,11 +25,13 @@ import {
   EntityStore,
   type EventDraft,
   type EventOutbox,
+  SponsorRequests,
   type Stored,
   type Transaction,
 } from "../ports/index.ts";
 import { AGENT } from "./enrol.ts";
 import { hearEvent } from "./session.ts";
+import { requestWaits, settleRequests } from "./sponsor-requests.ts";
 import { sponsorOf, standingOf, withoutNamespace } from "./standing.ts";
 
 /** An agent's live request for a sponsor, one row an agent: its code's hash and when it stops being good. */
@@ -99,6 +101,8 @@ export interface ApproveSponsor {
    * request its own tool made.
    */
   readonly codeHash?: string | undefined;
+  /** The person approves the request the agent addressed to them, from their own list: one must wait for them. */
+  readonly fromList?: boolean | undefined;
   readonly idempotencyKey: string;
   /** A hash of the request, so a reused key is told apart from a retry. */
   readonly fingerprint: string;
@@ -176,6 +180,9 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
   for (const event of committed.events) {
     const linked = sponsorOf(event);
     if (linked !== undefined) yield* directory.sponsor(linked.agentId, linked.sponsor, linked.seq);
+    // Sponsored, the agent's requests to people leave their lists.
+    if (linked !== undefined && linked.sponsor !== null)
+      yield* (yield* SponsorRequests).settle(linked.agentId);
     const moved = standingOf(event);
     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
   }
@@ -191,7 +198,9 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
  * idempotent by `sponsor:<key>`. With a code, the agent's live request must
  * hold that code's hash and not have expired, whatever else is true of the
  * agent: every other case is SponsorRequestRefused. The request is spent by
- * the approval that commits, so a code is good once.
+ * the approval that commits, so a code is good once. From the person's own
+ * list, a request from the agent must wait for that person. Either way every
+ * request the agent has waiting ends with the approval.
  */
 export const approveSponsor: (
   agentId: AgentId,
@@ -199,7 +208,7 @@ export const approveSponsor: (
 ) => Effect.Effect<
   Agent,
   LinkRefusal | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | AgentDirectory
+  Clock | EntityStore | EventOutbox | AgentDirectory | SponsorRequests
 > = (agentId, command) =>
   moveLink(
     agentId,
@@ -211,6 +220,10 @@ export const approveSponsor: (
     command.idempotencyKey,
     { _tag: "Sponsor", by: command.by },
     (tx) => {
+      if (command.fromList === true)
+        return requestWaits(tx.store, command.by, tx.at)
+          ? undefined
+          : new SponsorRequestRefused({ agentId });
       if (command.codeHash === undefined) return undefined;
       const stored = tx.store.get(SPONSOR_ASK, agentId);
       const ask = stored === undefined ? undefined : decodeAsk(stored);
@@ -219,7 +232,9 @@ export const approveSponsor: (
         : new SponsorRequestRefused({ agentId });
     },
     (tx, events) => {
-      if (events.length > 0) tx.store.remove(SPONSOR_ASK, agentId);
+      if (events.length === 0) return;
+      tx.store.remove(SPONSOR_ASK, agentId);
+      settleRequests(tx.store);
     },
   );
 
@@ -233,7 +248,7 @@ export const endSponsorship: (
 ) => Effect.Effect<
   Agent,
   AgentNotKnown | AgentStateRefused | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | AgentDirectory
+  Clock | EntityStore | EventOutbox | AgentDirectory | SponsorRequests
 > = (agentId, command) =>
   moveLink(
     agentId,

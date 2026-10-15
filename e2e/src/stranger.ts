@@ -338,8 +338,10 @@ async function standsBehind(): Promise<void> {
     (await agent.whoami()).result.agent.sponsor === undefined && !(await sponsored(stranger)),
     "(2) the agent signed itself up with no sponsor, and the stranger's agents do not hold it",
   );
-  const asked = await agent.askSponsor();
-  await stranger.client.approveSponsor(account.agentId, asked.result.code, {
+  const { code } = (await agent.askSponsor()).result;
+  if (code === undefined)
+    throw new Error("askSponsor answered no code for a request that names no person");
+  await stranger.client.approveSponsor(account.agentId, code, {
     idempotencyKey: key("sponsor"),
   });
   check(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-rate
+# kills: sponsor.ask-person-rate
+# why: an agent asks as many people as it likes in an hour, so one agent can fill any number of people's lists
+diff --git a/packages/core/src/application/identity/sponsor-requests.ts b/packages/core/src/application/identity/sponsor-requests.ts
+index 97d8d214..8253df10 100644
+--- a/packages/core/src/application/identity/sponsor-requests.ts
++++ b/packages/core/src/application/identity/sponsor-requests.ts
+@@ -192,7 +192,7 @@ export const askPerson: (
+   const times = decodeTimes(store.get(ASKED_AT, agentId) ?? []).filter(
+     (at) => at > now - SPONSOR_ASKS_WINDOW_MS,
+   );
+-  if (times.length >= SPONSOR_ASKS_PER_WINDOW)
++  if (times.length >= SPONSOR_ASKS_PER_WINDOW * 1000)
+     return yield* new SponsorRequestsLimited({
+       agentId,
+       retryAfterMs: Math.max(1, (times[0] ?? now) + SPONSOR_ASKS_WINDOW_MS - now),

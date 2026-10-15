@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-sponsored
+# kills: mcp.listen-sponsored
+# why: the end of a sponsor's link never reaches the agent's inbox, so a listening agent goes on believing it is sponsored
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index 5d5ceab4..b1b5e193 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -181,7 +181,8 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+   }
+   if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
+   store.transaction(() => {
+-    for (const event of committed.events) hearEvent(store, agentId, event);
++    for (const event of committed.events)
++      if (event.type !== "AgentUnsponsored") hearEvent(store, agentId, event);
+   });
+   return withoutNamespace(committed.value);
+ });

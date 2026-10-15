@@ -20,12 +20,14 @@ import {
   describeInvitationsContract,
   describeNamespaceAgentsContract,
   describeProjectAgentsContract,
+  describeSponsorRequestsContract,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Option, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { NamespaceAgentsD1 } from "../../src/adapters/driven/d1/namespace-agents.ts";
 import { ProjectAgentsD1 } from "../../src/adapters/driven/d1/project-agents.ts";
+import { SponsorRequestsD1 } from "../../src/adapters/driven/d1/sponsor-requests.ts";
 import { InvitationsRpc } from "../../src/adapters/driven/do-rpc/invitations.ts";
 import { decodeExit, NamespaceCodecs } from "../../src/rpc/index.ts";
 import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
@@ -56,6 +58,7 @@ const projectStub = (projectId: ProjectId) =>
 // The real adapters pass the same contract suites as the in-memory ones, inside workerd.
 describeNamespaceAgentsContract("d1", () => NamespaceAgentsD1(env.DB));
 describeProjectAgentsContract("d1", () => ProjectAgentsD1(env.DB));
+describeSponsorRequestsContract("d1", () => SponsorRequestsD1(env.DB));
 describeInvitationsContract("the object that holds each record, and d1", () =>
   Layer.mergeAll(
     InvitationsRpc(namespaceStub, projectStub),
@@ -946,7 +949,7 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     const { person, projectId } = await aSoloPerson();
     const agent = await keyAgent();
     const own = await agent.token();
-    // Nobody stands behind it, so `askSponsor` leads every answer; standing nowhere, it is told who invites it.
+    // Nobody stands behind it, so `askSponsor` is in every answer, after any invitation's read; standing nowhere, it is told who invites it.
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 0 },
       reads: ["askSponsor", undefined, "inbox"],
@@ -962,13 +965,13 @@ describe("whoami says an invitation is waiting, through the real Worker", () => 
     ).toBe(201);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 1, projects: 1 },
-      reads: ["askSponsor", "Agents_listNamespaces", "Agents_listProjects"],
+      reads: ["Agents_listNamespaces", "Agents_listProjects", "askSponsor"],
     });
 
     expect((await http(own, "PUT", `/agents/me/namespaces/${slug}`)).status).toBe(200);
     expect(await told(own)).toEqual({
       invitations: { namespaces: 0, projects: 1 },
-      reads: ["askSponsor", "Agents_listProjects", "Agents_listReachableProjects"],
+      reads: ["Agents_listProjects", "askSponsor", "Agents_listReachableProjects"],
     });
     expect(
       (await http(person.token, "DELETE", `/projects/${projectId}/agents/${agent.agentId}`)).status,
@@ -1057,8 +1060,8 @@ describe("an agent sets itself up through Keel's MCP alone", () => {
     expect(invited.body["summary"]).not.toMatch(/own namespace/);
     expect(invited.body["next"]).toMatchObject([
       { operationId: "declare" },
-      { operationId: "askSponsor" },
       { operationId: "Agents_listNamespaces" },
+      { operationId: "askSponsor" },
     ]);
     expect(invited.body["next"]).toHaveLength(3);
 
@@ -1161,5 +1164,151 @@ describe("an agent lists the projects it can reach, through the real Worker", ()
     const tooled = await tool(door, "Agents_listReachableProjects");
     expect(tooled.refused).toBe(false);
     expect(tooled.body["items"]).toEqual(listed.body["items"]);
+  });
+});
+
+/** An agent asks a person by handle, over REST, as `token`. */
+const askPerson = (token: string, handle: string) =>
+  http(token, "POST", `/agents/me/sponsor-request?person=${encodeURIComponent(handle)}`);
+
+/** An agent somebody sponsors through the code and the page: what tells a person of a request through an agent they have. */
+async function sponsoredBy(person: { readonly token: string }) {
+  const agent = await keyAgent();
+  const own = await agent.token();
+  const asked = await http(own, "POST", "/agents/me/sponsor-request");
+  const { code } = Object(asked.body["result"]);
+  expect(
+    (await http(person.token, "PUT", `/agents/${agent.agentId}/sponsor`, { code })).status,
+  ).toBe(200);
+  return { ...agent, own };
+}
+
+const kindsOf = async (token: string) =>
+  (await noticesOf(token)).map((notice) => String(notice["kind"]));
+
+describe("a sponsor request addressed to a person, through the real Worker", () => {
+  it("[sponsor.ask-person] an agent that names a person by handle puts a request on that person's own list for seven days and every agent they sponsor is told; asking again is the same request; a handle that is nobody's, an org's or an agent's is not found", async () => {
+    const person = await seedUser(uniqueHandle("pat"), { role: null, signedInBy: "passkey" });
+    const theirs = await sponsoredBy(person);
+    const agent = await keyAgent();
+    const own = await agent.token();
+    const before = Date.now();
+    const asked = await askPerson(own, person.handle);
+    expect(asked.status).toBe(201);
+    const result = Object(asked.body["result"]);
+    expect(result).toMatchObject({ person: person.handle });
+    expect(result["code"]).toBeUndefined();
+    const lapses = Date.parse(String(result["expiresAt"]));
+    expect(lapses - before).toBeGreaterThan(7 * 24 * 3_600_000 - 60_000);
+    expect(lapses - before).toBeLessThanOrEqual(7 * 24 * 3_600_000 + 60_000);
+    const listed = await http(person.token, "GET", "/users/me/sponsor-requests");
+    expect(listed.status).toBe(200);
+    expect(items(listed)).toMatchObject([
+      { agent: { id: agent.agentId, handle: agent.handle }, expiresAt: result["expiresAt"] },
+    ]);
+    await vi.waitFor(
+      async () => expect(await kindsOf(theirs.own)).toContain("SponsorRequested"),
+      WAIT,
+    );
+    // Again, through Keel's MCP: the same request, and still one on the list.
+    const door = await agent.token(undefined, undefined, `${BASE}/mcp`);
+    const again = await tool(door, "askSponsor", { person: person.handle });
+    expect([again.refused, Object(again.body["result"])["expiresAt"]]).toEqual([
+      false,
+      result["expiresAt"],
+    ]);
+    expect(items(await http(person.token, "GET", "/users/me/sponsor-requests"))).toHaveLength(1);
+    const { slug } = await anOrg();
+    for (const handle of [uniqueHandle("nobody"), slug, theirs.handle])
+      expect(refusal(await askPerson(own, handle))).toEqual([404, "resource.not_found"]);
+  });
+
+  it("[sponsor.ask-person-approve] the person approves from their list: they sponsor the agent, the agent is told, and the request leaves the list", async () => {
+    const person = await seedUser(uniqueHandle("pam"), { role: null, signedInBy: "passkey" });
+    const agent = await keyAgent();
+    const own = await agent.token();
+    expect((await askPerson(own, person.handle)).status).toBe(201);
+    const approved = await http(person.token, "PUT", `/users/me/sponsor-requests/${agent.agentId}`);
+    expect(approved.status).toBe(200);
+    expect(approved.body).toMatchObject({ id: agent.agentId, sponsor: person.userId });
+    expect(items(await http(person.token, "GET", "/users/me/sponsor-requests"))).toEqual([]);
+    expect(await kindsOf(own)).toContain("AgentSponsored");
+    // Another person's approval of no request is not found.
+    const stranger = await seedUser(uniqueHandle("sam"), { role: null, signedInBy: "passkey" });
+    expect(
+      refusal(await http(stranger.token, "PUT", `/users/me/sponsor-requests/${agent.agentId}`)),
+    ).toEqual([404, "resource.not_found"]);
+  });
+
+  it("[sponsor.ask-person-decline] the person declines: the request leaves the list, the agent is told, and it may ask again", async () => {
+    const person = await seedUser(uniqueHandle("dee"), { role: null, signedInBy: "passkey" });
+    const agent = await keyAgent();
+    const own = await agent.token();
+    expect((await askPerson(own, person.handle)).status).toBe(201);
+    const declined = await http(
+      person.token,
+      "DELETE",
+      `/users/me/sponsor-requests/${agent.agentId}`,
+    );
+    expect([declined.status, declined.body["blocked"]]).toEqual([200, false]);
+    expect(items(await http(person.token, "GET", "/users/me/sponsor-requests"))).toEqual([]);
+    const kinds = await kindsOf(own);
+    expect(kinds).toContain("SponsorRequestDeclined");
+    expect(kinds).not.toContain("AgentSponsored");
+    expect((await askPerson(own, person.handle)).status).toBe(201);
+  });
+
+  it("[sponsor.ask-person-block] declined with a block, the agent's next request to that person is not found until they unblock it, and the person lists whom they blocked", async () => {
+    const person = await seedUser(uniqueHandle("bea"), { role: null, signedInBy: "passkey" });
+    const agent = await keyAgent();
+    const own = await agent.token();
+    expect((await askPerson(own, person.handle)).status).toBe(201);
+    const declined = await http(
+      person.token,
+      "DELETE",
+      `/users/me/sponsor-requests/${agent.agentId}?block=true`,
+    );
+    expect([declined.status, declined.body["blocked"]]).toEqual([200, true]);
+    expect(refusal(await askPerson(own, person.handle))).toEqual([404, "resource.not_found"]);
+    expect(items(await http(person.token, "GET", "/users/me/blocked-agents"))).toMatchObject([
+      { agent: { id: agent.agentId } },
+    ]);
+    const unblocked = await http(
+      person.token,
+      "DELETE",
+      `/users/me/blocked-agents/${agent.agentId}`,
+    );
+    expect([unblocked.status, unblocked.body["id"]]).toEqual([200, agent.agentId]);
+    expect(items(await http(person.token, "GET", "/users/me/blocked-agents"))).toEqual([]);
+    expect((await askPerson(own, person.handle)).status).toBe(201);
+  });
+
+  it("[sponsor.ask-person-rate] an agent asks five people an hour at most: the sixth is 429 with when to try again", async () => {
+    const agent = await keyAgent();
+    const own = await agent.token();
+    for (let i = 0; i < 5; i += 1) {
+      const person = await seedUser(uniqueHandle(`r${i}`), { role: null, signedInBy: "passkey" });
+      expect((await askPerson(own, person.handle)).status).toBe(201);
+    }
+    const sixth = await seedUser(uniqueHandle("r5"), { role: null, signedInBy: "passkey" });
+    const refused = await askPerson(own, sixth.handle);
+    expect(refusal(refused)).toEqual([429, "rate.limited"]);
+    expect(Number(refused.body["retryAfterMs"])).toBeGreaterThan(0);
+  });
+
+  it("[sponsor.ask-person-cap] fifty requests waiting for one person are the most Keel takes: the next agent's is 429", async () => {
+    const person = await seedUser(uniqueHandle("cap"), { role: null, signedInBy: "passkey" });
+    const lapses = Date.now() + 3_600_000;
+    for (let i = 0; i < 50; i += 1)
+      await env.DB.prepare(
+        "INSERT INTO sponsor_requests (agent_id, person_id, asked_at, expires_at, blocked_at, seq) VALUES (?, ?, ?, ?, NULL, 1)",
+      )
+        .bind(makeId("agt", ulid()), person.userId, Date.now(), lapses)
+        .run();
+    const agent = await keyAgent();
+    expect(refusal(await askPerson(await agent.token(), person.handle))).toEqual([
+      429,
+      "rate.limited",
+    ]);
   });
 });

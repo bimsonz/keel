@@ -260,6 +260,50 @@ describe("the repo read API", () => {
       expect(await bodyOf(blob(path))).toMatchObject({ code: "repo.path_not_found" });
   });
 
+  it("[repo.blob-pages] a text file over 64 KiB comes a page of whole lines at a time, each saying which lines it holds and where the next starts, until the pages make the file; a smaller one comes whole", async () => {
+    const long = Array.from({ length: 3000 }, (_, i) => `line ${i + 1} ${"y".repeat(90)}\n`).join(
+      "",
+    );
+    await commit(PRIVATE, { ...FILES, "long.txt": long });
+    const reader = agentOf(PRIVATE);
+    const read = (startLine?: number) =>
+      bodyOf<{
+        content: string;
+        lines?: { start: number; end: number; total: number };
+        nextStartLine?: number;
+        next?: { operationId: string; args: { startLine: number } }[];
+      }>(
+        handlers.Repo_getBlob(reader, {
+          projectId: PRIVATE,
+          path: "long.txt",
+          ...(startLine === undefined ? {} : { startLine }),
+        }),
+      );
+    let page = await read();
+    expect(page.lines).toMatchObject({ start: 1, total: 3000 });
+    let joined = page.content;
+    let pages = 1;
+    while (page.nextStartLine !== undefined) {
+      expect(new TextEncoder().encode(page.content).byteLength).toBeLessThanOrEqual(64 * 1024);
+      expect(page.next).toMatchObject([
+        { operationId: "Repo_getBlob", args: { startLine: page.nextStartLine } },
+      ]);
+      expect(page.nextStartLine).toBe((page.lines?.end ?? 0) + 1);
+      page = await read(page.nextStartLine);
+      joined += page.content;
+      pages += 1;
+    }
+    expect(page.lines?.end).toBe(3000);
+    expect(page.next).toBeUndefined();
+    expect(joined).toBe(long);
+    expect(pages).toBeGreaterThan(4);
+    const small = await bodyOf<Record<string, unknown>>(
+      handlers.Repo_getBlob(reader, { projectId: PRIVATE, path: "src/index.ts" }),
+    );
+    expect(small).toMatchObject({ content: "export const one = 1;\n" });
+    expect(small).not.toHaveProperty("lines");
+  });
+
   it("[repo.commits-cursor] pages of history meet end to end, newest first, each starting where the last one's cursor says", async () => {
     const chain: string[] = [];
     for (let i = 0; i < 5; i += 1) chain.unshift(await commit(HISTORY, { f: `${i}\n` }));

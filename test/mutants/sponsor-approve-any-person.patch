@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-approve
+# kills: sponsor.ask-person-approve
+# why: any signed-in person approves from their list an agent that never asked them, and becomes its sponsor
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index 74776f62..b5d13ffd 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -221,7 +221,7 @@ export const approveSponsor: (
+     { _tag: "Sponsor", by: command.by },
+     (tx) => {
+       if (command.fromList === true)
+-        return requestWaits(tx.store, command.by, tx.at)
++        return true
+           ? undefined
+           : new SponsorRequestRefused({ agentId });
+       if (command.codeHash === undefined) return undefined;

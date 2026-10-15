@@ -12,4 +12,4 @@ index 352579f..d99d199 100644
 -        project: options.project,
          wait: options.wait,
          limit: options.limit,
-       },
+         view: options.view,

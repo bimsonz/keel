@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-decline
+# kills: sponsor.ask-person-decline
+# why: the agent is never told its request was declined, so it waits on a person who has said no
+diff --git a/packages/core/src/application/identity/sponsor-requests.ts b/packages/core/src/application/identity/sponsor-requests.ts
+index 97d8d214..b1f0e460 100644
+--- a/packages/core/src/application/identity/sponsor-requests.ts
++++ b/packages/core/src/application/identity/sponsor-requests.ts
+@@ -251,7 +251,7 @@ export const declinePerson: (
+   );
+   const store = yield* EntityStore;
+   store.transaction(() => {
+-    for (const event of events) hearEvent(store, agentId, event);
++    void events;
+   });
+   return { blocked: settled?.blockedAt !== undefined };
+ });

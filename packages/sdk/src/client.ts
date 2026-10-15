@@ -118,6 +118,49 @@ const ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
  * once, under the same Idempotency-Key. A refusal throws `KeelProblem`,
  * carrying the next actions.
  */
+/** The first pause before a long poll is sent again after its connection drops; it doubles up to `MAX_RESEND_PAUSE_MS`. */
+export const FIRST_RESEND_PAUSE_MS = 1_000;
+export const MAX_RESEND_PAUSE_MS = 30_000;
+
+/** Until when a long poll (a read with a `wait`) may be sent again: its own wait from now. Any other call, never. */
+function longPollDeadline(
+  method: string,
+  input: Readonly<Record<string, unknown>>,
+): number | undefined {
+  const wait = input["wait"];
+  return method === "GET" && typeof wait === "number" && wait > 0
+    ? Date.now() + wait * 1000
+    : undefined;
+}
+
+/**
+ * Sends a long poll again when its connection drops (`fetch` throws a TypeError: a deploy, a
+ * reset socket), pausing `FIRST_RESEND_PAUSE_MS` and doubling, until its deadline. An answer of
+ * any status, any other call, and a call its caller aborted are as they come.
+ */
+async function holding(
+  sending: () => Promise<Response>,
+  deadline: number | undefined,
+  signal: AbortSignal | undefined,
+): Promise<Response> {
+  let pause = FIRST_RESEND_PAUSE_MS;
+  for (;;) {
+    try {
+      return await sending();
+    } catch (error) {
+      if (
+        deadline === undefined ||
+        signal?.aborted === true ||
+        !(error instanceof TypeError) ||
+        Date.now() + pause >= deadline
+      )
+        throw error;
+      await new Promise((resolve) => setTimeout(resolve, pause));
+      pause = Math.min(pause * 2, MAX_RESEND_PAUSE_MS);
+    }
+  }
+}
+
 export class KeelClient {
   readonly #options: ClientOptions;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
@@ -263,7 +306,11 @@ export class KeelClient {
       });
     const credentialed = "clientId" in this.#options || "key" in this.#options;
     const session = "session" in this.#options ? this.#options.session : undefined;
-    let response = await send(credentialed ? await this.token() : session);
+    let response = await holding(
+      async () => send(credentialed ? await this.token() : session),
+      longPollDeadline(request.method, input),
+      options.signal,
+    );
     if (credentialed && response.status === 401)
       response = await send(await this.token({ fresh: true }));
     if (!response.ok) throw await KeelProblem.from(response);
@@ -326,10 +373,14 @@ export class KeelClient {
 
   /**
    * The calling agent asks for a sponsor: a code, good once and for ten minutes, and the page where
-   * a signed-in person approves it. A new request replaces the last.
+   * a signed-in person approves it. A new request replaces the last. Naming a person by their handle
+   * puts the request on that person's own list instead.
    */
-  askSponsor(options?: CallOptions): Promise<WireOutputs["askSponsor"]> {
-    return this.call("askSponsor", {}, options);
+  askSponsor(
+    input: { readonly person?: string } = {},
+    options?: CallOptions,
+  ): Promise<WireOutputs["askSponsor"]> {
+    return this.call("askSponsor", input, options);
   }
 
   /** Who an agent is, as anyone may see it: its name, its kind and the org it works in. */
@@ -368,6 +419,48 @@ export class KeelClient {
       { agentId, "idempotency-key": keyOf(options) },
       options,
     );
+  }
+
+  /** The agents asking the signed-in person to sponsor them, oldest first. */
+  sponsorRequests(options?: CallOptions): Promise<WireOutputs["Users_listSponsorRequests"]> {
+    return this.call("Users_listSponsorRequests", {}, options);
+  }
+
+  /** The signed-in person sponsors the agent whose request waits for them, on a fresh sign-in. */
+  approveSponsorRequest(
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Users_approveSponsorRequest"]> {
+    return this.call(
+      "Users_approveSponsorRequest",
+      { agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The signed-in person declines the agent's request; with `block`, it can't ask them again. */
+  declineSponsorRequest(
+    agentId: string,
+    options: Idempotent & { readonly block?: boolean } = {},
+  ): Promise<WireOutputs["Users_declineSponsorRequest"]> {
+    return this.call(
+      "Users_declineSponsorRequest",
+      { agentId, block: options.block, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** The agents the signed-in person has blocked from asking them, oldest first. */
+  blockedAgents(options?: CallOptions): Promise<WireOutputs["Users_listBlockedAgents"]> {
+    return this.call("Users_listBlockedAgents", {}, options);
+  }
+
+  /** The signed-in person lets a blocked agent ask them again. */
+  unblockAgent(
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Users_unblockAgent"]> {
+    return this.call("Users_unblockAgent", { agentId, "idempotency-key": keyOf(options) }, options);
   }
 
   /**
@@ -795,6 +888,8 @@ export class KeelClient {
       readonly project?: string;
       readonly wait?: number;
       readonly limit?: number;
+      /** `lines` for one line an event, `full` for each event whole. */
+      readonly view?: "lines" | "full";
     } = {},
   ): Promise<WireOutputs["Inbox_listEvents"]> {
     return this.call(
@@ -804,6 +899,7 @@ export class KeelClient {
         project: options.project,
         wait: options.wait,
         limit: options.limit,
+        view: options.view,
       },
       options,
     );
@@ -1018,13 +1114,20 @@ export class KeelClient {
     return this.call("Repo_getTree", { projectId, ref: options.ref, path: options.path }, options);
   }
 
-  /** A file of a project's trunk at `ref`: its text inline up to 1 MiB, unless it is binary. */
+  /**
+   * A file of a project's trunk at `ref`: its text inline up to 1 MiB, unless it is binary. A text
+   * file over 64 KiB comes a page of whole lines at a time, from `startLine`.
+   */
   blob(
     projectId: string,
     path: string,
-    options: CallOptions & { readonly ref?: string } = {},
+    options: CallOptions & { readonly ref?: string; readonly startLine?: number } = {},
   ): Promise<WireOutputs["Repo_getBlob"]> {
-    return this.call("Repo_getBlob", { projectId, path, ref: options.ref }, options);
+    return this.call(
+      "Repo_getBlob",
+      { projectId, path, ref: options.ref, startLine: options.startLine },
+      options,
+    );
   }
 
   /** Trunk's history from `ref`, newest first; pass a page's `nextCursor` for the next. */

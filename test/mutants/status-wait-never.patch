@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t a11.not-landed
+# kills: a11.not-landed
+# why: status never sends a change on its way to the inbox for its landing, so the agent polls status or stops
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index e1cf235a..436866a1 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1569,7 +1569,7 @@ export function statusOk(caller: Caller, status: SubmissionStatus): StatusResult
+   }
+   const bounced = remedy === undefined ? "" : ` It bounced: ${remedy.reasons.join("; ")}.`;
+   const landed = change.state === "landed";
+-  const waiting = !landed && remedy === undefined && OPEN_STATES.has(change.state);
++  const waiting = !landed && remedy === undefined && false;
+   return {
+     status: 200,
+     body: envelope(

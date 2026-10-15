@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t ids.mcp-either-case
+# kills: ids.mcp-either-case
+# why: the MCP door is not one where ids are read in either case, so a tool refuses a lower-cased project id
+diff --git a/apps/keel/src/adapters/driving/http/ids.ts b/apps/keel/src/adapters/driving/http/ids.ts
+index 260bf8c6..a50401e2 100644
+--- a/apps/keel/src/adapters/driving/http/ids.ts
++++ b/apps/keel/src/adapters/driving/http/ids.ts
+@@ -25,7 +25,7 @@ export function canonicalIds(value: unknown): unknown {
+ }
+ 
+ /** Where a request's ids are read in either case: the API and the MCP door. */
+-const DOORS = /^\/(v1\/|mcp$)/;
++const DOORS = /^\/(v1\/)/;
+ 
+ /**
+  * The request as Keel reads it: at the API and the MCP door, each path

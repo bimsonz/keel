@@ -2,15 +2,15 @@
 # kills: a11.declare-no-premises
 # why: the handler passes a missing premises list on as it came, so a declare that leaves it out is refused as invalid
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index 6ef381ad..432aaa9a 100644
+index 7123e023..5bba01b4 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -239,7 +239,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
+@@ -270,7 +270,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
    const fields = decodeWith(DeclareFields, {
      goal: input.goal,
      footprint: input.footprint ?? [],
--    premises: input.premises ?? [],
-+    premises: input.premises as never,
+-    premises: (input.premises ?? []).map(premiseOfAgent),
++    premises: input.premises === undefined ? (input.premises as never) : input.premises.map(premiseOfAgent),
      ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
    });
    const premises = Result.flatMap(fields, (f) =>

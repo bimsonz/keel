@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { AgentId, NamespaceId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
 import { AgentKind, GrantableScope, Scope } from "./agent.ts";
 import { PresentedKey } from "./agent-key.ts";
+import { SponsorBlockLifted, SponsorRequestDeclined, SponsorRequested } from "./sponsor-request.ts";
 import { Handle, Role } from "./tenancy.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
@@ -243,5 +244,8 @@ export const IdentityEvent = Schema.Union([
   OrgSuspended,
   OrgReinstated,
   OrgDeleted,
+  SponsorRequested,
+  SponsorRequestDeclined,
+  SponsorBlockLifted,
 ]);
 export type IdentityEvent = typeof IdentityEvent.Type;

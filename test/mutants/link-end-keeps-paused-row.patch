@@ -2,12 +2,12 @@
 # kills: link.sponsor-inline
 # why: ending the link reinstates the agent on its own object and leaves its directory row suspended, so the gate goes on refusing an agent nobody can reinstate
 diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
-index 49687ef7..db4189c9 100644
+index 74776f62..2cbf390b 100644
 --- a/packages/core/src/application/identity/sponsorship.ts
 +++ b/packages/core/src/application/identity/sponsorship.ts
-@@ -169,7 +169,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
-     const linked = sponsorOf(event);
-     if (linked !== undefined) yield* directory.sponsor(linked.agentId, linked.sponsor, linked.seq);
+@@ -184,7 +184,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+     if (linked !== undefined && linked.sponsor !== null)
+       yield* (yield* SponsorRequests).settle(linked.agentId);
      const moved = standingOf(event);
 -    if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
 +    if (moved !== undefined) continue;

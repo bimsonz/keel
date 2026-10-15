@@ -66,7 +66,8 @@ import { makeSyntaxSourceMemory } from "./memory/syntax-source.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeNamespaceUsageMemory } from "./memory/namespace-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
-import { makeSponsorshipsMemory } from "./memory/sponsorships.ts";
+import { makeSponsorRequestsMemory, makeSponsorshipsMemory } from "./memory/sponsorships.ts";
+import { describeSponsorRequestsContract } from "./contracts/sponsor-requests.ts";
 import {
   makeInvitationsMemory,
   makeNamespaceAgentsMemory,
@@ -636,6 +637,7 @@ export const PORTS = {
     SponsorshipsHarness
   >(memorySponsorshipsHarness, describeSponsorshipsContract),
   NamespaceAgents: port(() => makeNamespaceAgentsMemory().layer, describeNamespaceAgentsContract),
+  SponsorRequests: port(() => makeSponsorRequestsMemory().layer, describeSponsorRequestsContract),
   ProjectAgents: port(() => makeProjectAgentsMemory().layer, describeProjectAgentsContract),
   Invitations: port(
     () =>

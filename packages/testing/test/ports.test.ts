@@ -63,6 +63,7 @@ const CONTRACT_PORTS = [
   "Invitations",
   "NamespaceAgents",
   "ProjectAgents",
+  "SponsorRequests",
   "Namespaces",
   "ProjectNamespaces",
   "Users",

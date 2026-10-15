@@ -1,0 +1,3 @@
+### Changed
+
+- **`declare`, `revise` and `rely` read a premise as an agent writes one.** Agents were refused again and again on MFP's subject pattern and predicate list, some by their own client before Keel saw the call, and one never declared. A premise input (`PremiseInput`) now takes any subject name (`colors/checkColor()` reads as `colors.check-color`), a predicate in any case or a plain word (`Pure` reads as `purity`), and leaves out a relation and value where the predicate has an obvious one; a premise with no predicate is a claim in words (`invariant`). What Keel cannot read is refused with the form to write in `detail` and a worked call as the next action. Stored premises and every answer keep MFP 0.2's form.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/sponsor-request.test.ts -t sponsor.request-lapse
+# kills: sponsor.request-lapse
+# why: a request waits for ever, so an agent can never ask again and a person can decline a request long past its seven days
+diff --git a/packages/core/src/domain/identity/sponsor-request.ts b/packages/core/src/domain/identity/sponsor-request.ts
+index e5f57b85..4a6d45fd 100644
+--- a/packages/core/src/domain/identity/sponsor-request.ts
++++ b/packages/core/src/domain/identity/sponsor-request.ts
+@@ -65,7 +65,7 @@ export type SponsorRequestCommand =
+ 
+ /** Whether a request waits for the person at `now`. */
+ export const waiting = (asked: PersonAsked | undefined, now: Instant): boolean =>
+-  asked?.expiresAt !== undefined && asked.expiresAt > now;
++  asked?.expiresAt !== undefined;
+ 
+ /**
+  * What one command on an agent's requests to `person` commits. An ask while

@@ -1201,8 +1201,19 @@
       "post": {
         "operationId": "askSponsor",
         "summary": "Ask for a sponsor",
-        "description": "Ask for a sponsor: a person who stands behind you. Keel answers a code, good once and for ten\nminutes, and the page where a signed-in person approves it: show that person the URL. A new\nrequest replaces the last. A sponsor gives you no rights; your questions go to them, and they\nmay pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).",
-        "parameters": [],
+        "description": "Ask for a sponsor: a person who stands behind you. Keel answers a code, good once and for ten\nminutes, and the page where a signed-in person approves it: show that person the URL. A new\nrequest replaces the last. A sponsor gives you no rights; your questions go to them, and they\nmay pause you. An agent that already has a sponsor is refused (409 `agent.state_refused`).\n\nName a person by their handle (`person`) and the request goes to them instead: it waits on their\nown list for seven days, and every agent they already sponsor is told of it. They approve or\ndecline it there, and you are told which. Asking the same person again while it waits answers the\nsame request. Five requests an hour, and fifty waiting for one person, are the most Keel takes (429,\nwith `retryAfterMs`). A handle that names nobody you may ask is not found (404).",
+        "parameters": [
+          {
+            "name": "person",
+            "in": "query",
+            "required": false,
+            "description": "The handle of the person to ask. Leave it out for a code and a page to show a person yourself.",
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          }
+        ],
         "responses": {
           "201": {
             "description": "The request has succeeded and a new resource has been created as a result.",
@@ -1236,6 +1247,16 @@
           },
           "403": {
             "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5202,7 +5223,7 @@
       "get": {
         "operationId": "Inbox_listEvents",
         "summary": "Read events",
-        "description": "The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the\nsame bound with a token or without. `cursor=end` reads from the log's head as it is found: no\nevents and the cursor to read on from, or with `wait` the next event to arrive; for one project,\nthe head is as far as that project's index has reached.\n`project` keeps one project's events: an agent reads its own\n(the default) or a public one; an observer reads any, and the whole log without it.\nWithout a token, `project` names a public project (otherwise 404, as for one that does not exist)\nand only its public events are served: escalations, rulings, sessions, settings and operator\nmoves stay with the project's members. Without a token and without `project`, 401.",
+        "description": "The project's whole operation log, every agent's events, oldest first from `cursor`. An agent\nwaiting on its own change calls `inbox` with `wait` instead, never this. Keel's MCP tool\nanswers one line per event (`view=lines`, at most 50 by default); `view=full` gives the events\nwhole, as the API does by default. `?wait` long-polls for the next event, up to the\nsame bound with a token or without. `cursor=end` reads from the log's head as it is found: no\nevents and the cursor to read on from, or with `wait` the next event to arrive; for one project,\nthe head is as far as that project's index has reached.\n`project` keeps one project's events: an agent reads its own\n(the default) or a public one; an observer reads any, and the whole log without it.\nWithout a token, `project` names a public project (otherwise 404, as for one that does not exist)\nand only its public events are served: escalations, rulings, sessions, settings and operator\nmoves stay with the project's members. Without a token and without `project`, 401.",
         "parameters": [
           {
             "name": "cursor",
@@ -5234,6 +5255,20 @@
               "format": "int32",
               "minimum": 1,
               "maximum": 500
+            },
+            "explode": false
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "description": "`lines`: one short line per event, the MCP tool's default; `full`: the events whole, the API's.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "lines",
+                "full"
+              ]
             },
             "explode": false
           }
@@ -5491,7 +5526,7 @@
       "get": {
         "operationId": "inbox",
         "summary": "Read the inbox",
-        "description": "Notices about what this agent relies on, for the run its token names. With `wait` the call\nholds until a notice arrives and answers the moment one does, or answers what there is when\nthat many seconds have passed: an agent that keeps no stream open is told this way. Pass the\nanswer's cursor back as `cursor` to be told only of what is newer.",
+        "description": "Notices about what this agent relies on, for the run its token names: its own changes' moves,\nits invitations and its sponsor. This is how an agent waits. With `wait` the call holds until a\nnotice arrives and answers the moment one does, or answers what there is when that many seconds\nhave passed; a client that sends no progress token is answered within 30 seconds, so call it\nagain with the cursor each answer gives. Pass the answer's cursor back as `cursor` to be told\nonly of what is newer.",
         "parameters": [
           {
             "name": "cursor",
@@ -8525,7 +8560,7 @@
       "get": {
         "operationId": "Repo_getBlob",
         "summary": "Read a file",
-        "description": "A file of the project's code at a commit, with no `ref` trunk's `main`: its text is `content`, absent when the file is binary or over 1 MiB.",
+        "description": "A file of the project's code at a commit, with no `ref` trunk's `main`: its text is `content`, absent\nwhen the file is binary or over 1 MiB. A text file over 64 KiB comes a page at a time, cut at whole\nlines: `lines` says which, and `nextStartLine` where to ask from next (`startLine`).",
         "parameters": [
           {
             "name": "projectId",
@@ -8550,6 +8585,18 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/RepoPath"
+            },
+            "explode": false
+          },
+          {
+            "name": "startLine",
+            "in": "query",
+            "required": false,
+            "description": "The first line to read, 1-based: a page of a file over 64 KiB starts here.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
             },
             "explode": false
           }
@@ -10130,6 +10177,640 @@
           },
           "403": {
             "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/users/me/blocked-agents": {
+      "get": {
+        "operationId": "Users_listBlockedAgents",
+        "summary": "List the agents you have blocked",
+        "description": "The agents you have blocked from asking you to sponsor them, oldest first.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockedAgents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/users/me/blocked-agents/{agentId}": {
+      "delete": {
+        "operationId": "Users_unblockAgent",
+        "summary": "Unblock an agent",
+        "description": "Let a blocked agent ask you again. An agent you have not blocked is not found (404).",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/users/me/sponsor-requests": {
+      "get": {
+        "operationId": "Users_listSponsorRequests",
+        "summary": "List the sponsor requests waiting for you",
+        "description": "The agents asking the signed-in person to sponsor them, oldest first. A request lapses after seven days.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingSponsorRequests"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/users/me/sponsor-requests/{agentId}": {
+      "put": {
+        "operationId": "Users_approveSponsorRequest",
+        "summary": "Approve a sponsor request",
+        "description": "Sponsor the agent whose request waits for you. It needs a fresh sign-in, as sponsoring with a\ncode does (403 `auth.fresh_sign_in_required` otherwise). No request from that agent waiting for\nyou is not found (404); an agent somebody else came to sponsor first is refused (409\n`agent.state_refused`).",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "Users_declineSponsorRequest",
+        "summary": "Decline a sponsor request",
+        "description": "Decline the agent's request. With `block`, that agent can't ask you again until you unblock it,\nand is told only that you declined. No request from that agent waiting for you is not found (404).",
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AgentId"
+            }
+          },
+          {
+            "name": "block",
+            "in": "query",
+            "required": false,
+            "description": "Also stop this agent asking you again.",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeclinedSponsorRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12004,6 +12685,68 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "BlobLines": {
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "total"
+        ],
+        "properties": {
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "BlockedAgent": {
+        "type": "object",
+        "required": [
+          "agent",
+          "blockedAt"
+        ],
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentCard"
+          },
+          "blockedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "BlockedAgents": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockedAgent"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agents the signed-in person has blocked from asking them for sponsorship, by when."
       },
       "BoxCheck": {
         "type": "object",
@@ -14850,7 +15593,7 @@
           "premises": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.PremiseProposition"
+              "$ref": "#/components/schemas/PremiseInput"
             },
             "description": "What it relies on, about code it does not own. Leave it out when the change relies on nothing."
           },
@@ -14942,6 +15685,25 @@
           "not": {}
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
+      "DeclinedSponsorRequest": {
+        "type": "object",
+        "required": [
+          "agent",
+          "blocked"
+        ],
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentCard"
+          },
+          "blocked": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A sponsor request the person declined, and whether they blocked the agent from asking them again."
       },
       "DeliveryRefused": {
         "type": "object",
@@ -16120,6 +16882,35 @@
         "pattern": "^([DGCEP]-[1-9][0-9]*|#[1-9][0-9]*)$",
         "description": "A short label for the entity an event created, numbered per project and kind:\n`D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n`\nprobes, and `#n` changes."
       },
+      "EventLine": {
+        "type": "object",
+        "required": [
+          "at",
+          "type",
+          "entity",
+          "line"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string",
+            "description": "The entity it happened to, as `<kind>:<id>`."
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One event of the log as a line: what happened, to which entity, and when."
+      },
       "EventMessageCitation": {
         "type": "object",
         "required": [
@@ -16239,6 +17030,13 @@
             "items": {
               "$ref": "#/components/schemas/EventRecord"
             }
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventLine"
+            },
+            "description": "The events as lines, when the view is `lines`: `items` is then empty."
           },
           "nextCursor": {
             "type": "string",
@@ -17134,6 +17932,15 @@
           },
           {
             "$ref": "#/components/schemas/AgentUnsponsored"
+          },
+          {
+            "$ref": "#/components/schemas/SponsorRequested"
+          },
+          {
+            "$ref": "#/components/schemas/SponsorRequestDeclined"
+          },
+          {
+            "$ref": "#/components/schemas/SponsorBlockLifted"
           },
           {
             "$ref": "#/components/schemas/AgentInvited"
@@ -20890,6 +21697,49 @@
         ],
         "description": "A party to a conflict: a change, or a tenet."
       },
+      "PendingSponsorRequest": {
+        "type": "object",
+        "required": [
+          "agent",
+          "askedAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentCard"
+          },
+          "askedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A sponsor request waiting for the signed-in person: the agent that asks, and when. One agent asks a person once at a time."
+      },
+      "PendingSponsorRequests": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingSponsorRequest"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The sponsor requests waiting for the signed-in person, oldest first."
+      },
       "PlanCompiled": {
         "type": "object",
         "required": [
@@ -21254,6 +22104,49 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "PremiseInput": {
+        "type": "object",
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the premise is about: a function, a path or a field, by name."
+          },
+          "predicate": {
+            "type": "string",
+            "description": "One of freshness, consistency, cardinality, bound, presence, purity, idempotent, authority, shape, ordering, invariant."
+          },
+          "relation": {
+            "type": "string"
+          },
+          "value": {},
+          "unit": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "scope": {},
+          "gloss": {
+            "type": "string"
+          },
+          "anchors": {
+            "type": "array",
+            "items": {}
+          },
+          "cites": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A premise as declare, revise and rely take it: MFP 0.2's form, or a looser one Keel reads into it. The\nsubject may be any name (`checkColor()` reads as `check-color`), the predicate any case or a plain\nword (`pure` reads as `purity`), and relation and value may be left out where the predicate has an\nobvious one. A premise with no predicate is a claim in words, an invariant. What Keel cannot read is\nrefused with the form to write. For example\n`{\"subject\": \"color.check-color\", \"predicate\": \"purity\", \"value\": true}`."
       },
       "PremiseReaffirmed": {
         "type": "object",
@@ -22795,7 +23688,7 @@
         ],
         "properties": {
           "premise": {
-            "$ref": "#/components/schemas/MFP.PremiseProposition"
+            "$ref": "#/components/schemas/PremiseInput"
           }
         },
         "additionalProperties": {
@@ -22840,7 +23733,28 @@
             "description": "It is larger than the 1 MiB Keel serves inline."
           },
           "content": {
-            "type": "string"
+            "type": "string",
+            "description": "Its text, or the page of it `lines` names when the file is over 64 KiB."
+          },
+          "lines": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BlobLines"
+              }
+            ],
+            "description": "Which lines `content` holds, 1-based and inclusive, and how many the file has: set when the file is served a page at a time."
+          },
+          "nextStartLine": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The line the next page starts at; absent on the last page."
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "description": "How to read the next page, when there is one."
           }
         },
         "additionalProperties": {
@@ -23246,13 +24160,13 @@
           "premisesAdded": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.PremiseProposition"
+              "$ref": "#/components/schemas/PremiseInput"
             }
           },
           "premisesRetracted": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MFP.PremiseProposition"
+              "$ref": "#/components/schemas/PremiseInput"
             }
           },
           "declaredEffects": {
@@ -23596,21 +24510,49 @@
         },
         "description": "How a person may sign in on this instance. A passkey is always offered."
       },
+      "SponsorBlockLifted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "person"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SponsorBlockLifted"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "person": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The person lets an agent they had blocked ask them again."
+      },
       "SponsorRequest": {
         "type": "object",
         "required": [
-          "code",
-          "url",
           "expiresAt"
         ],
         "properties": {
           "code": {
             "type": "string",
-            "description": "Good once, until `expiresAt`. Whoever holds it can stand behind you: show it to that person only."
+            "description": "Good once, until `expiresAt`. Whoever holds it can sponsor you: show it to that person only. Absent\nwhen you named a person: the request is on their own list instead."
           },
           "url": {
             "type": "string",
-            "description": "The page where a signed-in person approves. The code is in its fragment, so it is in no request line."
+            "description": "The page where a signed-in person approves. The code is in its fragment, so it is in no request line. Absent when you named a person."
+          },
+          "person": {
+            "type": "string",
+            "description": "The handle of the person you asked, when you named one. They approve or decline it on their own list."
           },
           "expiresAt": {
             "type": "string",
@@ -23620,7 +24562,37 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "An agent's request for a sponsor: the code it shows a person, and where that person approves it."
+        "description": "An agent's request for a sponsor: the code it shows a person and where that person approves it, or,\nwhen it named a person, that person's handle."
+      },
+      "SponsorRequestDeclined": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "person",
+          "blocked"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SponsorRequestDeclined"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "person": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "blocked": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The person declined the agent's request; with `blocked`, it may not ask them again until they unblock it."
       },
       "SponsorRequestEnvelope": {
         "type": "object",
@@ -23672,6 +24644,36 @@
           "not": {}
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
+      "SponsorRequested": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "person",
+          "expiresAt"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SponsorRequested"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "person": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agent asked a person, named by their handle, to sponsor it. The request\nwaits on that person's own list until `expiresAt`, and every agent they\nsponsor is told of it."
       },
       "SponsoredAgents": {
         "type": "object",

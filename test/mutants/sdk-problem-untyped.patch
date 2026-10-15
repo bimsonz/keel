@@ -2,11 +2,11 @@
 # kills: sdk.problem
 # why: a refusal loses its code and next actions
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 5994e824..36ed206d 100644
+index 7f1a1c7b..a6af854d 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -266,7 +266,7 @@ export class KeelClient {
-     let response = await send(credentialed ? await this.token() : session);
+@@ -313,7 +313,7 @@ export class KeelClient {
+     );
      if (credentialed && response.status === 401)
        response = await send(await this.token({ fresh: true }));
 -    if (!response.ok) throw await KeelProblem.from(response);

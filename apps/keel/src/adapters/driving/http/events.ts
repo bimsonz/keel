@@ -109,9 +109,32 @@ function eventRecord(entry: EventFeedEntry) {
   };
 }
 
-export function eventsOk(page: EventFeedPage): Inbox_listEventsResult {
+/** How the log is answered: one short line per event, or the events whole. */
+export type EventsView = "lines" | "full";
+
+/** The most lines a page holds when the reader names no limit: an agent's read stays small. */
+export const EVENT_LINES_PAGE = 50;
+
+/** `ChangeLanded` reads as "Change landed". */
+const sentence = (type: string): string => {
+  const words = type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** One event as a line: a few words where its envelope is hundreds. */
+const eventLine = (entry: EventFeedEntry) => ({
+  at: new Date(entry.at).toISOString(),
+  type: entry.type,
+  entity: `${entry.entity.kind}:${entry.entity.id}`,
+  line: `${sentence(entry.type)}: ${entry.entity.id}`,
+});
+
+export function eventsOk(page: EventFeedPage, view: EventsView = "full"): Inbox_listEventsResult {
   return {
     status: 200,
-    body: { items: page.events.map(eventRecord), nextCursor: page.cursor },
+    body:
+      view === "lines"
+        ? { items: [], lines: page.events.map(eventLine), nextCursor: page.cursor }
+        : { items: page.events.map(eventRecord), nextCursor: page.cursor },
   };
 }

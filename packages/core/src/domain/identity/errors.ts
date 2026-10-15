@@ -96,6 +96,15 @@ export class SponsorRequestRefused extends Schema.TaggedError<SponsorRequestRefu
   { agentId: AgentId },
 ) {}
 
+/**
+ * 429: the agent has asked people for sponsorship as often as Keel takes in an
+ * hour, or as many requests already wait for the person it named.
+ */
+export class SponsorRequestsLimited extends Schema.TaggedError<SponsorRequestsLimited>()(
+  "SponsorRequestsLimited",
+  { agentId: AgentId, retryAfterMs: Schema.Int },
+) {}
+
 /** 401: an anonymous caller asked for something only a signed-in user or an agent may do. */
 export class AuthenticationRequired extends Schema.TaggedError<AuthenticationRequired>()(
   "AuthenticationRequired",

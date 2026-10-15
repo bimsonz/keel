@@ -194,5 +194,6 @@ export * from "./namespace-usage.ts";
 export * from "./reservations.ts";
 export * from "./session.ts";
 export * from "./sign-up.ts";
+export * from "./sponsor-requests.ts";
 export * from "./sponsorship.ts";
 export * from "./standing.ts";

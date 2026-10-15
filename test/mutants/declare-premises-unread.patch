@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-lenient
+# kills: a11.declare-lenient
+# why: declare decodes a premise exactly as MFP spells it, so an agent that names a function and writes a plain predicate is refused again and again
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 7123e023..4c9a3cb2 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -270,7 +270,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
+   const fields = decodeWith(DeclareFields, {
+     goal: input.goal,
+     footprint: input.footprint ?? [],
+-    premises: (input.premises ?? []).map(premiseOfAgent),
++    premises: input.premises ?? [],
+     ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
+   });
+   const premises = Result.flatMap(fields, (f) =>

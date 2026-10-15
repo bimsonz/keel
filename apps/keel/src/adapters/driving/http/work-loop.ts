@@ -88,6 +88,7 @@ import { type NoticeView, noticeView } from "../notices.ts";
 import type { Caller } from "./caller.ts";
 import { runView } from "./mappers.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
+import { PREMISE_EXAMPLE, PREMISE_HELP, premiseOfAgent } from "./premise-input.ts";
 
 /**
  * Pure mappers for the work loop: declare, submit, adopt, abandon, status and inbox. Wire
@@ -117,10 +118,40 @@ function decodeWith<S extends Schema.Decoder<unknown>>(
   );
 }
 
+/** The operation a premise's place in a request belongs to, by the field it is under. */
+const PREMISE_FIELDS: Readonly<Record<string, string>> = {
+  premises: "declare",
+  premisesAdded: "revise",
+  premisesRetracted: "revise",
+  premise: "rely",
+};
+
+/**
+ * A request refused as malformed. One refused over a premise also says how to
+ * write one, with a worked example as its next action, so an agent declares on
+ * its next try.
+ */
 export function invalid(caller: Caller, issues: Issues) {
+  const field = issues.map((issue) => String(issue.path[0] ?? "")).find((f) => f in PREMISE_FIELDS);
+  const operationId = field === undefined ? undefined : PREMISE_FIELDS[field];
   return {
     status: 400 as const,
-    body: problem(400, "request.invalid", caller.requestId, { issues }),
+    body: problem(400, "request.invalid", caller.requestId, {
+      issues,
+      ...(operationId === undefined || field === undefined
+        ? {}
+        : {
+            detail: PREMISE_HELP,
+            nextActions: [
+              {
+                kind: "call" as const,
+                title: `Call ${operationId} again with each premise written as this example`,
+                operationId,
+                args: { [field]: field === "premise" ? PREMISE_EXAMPLE : [PREMISE_EXAMPLE] },
+              },
+            ],
+          }),
+    }),
   };
 }
 
@@ -239,7 +270,7 @@ export function declareInput(input: Input<"declare">): Result.Result<DeclareInpu
   const fields = decodeWith(DeclareFields, {
     goal: input.goal,
     footprint: input.footprint ?? [],
-    premises: input.premises ?? [],
+    premises: (input.premises ?? []).map(premiseOfAgent),
     ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
   });
   const premises = Result.flatMap(fields, (f) =>
@@ -380,6 +411,31 @@ function preflightView(changeId: ChangeId, preflight: Preflight, tell: Teller) {
     ...(preflight.compared === undefined ? {} : { compared: { ...preflight.compared } }),
   };
 }
+
+/**
+ * The wait that tells an agent its change landed. Unread notices first, so a
+ * landing that came before the call is not missed.
+ */
+const landingOf: NextAction = {
+  kind: "read",
+  title: "Wait in your inbox for ChangeLanded: the change has landed only when it says so",
+  operationId: "inbox",
+  args: { wait: 600 },
+};
+
+/** The states Keel moves a submitted change through towards landing: an agent in them waits. */
+const OPEN_STATES: ReadonlySet<string> = new Set([
+  "submitted",
+  "deriving",
+  "drifted",
+  "verifying",
+  "queued",
+  "integrating",
+]);
+
+/** What a summary says of a change that has not landed, so no agent reads "submitted" or "queued" as landed. */
+const notLanded = (state: string) =>
+  `It is ${state}, not landed: it has landed only when your inbox says ChangeLanded.`;
 
 const statusOf = (changeId: ChangeId): NextAction => ({
   kind: "read",
@@ -537,9 +593,9 @@ export function submitOk(change: Change, commitSha: CommitSha): SubmitResult {
     status: 202,
     headers: { location: `/v1/changes/${change.id}/submission` },
     body: envelope(
-      `Submitted ${commitSha.slice(0, 12)} for ${change.id}; Keel is verifying it.`,
+      `Submitted ${commitSha.slice(0, 12)} for ${change.id}; Keel is verifying it. ${notLanded(change.state)}`,
       submissionView(change, commitSha),
-      [statusOf(change.id)],
+      [landingOf, statusOf(change.id)],
     ),
   };
 }
@@ -1035,8 +1091,8 @@ export function reviseInput(input: Input<"revise">): Result.Result<ReviseRequest
     lease: input["keel-lease"],
     ...(input.goal === undefined ? {} : { goal: input.goal }),
     ...(input.footprint === undefined ? {} : { footprint: input.footprint }),
-    premisesAdded: input.premisesAdded ?? [],
-    premisesRetracted: input.premisesRetracted ?? [],
+    premisesAdded: (input.premisesAdded ?? []).map(premiseOfAgent),
+    premisesRetracted: (input.premisesRetracted ?? []).map(premiseOfAgent),
     ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
   });
   const revision = ifMatchInput(input["if-match"]);
@@ -1219,7 +1275,7 @@ export function relyInput(input: Input<"rely">): Result.Result<RelyRequest, Issu
     decodeWith(RelyFields, {
       changeId: input.changeId,
       lease: input["keel-lease"],
-      premise: input.premise,
+      premise: premiseOfAgent(input.premise),
     }),
     ({ premise, ...fields }) => ({
       rely: { ...fields, idempotencyKey: input["idempotency-key"] },
@@ -1512,12 +1568,16 @@ export function statusOk(caller: Caller, status: SubmissionStatus): StatusResult
     };
   }
   const bounced = remedy === undefined ? "" : ` It bounced: ${remedy.reasons.join("; ")}.`;
+  const landed = change.state === "landed";
+  const waiting = !landed && remedy === undefined && OPEN_STATES.has(change.state);
   return {
     status: 200,
     body: envelope(
-      `${change.id} is ${state} at ${commitSha.slice(0, 12)}.${bounced}`,
+      landed
+        ? `${change.id} has landed at ${commitSha.slice(0, 12)}.`
+        : `${change.id} is ${state} at ${commitSha.slice(0, 12)}, not landed.${bounced}${waiting ? " It has landed only when your inbox says ChangeLanded." : ""}`,
       submissionView(change, commitSha),
-      nextFor(change, remedy),
+      waiting ? [landingOf, ...nextFor(change, remedy)].slice(0, 3) : nextFor(change, remedy),
     ),
   };
 }
@@ -1540,9 +1600,9 @@ export function inboxOk(page: InboxPage): InboxResult {
       [
         {
           kind: "read",
-          title: "Wait for the next notice",
+          title: "Keep waiting: call inbox again with this cursor",
           operationId: "inbox",
-          args: { cursor: page.cursor, wait: 30 },
+          args: { cursor: page.cursor, wait: 600 },
         },
       ],
     ),

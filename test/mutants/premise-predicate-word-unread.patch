@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-lenient
+# kills: a11.declare-lenient
+# why: a plain word for a predicate (pure for purity) is not read, so the premise is refused
+diff --git a/apps/keel/src/adapters/driving/http/premise-input.ts b/apps/keel/src/adapters/driving/http/premise-input.ts
+index 34a42586..129d252c 100644
+--- a/apps/keel/src/adapters/driving/http/premise-input.ts
++++ b/apps/keel/src/adapters/driving/http/premise-input.ts
+@@ -98,7 +98,7 @@ export const subjectKeyOf = (subject: string): string =>
+ const predicateOf = (raw: unknown): string | undefined => {
+   if (typeof raw !== "string") return undefined;
+   const word = spelled(raw);
+-  return PREDICATES.has(word) ? word : SYNONYMS[word];
++  return PREDICATES.has(word) ? word : undefined;
+ };
+ 
+ /** A yes-or-no value as an agent writes one. */

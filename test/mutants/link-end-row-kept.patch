@@ -2,16 +2,16 @@
 # kills: link.sponsor-inline
 # why: the link's end is not written to the directory, so the gate and a person's own list still read the sponsor who left
 diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
-index a1432471..82818d1a 100644
+index 74776f62..8e591634 100644
 --- a/packages/core/src/application/identity/sponsorship.ts
 +++ b/packages/core/src/application/identity/sponsorship.ts
-@@ -154,7 +154,8 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+@@ -179,7 +179,8 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
    const directory = yield* AgentDirectory;
    for (const event of committed.events) {
      const linked = sponsorOf(event);
 -    if (linked !== undefined) yield* directory.sponsor(linked.agentId, linked.sponsor, linked.seq);
 +    if (linked !== undefined && linked.sponsor !== null)
 +      yield* directory.sponsor(linked.agentId, linked.sponsor, linked.seq);
-     const moved = standingOf(event);
-     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
-   }
+     // Sponsored, the agent's requests to people leave their lists.
+     if (linked !== undefined && linked.sponsor !== null)
+       yield* (yield* SponsorRequests).settle(linked.agentId);

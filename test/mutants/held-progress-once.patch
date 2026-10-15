@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.held-progress
+# kills: mcp.held-progress
+# why: a held tool call says it is waiting only at the start, so a client that drops a call silent for 325 seconds drops a longer wait before Keel answers
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index a87cfbf2..5fbdfc9f 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -106,7 +106,6 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+       beat = setTimeout(() => {
+         progress += 1;
+         // A stream the client has let go refuses the notice; the read ends with it anyway.
+-        told(progress).catch(() => undefined);
+         arm();
+       }, PROGRESS_EVERY_SECONDS * 1000);
+     };

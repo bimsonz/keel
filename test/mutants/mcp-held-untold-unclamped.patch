@@ -2,15 +2,15 @@
 # kills: mcp.held
 # why: a held call with no progress token waits as long as it asks, one JSON body with no byte before it, which a client drops at a minute
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 8214fbad..36cc655f 100644
+index 3becca03..08a9e946 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -71,7 +71,7 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
-   const waiting = async <I extends { readonly wait?: number }>(input: I): Promise<I> => {
-     if (input.wait === undefined || input.wait === 0) return input;
+@@ -96,7 +96,7 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+     if (input.wait === undefined || input.wait === 0) return read(input);
      if (token === undefined)
--      return input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input;
-+      return input;
-     await context.mcpReq.notify({
-       method: "notifications/progress",
-       params: { progressToken: token, progress: 0, message: "Waiting for something to arrive" },
+       return read(
+-        input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input,
++        input,
+       );
+     await told(0);
+     let progress = 0;

@@ -1,3 +1,4 @@
+import { canonicalRequest } from "./adapters/driving/http/ids.ts";
 import { consumeQueue } from "./adapters/driving/queue/consumer.ts";
 import { queueRuntime } from "./composition/queue.ts";
 import { enforceRetention } from "./composition/retention.ts";
@@ -25,9 +26,10 @@ export { PushObserved } from "./adapters/driving/workflow/push-observed.ts";
 export default {
   // The HTTP side loads on the first request, not with the Worker: Cloudflare gives a Worker's global scope a
   // second of CPU, and scripts/guard-startup.ts fails the build when it is reached as the Worker loads.
+  // An id is read in either case at the API and the MCP door: each is written as Keel writes it first.
   fetch(request, env, ctx): Response | Promise<Response> {
-    return import("./composition/isolate.ts").then(({ isolateFor }) =>
-      isolateFor(env).app.fetch(request, env, ctx),
+    return Promise.all([import("./composition/isolate.ts"), canonicalRequest(request)]).then(
+      ([{ isolateFor }, read]) => isolateFor(env).app.fetch(read, env, ctx),
     );
   },
   queue(batch, env, _ctx): Promise<void> {

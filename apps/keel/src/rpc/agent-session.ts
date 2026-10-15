@@ -12,6 +12,7 @@ import {
   Scope,
   SignUpRefused,
   SponsorRequestRefused,
+  SponsorRequestsLimited,
 } from "@keeltown/core/domain/identity";
 import { Session } from "@keeltown/core/domain/memory";
 import {
@@ -151,6 +152,7 @@ export const AskSponsorCommand = Schema.Struct({ codeHash: Schema.NonEmptyString
 export const ApproveSponsorCommand = Schema.Struct({
   by: UserId,
   codeHash: Schema.optional(Schema.NonEmptyString),
+  fromList: Schema.optional(Schema.Boolean),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });
@@ -163,6 +165,37 @@ export const ApproveSponsorCommand = Schema.Struct({
 export const EndSponsorCommand = Schema.Struct({
   by: CommandActor,
   run: Schema.optional(RunRef),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/**
+ * The agent asks a person, found by their handle, to sponsor it. `run` is the
+ * run it asks in, from its token. The commit's cause is `ask-person:<idempotencyKey>`.
+ */
+export const AskPersonCommand = Schema.Struct({
+  person: UserId,
+  run: Schema.optional(RunRef),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/** What the agent is told of its request to a person: whom, and until when it waits. */
+export const PersonRequestAnswer = Schema.Struct({ person: UserId, expiresAt: InstantSchema });
+
+/**
+ * The person an agent asked declines it, and with `block` stops it asking
+ * again; or (`UnblockPersonCommand`) lets it ask again. The commits' causes
+ * are `decline:<idempotencyKey>` and `unblock:<idempotencyKey>`.
+ */
+export const DeclinePersonCommand = Schema.Struct({
+  person: UserId,
+  block: Schema.Boolean,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+export const UnblockPersonCommand = Schema.Struct({
+  person: UserId,
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });
@@ -187,6 +220,21 @@ export const AgentSessionCodecs = {
     Schema.Union([AgentNotKnown, AgentStateRefused, SponsorRequestRefused, IdempotencyConflict]),
   ),
   endSponsorship: exitCodec(Agent, StandingRefusal),
+  askPerson: exitCodec(
+    PersonRequestAnswer,
+    Schema.Union([
+      AgentNotKnown,
+      AgentStateRefused,
+      SponsorRequestRefused,
+      SponsorRequestsLimited,
+      IdempotencyConflict,
+    ]),
+  ),
+  declinePerson: exitCodec(
+    Schema.Struct({ blocked: Schema.Boolean }),
+    Schema.Union([SponsorRequestRefused, IdempotencyConflict]),
+  ),
+  unblockPerson: exitCodec(Schema.Void, Schema.Union([SponsorRequestRefused, IdempotencyConflict])),
 };
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
@@ -242,4 +290,10 @@ export interface AgentSessionRpc extends EventReceiverRpc {
   approveSponsor(command: typeof ApproveSponsorCommand.Encoded): Promise<ExitJson>;
   /** Ends the sponsor link, reinstating a paused agent in the same commit. */
   endSponsorship(command: typeof EndSponsorCommand.Encoded): Promise<ExitJson>;
+  /** The agent asks a person to sponsor it: a request on that person's own list, told to every agent they sponsor. */
+  askPerson(command: typeof AskPersonCommand.Encoded): Promise<ExitJson>;
+  /** The person the agent asked declines it, blocking it from asking again when they say so; the agent is told. */
+  declinePerson(command: typeof DeclinePersonCommand.Encoded): Promise<ExitJson>;
+  /** The person lets an agent they blocked ask them again. */
+  unblockPerson(command: typeof UnblockPersonCommand.Encoded): Promise<ExitJson>;
 }

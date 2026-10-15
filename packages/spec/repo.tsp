@@ -63,7 +63,23 @@ model RepoBlob {
   /** It is larger than the 1 MiB Keel serves inline. */
   truncated: boolean;
 
+  /** Its text, or the page of it `lines` names when the file is over 64 KiB. */
   content?: string;
+
+  /** Which lines `content` holds, 1-based and inclusive, and how many the file has: set when the file is served a page at a time. */
+  lines?: BlobLines;
+
+  /** The line the next page starts at; absent on the last page. */
+  nextStartLine?: int32;
+
+  /** How to read the next page, when there is one. */
+  next?: NextAction[];
+}
+
+model BlobLines {
+  start: int32;
+  end: int32;
+  total: int32;
 }
 
 /** Who a commit names, and when. */
@@ -165,7 +181,11 @@ interface Repo {
     @query path?: RepoPath,
   ): RepoTree | NotFound | StandardErrors;
 
-  /** A file of the project's code at a commit, with no `ref` trunk's `main`: its text is `content`, absent when the file is binary or over 1 MiB. */
+  /**
+   * A file of the project's code at a commit, with no `ref` trunk's `main`: its text is `content`, absent
+   * when the file is binary or over 1 MiB. A text file over 64 KiB comes a page at a time, cut at whole
+   * lines: `lines` says which, and `nextStartLine` where to ask from next (`startLine`).
+   */
   @summary("Read a file")
   @tag("mcp")
   @useAuth(NoAuth | AgentRead | SessionAuth)
@@ -175,6 +195,11 @@ interface Repo {
     @path projectId: ProjectId,
     @query ref?: RepoRefName,
     @query path: RepoPath,
+
+    /** The first line to read, 1-based: a page of a file over 64 KiB starts here. */
+    @minValue(1)
+    @query
+    startLine?: int32,
   ): RepoBlob | NotFound | StandardErrors;
 
   /** Newest first along the first-parent chain. The cursor names a commit, so a page holds still while trunk moves. */

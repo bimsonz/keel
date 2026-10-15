@@ -32,7 +32,7 @@ type DocumentedOperation = keyof WireInputs | keyof WireOutputs;
  */
 export const ROUTES = {
   whoami: { method: "GET", path: "/agents/me" },
-  askSponsor: { method: "POST", path: "/agents/me/sponsor-request" },
+  askSponsor: { method: "POST", path: "/agents/me/sponsor-request", query: ["person"] },
   Agents_listSponsored: { method: "GET", path: "/agents/sponsored" },
   Agents_approveSponsor: {
     method: "PUT",
@@ -99,7 +99,7 @@ export const ROUTES = {
   Inbox_listEvents: {
     method: "GET",
     path: "/events",
-    query: ["cursor", "project", "wait", "limit"],
+    query: ["cursor", "project", "wait", "limit", "view"],
   },
   Views_getTrunk: { method: "GET", path: "/projects/{projectId}/trunk" },
   abandon: {
@@ -113,7 +113,11 @@ export const ROUTES = {
   Operator_syncUpstream: { method: "POST", path: "/projects/{projectId}/sync" },
   Operator_enrolAgent: { method: "POST", path: "/agents", headers: ["idempotency-key"] },
   Repo_getTree: { method: "GET", path: "/projects/{projectId}/repo/tree", query: ["ref", "path"] },
-  Repo_getBlob: { method: "GET", path: "/projects/{projectId}/repo/blob", query: ["ref", "path"] },
+  Repo_getBlob: {
+    method: "GET",
+    path: "/projects/{projectId}/repo/blob",
+    query: ["ref", "path", "startLine"],
+  },
   Repo_listCommits: {
     method: "GET",
     path: "/projects/{projectId}/repo/commits",
@@ -189,6 +193,24 @@ export const ROUTES = {
   Namespaces_getNamespace: { method: "GET", path: "/namespaces/{handle}" },
   Namespaces_getProject: { method: "GET", path: "/namespaces/{handle}/projects/{name}" },
   Users_me: { method: "GET", path: "/users/me" },
+  Users_listSponsorRequests: { method: "GET", path: "/users/me/sponsor-requests" },
+  Users_approveSponsorRequest: {
+    method: "PUT",
+    path: "/users/me/sponsor-requests/{agentId}",
+    headers: ["idempotency-key"],
+  },
+  Users_declineSponsorRequest: {
+    method: "DELETE",
+    path: "/users/me/sponsor-requests/{agentId}",
+    query: ["block"],
+    headers: ["idempotency-key"],
+  },
+  Users_listBlockedAgents: { method: "GET", path: "/users/me/blocked-agents" },
+  Users_unblockAgent: {
+    method: "DELETE",
+    path: "/users/me/blocked-agents/{agentId}",
+    headers: ["idempotency-key"],
+  },
   Operator_suspendAgent: {
     method: "POST",
     path: "/agents/{agentId}/suspend",

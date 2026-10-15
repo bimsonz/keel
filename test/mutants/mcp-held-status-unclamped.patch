@@ -2,14 +2,14 @@
 # kills: mcp.held
 # why: the submission's status is held as long as it asks without a progress token, as the inbox is not
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 8214fbad..752e5579 100644
+index 90380e5b..4477b583 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -83,7 +83,6 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
-     inbox: async (caller, input) => handlers.inbox(caller, await waiting(input)),
-     Inbox_listEvents: async (caller, input) =>
-       handlers.Inbox_listEvents(caller, await waiting(input)),
--    status: async (caller, input) => handlers.status(caller, await waiting(input)),
+@@ -125,7 +125,6 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+       waiting({ ...input, view: input.view ?? "lines" }, (asked) =>
+         handlers.Inbox_listEvents(caller, asked),
+       ),
+-    status: async (caller, input) => waiting(input, (asked) => handlers.status(caller, asked)),
    };
  }
  

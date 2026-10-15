@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t ids.mcp-either-case
+# kills: ids.mcp-either-case
+# why: an id in a JSON body is left lower-case, so a tool's argument is refused as malformed
+diff --git a/apps/keel/src/adapters/driving/http/ids.ts b/apps/keel/src/adapters/driving/http/ids.ts
+index 1c2a32ff..0b459a3c 100644
+--- a/apps/keel/src/adapters/driving/http/ids.ts
++++ b/apps/keel/src/adapters/driving/http/ids.ts
+@@ -69,7 +69,7 @@ export async function canonicalRequest(request: Request): Promise<Request> {
+ function rewrittenJson(text: string): string {
+   try {
+     const parsed: unknown = JSON.parse(text);
+-    const written = JSON.stringify(canonicalIds(parsed));
++    const written = JSON.stringify(parsed);
+     return written === JSON.stringify(parsed) ? text : written;
+   } catch {
+     return text;

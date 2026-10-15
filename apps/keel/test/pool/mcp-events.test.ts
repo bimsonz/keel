@@ -4,6 +4,7 @@
 // Every read goes token, gate, door, port, object.
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { namespaceAddress } from "@keeltown/core/application/coordination";
 import { IntentDeclared } from "@keeltown/core/domain/coordination";
 import { agentIdOf, runIdOf } from "@keeltown/core/domain/identity";
 import {
@@ -25,6 +26,7 @@ import {
   establishProject,
   placeProject,
   seedAgent,
+  seedOrg,
   seedUser,
   tokenFor,
   uniqueHandle,
@@ -199,6 +201,29 @@ const acknowledged = (message: Message | "quiet" | "ended") =>
 
 const updated = (uri: string) => (message: Message) =>
   message.method === "notifications/resources/updated" && message.params?.["uri"] === uri;
+
+/**
+ * What an act made while the agent listens on its inbox comes to: the act's
+ * status, and the kinds of notice the agent's next answer carries once the
+ * listen is told of an update within 10 s. Told nothing in time, no kinds.
+ */
+async function toldWhileListening(token: string, act: () => Promise<Response>) {
+  const stop = new AbortController();
+  try {
+    const stream = await listen(token, [INBOX], stop.signal);
+    await stream.next(5_000);
+    const { status } = await act();
+    if (typeof (await stream.until(10_000, updated(INBOX))) !== "object")
+      return { status, kinds: [] };
+    const answer = await toolResult(
+      await send(token, "tools/call", { name: "whoami", arguments: {} }, { name: "whoami" }),
+    );
+    const notices: readonly { kind: string }[] = Object(answer["structuredContent"]).notices;
+    return { status, kinds: notices.map((notice) => notice.kind) };
+  } finally {
+    stop.abort();
+  }
+}
 
 /** An event as the fan-out delivers it to the agent's own object. */
 const delivered = (fields: Record<string, unknown>) =>
@@ -382,6 +407,136 @@ describe("MCP events", () => {
     } finally {
       stop.abort();
     }
+  });
+
+  it("[mcp.listen-invited] an org's invitation made while the agent listens is told as an update of its inbox within seconds, and its next answer carries AgentInvited", async () => {
+    const agent = await mcpAgent();
+    const org = makeId("org", ulid());
+    const slug = uniqueHandle("told");
+    await seedOrg(org, slug, makeId("usr", ulid()), uniqueHandle("owner"));
+    const member = await seedUser(uniqueHandle("ann"), { org, signedInBy: "passkey" });
+    drainAfter(env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(org))));
+    const card = Object(await (await worker(`${BASE}/v1/agents/${agent.agentId}`)).json());
+    const stop = new AbortController();
+    try {
+      const stream = await listen(agent.a, [INBOX], stop.signal);
+      await stream.next(5_000);
+      const started = Date.now();
+      const invited = await worker(`${BASE}/v1/namespaces/${slug}/agents`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${member.token}`,
+          "content-type": "application/json",
+          "idempotency-key": `invite-${ulid()}`,
+          "cf-connecting-ip": "203.0.113.9",
+        },
+        body: JSON.stringify({ agent: String(card.handle) }),
+      });
+      expect(invited.status).toBe(201);
+      expect(await stream.until(10_000, updated(INBOX))).toMatchObject({
+        method: "notifications/resources/updated",
+        params: { uri: INBOX },
+      });
+      expect(Date.now() - started).toBeLessThan(10_000);
+      const answer = await toolResult(
+        await send(agent.a, "tools/call", { name: "whoami", arguments: {} }, { name: "whoami" }),
+      );
+      const kinds = Object(answer["structuredContent"]).notices.map(
+        (notice: { kind: string }) => notice.kind,
+      );
+      expect(kinds).toContain("AgentInvited");
+    } finally {
+      stop.abort();
+    }
+  });
+
+  it("[mcp.listen-sponsored] a person's approval of the agent's sponsor request, and then their end of the link, made while the agent listens, are each told as an update of its inbox within seconds, and each next answer carries its notice", async () => {
+    const agent = await mcpAgent();
+    const asked = await toolResult(
+      await send(
+        agent.a,
+        "tools/call",
+        { name: "askSponsor", arguments: {} },
+        { name: "askSponsor" },
+      ),
+    );
+    const { code } = Object(Object(asked["structuredContent"])["result"]);
+    expect(typeof code).toBe("string");
+    const person = await seedUser(uniqueHandle("sponsor"), { role: null, signedInBy: "passkey" });
+    const byPerson = (method: string, body?: unknown) =>
+      worker(`${BASE}/v1/agents/${agent.agentId}/sponsor`, {
+        method,
+        headers: {
+          authorization: `Bearer ${person.token}`,
+          "content-type": "application/json",
+          "idempotency-key": `${method}-${ulid()}`,
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    expect(await toldWhileListening(agent.a, () => byPerson("PUT", { code }))).toEqual({
+      status: 200,
+      kinds: expect.arrayContaining(["AgentSponsored"]),
+    });
+    expect(await toldWhileListening(agent.a, () => byPerson("DELETE"))).toEqual({
+      status: 200,
+      kinds: expect.arrayContaining(["AgentUnsponsored"]),
+    });
+  });
+
+  it("[mcp.listen-uninvited] an org member taking back the agent's invitation while it listens is told as an update of its inbox within seconds, and its next answer carries AgentLeftNamespace", async () => {
+    const agent = await mcpAgent();
+    const org = makeId("org", ulid());
+    const slug = uniqueHandle("taken");
+    await seedOrg(org, slug, makeId("usr", ulid()), uniqueHandle("owner"));
+    const member = await seedUser(uniqueHandle("ann"), { org, signedInBy: "passkey" });
+    drainAfter(env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(org))));
+    const card = Object(await (await worker(`${BASE}/v1/agents/${agent.agentId}`)).json());
+    const byMember = (method: string, path: string, body?: unknown) =>
+      worker(`${BASE}/v1/namespaces/${slug}/agents${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${member.token}`,
+          "content-type": "application/json",
+          "idempotency-key": `${method}-${ulid()}`,
+          "cf-connecting-ip": "203.0.113.9",
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    expect((await byMember("POST", "", { agent: String(card.handle) })).status).toBe(201);
+    // The invitation's own notice is read first, so the end is what the listen is told of.
+    await send(agent.a, "tools/call", { name: "whoami", arguments: {} }, { name: "whoami" });
+    expect(
+      await toldWhileListening(agent.a, () => byMember("DELETE", `/${agent.agentId}`)),
+    ).toEqual({ status: 200, kinds: expect.arrayContaining(["AgentLeftNamespace"]) });
+  });
+
+  it("[ids.http-either-case] an id lower-cased at the API is read as Keel writes it: the same agent, its id upper-case", async () => {
+    const agent = await mcpAgent();
+    const lower = `agt_${agent.agentId.slice(4).toLowerCase()}`;
+    const card = await worker(`${BASE}/v1/agents/${lower}`);
+    expect(card.status).toBe(200);
+    expect(Object(await card.json())).toMatchObject({ id: agent.agentId });
+  });
+
+  it("[ids.mcp-either-case] an id lower-cased in an MCP tool's arguments is read as Keel writes it: the same answer as the upper-case id's", async () => {
+    const agent = await mcpAgent();
+    const listed = async (project: string) =>
+      Object(
+        (
+          await toolResult(
+            await send(
+              agent.a,
+              "tools/call",
+              { name: "Inbox_listEvents", arguments: { project } },
+              { name: "Inbox_listEvents" },
+            ),
+          )
+        )["structuredContent"],
+      );
+    const upper = await listed(agent.projectId);
+    const lower = await listed(`prj_${agent.projectId.slice(4).toLowerCase()}`);
+    expect(lower).toEqual(upper);
+    expect(lower).not.toHaveProperty("code");
   });
 
   it("[mcp.listen-feed] an event of the token's project is told as an update of its feed", async () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t a11.declare-lenient
+# kills: a11.declare-lenient
+# why: a premise Keel cannot read is refused with its issues alone, and no form or worked call, so the agent guesses again
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 7123e023..41d42c6f 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -138,7 +138,7 @@ export function invalid(caller: Caller, issues: Issues) {
+     status: 400 as const,
+     body: problem(400, "request.invalid", caller.requestId, {
+       issues,
+-      ...(operationId === undefined || field === undefined
++      ...(true
+         ? {}
+         : {
+             detail: PREMISE_HELP,

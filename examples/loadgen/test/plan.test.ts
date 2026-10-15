@@ -3,6 +3,7 @@ import {
   BENCH_KINDS,
   PENDING,
   anchoredAt,
+  anchorsOf,
   apply,
   dealPairs,
   mix,
@@ -28,8 +29,7 @@ const sidesOf = (p: Plan, pair: number): [Task, Task] => {
 /** The functions an edit touches in a file of the pair's, or none for a file of its own. */
 const touched = (edit: Edit) => (edit.op === "create" ? [] : [`${edit.path}#${edit.fn}`]);
 
-const anchors = (q: Plan) =>
-  q.tasks.flatMap((t) => t.premises.flatMap((premise) => premise.anchors ?? []));
+const anchors = (q: Plan) => q.tasks.flatMap((t) => t.premises.flatMap(anchorsOf));
 
 describe("a loadgen run's plan", () => {
   it("[loadgen.plan-mix] splits every agent count into pairs, shared groups and disjoint agents, a pair's sides started together", () => {

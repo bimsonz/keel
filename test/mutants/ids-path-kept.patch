@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t ids.http-either-case
+# kills: ids.http-either-case
+# why: an id in the path is left lower-case, so the API refuses an agent's own id copied from an address
+diff --git a/apps/keel/src/adapters/driving/http/ids.ts b/apps/keel/src/adapters/driving/http/ids.ts
+index 260bf8c6..3ab0869f 100644
+--- a/apps/keel/src/adapters/driving/http/ids.ts
++++ b/apps/keel/src/adapters/driving/http/ids.ts
+@@ -42,7 +42,7 @@ export async function canonicalRequest(request: Request): Promise<Request> {
+     .map((segment) => {
+       const decoded = safeDecode(segment);
+       const written = decoded === undefined ? segment : canonicalId(decoded);
+-      return written === decoded ? segment : encodeURIComponent(written);
++      return written === decoded ? segment : segment;
+     })
+     .join("/");
+   const query = new URLSearchParams();

@@ -4,6 +4,7 @@ import type {
   AgentStateRefused,
   IdempotencyConflict,
   SponsorRequestRefused,
+  SponsorRequestsLimited,
 } from "@keeltown/core/domain/identity";
 import { AgentId } from "@keeltown/core/kernel";
 import type { SponsorRequest } from "@keeltown/core/ports";
@@ -14,6 +15,11 @@ import type {
   Agents_getAgentResult,
   Agents_listSponsoredResult,
   AskSponsorResult,
+  Users_approveSponsorRequestResult,
+  Users_declineSponsorRequestResult,
+  Users_listBlockedAgentsResult,
+  Users_listSponsorRequestsResult,
+  Users_unblockAgentResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { admissionRefused, agentProfile } from "./mappers.ts";
@@ -299,6 +305,205 @@ export function freshSignInRequired(requestId: string): {
     body: problem(403, "auth.fresh_sign_in_required", requestId, {
       detail: "This needs a fresh sign-in: a passkey sign-in from the last ten minutes.",
       nextActions: [{ kind: "escalate", title: "Sign in again with your passkey, then retry" }],
+    }),
+  };
+}
+
+/** An agent's card as a person's list shows it: the same card anyone reads. */
+export type ListedCard = CardBody;
+
+/** The agent's request now waits on the person's own list. */
+export function askPersonOk(handle: string, expiresAt: number): AskSponsorResult {
+  const until = iso(expiresAt);
+  return {
+    status: 201,
+    body: {
+      ok: true,
+      summary: `Your request waits on ${handle}'s own list until ${until}, and every agent they sponsor is told of it. They approve or decline it there; you are told which.`,
+      result: { person: handle, expiresAt: until },
+      findings: [],
+      next: [
+        {
+          kind: "call",
+          title: "Wait in your inbox: Keel tells you the moment they approve or decline",
+          operationId: "inbox",
+          args: { cursor: "end", wait: 600 },
+        },
+        {
+          kind: "call",
+          title: "Read who you are: your profile names your sponsor once they approve",
+          operationId: "whoami",
+        },
+      ],
+      notices: [],
+      cost: {},
+    },
+  };
+}
+
+/** The one answer to a handle nobody may be asked by: no such person, an agent's or an org's, or a person who blocked the agent. */
+function noSuchPerson(caller: Caller, handle: string) {
+  return {
+    status: 404 as const,
+    body: problem(404, "resource.not_found", caller.requestId, {
+      detail: `No person you may ask has the handle ${handle}.`,
+      nextActions: [
+        {
+          kind: "escalate" as const,
+          title: "Ask a person you know for their handle, or ask for a link to show them",
+        },
+      ],
+    }),
+  };
+}
+
+export function askPersonError(
+  caller: Caller,
+  handle: string,
+  error:
+    | AgentNotKnown
+    | AgentStateRefused
+    | SponsorRequestRefused
+    | SponsorRequestsLimited
+    | IdempotencyConflict,
+): AskSponsorResult {
+  switch (error._tag) {
+    case "AgentNotKnown":
+      return admissionRefused(caller, error);
+    case "AgentStateRefused":
+      return stateRefused(caller, error);
+    case "SponsorRequestRefused":
+      return noSuchPerson(caller, handle);
+    case "SponsorRequestsLimited":
+      return {
+        status: 429,
+        body: problem(429, "rate.limited", caller.requestId, {
+          detail:
+            "You have asked people for sponsorship as often as Keel takes in an hour, or as many requests already wait for that person.",
+          retryAfterMs: error.retryAfterMs,
+        }),
+        headers: { "retry-after": Math.ceil(error.retryAfterMs / 1000) },
+      };
+    case "IdempotencyConflict":
+      return idempotencyConflict(caller, error, "askSponsor");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+/** One request waiting for the person, as their list shows it. */
+export interface Waiting {
+  readonly agent: CardBody;
+  readonly askedAt: number;
+  readonly expiresAt: number;
+}
+
+export function waitingOk(items: readonly Waiting[]): Users_listSponsorRequestsResult {
+  return {
+    status: 200,
+    body: {
+      items: items.map((item) => ({
+        agent: item.agent,
+        askedAt: iso(item.askedAt),
+        expiresAt: iso(item.expiresAt),
+      })),
+    },
+  };
+}
+
+export function blockedOk(
+  items: readonly { readonly agent: CardBody; readonly blockedAt: number }[],
+): Users_listBlockedAgentsResult {
+  return {
+    status: 200,
+    body: { items: items.map((item) => ({ agent: item.agent, blockedAt: iso(item.blockedAt) })) },
+  };
+}
+
+/** No request from that agent waits for the person (or the agent is not one they blocked). */
+export function noRequestFromAgent(caller: Caller) {
+  return {
+    status: 404 as const,
+    body: problem(404, "resource.not_found", caller.requestId, {
+      detail: "No request from that agent waits for you.",
+      nextActions: [
+        {
+          kind: "call" as const,
+          title: "List the sponsor requests waiting for you",
+          operationId: "Users_listSponsorRequests",
+        },
+      ],
+    }),
+  };
+}
+
+export function approveFromListError(
+  caller: Caller,
+  error: AgentNotKnown | AgentStateRefused | SponsorRequestRefused | IdempotencyConflict,
+): Users_approveSponsorRequestResult {
+  switch (error._tag) {
+    case "AgentNotKnown":
+    case "SponsorRequestRefused":
+      return noRequestFromAgent(caller);
+    case "AgentStateRefused":
+      return stateRefused(caller, error);
+    case "IdempotencyConflict":
+      return idempotencyConflict(caller, error, "Users_approveSponsorRequest");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+export function declinedOk(agent: CardBody, blocked: boolean): Users_declineSponsorRequestResult {
+  return { status: 200, body: { agent, blocked } };
+}
+
+export function declineError(
+  caller: Caller,
+  error: SponsorRequestRefused | IdempotencyConflict,
+): Users_declineSponsorRequestResult {
+  switch (error._tag) {
+    case "SponsorRequestRefused":
+      return noRequestFromAgent(caller);
+    case "IdempotencyConflict":
+      return idempotencyConflict(caller, error, "Users_declineSponsorRequest");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+export function unblockedOk(agent: CardBody): Users_unblockAgentResult {
+  return { status: 200, body: agent };
+}
+
+export function unblockError(
+  caller: Caller,
+  error: SponsorRequestRefused | IdempotencyConflict,
+): Users_unblockAgentResult {
+  switch (error._tag) {
+    case "SponsorRequestRefused":
+      return notBlocked(caller);
+    case "IdempotencyConflict":
+      return idempotencyConflict(caller, error, "Users_unblockAgent");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+/** The agent named is not one the person blocked. */
+export function notBlocked(caller: Caller) {
+  return {
+    status: 404 as const,
+    body: problem(404, "resource.not_found", caller.requestId, {
+      detail: "You have not blocked that agent.",
     }),
   };
 }

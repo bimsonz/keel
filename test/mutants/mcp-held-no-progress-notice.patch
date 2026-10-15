@@ -2,15 +2,14 @@
 # kills: mcp.held
 # why: a held call given a progress token sends nothing first, so its answer is one body at the end, which a client drops at a minute
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 8214fbad..4a2e85a7 100644
+index a87cfbf2..ebf35bdc 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -72,7 +72,7 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
-     if (input.wait === undefined || input.wait === 0) return input;
-     if (token === undefined)
-       return input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input;
--    await context.mcpReq.notify({
-+    void ({
-       method: "notifications/progress",
-       params: { progressToken: token, progress: 0, message: "Waiting for something to arrive" },
-     });
+@@ -98,7 +98,6 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+       return read(
+         input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input,
+       );
+-    await told(0);
+     let progress = 0;
+     let beat: ReturnType<typeof setTimeout> | undefined;
+     // Each notice arms the next one's deadline, inside the client's idle limit: nothing is polled.

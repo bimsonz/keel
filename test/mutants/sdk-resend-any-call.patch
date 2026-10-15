@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts -t sdk.long-poll-resend
+# kills: sdk.long-poll-resend
+# why: every read is sent again when its connection drops, though only a long poll has a wait to keep
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 7f1a1c7b..008f4ee2 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -128,7 +128,7 @@ function longPollDeadline(
+   input: Readonly<Record<string, unknown>>,
+ ): number | undefined {
+   const wait = input["wait"];
+-  return method === "GET" && typeof wait === "number" && wait > 0
++  return method === "GET"
+     ? Date.now() + wait * 1000
+     : undefined;
+ }

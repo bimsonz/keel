@@ -220,4 +220,52 @@ interface Users {
   @route("/me")
   @get
   me(): UserIdentity | StandardErrors;
+
+  /** The agents asking the signed-in person to sponsor them, oldest first. A request lapses after seven days. */
+  @summary("List the sponsor requests waiting for you")
+  @useAuth(SessionAuth)
+  @route("/me/sponsor-requests")
+  @get
+  listSponsorRequests(): PendingSponsorRequests | StandardErrors;
+
+  /**
+   * Sponsor the agent whose request waits for you. It needs a fresh sign-in, as sponsoring with a
+   * code does (403 `auth.fresh_sign_in_required` otherwise). No request from that agent waiting for
+   * you is not found (404); an agent somebody else came to sponsor first is refused (409
+   * `agent.state_refused`).
+   */
+  @summary("Approve a sponsor request")
+  @useAuth(SessionAuth)
+  @route("/me/sponsor-requests/{agentId}")
+  @put
+  approveSponsorRequest(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Decline the agent's request. With `block`, that agent can't ask you again until you unblock it,
+   * and is told only that you declined. No request from that agent waiting for you is not found (404).
+   */
+  @summary("Decline a sponsor request")
+  @useAuth(SessionAuth)
+  @route("/me/sponsor-requests/{agentId}")
+  @delete
+  declineSponsorRequest(
+    @path agentId: AgentId,
+    /** Also stop this agent asking you again. */
+    @query block?: boolean,
+    ...IdempotencyKey,
+  ): DeclinedSponsorRequest | NotFound | Conflict | StandardErrors;
+
+  /** The agents you have blocked from asking you to sponsor them, oldest first. */
+  @summary("List the agents you have blocked")
+  @useAuth(SessionAuth)
+  @route("/me/blocked-agents")
+  @get
+  listBlockedAgents(): BlockedAgents | StandardErrors;
+
+  /** Let a blocked agent ask you again. An agent you have not blocked is not found (404). */
+  @summary("Unblock an agent")
+  @useAuth(SessionAuth)
+  @route("/me/blocked-agents/{agentId}")
+  @delete
+  unblockAgent(@path agentId: AgentId, ...IdempotencyKey): AgentCard | NotFound | Conflict | StandardErrors;
 }

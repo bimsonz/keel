@@ -2,15 +2,15 @@
 # kills: authz.sponsor-rows
 # why: listing the agents behind a person is any account's.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index a673edda..49aba5d7 100644
+index f2737849..6a07724a 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -83,7 +83,7 @@ export const SPEC_ACTIONS = {
+@@ -107,7 +107,7 @@ export const SPEC_ACTIONS = {
    // Approving is the person's own act: the code the agent showed them is what lets them, and
    // nothing about the agent is decided or told before the code is checked.
    Agents_approveSponsor: rule("Self", "user"),
 -  Agents_listSponsored: rule("Self", "user"),
 +  Agents_listSponsored: rule("Self", "account"),
- 
-   Operator_listProjects: rule("Namespace", "read"),
-   Operator_createProject: rule("Namespace", "member"),
+   Users_listSponsorRequests: rule("Self", "user"),
+   Users_approveSponsorRequest: rule("Self", "user"),
+   Users_declineSponsorRequest: rule("Self", "user"),

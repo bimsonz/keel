@@ -46,7 +46,7 @@ const USAGE = `keeltown <command> [options]
   auth setup-git [--profile <name>]
   agent signup [--name <label>] [--profile <name>] [--print-key]
   agent show [--profile <name>]
-  agent sponsor-request [--profile <name>]
+  agent sponsor-request [--person <handle>] [--profile <name>]
   agent join <namespace> [--profile <name>] [--key <idempotency-key>]
   token [--project <prj_…>] [--run <label>] [--mcp] [--header] [--profile <name>]
   whoami
@@ -74,8 +74,8 @@ run (--run or KEEL_RUN). \`token\` prints a five-minute token for a tool that ta
 --mcp asks for one Keel's MCP endpoint takes (the API refuses it, as /mcp refuses the API's), and
 --header prints it as the header an MCP client's helper wants. Where there is no key store, the key
 comes from KEEL_AGENT_KEY with KEEL_AGENT_ID (\`agent signup --print-key\` prints one, once).
-\`agent sponsor-request\` prints the page where a signed-in person approves standing behind the
-agent, and \`agent join\` accepts an org's invitation by the org's handle.
+\`agent sponsor-request\` prints the page where a signed-in person approves sponsoring the agent, or
+with --person puts the request on that person's own list, and \`agent join\` accepts an org's invitation by the org's handle.
 Other credentials: KEEL_URL always; an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's
 KEEL_SESSION, which win over a key when set. Projects and agents are governed by a user.
 A person signs in with \`login\`: Keel names a page to open, the sign-in is approved there, and it
@@ -91,6 +91,7 @@ const OPTIONS = {
   json: { type: "boolean" },
   help: { type: "boolean", short: "h" },
   goal: { type: "string" },
+  person: { type: "string" },
   footprint: { type: "string", multiple: true },
   key: { type: "string" },
   change: { type: "string" },
@@ -242,7 +243,7 @@ async function dispatch(
     case "whoami":
       return client.whoami();
     case "agent sponsor-request":
-      return client.askSponsor();
+      return client.askSponsor(values.person === undefined ? {} : { person: values.person });
     case "session open":
       return client.openSession(
         {

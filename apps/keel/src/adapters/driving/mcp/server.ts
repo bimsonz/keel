@@ -68,30 +68,64 @@ function toolDeps(admitted: Admitted): ToolDeps<Caller> {
 export const UNTOLD_WAIT_SECONDS = 30;
 
 /**
+ * How often a held tool call with a progress token says again that it is
+ * waiting: well inside a client's idle limit, since a client drops a call that
+ * has sent nothing for a while (one does at 325 seconds).
+ */
+export const PROGRESS_EVERY_SECONDS = 30;
+
+/**
  * The three reads that wait, as one tool call holds them. Given a progress
- * token, the call sends one progress notice at once, so its answer is a
- * stream from the first byte and may wait as long as the operation allows;
- * given none, it waits `UNTOLD_WAIT_SECONDS` at most.
+ * token, the call sends a progress notice at once, so its answer is a stream
+ * from the first byte, and another every `PROGRESS_EVERY_SECONDS` until it
+ * answers, so it may wait as long as the operation allows; given none, it
+ * waits `UNTOLD_WAIT_SECONDS` at most.
  */
 export function held(handlers: Handlers, context: ServerContext): Handlers {
   const { _meta: meta } = context.mcpReq;
   const token = meta?.progressToken;
-  const waiting = async <I extends { readonly wait?: number }>(input: I): Promise<I> => {
-    if (input.wait === undefined || input.wait === 0) return input;
-    if (token === undefined)
-      return input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input;
-    await context.mcpReq.notify({
+  const told = (progress: number) =>
+    context.mcpReq.notify({
       method: "notifications/progress",
-      params: { progressToken: token, progress: 0, message: "Waiting for something to arrive" },
+      params: { progressToken: token, progress, message: "Waiting for something to arrive" },
     });
-    return input;
+  const waiting = async <I extends { readonly wait?: number }, A>(
+    input: I,
+    read: (input: I) => A | Promise<A>,
+  ): Promise<A> => {
+    if (input.wait === undefined || input.wait === 0) return read(input);
+    if (token === undefined)
+      return read(
+        input.wait > UNTOLD_WAIT_SECONDS ? { ...input, wait: UNTOLD_WAIT_SECONDS } : input,
+      );
+    await told(0);
+    let progress = 0;
+    let beat: ReturnType<typeof setTimeout> | undefined;
+    // Each notice arms the next one's deadline, inside the client's idle limit: nothing is polled.
+    const arm = () => {
+      beat = setTimeout(() => {
+        progress += 1;
+        // A stream the client has let go refuses the notice; the read ends with it anyway.
+        told(progress).catch(() => undefined);
+        arm();
+      }, PROGRESS_EVERY_SECONDS * 1000);
+    };
+    arm();
+    try {
+      return await read(input);
+    } finally {
+      clearTimeout(beat);
+    }
   };
   return {
     ...handlers,
-    inbox: async (caller, input) => handlers.inbox(caller, await waiting(input)),
+    inbox: async (caller, input) => waiting(input, (asked) => handlers.inbox(caller, asked)),
+    // A model reads the log a line per event unless it asks for the whole: it holds every agent's events.
     Inbox_listEvents: async (caller, input) =>
-      handlers.Inbox_listEvents(caller, await waiting(input)),
-    status: async (caller, input) => handlers.status(caller, await waiting(input)),
+      waiting({ ...input, view: input.view ?? "lines" }, (asked) =>
+        handlers.Inbox_listEvents(caller, asked),
+      ),
+    status: async (caller, input) => waiting(input, (asked) => handlers.status(caller, asked)),
   };
 }
 

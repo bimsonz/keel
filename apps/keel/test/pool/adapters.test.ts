@@ -319,6 +319,10 @@ const drainedSponsorships = Layer.effect(
       ask: links.ask,
       approve: (approval) => links.approve(approval).pipe(Effect.ensuring(drain(approval.agentId))),
       end: (actor, ending) => links.end(actor, ending).pipe(Effect.ensuring(drain(ending.agentId))),
+      askPerson: (move) => links.askPerson(move).pipe(Effect.ensuring(drain(move.agentId))),
+      decline: (move, block) =>
+        links.decline(move, block).pipe(Effect.ensuring(drain(move.agentId))),
+      unblock: (move) => links.unblock(move).pipe(Effect.ensuring(drain(move.agentId))),
     });
   }),
 ).pipe(Layer.provide(SponsorshipsRpc(agentSession)));

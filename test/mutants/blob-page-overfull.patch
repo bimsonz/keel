@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t repo.blob-pages
+# kills: repo.blob-pages
+# why: a page holds far more than its 64 KiB, so a paged read still floods the reader
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 79d2f8cf..fb62a6f1 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -109,7 +109,7 @@ function pageOf(whole: string, start: number) {
+   let end = first - 1;
+   while (end < total) {
+     const size = encoder.encode(lines[end] ?? "").byteLength;
+-    if (end >= first && bytes + size > BLOB_PAGE_BYTES) break;
++    if (end >= first && bytes + size > BLOB_PAGE_BYTES * 8) break;
+     bytes += size;
+     end += 1;
+   }

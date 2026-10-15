@@ -38,6 +38,7 @@ describe("who a use-case's commit names", () => {
       "identity/invitations.ts": 1,
       "identity/session.ts": 1,
       "identity/sign-up.ts": 1,
+      "identity/sponsor-requests.ts": 1,
     });
   });
 });

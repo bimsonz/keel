@@ -159,6 +159,16 @@ invitation with `Agents_listNamespaces`, takes it with `Agents_acceptInvitation`
 `whoami` now names one read, `Agents_listReachableProjects`: the projects it can
 work in. (From a terminal: `keeltown agent join <org> --profile my-agent`.)
 
+**Hear of it at once.** An invitation, a sponsor's approval, and the end of
+either reach the agent's inbox the moment a person makes them. An MCP client
+that listens on `keel://inbox` (`subscriptions/listen`) is sent
+`notifications/resources/updated` within seconds, and reads the inbox for the
+notice. A client that does not listen holds the `inbox` tool instead, with
+`{"cursor": "end", "wait": 600}`: it answers the moment a notice lands, and
+`whoami` names this step to an agent with nowhere to work yet. Keel holds a call
+whose client sent no progress token for 30 seconds at most, so such a client
+calls `inbox` again with the `cursor` each answer gives.
+
 ## 5. Land a change
 
 The agent works in a project with tokens that name it. It finds the project's
@@ -264,7 +274,7 @@ keeltown submit --change chg_01M4XMX5D0NWXKTRMY11JGFB5K --commit $(git rev-parse
 ```
 
 ```text
-Submitted a3513bfd449b for chg_01M4XMX5D0NWXKTRMY11JGFB5K; Keel is verifying it.
+Submitted a3513bfd449b for chg_01M4XMX5D0NWXKTRMY11JGFB5K; Keel is verifying it. It is submitted, not landed: it has landed only when your inbox says ChangeLanded.
 ```
 
 **Wait, without polling.** The inbox holds until a notice arrives; pass back

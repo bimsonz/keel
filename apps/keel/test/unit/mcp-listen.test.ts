@@ -20,7 +20,11 @@ import {
   watchable,
   type Watches,
 } from "../../src/adapters/driving/mcp/listen.ts";
-import { held, UNTOLD_WAIT_SECONDS } from "../../src/adapters/driving/mcp/server.ts";
+import {
+  held,
+  PROGRESS_EVERY_SECONDS,
+  UNTOLD_WAIT_SECONDS,
+} from "../../src/adapters/driving/mcp/server.ts";
 
 const AGENT: AgentId = makeId("agt", ulid());
 
@@ -170,6 +174,51 @@ describe("a held tool call at the MCP door", () => {
       ],
       before: { status: 200, sent: 1 },
     });
+  });
+
+  it("[mcp.feed-lines] Keel's MCP tool reads the log a line per event unless the model asks for the whole", async () => {
+    const views: unknown[] = [];
+    const handlers = {
+      Inbox_listEvents: (_caller: Caller, input: { readonly view?: string }) => {
+        views.push(input.view);
+        return { status: 200 } as never;
+      },
+    } as unknown as Handlers;
+    const context = { mcpReq: { notify: async () => undefined } } as unknown as ServerContext;
+    const tools = held(handlers, context);
+    await tools.Inbox_listEvents({} as Caller, {});
+    await tools.Inbox_listEvents({} as Caller, { view: "full" });
+    expect(views).toEqual(["lines", "full"]);
+  });
+
+  it("[mcp.held-progress] a held call with a progress token says it is still waiting every 30 seconds until it answers, so a client that drops a silent call keeps it, and says nothing after", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const sent: { params: { progress: number } }[] = [];
+      let answer: ((value: never) => void) | undefined;
+      const handlers = {
+        inbox: () => new Promise<never>((resolve) => (answer = resolve)),
+      } as unknown as Handlers;
+      const context = {
+        mcpReq: {
+          _meta: { progressToken: "p-2" },
+          notify: async (notification: { params: { progress: number } }) => {
+            sent.push(notification);
+          },
+        },
+      } as unknown as ServerContext;
+      const reading = held(handlers, context).inbox({} as Caller, { wait: 600 });
+      await vi.advanceTimersByTimeAsync(PROGRESS_EVERY_SECONDS * 1000 * 10 + 1);
+      expect(sent.map((notice) => notice.params.progress)).toEqual([
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+      ]);
+      answer?.({ status: 200 } as never);
+      expect(await reading).toEqual({ status: 200 });
+      await vi.advanceTimersByTimeAsync(PROGRESS_EVERY_SECONDS * 1000 * 3);
+      expect(sent).toHaveLength(11);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

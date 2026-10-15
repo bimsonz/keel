@@ -13,6 +13,7 @@ import {
   makeAgentDirectoryMemory,
   makeEventOutboxMemory,
   makeManualClock,
+  makeSponsorshipsMemory,
   sampleOrgId,
   sampleProjectId,
   ulidOf,
@@ -31,6 +32,7 @@ function enrolledAgent() {
     makeEventOutboxMemory().layer,
     makeManualClock().layer,
     directory.layer,
+    makeSponsorshipsMemory().layer.pipe(Layer.provide(directory.layer)),
   );
   const enrolled = enrol(agentId, {
     projectId: sampleProjectId,

@@ -60,8 +60,22 @@ model EventRecord {
   payload: KeelEvent;
 }
 
+/** One event of the log as a line: what happened, to which entity, and when. */
+model EventLine {
+  at: utcDateTime;
+  type: string;
+
+  /** The entity it happened to, as `<kind>:<id>`. */
+  entity: string;
+
+  line: string;
+}
+
 model EventPage {
   items: EventRecord[];
+
+  /** The events as lines, when the view is `lines`: `items` is then empty. */
+  lines?: EventLine[];
 
   /**
    * The cursor just after the last item returned. Always present, even on the
@@ -73,10 +87,12 @@ model EventPage {
 @tag("Inbox")
 interface Inbox {
   /**
-   * Notices about what this agent relies on, for the run its token names. With `wait` the call
-   * holds until a notice arrives and answers the moment one does, or answers what there is when
-   * that many seconds have passed: an agent that keeps no stream open is told this way. Pass the
-   * answer's cursor back as `cursor` to be told only of what is newer.
+   * Notices about what this agent relies on, for the run its token names: its own changes' moves,
+   * its invitations and its sponsor. This is how an agent waits. With `wait` the call holds until a
+   * notice arrives and answers the moment one does, or answers what there is when that many seconds
+   * have passed; a client that sends no progress token is answered within 30 seconds, so call it
+   * again with the cursor each answer gives. Pass the answer's cursor back as `cursor` to be told
+   * only of what is newer.
    */
   @summary("Read the inbox")
   @tag("mcp")
@@ -87,7 +103,10 @@ interface Inbox {
   inbox(@query cursor?: string, ...WaitQuery): InboxEnvelope | StandardErrors;
 
   /**
-   * The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the
+   * The project's whole operation log, every agent's events, oldest first from `cursor`. An agent
+   * waiting on its own change calls `inbox` with `wait` instead, never this. Keel's MCP tool
+   * answers one line per event (`view=lines`, at most 50 by default); `view=full` gives the events
+   * whole, as the API does by default. `?wait` long-polls for the next event, up to the
    * same bound with a token or without. `cursor=end` reads from the log's head as it is found: no
    * events and the cursor to read on from, or with `wait` the next event to arrive; for one project,
    * the head is as far as that project's index has reached.
@@ -107,6 +126,9 @@ interface Inbox {
     @query project?: ProjectId,
     ...WaitQuery,
     @query @minValue(1) @maxValue(500) limit?: int32,
+
+    /** `lines`: one short line per event, the MCP tool's default; `full`: the events whole, the API's. */
+    @query view?: "lines" | "full",
   ): EventPage | NotFound | StandardErrors;
 
   /**

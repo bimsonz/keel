@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/mcp-events.test.ts -t mcp.listen-invited
+# kills: mcp.listen-invited
+# why: an org's invitation never reaches the agent's inbox, so an agent listening for it is told nothing and its next answer carries no AgentInvited
+diff --git a/packages/core/src/application/identity/invitations.ts b/packages/core/src/application/identity/invitations.ts
+index 447fb287..f5eefa25 100644
+--- a/packages/core/src/application/identity/invitations.ts
++++ b/packages/core/src/application/identity/invitations.ts
+@@ -48,7 +48,7 @@ export const NAMESPACE_AGENT = "namespace-agent";
+ export const PROJECT_AGENT = "project-agent";
+ 
+ /** What an agent is told of its place in a namespace: a member invited it, or its invitation ended. */
+-export const INVITATION_TELLS = ["AgentInvited", "AgentLeftNamespace"] as const;
++export const INVITATION_TELLS = ["AgentLeftNamespace"] as const;
+ 
+ /** What an agent is told of its place on a project: its person invited it, or its invitation ended. */
+ export const PROJECT_INVITATION_TELLS = ["AgentInvitedToProject", "AgentLeftProject"] as const;

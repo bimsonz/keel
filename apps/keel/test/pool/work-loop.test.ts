@@ -142,6 +142,62 @@ describe("the work loop over REST and MCP", () => {
     expect(viaRest.body.result).toMatchObject({ change: { premises: [] } });
   });
 
+  it("[a11.declare-lenient] a premise written as an agent writes one, a function's name and a plain word for its predicate, is read into MFP's form over MCP and REST; one Keel cannot read is refused with the form to write and a worked declare", async () => {
+    const { via } = loop();
+    const token = await tokenFor(await seedAgent());
+    const loose = { subject: "colors/checkColor()", predicate: "Pure" };
+    const viaTool = await tool(via, token, "declare", {
+      "idempotency-key": "declare-key-lenient-mcp",
+      ...declareBody,
+      premises: [loose],
+    });
+    expect(viaTool).toMatchObject({
+      ok: true,
+      result: {
+        change: {
+          premises: [
+            { subject: "colors.check-color", predicate: "purity", relation: "is", value: true },
+          ],
+        },
+      },
+    });
+    const viaRest = await declare(via, token, "declare-key-lenient-rest", {
+      ...declareBody,
+      premises: [{ subject: "renderPage", value: "never writes to the cache" }],
+    });
+    expect(viaRest.status).toBe(201);
+    expect(viaRest.body.result).toMatchObject({
+      change: {
+        premises: [
+          {
+            subject: "render-page",
+            predicate: "invariant",
+            relation: "is",
+            value: "never writes to the cache",
+          },
+        ],
+      },
+    });
+    const refused = Object(
+      (
+        await declare(via, token, "declare-key-lenient-bad", {
+          ...declareBody,
+          premises: [{ subject: "renderPage", predicate: "vibes" }],
+        })
+      ).body,
+    );
+    expect(refused).toMatchObject({
+      code: "request.invalid",
+      detail: expect.stringContaining('"predicate": "<one of freshness'),
+      nextActions: [{ kind: "call", operationId: "declare" }],
+    });
+    const again = await declare(via, token, "declare-key-lenient-again", {
+      ...declareBody,
+      ...refused.nextActions[0].args,
+    });
+    expect(again.status).toBe(201);
+  });
+
   it("[a11.declare-footprint-asks] a declare that names no path is told preflight saw no neighbour and asked to revise with its paths, and the revise it is handed is accepted; one that names a path is not", async () => {
     const { via } = loop();
     const token = await tokenFor(await seedAgent());

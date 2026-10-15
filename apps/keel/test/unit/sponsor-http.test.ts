@@ -227,7 +227,7 @@ const key = () => `key-${ulid()}`;
 
 /** The agent asks and the code it was given. */
 async function asked(w: World, agentId: AgentId): Promise<string> {
-  const given = answer(await w.handlers.askSponsor(agent(agentId)));
+  const given = answer(await w.handlers.askSponsor(agent(agentId), {}));
   expect(given.status).toBe(201);
   return String(resultOf(given)["code"]);
 }
@@ -269,7 +269,7 @@ describe("the sponsor link at the doorway", () => {
   it("[link.sponsor-http] an agent asks, and is answered a code and the page where a person approves it, with the code in the fragment", async () => {
     const w = world();
     const bot = w.enrolled("bot");
-    const given = answer(await w.handlers.askSponsor(agent(bot)));
+    const given = answer(await w.handlers.askSponsor(agent(bot), {}));
     expect(given.status).toBe(201);
     const { code, url, expiresAt } = resultOf(given);
     expect(String(code).length).toBeGreaterThan(20);
@@ -283,7 +283,7 @@ describe("the sponsor link at the doorway", () => {
       { operationId: "whoami" },
     ]);
     // A person has no account of an agent's to ask for, and an agent approves nothing.
-    expect(refusal(answer(await w.handlers.askSponsor(person(ANN))))).toEqual([
+    expect(refusal(answer(await w.handlers.askSponsor(person(ANN), {})))).toEqual([
       403,
       "auth.forbidden",
       "Refused: agents-only. This reads an agent's own record.",
@@ -333,7 +333,7 @@ describe("the sponsor link at the doorway", () => {
     expect(await approve(w, person(BOB), bot, code)).toEqual(miss);
     expect(w.rowOf(bot)).toEqual([ANN, "active"]);
     // An agent somebody stands behind is given no new code.
-    const again = answer(await w.handlers.askSponsor(agent(bot)));
+    const again = answer(await w.handlers.askSponsor(agent(bot), {}));
     expect(refusal(again).slice(0, 2)).toEqual([409, "agent.state_refused"]);
     expect(again.body["nextActions"]).toMatchObject([{ operationId: "Agents_endSponsorship" }]);
 
@@ -391,7 +391,7 @@ describe("the sponsor link at the doorway", () => {
         links.approve({ agentId: bot, by, asked: { _tag: "Consent" }, idempotencyKey: key() }),
       );
     // The agent, asking for a sponsor it already has: it may end the link, and is told how.
-    const own = answer(await w.handlers.askSponsor(agent(bot)));
+    const own = answer(await w.handlers.askSponsor(agent(bot), {}));
     expect(refusal(own)).toEqual(held);
     expect(own.body["nextActions"]).toEqual([
       {

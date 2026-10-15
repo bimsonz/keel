@@ -14,6 +14,7 @@ import {
   type NamespaceUsage,
   type NamespaceAgents,
   type Namespaces,
+  type SponsorRequests,
   type ProjectAgents,
   type PlanStore,
   ProjectNamespaces,
@@ -39,6 +40,7 @@ import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
 import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
+import { SponsorRequestsD1 } from "../adapters/driven/d1/sponsor-requests.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { boxComposerRpc } from "../adapters/driven/do-rpc/mergebox.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
@@ -78,8 +80,8 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
   return Layer.mergeAll(EntityStoreSql(storage), EventOutboxSql(storage), SystemLive);
 }
 
-/** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project, and holds the handle of an agent that signs itself up. */
-export type AgentSessionServices = AgentDirectory | Namespaces;
+/** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project, holds the handle of an agent that signs itself up, and writes the rows of its sponsor requests to people. */
+export type AgentSessionServices = AgentDirectory | Namespaces | SponsorRequests;
 
 /**
  * The Projector repeats each agent standing it hears in the AgentDirectory,
@@ -116,7 +118,7 @@ export function namespaceServices(env: Env): Layer.Layer<NamespaceServices> {
 
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
 export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
-  return Layer.mergeAll(AgentDirectoryD1(env.DB), NamespacesD1(env.DB));
+  return Layer.mergeAll(AgentDirectoryD1(env.DB), NamespacesD1(env.DB), SponsorRequestsD1(env.DB));
 }
 
 /** The Subject DO's driven adapters beyond the backbone: what it needs to put a conflict to a person. */

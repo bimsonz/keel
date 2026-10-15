@@ -2,11 +2,11 @@
 # kills: whoami.declare-next
 # why: whoami names more steps than its envelope allows, so an agent with work, no sponsor and two invitations is answered with a body the contract refuses
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index 7c7a31d0..3ad9d7dc 100644
+index e292dc54..2e40c7d7 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
-@@ -229,7 +229,7 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
-         ...waiting.next,
+@@ -230,7 +230,7 @@ export function whoamiOk(identity: Identity, here?: TokenProject): WhoamiResult
+         ...sponsor.next,
          ...placed.next,
          ...reach(identity).next,
 -      ].slice(0, MAX_NEXT),

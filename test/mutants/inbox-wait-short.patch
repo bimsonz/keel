@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t inbox.keep-waiting
+# kills: inbox.keep-waiting
+# why: an empty inbox names a 30-second wait, so a waiting agent spends a model turn every half minute
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 4ce055ab..b4ebe746 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -1602,7 +1602,7 @@ export function inboxOk(page: InboxPage): InboxResult {
+           kind: "read",
+           title: "Keep waiting: call inbox again with this cursor",
+           operationId: "inbox",
+-          args: { cursor: page.cursor, wait: 600 },
++          args: { cursor: page.cursor, wait: 30 },
+         },
+       ],
+     ),

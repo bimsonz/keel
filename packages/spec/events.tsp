@@ -770,6 +770,33 @@ model AgentUnsponsored {
 }
 
 /**
+ * The agent asked a person, named by their handle, to sponsor it. The request
+ * waits on that person's own list until `expiresAt`, and every agent they
+ * sponsor is told of it.
+ */
+model SponsorRequested {
+  _tag: "SponsorRequested";
+  agentId: AgentId;
+  person: UserId;
+  expiresAt: Instant;
+}
+
+/** The person declined the agent's request; with `blocked`, it may not ask them again until they unblock it. */
+model SponsorRequestDeclined {
+  _tag: "SponsorRequestDeclined";
+  agentId: AgentId;
+  person: UserId;
+  blocked: boolean;
+}
+
+/** The person lets an agent they had blocked ask them again. */
+model SponsorBlockLifted {
+  _tag: "SponsorBlockLifted";
+  agentId: AgentId;
+  person: UserId;
+}
+
+/**
  * A member invited the agent into the namespace, and answers for it there once
  * it accepts. Until then it gives the agent nothing.
  */
@@ -1942,6 +1969,9 @@ union KeelEvent {
   AgentRevoked,
   AgentSponsored,
   AgentUnsponsored,
+  SponsorRequested,
+  SponsorRequestDeclined,
+  SponsorBlockLifted,
   AgentInvited,
   AgentJoinedNamespace,
   AgentLeftNamespace,

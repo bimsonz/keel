@@ -40,6 +40,9 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AgentRevoked: "members",
   AgentSponsored: "members",
   AgentUnsponsored: "members",
+  SponsorRequested: "members",
+  SponsorRequestDeclined: "members",
+  SponsorBlockLifted: "members",
   // An invitation and its end name the member or whoever ended it; that an agent joined names no person.
   AgentInvited: "members",
   AgentJoinedNamespace: "public",

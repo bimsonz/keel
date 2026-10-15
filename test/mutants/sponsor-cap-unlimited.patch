@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-cap
+# kills: sponsor.ask-person-cap
+# why: any number of requests wait for one person, so many new agents can bury a person's list
+diff --git a/packages/core/src/application/identity/sponsor-requests.ts b/packages/core/src/application/identity/sponsor-requests.ts
+index 97d8d214..00612913 100644
+--- a/packages/core/src/application/identity/sponsor-requests.ts
++++ b/packages/core/src/application/identity/sponsor-requests.ts
+@@ -198,7 +198,7 @@ export const askPerson: (
+       retryAfterMs: Math.max(1, (times[0] ?? now) + SPONSOR_ASKS_WINDOW_MS - now),
+     });
+   const requests = yield* SponsorRequests;
+-  if ((yield* requests.waitingCount(command.person, now)) >= SPONSOR_REQUESTS_PER_PERSON)
++  if ((yield* requests.waitingCount(command.person, now)) >= SPONSOR_REQUESTS_PER_PERSON * 1000)
+     return yield* new SponsorRequestsLimited({ agentId, retryAfterMs: SPONSOR_ASKS_WINDOW_MS });
+   const sponsored = yield* (yield* AgentDirectory).sponsoredBy(command.person);
+   const tells = sponsored.map((other) => other.id).filter((id) => id !== agentId);

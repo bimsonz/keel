@@ -20,6 +20,20 @@ type Intent = Parameters<KeelClient["declare"]>[0];
 export type Premise = NonNullable<Intent["premises"]>[number];
 export type FootprintEntry = NonNullable<Intent["footprint"]>[number];
 
+/** An anchor as the plan writes one: the file, the symbol, and the commit it is read at. */
+export interface Anchor {
+  readonly path: string;
+  readonly symbol?: string;
+  readonly commit?: string;
+}
+
+const isAnchor = (a: unknown): a is Anchor =>
+  typeof a === "object" && a !== null && "path" in a && typeof a.path === "string";
+
+/** A premise's anchors, read back by their shape: `declare` takes a premise's anchors as any JSON. */
+export const anchorsOf = (premise: Premise): readonly Anchor[] =>
+  (premise.anchors ?? []).filter(isAnchor);
+
 /** The four kinds of conflict the benchmark plants, each with its decoy. */
 export const BENCH_KINDS = ["premise", "effect", "textual", "interaction"] as const;
 export type BenchKind = (typeof BENCH_KINDS)[number];
@@ -354,7 +368,7 @@ export function anchoredAt(plan: Plan, commit: string): Plan {
           ? premise
           : {
               ...premise,
-              anchors: premise.anchors.map((a) => (a.commit === PENDING ? { ...a, commit } : a)),
+              anchors: anchorsOf(premise).map((a) => (a.commit === PENDING ? { ...a, commit } : a)),
             },
       ),
     })),

@@ -1,7 +1,9 @@
 import {
   approveSponsor,
+  askPerson,
   askSponsor,
   changeStanding,
+  declinePerson,
   endSponsorship,
   enrol,
   hearEvent,
@@ -13,6 +15,7 @@ import {
   signUp,
   type StandingMove,
   takeNotices,
+  unblockPerson,
   viewSession,
 } from "@keeltown/core/application/identity";
 import { AgentId, type EventEnvelope, RunId } from "@keeltown/core/kernel";
@@ -22,7 +25,9 @@ import {
   AgentSessionCodecs,
   type AgentSessionRpc,
   ApproveSponsorCommand,
+  AskPersonCommand,
   AskSponsorCommand,
+  DeclinePersonCommand,
   DescribeSession,
   EndSponsorCommand,
   EnrolCommand,
@@ -33,6 +38,7 @@ import {
   SignUpCommand,
   StandingCommand,
   TakeNotices,
+  UnblockPersonCommand,
 } from "../../../rpc/index.ts";
 import { type AgentSessionServices, agentSessionServices } from "../../../composition/do.ts";
 import { isInboxCursor, socketFrame } from "../notices.ts";
@@ -268,6 +274,36 @@ export class AgentSessionDO
     const answer = await this.answer(AgentSessionCodecs.endSponsorship, program);
     await this.received();
     return answer;
+  }
+
+  async askPerson(command: typeof AskPersonCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(AskPersonCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((asking) => askPerson(agentId, asking)),
+    );
+    return this.answer(AgentSessionCodecs.askPerson, program);
+  }
+
+  /** The agent is told in its own inbox, so an open socket is sent the notice once the commit is durable. */
+  async declinePerson(command: typeof DeclinePersonCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(DeclinePersonCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((declining) => declinePerson(agentId, declining)),
+    );
+    const answer = await this.answer(AgentSessionCodecs.declinePerson, program);
+    await this.received();
+    return answer;
+  }
+
+  async unblockPerson(command: typeof UnblockPersonCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(UnblockPersonCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((unblocking) => unblockPerson(agentId, unblocking)),
+    );
+    return this.answer(AgentSessionCodecs.unblockPerson, program);
   }
 
   async enrol(command: typeof EnrolCommand.Encoded) {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.held-progress
+# kills: mcp.held-progress
+# why: a held tool call goes on saying it is waiting after it has answered, into a stream that has ended
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index a87cfbf2..5ec68910 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -114,7 +114,7 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+     try {
+       return await read(input);
+     } finally {
+-      clearTimeout(beat);
++      void beat;
+     }
+   };
+   return {

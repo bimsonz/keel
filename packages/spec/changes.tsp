@@ -10,6 +10,32 @@ using OpenAPI;
 
 namespace Keel;
 
+/**
+ * A premise as declare, revise and rely take it: MFP 0.2's form, or a looser one Keel reads into it. The
+ * subject may be any name (`checkColor()` reads as `check-color`), the predicate any case or a plain
+ * word (`pure` reads as `purity`), and relation and value may be left out where the predicate has an
+ * obvious one. A premise with no predicate is a claim in words, an invariant. What Keel cannot read is
+ * refused with the form to write. For example
+ * `{"subject": "color.check-color", "predicate": "purity", "value": true}`.
+ */
+model PremiseInput {
+  /** What the premise is about: a function, a path or a field, by name. */
+  @minLength(1)
+  subject: string;
+
+  /** One of freshness, consistency, cardinality, bound, presence, purity, idempotent, authority, shape, ordering, invariant. */
+  predicate?: string;
+
+  relation?: string;
+  value?: unknown;
+  unit?: string;
+  strength?: string;
+  scope?: unknown;
+  gloss?: string;
+  anchors?: unknown[];
+  cites?: unknown[];
+}
+
 model DeclareRequest {
   /** What the change will achieve, in one or two sentences. */
   @minLength(1)
@@ -22,7 +48,7 @@ model DeclareRequest {
   footprint?: MFP.FootprintEntry[];
 
   /** What it relies on, about code it does not own. Leave it out when the change relies on nothing. */
-  premises?: MFP.PremiseProposition[];
+  premises?: PremiseInput[];
 
   /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
   declaredEffects?: MFP.EffectProposition[];
@@ -40,8 +66,8 @@ model DeclaredEnvelope is AgentEnvelope<Declared>;
 model ReviseRequest {
   goal?: string;
   footprint?: MFP.FootprintEntry[];
-  premisesAdded?: MFP.PremiseProposition[];
-  premisesRetracted?: MFP.PremiseProposition[];
+  premisesAdded?: PremiseInput[];
+  premisesRetracted?: PremiseInput[];
 
   /** Replaces the declared effects. Advisory only. */
   declaredEffects?: MFP.EffectProposition[];
@@ -55,7 +81,7 @@ model Revised {
 model RevisedEnvelope is AgentEnvelope<Revised>;
 
 model RelyRequest {
-  premise: MFP.PremiseProposition;
+  premise: PremiseInput;
 }
 
 model Relied {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts -t sdk.long-poll-resend
+# kills: sdk.long-poll-resend
+# why: a long poll whose connection drops ends the caller's wait with a stack trace, so a deploy ends every agent's wait
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 7f1a1c7b..bed146c3 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -149,7 +149,7 @@ async function holding(
+       return await sending();
+     } catch (error) {
+       if (
+-        deadline === undefined ||
++        true ||
+         signal?.aborted === true ||
+         !(error instanceof TypeError) ||
+         Date.now() + pause >= deadline

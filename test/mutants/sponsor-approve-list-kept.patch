@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-approve
+# kills: sponsor.ask-person-approve
+# why: an approved request stays on the person's list, so they are asked again about an agent they already sponsor
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index 74776f62..a3dc9bb8 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -182,7 +182,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+     if (linked !== undefined) yield* directory.sponsor(linked.agentId, linked.sponsor, linked.seq);
+     // Sponsored, the agent's requests to people leave their lists.
+     if (linked !== undefined && linked.sponsor !== null)
+-      yield* (yield* SponsorRequests).settle(linked.agentId);
++      yield* Effect.void;
+     const moved = standingOf(event);
+     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
+   }

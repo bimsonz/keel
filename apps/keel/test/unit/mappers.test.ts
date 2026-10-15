@@ -54,7 +54,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
 import { createProjectError } from "../../src/adapters/driving/http/operator.ts";
-import { statusOk, submitError } from "../../src/adapters/driving/http/work-loop.ts";
+import {
+  inboxOk,
+  statusOk,
+  submitError,
+  submitOk,
+} from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
@@ -278,6 +283,35 @@ describe("a status read's next actions", () => {
   });
   const SHA = CommitSha.make("a".repeat(40));
 
+  it("[inbox.keep-waiting] an inbox read that ends with nothing new says so in two words and names the same read again, from its cursor, holding ten minutes", () => {
+    const empty = inboxOk({ notices: [], cursor: "000000000042" });
+    if (empty.status !== 200) throw new Error(`inbox answered ${empty.status}`);
+    expect(empty.body.summary).toBe("Nothing new.");
+    expect(empty.body.next).toEqual([
+      expect.objectContaining({
+        operationId: "inbox",
+        args: { cursor: "000000000042", wait: 600 },
+      }),
+    ]);
+  });
+
+  it("[a11.not-landed] a change on its way is said to be not landed, with the inbox wait for ChangeLanded first, at submit and at every status read until it lands; a landed one says it has landed", () => {
+    for (const state of ["submitted", "queued", "integrating"] as const) {
+      const read = statusOk(caller, { change: change({ state }), commitSha: SHA });
+      if (read.status !== 200) throw new Error(`status answered ${read.status}`);
+      expect(read.body.summary).toContain(`is ${state} at aaaaaaaaaaaa, not landed`);
+      expect(read.body.summary).toContain("only when your inbox says ChangeLanded");
+      expect(read.body.next[0]).toMatchObject({ kind: "read", operationId: "inbox" });
+    }
+    const landed = statusOk(caller, { change: change({ state: "landed" }), commitSha: SHA });
+    if (landed.status !== 200) throw new Error(`status answered ${landed.status}`);
+    expect(landed.body.summary).toBe(`${landed.body.result.changeId} has landed at aaaaaaaaaaaa.`);
+    const submitted = submitOk(change({}), SHA);
+    if (submitted.status !== 202) throw new Error(`submit answered ${submitted.status}`);
+    expect(submitted.body.summary).toContain("It is submitted, not landed");
+    expect(submitted.body.next[0]).toMatchObject({ kind: "read", operationId: "inbox" });
+  });
+
   it("[b11.status-next] waits on the submission only while the platform moves it; a park waits on its ruling or on an adopter", () => {
     const submitted = statusOk(caller, { change: change({}), commitSha: SHA });
     const escalated = change({
@@ -290,6 +324,10 @@ describe("a status read's next actions", () => {
     const unsubmitted = statusOk(caller, { change: lapsed, commitSha: null });
 
     expect(submitted.status === 200 && submitted.body.next).toEqual([
+      expect.objectContaining({
+        operationId: "inbox",
+        title: expect.stringContaining("ChangeLanded"),
+      }),
       expect.objectContaining({ operationId: "status" }),
     ]);
     expect(ruling.status === 200 && ruling.body.next).toEqual([

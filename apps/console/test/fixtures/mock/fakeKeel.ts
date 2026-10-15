@@ -191,7 +191,7 @@ export interface FakeKeel {
   /** The project it holds, as it names it to a reader who is not a member of its namespace. */
   project: ProjectView;
   /** An agent asks for a sponsor, as Keel's `askSponsor` answers it: a code good once and for ten minutes. */
-  askSponsor(agentId: string): SponsorRequest;
+  askSponsor(agentId: string): SponsorRequest & { readonly code: string; readonly url: string };
   /** Who sponsors an agent, by the id its reader was known by; nobody, where it has no sponsor. */
   sponsorOf(agentId: string): string | undefined;
   /** How an agent stands: `suspended` while its sponsor has it paused. */

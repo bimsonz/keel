@@ -43,6 +43,11 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Agents_listSponsored: (c) => c.sponsoredAgents(),
   Agents_approveSponsor: (c) => c.approveSponsor("agt_1", "CODE"),
   Agents_endSponsorship: (c) => c.endSponsorship("agt_1"),
+  Users_listSponsorRequests: (c) => c.sponsorRequests(),
+  Users_approveSponsorRequest: (c) => c.approveSponsorRequest("agt_1"),
+  Users_declineSponsorRequest: (c) => c.declineSponsorRequest("agt_1"),
+  Users_listBlockedAgents: (c) => c.blockedAgents(),
+  Users_unblockAgent: (c) => c.unblockAgent("agt_1"),
   Agents_listNamespaces: (c) => c.invitations(),
   Agents_acceptInvitation: (c) => c.acceptInvitation("an-org"),
   Agents_leaveNamespace: (c) => c.leaveNamespace("an-org"),
@@ -145,9 +150,12 @@ type QueriedOperation = {
 const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<unknown>>> = {
   status: (c) => c.status("chg_1", { wait: 1 }),
   inbox: (c) => c.inbox({ cursor: "c1", wait: 1 }),
-  Inbox_listEvents: (c) => c.events({ cursor: "c1", project: "prj_1", wait: 1, limit: 5 }),
+  Inbox_listEvents: (c) =>
+    c.events({ cursor: "c1", project: "prj_1", wait: 1, limit: 5, view: "lines" }),
+  askSponsor: (c) => c.askSponsor({ person: "ada" }),
+  Users_declineSponsorRequest: (c) => c.declineSponsorRequest("agt_1", { block: true }),
   Repo_getTree: (c) => c.tree("prj_1", { ref: "main", path: "src" }),
-  Repo_getBlob: (c) => c.blob("prj_1", "README.md", { ref: "main" }),
+  Repo_getBlob: (c) => c.blob("prj_1", "README.md", { ref: "main", startLine: 2 }),
   Repo_listCommits: (c) => c.commits("prj_1", { ref: "main", cursor: "c1", limit: 5 }),
   Repo_compare: (c) => c.compare("prj_1", "main", { head: "feature" }),
   Changes_listChanges: (c) =>

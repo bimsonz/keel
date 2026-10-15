@@ -48,6 +48,7 @@ import { emailOtpSender } from "../adapters/driven/email/otp-sender.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
+import { SponsorRequestsD1 } from "../adapters/driven/d1/sponsor-requests.ts";
 import { ProjectAgentsD1 } from "../adapters/driven/d1/project-agents.ts";
 import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
 import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
@@ -160,6 +161,8 @@ export function isolateLayer(
     credentialStoreLayer(env),
     NamespaceAgentsD1(env.DB),
     ProjectAgentsD1(env.DB),
+    // The sponsor requests waiting for a person, which their own list reads.
+    SponsorRequestsD1(env.DB),
     directory,
     UsersD1(env.DB),
     MembershipsD1(env.DB),

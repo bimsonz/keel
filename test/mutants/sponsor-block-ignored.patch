@@ -1,0 +1,27 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/invitations.test.ts -t sponsor.ask-person-block
+# kills: sponsor.ask-person-block
+# why: an agent the person blocked asks them again, and the request is on their list once more
+diff --git a/packages/core/src/application/identity/sponsor-requests.ts b/packages/core/src/application/identity/sponsor-requests.ts
+index 97d8d214..91a2a201 100644
+--- a/packages/core/src/application/identity/sponsor-requests.ts
++++ b/packages/core/src/application/identity/sponsor-requests.ts
+@@ -188,7 +188,6 @@ export const askPerson: (
+   const asked = askedOf(store, command.person);
+   if (asked?.expiresAt !== undefined && waiting(asked, now))
+     return { person: command.person, expiresAt: asked.expiresAt };
+-  if (asked?.blockedAt !== undefined) return yield* new SponsorRequestRefused({ agentId });
+   const times = decodeTimes(store.get(ASKED_AT, agentId) ?? []).filter(
+     (at) => at > now - SPONSOR_ASKS_WINDOW_MS,
+   );
+diff --git a/packages/core/src/domain/identity/sponsor-request.ts b/packages/core/src/domain/identity/sponsor-request.ts
+index e5f57b85..a5f420fe 100644
+--- a/packages/core/src/domain/identity/sponsor-request.ts
++++ b/packages/core/src/domain/identity/sponsor-request.ts
+@@ -83,7 +83,6 @@ export const decideSponsorRequest = (
+   const refused = Result.fail(new SponsorRequestRefused({ agentId }));
+   switch (command._tag) {
+     case "Ask":
+-      if (asked?.blockedAt !== undefined) return refused;
+       if (waiting(asked, command.now)) return Result.succeed([]);
+       return Result.succeed([
+         SponsorRequested.make({

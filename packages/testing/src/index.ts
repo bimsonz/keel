@@ -41,6 +41,7 @@ export * from "./contracts/lanes.ts";
 export * from "./contracts/trunks.ts";
 export * from "./contracts/standings.ts";
 export * from "./contracts/sponsorships.ts";
+export * from "./contracts/sponsor-requests.ts";
 export * from "./contracts/invitations.ts";
 export * from "./contracts/live-changes.ts";
 export * from "./contracts/probe-changes.ts";

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-listen.test.ts -t mcp.feed-lines
+# kills: mcp.feed-lines
+# why: Keel's MCP tool serves the log whole by default, so a model that pages it while it waits fills its context with every agent's events
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 90380e5b..4ecff7da 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -122,7 +122,7 @@ export function held(handlers: Handlers, context: ServerContext): Handlers {
+     inbox: async (caller, input) => waiting(input, (asked) => handlers.inbox(caller, asked)),
+     // A model reads the log a line per event unless it asks for the whole: it holds every agent's events.
+     Inbox_listEvents: async (caller, input) =>
+-      waiting({ ...input, view: input.view ?? "lines" }, (asked) =>
++      waiting(input, (asked) =>
+         handlers.Inbox_listEvents(caller, asked),
+       ),
+     status: async (caller, input) => waiting(input, (asked) => handlers.status(caller, asked)),

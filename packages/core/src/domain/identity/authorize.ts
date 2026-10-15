@@ -111,6 +111,11 @@ export const SPEC_ACTIONS = {
   // nothing about the agent is decided or told before the code is checked.
   Agents_approveSponsor: rule("Self", "user"),
   Agents_listSponsored: rule("Self", "user"),
+  Users_listSponsorRequests: rule("Self", "user"),
+  Users_approveSponsorRequest: rule("Self", "user"),
+  Users_declineSponsorRequest: rule("Self", "user"),
+  Users_listBlockedAgents: rule("Self", "user"),
+  Users_unblockAgent: rule("Self", "user"),
 
   Operator_listProjects: rule("Namespace", "read"),
   Operator_createProject: rule("Namespace", "member"),

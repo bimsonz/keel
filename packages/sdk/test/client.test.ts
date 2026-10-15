@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createKeelClient, KeelProblem, KeelTokenError } from "../src/index.ts";
 import { fakeKeel } from "./fake-keel.ts";
 
@@ -158,5 +158,44 @@ describe("the Keel client", () => {
     ]);
     expect(sent.every((s) => s.headers["authorization"] === undefined)).toBe(true);
     await expect(client.token()).rejects.toBeInstanceOf(KeelTokenError);
+  });
+
+  it("[sdk.long-poll-resend] a long poll whose connection drops is sent again, after 1 s and then 2 s, until its own wait is up; a call that does not wait throws at once", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    try {
+      let tries = 0;
+      let dropsLeft = 2;
+      const client = createKeelClient({
+        baseUrl: "https://keel.test",
+        fetch: async () => {
+          tries += 1;
+          if (dropsLeft > 0) {
+            dropsLeft -= 1;
+            throw new TypeError("fetch failed");
+          }
+          return ok({ changeId: "chg_x", revision: 1, state: "queued" });
+        },
+      });
+      const held = client.call("status", { changeId: "chg_x", wait: 60 });
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await held).toMatchObject({ state: "queued" });
+      expect(tries).toBe(3);
+
+      [tries, dropsLeft] = [0, 1];
+      expect(
+        await client.call("status", { changeId: "chg_x" }).catch((e: unknown) => e),
+      ).toBeInstanceOf(TypeError);
+      expect(tries).toBe(1);
+
+      [tries, dropsLeft] = [0, 100];
+      const lapsing = client
+        .call("status", { changeId: "chg_x", wait: 2 })
+        .catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await lapsing).toBeInstanceOf(TypeError);
+      expect(tries).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
