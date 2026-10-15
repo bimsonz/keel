@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/catalogue.test.ts
+# kills: catalogue.covered
+# why: an event row under a heading that is none of the domain's contexts is checked against no union, and nothing says so
+diff --git a/docs/domain/events.md b/docs/domain/events.md
+index 87c166a1..3fc96661 100644
+--- a/docs/domain/events.md
++++ b/docs/domain/events.md
+@@ -217,6 +217,7 @@ Third-party events never enter the catalogue directly. Each is decoded with Effe
+ | Source | External event | Becomes |
+ |---|---|---|
+ | Artifacts, through a namespace-wide `triggers.events` rule (one per workspace namespace) starting the PushObserved Workflow | `cf.artifacts.repo.pushed` | `WorkspacePushed` for a branch update; tags, notes and deletions are dropped. An observation only: `submit` is authoritative |
++| `StrayHappened` | a stray source | — |
+ 
+ Forks are not observed this way: the account's Artifacts lifecycle subscription is not Keel's to hold on a shared account, and namespace triggers do not fire on forks. The WorkspacePool DO emits `WorkspaceForked` itself (spike S2).
+ 

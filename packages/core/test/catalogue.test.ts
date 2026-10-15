@@ -33,20 +33,25 @@ function catalogued(): Map<string, string[]> {
   return sections;
 }
 
+/** The domain's contexts, each with the union of its events: the catalogue has one section for each. */
+const CONTEXTS = [
+  ["identity", IdentityEvent],
+  ["coordination", CoordinationEvent],
+  ["verification", VerificationEvent],
+  ["integration", IntegrationEvent],
+  ["memory", MemoryEvent],
+  ["delivery", DeliveryEvent],
+] as const;
+
 describe("the domain's events are the catalogue's events", () => {
   const sections = catalogued();
-  it.each([
-    ["identity", IdentityEvent],
-    ["coordination", CoordinationEvent],
-    ["verification", VerificationEvent],
-    ["integration", IntegrationEvent],
-    ["memory", MemoryEvent],
-    ["delivery", DeliveryEvent],
-  ] as const)("%s", (context, union) => {
+  it.each(CONTEXTS)("%s", (context, union) => {
     expect(tags(union).toSorted()).toEqual((sections.get(context) ?? []).toSorted());
   });
 
-  it("covers all 123 catalogued events", () => {
-    expect([...sections.values()].flat()).toHaveLength(123);
+  it("[catalogue.covered] every catalogued event sits under one of the domain's contexts, so each is checked against its union", () => {
+    expect(
+      [...sections.keys()].filter((section) => !CONTEXTS.some(([c]) => c === section)),
+    ).toEqual([]);
   });
 });
