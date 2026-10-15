@@ -159,6 +159,9 @@ async function holdsPasskey(db: D1Database, userId: string): Promise<boolean> {
   return held !== null;
 }
 
+/** How long an email code holds, in seconds: what Better Auth is told and what the email says. */
+export const CODE_SECONDS = 300;
+
 /** Delivers a one-time code. Keel offers email codes only once it can send them. */
 export type OtpSender = (message: {
   readonly to: string;
@@ -591,7 +594,12 @@ export function authOptions(config: AuthConfig) {
       }),
       ...(config.sendOtp === undefined
         ? []
-        : [emailOTP({ sendVerificationOTP: refusingInvalid(config.sendOtp) })]),
+        : [
+            emailOTP({
+              expiresIn: CODE_SECONDS,
+              sendVerificationOTP: refusingInvalid(config.sendOtp),
+            }),
+          ]),
     ],
   } satisfies Parameters<typeof betterAuth>[0];
 

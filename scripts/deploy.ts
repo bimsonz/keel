@@ -187,6 +187,9 @@ function render(dir: App, outputs: ReadonlyMap<string, string>): { name: string;
   set(["vars", "KEEL_HOST"], host);
   const vars = committed["vars"];
   if (isObject(vars) && "KEEL_API_HOST" in vars) set(["vars", "KEEL_API_HOST"], host);
+  // Sign-in codes come from the site's mail subdomain, which is onboarded to Email Service's sending.
+  if (isObject(vars) && "KEEL_MAIL_FROM" in vars)
+    set(["vars", "KEEL_MAIL_FROM"], `noreply@mail.${host}`);
   // The half of the bundle URL key pair that only verifies: a var, so keel-verify holds no secret.
   if (isObject(vars) && "BUNDLE_URL_PUBLIC_KEY" in vars)
     set(

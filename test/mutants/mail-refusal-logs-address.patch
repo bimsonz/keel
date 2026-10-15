@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/email-otp-sender.test.ts
+# kills: mail.refused
+# why: a refused send logs its message, which can hold the address, into Workers Logs
+diff --git a/apps/keel/src/adapters/driven/email/otp-sender.ts b/apps/keel/src/adapters/driven/email/otp-sender.ts
+index 14f2efd3..68ac5db6 100644
+--- a/apps/keel/src/adapters/driven/email/otp-sender.ts
++++ b/apps/keel/src/adapters/driven/email/otp-sender.ts
+@@ -22,7 +22,7 @@ export function emailOtpSender(email: SendEmail, from: string): OtpSender {
+     } catch (error) {
+       const code: unknown = error instanceof Error ? Reflect.get(error, "code") : undefined;
+       const refused =
+-        typeof code === "string" ? code : error instanceof Error ? error.name : "unknown";
++        error instanceof Error ? error.message : String(code);
+       console.error(JSON.stringify({ ops: "email-code", refused }));
+       throw error;
+     }

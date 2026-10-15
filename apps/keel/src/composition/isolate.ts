@@ -44,6 +44,7 @@ import {
   signInMethods,
 } from "../adapters/driven/better-auth/auth.ts";
 import { reaching } from "../adapters/driven/better-auth/database.ts";
+import { emailOtpSender } from "../adapters/driven/email/otp-sender.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
 import { NamespaceAgentsD1 } from "../adapters/driven/d1/namespace-agents.ts";
@@ -310,16 +311,24 @@ function listenReads(runtime: IsolateRuntime): Omit<Watches, "admit"> {
 
 /** What the identity adapter needs beyond `env`: pool tests read the codes it sends. */
 export interface AuthOverrides {
-  /** Email codes; production has no sender until Keel can send mail, so none are offered. */
+  /** Email codes in place of Email Service's, which sends only where KEEL_MAIL_FROM names an address. */
   readonly sendOtp?: OtpSender;
   /** Told of each Better Auth instance as it is made, so a test can count them. */
   readonly made?: () => void;
 }
 
+/** The codes' sender: a test's own, else Email Service's once KEEL_MAIL_FROM names the address to send from. */
+function codeSender(env: Env, overrides: AuthOverrides): { readonly sendOtp?: OtpSender } {
+  if (overrides.sendOtp !== undefined) return { sendOtp: overrides.sendOtp };
+  if (env.KEEL_MAIL_FROM === "") return {};
+  return { sendOtp: emailOtpSender(env.EMAIL, env.KEEL_MAIL_FROM) };
+}
+
 /**
- * Better Auth's config over the Worker's D1, with GitHub only once both of its
- * secrets are set. The database is handed over as `reaching` wraps it, so a
- * query D1 was away for leaves Better Auth as an error the doorway can read.
+ * Better Auth's config over the Worker's D1, with email codes only where Keel
+ * can send them and GitHub only once both of its secrets are set. The database
+ * is handed over as `reaching` wraps it, so a query D1 was away for leaves
+ * Better Auth as an error the doorway can read.
  */
 function identity(
   env: Env,
@@ -338,7 +347,7 @@ function identity(
     agents,
     endSponsorships,
     background: waitUntil,
-    ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
+    ...codeSender(env, overrides),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
   };
 }

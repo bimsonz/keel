@@ -35,6 +35,9 @@
     // /.well-known/keel/allowed-signers. scripts/deploy.ts fills it from Terraform; a compose is a defect
     // while it does not hold KEEL_COMMIT_SIGNING_KEY's public half for the commit's time.
     "KEEL_COMMIT_SIGNERS": "[]",
+    // The address Keel sends sign-in codes from, on a domain onboarded to Email Service's sending; empty
+    // offers no email codes. scripts/deploy.ts fills it as noreply@mail.<host>.
+    "KEEL_MAIL_FROM": "",
     // The id of Keel's OAuth client on Cloudflare, which an owner connects a project's deploy target through.
     // Not a secret: it is in every consent URL. scripts/deploy.ts fills it from Terraform, which registers the
     // client; empty here, where Connect answers that no client is registered.
@@ -61,6 +64,8 @@
       "KEEL_COMMIT_SIGNING_KEY",
     ],
   },
+  // Email Service's sending: the sign-in codes, from KEEL_MAIL_FROM.
+  "send_email": [{ "name": "EMAIL" }],
   // Workers Rate Limiting, each keyed by IP: writes to /v1/auth/* (sign-in, codes, sign-up),
   // and token exchanges at /v1/oauth/token.
   "ratelimits": [

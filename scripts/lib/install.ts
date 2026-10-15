@@ -235,6 +235,8 @@ const NEEDS_NOTHING = new Set([
   "workflows",
   "triggers",
   "services",
+  // Unrestricted, it names no address: an install leaves KEEL_MAIL_FROM empty and sends nothing.
+  "send_email",
   "containers",
   "worker_loaders",
   "ai",

@@ -131,6 +131,47 @@ describe("Better Auth at /v1/auth", () => {
     expect((await viaGithub("/methods")).json).toEqual({ emailCode: false, github: true });
   });
 
+  it("[auth.mail] where KEEL_MAIL_FROM names an address, Keel offers email codes, sends them through Email Service, and one signs in", async () => {
+    const sent: (EmailMessage | EmailMessageBuilder)[] = [];
+    const EMAIL: SendEmail = {
+      send: async (message: EmailMessage | EmailMessageBuilder) => {
+        sent.push(message);
+        return { messageId: `<${sent.length}@mail.keel.test>` };
+      },
+    };
+    const mailing: Env = { ...env, KEEL_MAIL_FROM: "noreply@mail.keel.test", EMAIL };
+    const isolate = makeIsolate(mailing, isolateLayer(env));
+    const via = caller(async (request) =>
+      isolate.app.fetch(request, mailing, createExecutionContext()),
+    );
+    expect((await via("/methods")).json).toEqual({ emailCode: true, github: false });
+
+    const asked = await via("/email-otp/send-verification-otp", {
+      body: { email: "mailed@example.com", type: "sign-in" },
+    });
+    answered(asked, 200);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    const [message] = sent;
+    if (message === undefined || !("text" in message)) throw new Error("no code was sent");
+    expect([message.to, message.from, message.subject]).toEqual([
+      "mailed@example.com",
+      { email: "noreply@mail.keel.test", name: "Keel" },
+      "Your Keel code",
+    ]);
+    const otp = /^Your Keel code is (\d{6})\. It expires in 5 minutes\.$/.exec(
+      message.text ?? "",
+    )?.[1];
+    if (otp === undefined) throw new Error(`no code in ${message.text}`);
+
+    const jar = new Jar();
+    answered(
+      await via("/sign-in/email-otp", { body: { email: "mailed@example.com", otp }, jar }),
+      200,
+    );
+    const session = await via("/get-session", { jar });
+    expect(session.json.user.email).toBe("mailed@example.com");
+  });
+
   it("[ba.github-no-token] signs in with GitHub and keeps none of GitHub's tokens, at sign-up or at a later sign-in", async () => {
     const githubEnv: Env & { GITHUB_CLIENT_ID: string; GITHUB_CLIENT_SECRET: string } = {
       ...env,

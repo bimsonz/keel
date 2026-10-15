@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: auth.mail
+# why: keel.town names its mail address and binds Email Service, yet offers no email codes, as before
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index dc044203..1b05be60 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -320,8 +320,7 @@ export interface AuthOverrides {
+ /** The codes' sender: a test's own, else Email Service's once KEEL_MAIL_FROM names the address to send from. */
+ function codeSender(env: Env, overrides: AuthOverrides): { readonly sendOtp?: OtpSender } {
+   if (overrides.sendOtp !== undefined) return { sendOtp: overrides.sendOtp };
+-  if (env.KEEL_MAIL_FROM === "") return {};
+-  return { sendOtp: emailOtpSender(env.EMAIL, env.KEEL_MAIL_FROM) };
++  return {};
+ }
+ 
+ /**

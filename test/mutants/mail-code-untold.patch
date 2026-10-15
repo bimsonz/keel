@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/email-otp-sender.test.ts
+# kills: mail.code
+# why: the email says the code expires but not what it is, and nobody can sign in with it
+diff --git a/apps/keel/src/adapters/driven/email/otp-sender.ts b/apps/keel/src/adapters/driven/email/otp-sender.ts
+index 14f2efd3..35b3288f 100644
+--- a/apps/keel/src/adapters/driven/email/otp-sender.ts
++++ b/apps/keel/src/adapters/driven/email/otp-sender.ts
+@@ -2,7 +2,7 @@ import { CODE_SECONDS, type OtpSender } from "../better-auth/auth.ts";
+ 
+ /** What a sign-in code's email says: the code and how long it holds, nothing else. */
+ export function codeText(otp: string): string {
+-  return `Your Keel code is ${otp}. It expires in ${CODE_SECONDS / 60} minutes.`;
++  return `Your Keel code expires in ${CODE_SECONDS / 60} minutes.`;
+ }
+ 
+ /**
