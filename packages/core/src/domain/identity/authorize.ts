@@ -509,6 +509,12 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title:
       "A private project forks only into its own namespace; ask whoever maintains it to make it public",
   },
+  "org-project": {
+    kind: "call",
+    title:
+      "An org takes an agent into the whole of it, not one project: invite the agent into the org instead",
+    operationId: "Namespaces_inviteAgent",
+  },
 };
 
 const refused = (reason: Exclude<RefusalReason, "role">): Decision =>
@@ -831,7 +837,9 @@ const notPersonal = (asked: ResourceKind, resource: Resource): boolean =>
  * removing, making an owner and deleting are an org's own actions: of a
  * person's or an agent's own namespace they are NotVisible. Inviting an agent
  * to one project is a person's own project's: of a project anywhere else it is
- * NotVisible, and it is a person's act, never an agent's. Whoever lacks a
+ * NotVisible, except to a member of the project's org, who is refused
+ * `org-project` and pointed to the org's invitation; and it is a person's act,
+ * never an agent's. Whoever lacks a
  * role is told whom to ask in an org, and in anyone's own namespace that there
  * is nobody to ask.
  *
@@ -854,6 +862,16 @@ export const authorize = <A extends Action>(
   resource: ResourceFor<A>,
 ): Decision => {
   const { need, resource: asked } = ACTIONS[action];
+  // A member of an org who asks to invite an agent to one of its projects sees the project, so
+  // a 404 would hide nothing: they are told the org's own way instead.
+  if (
+    action === "Projects_inviteAgent" &&
+    principal._tag === "User" &&
+    notPersonal(asked, resource) &&
+    resource._tag === "Project" &&
+    rightsOf(principal, resource).has("member")
+  )
+    return refused("org-project");
   const on: Resource =
     noOrg(asked, resource) || notPersonal(asked, resource) ? { _tag: "Missing" } : resource;
   switch (principal._tag) {

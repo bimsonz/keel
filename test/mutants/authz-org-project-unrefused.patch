@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.personal-project
+# why: a member who asks to invite an agent to one of their org's projects is answered 404, as if the project they can see were missing, and is never pointed to the org's invitation
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 747748d7..272101a6 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -854,7 +854,7 @@ export const authorize = <A extends Action>(
+   // A member of an org who asks to invite an agent to one of its projects sees the project, so
+   // a 404 would hide nothing: they are told the org's own way instead.
+   if (
+-    action === "Projects_inviteAgent" &&
++    action === "Projects_removeAgent" &&
+     principal._tag === "User" &&
+     notPersonal(asked, resource) &&
+     resource._tag === "Project" &&

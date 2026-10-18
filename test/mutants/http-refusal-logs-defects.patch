@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts
+# kills: http.refusal-line
+# why: a 500 is logged as a refusal too, so every defect leaves a second line that reads as the caller's fault
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index c1f40a70..5263f724 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -130,7 +130,7 @@ export function logDefect(
+ export const logRefusals: MiddlewareHandler<AppEnv> = async (c, next) => {
+   await next();
+   const { status, headers } = c.res;
+-  if (status < 400 || status >= 500) return;
++  if (status < 400) return;
+   if (!(headers.get("content-type") ?? "").includes("application/problem+json")) return;
+   const body: unknown = await c.res
+     .clone()

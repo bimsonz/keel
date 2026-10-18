@@ -11,7 +11,7 @@ import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
-import { answerUnhandled, type DatabaseAway } from "./run.ts";
+import { answerUnhandled, type DatabaseAway, logRefusals } from "./run.ts";
 import { registerSigners } from "./signers.ts";
 import { registerWellKnown, type WellKnown } from "./well-known.ts";
 import { registerFrontDoor } from "./front-door.ts";
@@ -52,6 +52,7 @@ export function makeApp(options: AppOptions) {
 
   // Middleware first: Hono applies it only to routes registered after it.
   app.use(requestId());
+  app.use(logRefusals);
   app.use(secureHeaders());
   // Ahead of the 1 MiB limit: a fetch's negotiation has its own cap, and a clone URL is no /v1 operation.
   registerGitClone(app, options.git);

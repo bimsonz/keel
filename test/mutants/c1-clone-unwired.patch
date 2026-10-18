@@ -2,12 +2,12 @@
 # kills: clone.wired
 # why: the clone URL's routes are built and never registered, so a fetch gets the API's 404 (or, behind the console, the page)
 diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
-index 84fa827f..2b05b50c 100644
+index 863e3a5f..2605321b 100644
 --- a/apps/keel/src/adapters/driving/http/app.ts
 +++ b/apps/keel/src/adapters/driving/http/app.ts
-@@ -49,8 +49,6 @@ export function makeApp(options: AppOptions) {
-   // Middleware first: Hono applies it only to routes registered after it.
+@@ -54,8 +54,6 @@ export function makeApp(options: AppOptions) {
    app.use(requestId());
+   app.use(logRefusals);
    app.use(secureHeaders());
 -  // Ahead of the 1 MiB limit: a fetch's negotiation has its own cap, and a clone URL is no /v1 operation.
 -  registerGitClone(app, options.git);

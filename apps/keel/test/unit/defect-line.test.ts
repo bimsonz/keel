@@ -1,6 +1,9 @@
+import { Hono } from "hono";
+import { requestId } from "hono/request-id";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answerUnhandled } from "../../src/adapters/driving/http/run.ts";
-import { UndeclaredStatusError } from "../../src/generated/http/runtime.gen.ts";
+import { problemResponse } from "../../src/adapters/driving/http/problems.ts";
+import { answerUnhandled, logRefusals } from "../../src/adapters/driving/http/run.ts";
+import { type AppEnv, UndeclaredStatusError } from "../../src/generated/http/runtime.gen.ts";
 import { describeDefect } from "../../src/rpc/index.ts";
 
 /** What a held call is rejected with when the platform resets its object: the marks are the platform's. */
@@ -97,6 +100,30 @@ describe("the line something thrown past a handler leaves", () => {
         marks: ["remote"],
       },
     ]);
+  });
+
+  it("[http.refusal-line] a request refused with a problem leaves one line of its status and code, and nothing else does", async () => {
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const app = new Hono<AppEnv>();
+    app.use(requestId({ generator: () => "req-refused" }));
+    app.use(logRefusals);
+    app.get("/refused", (c) =>
+      problemResponse(404, "resource.not_found", c.get("requestId"), {
+        detail: "No project named someone/private-name.",
+      }),
+    );
+    app.get("/fine", (c) => c.json({ ok: true }));
+    app.get("/plain", (c) => c.text("not here", 404));
+    app.get("/broken", (c) => problemResponse(500, "internal.defect", c.get("requestId")));
+
+    for (const path of ["/refused", "/fine", "/plain", "/broken"])
+      await app.request(`https://keel.test${path}`);
+    const lines = warned.mock.calls.map((line): unknown => JSON.parse(String(line[0])));
+    expect(lines).toEqual([
+      { ops: "refused", requestId: "req-refused", status: 404, code: "resource.not_found" },
+    ]);
+    // The detail names what the caller asked for; the line never carries it.
+    expect(JSON.stringify(warned.mock.calls)).not.toContain("private-name");
   });
 
   it("[http.unhandled-line] logs a response that broke its contract apart, and throws it on only where asked", () => {

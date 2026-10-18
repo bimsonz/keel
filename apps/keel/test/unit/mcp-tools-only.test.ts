@@ -20,6 +20,7 @@ const NOT_TOOLS: Readonly<Record<string, string>> = {
   Delivery_listDeployTargets: "a person's",
   Delivery_putDeployTarget: "a person's",
   ManageOwners: "a person's",
+  Namespaces_inviteAgent: "a person's",
   Namespaces_listAgents: "a person's",
   Operator_createProject: "a person's, or an agent's over REST",
   Operator_enrolAgent: "a person's",

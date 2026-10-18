@@ -695,13 +695,26 @@ describe("authorize", () => {
     expect(invite(ANON)).toBe("401");
     expect(invite(user({ userId: ada, suspended: true }))).toBe("403:user-suspended");
 
-    // An org's project takes no such invitation, whoever asks: an org takes an agent whole.
+    // An org's project takes no such invitation, whoever asks: an org takes an agent whole. Its
+    // members see the project, so they are told to invite the agent into the org; to anyone
+    // else it is asked of nothing.
     const orgs = project(PRJ_1, "private");
     const owner = user({ userId: ada, memberships: [{ org: ORG_1, role: "owner" }] });
+    const member = user({ userId: ben, memberships: [{ org: ORG_1, role: "member" }] });
     expect(outcome(authorize(owner, "Operator_putSettings", orgs))).toBe("ok:");
-    expect(invite(owner, orgs)).toBe("404");
+    expect(invite(owner, orgs)).toBe("403:org-project");
+    expect(invite(member, orgs)).toBe("403:org-project");
     expect(takeOff(owner, orgs)).toBe("404");
-    expect(invite(owner, { ...orgs, visibility: "public" })).toBe("404");
+    expect(invite(owner, { ...orgs, visibility: "public" })).toBe("403:org-project");
+    expect(invite(user({ userId: ben }), orgs)).toBe("404");
+    expect(invite(user({ userId: ben }), { ...orgs, visibility: "public" })).toBe("404");
+    expect(
+      invite(
+        user({ userId: ada, memberships: [{ org: ORG_1, role: "owner" }], suspended: true }),
+        orgs,
+      ),
+    ).toBe("403:user-suspended");
+    expect(invite(owner, { ...orgs, namespaceSuspended: true })).toBe("404");
     // Nor does a project of an agent's own namespace.
     const agentsOwn = makeId("agt", ulid(7));
     const its = project(PRJ_1, "public", { namespace: agentsOwn, personOwned: false });

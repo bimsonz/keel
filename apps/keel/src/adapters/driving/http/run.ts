@@ -41,7 +41,9 @@ import type {
   WorkspacePool,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
+import type { MiddlewareHandler } from "hono";
 import {
+  type AppEnv,
   ResponseContractError,
   UndeclaredStatusError,
 } from "../../../generated/http/runtime.gen.ts";
@@ -119,6 +121,27 @@ export function logDefect(
 ) {
   console.error(JSON.stringify({ ops, requestId, ...describeDefect(defect) }));
 }
+
+/**
+ * One line a request refused with a problem (a 4xx) leaves, found by its
+ * request id: its status and its code, never its detail, which can name what
+ * the caller sent. Without it a refusal shows in the logs only as a status.
+ */
+export const logRefusals: MiddlewareHandler<AppEnv> = async (c, next) => {
+  await next();
+  const { status, headers } = c.res;
+  if (status < 400 || status >= 500) return;
+  if (!(headers.get("content-type") ?? "").includes("application/problem+json")) return;
+  const body: unknown = await c.res
+    .clone()
+    .json()
+    .catch(() => undefined);
+  const code =
+    typeof body === "object" && body !== null && "code" in body && typeof body.code === "string"
+      ? body.code
+      : undefined;
+  console.warn(JSON.stringify({ ops: "refused", requestId: c.get("requestId"), status, code }));
+};
 
 /**
  * What a request answers when something was thrown past its handler: logged in

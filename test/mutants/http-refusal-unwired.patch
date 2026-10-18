@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/refusal-line.test.ts
+# kills: http.refusal-wired
+# why: Keel's door never logs a refusal, so a 4xx shows in the logs only as a status and nobody can read back why a request was refused
+diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
+index 863e3a5f..49a56b4d 100644
+--- a/apps/keel/src/adapters/driving/http/app.ts
++++ b/apps/keel/src/adapters/driving/http/app.ts
+@@ -52,7 +52,6 @@ export function makeApp(options: AppOptions) {
+ 
+   // Middleware first: Hono applies it only to routes registered after it.
+   app.use(requestId());
+-  app.use(logRefusals);
+   app.use(secureHeaders());
+   // Ahead of the 1 MiB limit: a fetch's negotiation has its own cap, and a clone URL is no /v1 operation.
+   registerGitClone(app, options.git);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/defect-line.test.ts
+# kills: http.refusal-line
+# why: a refusal's line carries its problem's detail, so the logs keep what the caller sent, a private project's name among it
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index c1f40a70..45744410 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -140,7 +140,7 @@ export const logRefusals: MiddlewareHandler<AppEnv> = async (c, next) => {
+     typeof body === "object" && body !== null && "code" in body && typeof body.code === "string"
+       ? body.code
+       : undefined;
+-  console.warn(JSON.stringify({ ops: "refused", requestId: c.get("requestId"), status, code }));
++  console.warn(JSON.stringify({ ops: "refused", requestId: c.get("requestId"), status, code, body }));
+ };
+ 
+ /**

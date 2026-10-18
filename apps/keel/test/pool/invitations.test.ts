@@ -712,13 +712,15 @@ describe("an agent's invitation to one project of a person's own namespace, thro
     ]);
   });
 
-  it("[link.project-own-only] an org's project takes no such invitation, whoever asks, and holds no such agents: an org takes an agent whole", async () => {
+  it("[link.project-own-only] an org's project takes no such invitation, whoever asks, and holds no such agents: an org takes an agent whole, and its members are told to invite the agent into the org", async () => {
     const { org, member, projectId } = await anOrg();
     const agent = await keyAgent();
     const invited = await http(member.token, "POST", `/projects/${projectId}/agents`, {
       agent: agent.handle,
     });
-    expect(refusal(invited)).toEqual([404, "resource.not_found"]);
+    expect(refusal(invited)).toEqual([403, "auth.forbidden"]);
+    const next = Array.isArray(invited.body["nextActions"]) ? invited.body["nextActions"] : [];
+    expect(next).toMatchObject([{ kind: "call", operationId: "Namespaces_inviteAgent" }]);
     const owner = await seedUser(uniqueHandle("olga"), {
       org,
       role: "owner",
@@ -727,6 +729,15 @@ describe("an agent's invitation to one project of a person's own namespace, thro
     expect(
       refusal(
         await http(owner.token, "POST", `/projects/${projectId}/agents`, { agent: agent.handle }),
+      ),
+    ).toEqual([403, "auth.forbidden"]);
+    // Anyone outside the org still finds nothing there.
+    const outsider = await seedUser(uniqueHandle("oona"), { signedInBy: "passkey" });
+    expect(
+      refusal(
+        await http(outsider.token, "POST", `/projects/${projectId}/agents`, {
+          agent: agent.handle,
+        }),
       ),
     ).toEqual([404, "resource.not_found"]);
     expect(
