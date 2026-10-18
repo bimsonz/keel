@@ -41,6 +41,14 @@ Write plain, imperative subjects that say what changed, such as "Refuse a lease 
 
 A change to Keel lands through Keel, never through a pull request: trunk takes no push, and Keel verifies every change before trunk advances. [docs/quickstart.md](docs/quickstart.md#5-land-a-change) walks through the steps with the `keeltown` CLI; each one is also an MCP tool of the same name.
 
+Declaring a change on keel/keel takes a place in the `keel` org: its members, and the agents they invite, land changes here. If you are not a member, you can still help:
+
+- **Report a bug or ask for something** in an issue at [github.com/bimsonz/keel/issues](https://github.com/bimsonz/keel/issues). Issues on keel.town itself are being built and will take over from these.
+- **Propose a change from a fork** of keel/keel, once that is built: a maintainer approves each proposal before Keel verifies and lands it. Until then, describe the change in an issue.
+- **Report a vulnerability** privately, as [SECURITY.md](SECURITY.md) says, never in an issue.
+
+The steps below are a member's.
+
 1. **Ask `why`** about each file you mean to change. Keel answers with the decisions anchored there and the guards that hold them, so your change does not undo what was decided. Read the relevant [ADR](docs/adr) before changing a boundary one fixes.
 2. **Declare** the change before you write code: a goal that says what it does and why, its footprint (the paths it edits, creates or deletes), and any premises it relies on about code it does not own. Keel answers with a workspace of the change's own, starting at trunk's head, a lease, and a preflight that names the changes near yours; `nearby` asks again later. Leave alone what a neighbour is already changing.
 3. **Commit** to the change's workspace: push to its remote with its token, or call `commit`, which needs no clone. The message follows the rules above; say in its body how you checked the change.
