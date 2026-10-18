@@ -15,6 +15,9 @@ import { EscalationPage } from "./pages/Escalation.tsx";
 import { EscalationsPage } from "./pages/Escalations.tsx";
 import { DecisionPage } from "./pages/Decision.tsx";
 import { DecisionsPage } from "./pages/Decisions.tsx";
+import { IssuePage } from "./pages/Issue.tsx";
+import { IssuesPage } from "./pages/Issues.tsx";
+import { NewIssuePage } from "./pages/NewIssue.tsx";
 import { type HomeAccount, HomePage } from "./pages/Home.tsx";
 import { InsightsFrame, InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
@@ -144,12 +147,28 @@ function useReader(live: boolean): Reader | undefined {
   return reader;
 }
 
-function Page({ route, mode, project }: { route: Route; mode: Mode; project: ProjectView }) {
+function Page({
+  route,
+  mode,
+  project,
+  reader,
+}: {
+  route: Route;
+  mode: Mode;
+  project: ProjectView;
+  reader: ReaderMark | undefined;
+}) {
   switch (route.at) {
     case "code":
     case "commits":
     case "commit":
       return <CodePage route={route} mode={mode} />;
+    case "issues":
+      return <IssuesPage state={route.state} reader={reader} />;
+    case "issue":
+      return <IssuePage number={route.number} reader={reader} />;
+    case "new-issue":
+      return <NewIssuePage reader={reader} />;
     case "changes":
       return <ChangesPage filter={route.filter} shown={route.shown} />;
     case "change":
@@ -202,6 +221,7 @@ function pageOf(route: Route, address: string): string {
   // A list is one page under any filter, and the live graph is one page whichever subject is open beside it.
   // The code is one page among its files, so the list of files beside one keeps what was opened in it.
   if (
+    route.at === "issues" ||
     route.at === "changes" ||
     route.at === "conflicts" ||
     route.at === "escalations" ||
@@ -217,8 +237,16 @@ function pageOf(route: Route, address: string): string {
   return address;
 }
 
-/** The places that need nothing of the project's log: its code, and its settings, which Keel is asked for. */
-const UNLOGGED: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit", "settings"]);
+/** The places that need nothing of the project's log: its code, its issues and its settings, which Keel is asked for. */
+const UNLOGGED: ReadonlySet<Route["at"]> = new Set([
+  "code",
+  "commits",
+  "commit",
+  "settings",
+  "issues",
+  "issue",
+  "new-issue",
+]);
 
 /** A project's pages, in its frame. */
 function Console({
@@ -275,6 +303,7 @@ function Console({
               route={route}
               mode={mode}
               project={found}
+              reader={reader}
             />
           )}
         </Frame>

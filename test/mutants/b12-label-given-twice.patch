@@ -2,14 +2,14 @@
 # kills: b12.labels-replay
 # why: the label is not looked up before numbering, so a thing whose creation arrives twice gets two numbers
 diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
-index 36e2699..e949c72 100644
+index deb41649..124789ec 100644
 --- a/packages/core/src/application/memory/feed.ts
 +++ b/packages/core/src/application/memory/feed.ts
-@@ -93,7 +93,6 @@ function labelFor(store: Store, event: EventEnvelope): string | undefined {
-   if (typeof id !== "string") return undefined;
-   const given = `${project}/${rule.prefix}/${id}`;
+@@ -135,7 +135,6 @@ function labelFor(store: Store, event: EventEnvelope): string | undefined {
+ export function giveLabel(store: Store, project: string, prefix: string, id: string): string {
+   const given = `${project}/${prefix}/${id}`;
    const already = store.get(FEED.given, given);
 -  if (typeof already === "string") return already;
-   const counter = `${project}/${rule.prefix}`;
+   const counter = `${project}/${prefix}`;
    const last = store.get(FEED.counter, counter);
    const count = (typeof last === "number" ? last : 0) + 1;

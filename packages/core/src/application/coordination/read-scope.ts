@@ -3,6 +3,7 @@ import type { CoordinationEvent } from "../../domain/coordination/index.ts";
 import type { DeliveryEvent } from "../../domain/delivery/index.ts";
 import type { Audience, IdentityEvent } from "../../domain/identity/index.ts";
 import type { IntegrationEvent } from "../../domain/integration/index.ts";
+import type { IssuesEvent } from "../../domain/issues/index.ts";
 import type { ProjectId } from "../../domain/kernel/index.ts";
 import type { MemoryEvent } from "../../domain/memory/index.ts";
 import type { VerificationEvent } from "../../domain/verification/index.ts";
@@ -14,6 +15,7 @@ type EventType = (
   | VerificationEvent
   | MemoryEvent
   | DeliveryEvent
+  | IssuesEvent
 )["_tag"];
 
 /**
@@ -165,6 +167,11 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   DeploymentRolledBack: "public",
   // Why trunk advanced and nothing was deployed, in Cloudflare's words about the project's account: operator data.
   DeliveryRefused: "members",
+  // An issue and its comments are the project's to read, as GitHub's are: public on a public project.
+  IssueOpened: "public",
+  IssueCommented: "public",
+  IssueClosed: "public",
+  IssueReopened: "public",
 };
 
 const AUDIENCE = new Map<string, Audience>(Object.entries(EVENT_AUDIENCE));

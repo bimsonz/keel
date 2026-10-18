@@ -383,6 +383,7 @@ describe("the request gate", () => {
           namespace: sampleOrgId,
           paused: false,
           standing: { _tag: "None" },
+          sponsored: false,
         });
       }).pipe(Effect.provide(layers({ sponsor: undefined }))),
   );
@@ -394,6 +395,7 @@ describe("the request gate", () => {
         const admitted = yield* principalOf(yield* tokenAt(2));
         expect(admitted.principal).toMatchObject({
           standing: { _tag: "Invited", by: { userId: ANN, role: "member", suspended: false } },
+          sponsored: true,
         });
       }).pipe(Effect.provide(layers())),
   );
@@ -565,6 +567,7 @@ describe("the request gate", () => {
             scopes: ["agent:work", "agent:read"],
             paused: false,
             standing: { _tag: "Governs" },
+            sponsored: false,
           },
           token: { agentId: KEYED, scopes: ["agent:work", "agent:read"], revocationEpoch: 1 },
         });

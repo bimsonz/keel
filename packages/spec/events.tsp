@@ -1974,6 +1974,53 @@ model BatchDropped {
   because: BatchId;
 }
 
+// ─── Issues ─────────────────────────────────────────────────────────────────
+
+/** Someone opened an issue on the project. */
+model IssueOpened {
+  _tag: "IssueOpened";
+  projectId: ProjectId;
+  issueId: IssueId;
+  number: IssueNumber;
+  title: IssueTitle;
+  body: IssueText;
+  author: CommandActor;
+}
+
+/** Someone commented on an issue, open or closed. */
+model IssueCommented {
+  _tag: "IssueCommented";
+  projectId: ProjectId;
+  issueId: IssueId;
+  number: IssueNumber;
+  commentId: CommentId;
+  body: CommentText;
+  author: CommandActor;
+}
+
+/**
+ * The issue was closed, and why: by a person or an agent (`by`), or by a change that named it in its goal and landed
+ * (`byChange`). Exactly one of the two.
+ */
+model IssueClosed {
+  _tag: "IssueClosed";
+  projectId: ProjectId;
+  issueId: IssueId;
+  number: IssueNumber;
+  reason: CloseReason;
+  by?: CommandActor;
+  byChange?: ChangeId;
+}
+
+/** A closed issue was opened again. */
+model IssueReopened {
+  _tag: "IssueReopened";
+  projectId: ProjectId;
+  issueId: IssueId;
+  number: IssueNumber;
+  by: CommandActor;
+}
+
 union KeelEvent {
   // Identity
   AgentEnrolled,
@@ -2109,4 +2156,10 @@ union KeelEvent {
   DeploymentPromoted,
   DeploymentRolledBack,
   DeliveryRefused,
+
+  // Issues
+  IssueOpened,
+  IssueCommented,
+  IssueClosed,
+  IssueReopened,
 }

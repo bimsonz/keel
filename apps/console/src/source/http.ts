@@ -49,6 +49,16 @@ import type {
   NamespaceView,
   Namespaces_inviteAgentInput,
   DecisionPage,
+  IssueComment,
+  IssueInput,
+  IssuePage,
+  IssuesInput,
+  IssueThread,
+  OpenIssueInput,
+  CommentOnIssueInput,
+  CloseIssueInput,
+  ReopenIssueInput,
+  ProjectIssue,
   DecisionView,
   Memory_getDecisionInput,
   Memory_listDecisionsInput,
@@ -95,6 +105,7 @@ import {
   type KeelInvited,
   type KeelOrgAgents,
   type KeelRemembered,
+  type KeelIssued,
   type KeelSponsorship,
   type KeelEventSource,
   KeelRefused,
@@ -144,6 +155,7 @@ export type HttpSource = KeelEventSource &
   KeelSync &
   KeelInvited &
   KeelRemembered &
+  KeelIssued &
   KeelTargeted &
   KeelAgents;
 
@@ -759,6 +771,108 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         if (response.status === 404) return null;
         if (!response.ok) throw await refusalOf(response);
         return answered<DecisionView>(response);
+      },
+    },
+    // The project's issues: Keel's own operations at the project's own address. Each move carries a key made for
+    // the one attempt and nothing of the page's beside it.
+    issues: {
+      async listIssues(asked, signal) {
+        const input: IssuesInput = { projectId: project.id, ...asked };
+        const { projectId, ...query } = input;
+        const response = await read(
+          `/v1/projects/${encodeURIComponent(projectId)}/issues${queryOf({ ...query })}`,
+          signal,
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<IssuePage>(response);
+      },
+      async getIssue(number, signal) {
+        const input: IssueInput = { projectId: project.id, number };
+        const response = await read(
+          `/v1/projects/${encodeURIComponent(input.projectId)}/issues/${input.number}`,
+          signal,
+        );
+        if (response.status === 404) return null;
+        if (!response.ok) throw await refusalOf(response);
+        return answered<IssueThread>(response);
+      },
+      async openIssue(opening) {
+        const {
+          projectId,
+          "idempotency-key": key,
+          ...body
+        }: OpenIssueInput = {
+          projectId: project.id,
+          "idempotency-key": `console:open-issue:${crypto.randomUUID()}`,
+          ...opening,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/issues`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json", "idempotency-key": key },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ProjectIssue>(response);
+      },
+      async commentOnIssue(number, text) {
+        const {
+          projectId,
+          "idempotency-key": key,
+          ...body
+        }: CommentOnIssueInput = {
+          projectId: project.id,
+          number,
+          "idempotency-key": `console:comment:${crypto.randomUUID()}`,
+          body: text,
+        };
+        const { number: _number, ...sent } = body;
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/issues/${number}/comments`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json", "idempotency-key": key },
+            body: JSON.stringify(sent),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<IssueComment>(response);
+      },
+      async closeIssue(number, reason) {
+        const input: CloseIssueInput = {
+          projectId: project.id,
+          number,
+          "idempotency-key": `console:close-issue:${crypto.randomUUID()}`,
+          reason,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(input.projectId)}/issues/${number}/close`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": input["idempotency-key"],
+            },
+            body: JSON.stringify({ reason: input.reason }),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ProjectIssue>(response);
+      },
+      async reopenIssue(number) {
+        const input: ReopenIssueInput = {
+          projectId: project.id,
+          number,
+          "idempotency-key": `console:reopen-issue:${crypto.randomUUID()}`,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(input.projectId)}/issues/${number}/reopen`,
+          { method: "POST", headers: { "idempotency-key": input["idempotency-key"] } },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ProjectIssue>(response);
       },
     },
     // The agents invited to this one project: Keel's own three operations at the project's own address. Each

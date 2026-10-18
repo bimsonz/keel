@@ -12,6 +12,7 @@ import {
   type HumanGate,
   type Ids,
   InstanceQuotas,
+  type IssueNumbers,
   type NamespaceUsage,
   type NamespaceAgents,
   type Namespaces,
@@ -66,6 +67,7 @@ import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
 import { QuestionRaisersRpc } from "../adapters/driven/do-rpc/question-raisers.ts";
 import { DecisionsRpc } from "../adapters/driven/do-rpc/decisions.ts";
+import { IssueNumbersRpc } from "../adapters/driven/do-rpc/issue-numbers.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -148,7 +150,13 @@ export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
 }
 
 /** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */
-export type ProjectServices = CodeHost | Trunks | WorkspacePool | ProjectNamespaces | ProjectAgents;
+export type ProjectServices =
+  | CodeHost
+  | Trunks
+  | WorkspacePool
+  | ProjectNamespaces
+  | ProjectAgents
+  | IssueNumbers;
 
 /** How many ready workspaces a project's pool keeps forked when the Worker's `POOL_TARGET` names none. */
 export const DEFAULT_POOL_TARGET = 2;
@@ -169,7 +177,8 @@ export const poolTargetOf = (declared: string | undefined): number => {
  * and syncs trunk through the Trunk DO, and configures the project's pool. It
  * writes its visibility to its place's D1 row inline, so the next list of
  * projects is narrowed by it, and the rows of the agents invited to it, so an
- * acceptance or a removal binds the agent's next request.
+ * acceptance or a removal binds the agent's next request. An issue's `#n`
+ * comes from the Projector, which numbers the project's changes too.
  */
 export function projectServices(env: Env): Layer.Layer<ProjectServices> {
   return Layer.mergeAll(
@@ -178,6 +187,7 @@ export function projectServices(env: Env): Layer.Layer<ProjectServices> {
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
     ProjectNamespacesD1(env.DB),
     ProjectAgentsD1(env.DB),
+    IssueNumbersRpc(() => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR))),
   );
 }
 

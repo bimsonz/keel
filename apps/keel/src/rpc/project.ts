@@ -22,6 +22,16 @@ import {
 } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import {
+  CloseReason,
+  CommentText,
+  Issue,
+  IssueComment,
+  IssueNotFound,
+  IssueNumber,
+  IssueText,
+  IssueTitle,
+} from "@keeltown/core/domain/issues";
+import {
   CommandActor,
   AgentId,
   Anchor,
@@ -284,6 +294,62 @@ export const DeliveryRefusedCommand = Schema.Struct({
   detail: Schema.String,
 });
 
+/**
+ * Open an issue on the project (core's `OpenIssue`): `author` is the person or
+ * the agent the policy let through. The commit's cause is
+ * `open-issue:<author>:<idempotencyKey>`.
+ */
+export const OpenIssueCommand = Schema.Struct({
+  title: IssueTitle,
+  body: IssueText,
+  author: CommandActor,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/** What is done to an issue by its `#n` (core's `IssueMove`). */
+export const IssueMove = Schema.Union([
+  Schema.TaggedStruct("Comment", { body: CommentText }),
+  Schema.TaggedStruct("Close", { reason: CloseReason }),
+  Schema.TaggedStruct("Reopen", {}),
+]);
+
+/** Comment on, close or reopen issue `#n` (core's `MoveIssue`): `by` is who the policy let through. */
+export const MoveIssueCommand = Schema.Struct({
+  number: IssueNumber,
+  move: IssueMove,
+  by: CommandActor,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/** A page of the project's issues, newest first, below `before` when given. */
+export const IssuesRead = Schema.Struct({
+  state: Schema.optional(Schema.Literals(["open", "closed"])),
+  before: Schema.optional(IssueNumber),
+  limit: Schema.Int,
+});
+
+export const IssueRead = Schema.Struct({ number: IssueNumber });
+
+export const IssuePageView = Schema.Struct({
+  items: Schema.Array(Issue),
+  next: Schema.optional(IssueNumber),
+  open: Schema.Int,
+  closed: Schema.Int,
+});
+
+export const IssueThreadView = Schema.Struct({
+  issue: Issue,
+  comments: Schema.Array(IssueComment),
+});
+
+/** An issue after a move on it, and the comment a comment made. */
+export const IssueMovedView = Schema.Struct({
+  issue: Issue,
+  comment: Schema.optional(IssueComment),
+});
+
 const invitationMove = exitCodec(
   Invitation,
   Schema.Union([InvitationRefused, IdempotencyConflict]),
@@ -309,6 +375,10 @@ export const ProjectCodecs = {
   deploymentOf: exitCodec(Schema.UndefinedOr(Deployment), ProjectNotFound),
   deploymentPromoted: exitCodec(Schema.Void, ProjectNotFound),
   deliveryRefused: exitCodec(Schema.Void, ProjectNotFound),
+  openIssue: exitCodec(Issue, IdempotencyConflict),
+  moveIssue: exitCodec(IssueMovedView, Schema.Union([IssueNotFound, IdempotencyConflict])),
+  issues: exitCodec(IssuePageView, Schema.Never),
+  issue: exitCodec(IssueThreadView, IssueNotFound),
   createProject: exitCodec(
     ProjectView,
     Schema.Union([IdempotencyConflict, RepoNotFound, ImportRefused, QuotaExceeded, ImportTooLarge]),
@@ -349,4 +419,12 @@ export interface ProjectRpc extends EventReceiverRpc {
   acceptInvitation(command: typeof AcceptProjectInvitationCommand.Encoded): Promise<ExitJson>;
   /** The agent's invitation to the project ends: it declines or leaves, or the person takes it off. */
   endInvitation(command: typeof EndProjectInvitationCommand.Encoded): Promise<ExitJson>;
+  /** Opens an issue with the project's next `#n`, idempotent by its author's key. */
+  openIssue(command: typeof OpenIssueCommand.Encoded): Promise<ExitJson>;
+  /** Comments on, closes or reopens issue `#n`, idempotent by the caller's key. */
+  moveIssue(command: typeof MoveIssueCommand.Encoded): Promise<ExitJson>;
+  /** A page of the project's issues, newest first, with the open and closed totals. */
+  issues(read: typeof IssuesRead.Encoded): Promise<ExitJson>;
+  /** Issue `#n` and its comments, oldest first. */
+  issue(read: typeof IssueRead.Encoded): Promise<ExitJson>;
 }

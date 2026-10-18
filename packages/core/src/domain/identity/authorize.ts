@@ -1,10 +1,12 @@
 import { Result } from "effect";
 import {
+  agentActor,
   type NamespaceId,
   type NamespaceKind,
   namespaceKind,
   type NextAction,
   type ProjectId,
+  userActor,
 } from "../kernel/index.ts";
 import { AccessRefused, AuthenticationRequired, NotVisible, type RefusalReason } from "./errors.ts";
 import type {
@@ -13,6 +15,7 @@ import type {
   AgentStanding,
   ForkResource,
   InstanceResource,
+  IssueResource,
   Membership,
   MemberStanding,
   MissingResource,
@@ -54,7 +57,12 @@ import type {
  *   targets are never an agent's, wherever it governs;
  * - `sponsor`: the person who sponsors the agent the action is on, and
  *   nobody else, whatever their role anywhere; `sponsorOrSelf`: that person, or
- *   the agent itself.
+ *   the agent itself;
+ * - `participate`: opens an issue or comments on one: any person who reads the
+ *   project; an agent on a project it stands on, and elsewhere one a person
+ *   sponsors, on a project it reads;
+ * - `authorOrMaintain`: an issue's own action: whoever opened it, or whoever
+ *   maintains its project.
  */
 export type Need =
   | "anyone"
@@ -78,13 +86,16 @@ export type Need =
   | "own"
   | "ownAsUser"
   | "sponsor"
-  | "sponsorOrSelf";
+  | "sponsorOrSelf"
+  | "participate"
+  | "authorOrMaintain";
 
 /**
  * The kind of resource an action is decided on. `Org` is a namespace asked for
  * what only an org has: its members, its owners, its deletion.
  * `PersonalProject` is a project asked for what only a person's own namespace
  * gives it: an agent invited to that one project (an org takes an agent whole).
+ * `Issue` is one issue of a project, with who opened it.
  */
 export type ResourceKind =
   | "Instance"
@@ -94,7 +105,8 @@ export type ResourceKind =
   | "Project"
   | "PersonalProject"
   | "Agent"
-  | "Fork";
+  | "Fork"
+  | "Issue";
 
 export interface ActionRule {
   readonly resource: ResourceKind;
@@ -202,6 +214,13 @@ export const SPEC_ACTIONS = {
   Delivery_deleteDeployTarget: rule("Project", "ownAsUser"),
   Delivery_beginCloudflareConnect: rule("Project", "ownAsUser"),
   Delivery_completeCloudflareConnect: rule("Project", "ownAsUser"),
+
+  issues: rule("Project", "read"),
+  issue: rule("Project", "read"),
+  openIssue: rule("Project", "participate"),
+  commentOnIssue: rule("Project", "participate"),
+  closeIssue: rule("Issue", "authorOrMaintain"),
+  reopenIssue: rule("Issue", "authorOrMaintain"),
 } as const satisfies Record<string, ActionRule>;
 
 /**
@@ -243,6 +262,7 @@ interface ResourceOfKind {
   readonly PersonalProject: ProjectResource | MissingResource;
   readonly Agent: AgentResource | MissingResource;
   readonly Fork: ForkResource;
+  readonly Issue: IssueResource;
 }
 export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["resource"]];
 
@@ -509,6 +529,12 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title:
       "A private project forks only into its own namespace; ask whoever maintains it to make it public",
   },
+  "sponsor-required": {
+    kind: "call",
+    title:
+      "Ask a person to sponsor you: an agent nobody sponsors opens no issue on a project it does not stand on",
+    operationId: "askSponsor",
+  },
   "org-project": {
     kind: "call",
     title:
@@ -664,6 +690,9 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
   switch (need) {
     case "read":
       return granted(rights.has("member") ? "members" : "public");
+    // Whoever sees a project may open an issue on it, as anyone signed in may on GitHub.
+    case "participate":
+      return granted();
     case "readMembers":
     case "readMembersOrSponsor":
       return rights.has("member") ? granted("members") : lacksRole("member", kind);
@@ -776,6 +805,12 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
       return rights.has("read") && asMember
         ? granted("members")
         : refused(whyNoWork(principal, resource));
+    // On its own project an agent writes issues as a member; elsewhere a person must answer for it.
+    case "participate":
+      if (resource._tag !== "Project") return hidden();
+      if (!rights.has("read"))
+        return refused(resource.visibility === "public" ? "scope" : whyNoWork(principal, resource));
+      return asMember || principal.sponsored === true ? granted() : refused("sponsor-required");
     case "work":
       return rights.has("work") ? granted() : refused(whyNoWork(principal, resource));
     case "workOrMaintain":
@@ -872,8 +907,14 @@ export const authorize = <A extends Action>(
     rightsOf(principal, resource).has("member")
   )
     return refused("org-project");
+  if (resource._tag === "Issue") return onIssue(principal, resource);
   const on: Resource =
     noOrg(asked, resource) || notPersonal(asked, resource) ? { _tag: "Missing" } : resource;
+  return decide(principal, need, on);
+};
+
+/** What each kind of principal may do: the policy's rules for an anonymous caller, a person and an agent. */
+const decide = (principal: Principal, need: Need, on: Resource): Decision => {
   switch (principal._tag) {
     case "Anonymous":
       return anonymous(need, on);
@@ -886,4 +927,24 @@ export const authorize = <A extends Action>(
       return unreachable;
     }
   }
+};
+
+/**
+ * An issue's own action: whoever opened it may take it, and whoever maintains
+ * its project. Its project is read first, so an issue of a project the caller
+ * may not see is not there, nor is one the project has not got; a paused agent
+ * or a suspended person is told so, as on any read.
+ */
+const onIssue = (principal: Principal, issue: IssueResource): Decision => {
+  if (principal._tag === "Anonymous") return unauthenticated();
+  const read = decide(principal, "read", issue.project);
+  if (Result.isFailure(read)) return read;
+  if (issue.author === undefined) return hidden();
+  const actor =
+    principal._tag === "User"
+      ? userActor(principal.userId)
+      : principal._tag === "Agent"
+        ? agentActor(principal.agentId)
+        : undefined;
+  return actor === issue.author ? granted() : decide(principal, "maintain", issue.project);
 };

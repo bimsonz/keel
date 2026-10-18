@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.issues
+# why: an agent nobody sponsors opens issues and comments on any public project, so a key and a script are enough to flood a project with issues no person answers for
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index dbf68d04..82cee2ea 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -810,7 +810,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+       if (resource._tag !== "Project") return hidden();
+       if (!rights.has("read"))
+         return refused(resource.visibility === "public" ? "scope" : whyNoWork(principal, resource));
+-      return asMember || principal.sponsored === true ? granted() : refused("sponsor-required");
++      return granted();
+     case "work":
+       return rights.has("work") ? granted() : refused(whyNoWork(principal, resource));
+     case "workOrMaintain":

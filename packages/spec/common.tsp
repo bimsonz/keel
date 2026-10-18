@@ -107,6 +107,54 @@ model NamespaceRef {
 @pattern("^crd_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar CredentialId extends string;
 
+/** An issue on a project: something someone asked for, apart from any change. */
+@pattern("^iss_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar IssueId extends string;
+
+/** A comment on an issue. */
+@pattern("^cmt_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar CommentId extends string;
+
+/** An issue's `#n`: counted per project, from the same sequence as its changes. */
+@minValue(1)
+scalar IssueNumber extends integer;
+
+/** An issue's title: one line of at most 256 characters, with no space at either end. */
+@minLength(1)
+@maxLength(256)
+@pattern("^\\S(?:.*\\S)?$")
+scalar IssueTitle extends string;
+
+/** An issue's text: Markdown, at most 64 KiB of it. */
+@maxLength(65536)
+scalar IssueText extends string;
+
+/** A comment's text, which says something: Markdown, at most 64 KiB. */
+@maxLength(65536)
+@pattern("\\S")
+scalar CommentText extends string;
+
+/** An agent as the author of an issue or a comment: `agent:<agent id>`. */
+@pattern("^agent:[\\s\\S]*?$")
+scalar AgentActor extends string;
+
+/** A person as the author of an issue or a comment: `user:<user id>`. */
+@pattern("^user:[\\s\\S]*?$")
+scalar UserActor extends string;
+
+/** Who wrote or did something on an issue: an agent or a person. */
+union CommandActor {
+  AgentActor,
+  UserActor,
+}
+
+/** Why an issue was closed: GitHub's three. */
+union CloseReason {
+  completed: "completed",
+  notPlanned: "not-planned",
+  duplicate: "duplicate",
+}
+
 /** A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256). */
 @pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
 scalar CommitSha extends string;
@@ -201,6 +249,7 @@ union ProblemCode {
   escalationStateRefused: "escalation.state_refused",
   escalationOptionUnknown: "escalation.option_unknown",
   decisionNotFound: "decision.not_found",
+  issueNotFound: "issue.not_found",
   probeNotFound: "probe.not_found",
   verdictNotFound: "verdict.not_found",
   whyNothingToExplain: "why.nothing_to_explain",

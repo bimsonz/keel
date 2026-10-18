@@ -201,6 +201,32 @@ export interface KeelDecisions {
   getDecision(decisionId: string, signal?: AbortSignal): Promise<Keel.DecisionView | null>;
 }
 
+/**
+ * A project's issues, which Keel reads to whoever reads the project and lets anyone signed in open on a public
+ * one. Every move is Keel's to allow: the console sends the reader's own session and shows what Keel answers.
+ */
+export interface KeelIssues {
+  /** A page of the project's issues, newest first, in one state: `GET /v1/projects/{id}/issues`. */
+  listIssues(
+    asked: { state: "open" | "closed"; before?: number },
+    signal?: AbortSignal,
+  ): Promise<Keel.IssuePage>;
+  /** One issue and its comments; null where the project has no issue of that number. */
+  getIssue(number: number, signal?: AbortSignal): Promise<Keel.IssueThread | null>;
+  openIssue(opening: { title: string; body: string }): Promise<Keel.ProjectIssue>;
+  commentOnIssue(number: number, body: string): Promise<Keel.IssueComment>;
+  closeIssue(
+    number: number,
+    reason: "completed" | "not-planned" | "duplicate",
+  ): Promise<Keel.ProjectIssue>;
+  reopenIssue(number: number): Promise<Keel.ProjectIssue>;
+}
+
+/** A project's source that has Keel's issues: a test fixture's has none. */
+export interface KeelIssued {
+  issues: KeelIssues;
+}
+
 /** A project's source that has Keel's memory of its decisions: a test fixture's has none. */
 export interface KeelRemembered {
   decisions: KeelDecisions;

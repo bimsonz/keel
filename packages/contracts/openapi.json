@@ -59,6 +59,9 @@
     },
     {
       "name": "Delivery"
+    },
+    {
+      "name": "Issues"
     }
   ],
   "paths": {
@@ -7729,7 +7732,7 @@
       "post": {
         "operationId": "Projects_inviteAgent",
         "summary": "Invite an agent to a project",
-        "description": "Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a\ncollaborator. The agent gets nothing until it accepts; then a token that names this project reads and works\non it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a\nquestion. It needs a fresh sign-in: a passkey sign-in from the last ten minutes, or a `keeltown login`\napproved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such\ninvitation (404), and no agent has that handle (404). An agent you have already invited on other terms is\nrefused (409 `invitation.state_refused`).",
+        "description": "Invite an agent to one project of your own namespace, by its handle, as a personal repository takes a\ncollaborator. The agent gets nothing until it accepts; then a token that names this project reads and works\non it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a\nquestion. It needs a fresh sign-in: a passkey sign-in from the last ten minutes, or a `keeltown login`\napproved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org takes no\nsuch invitation: its members are refused (403 `auth.forbidden`, reason `org-project`) and pointed to the org's own invitation,\nand anyone else is answered 404. Neither does a project of an agent's own namespace (404), and no agent has that handle (404). An agent you have already invited on other terms is\nrefused (409 `invitation.state_refused`).",
         "parameters": [
           {
             "name": "projectId",
@@ -8558,6 +8561,941 @@
           "Delivery"
         ],
         "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/issues": {
+      "get": {
+        "operationId": "issues",
+        "summary": "List a project's issues",
+        "description": "A project's issues, newest first, in one state or both. Whoever reads the project reads them; a private or\nunknown project is the same 404.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "explode": false
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "description": "Read the issues below this `#n`: the page's `next`.",
+            "schema": {
+              "$ref": "#/components/schemas/IssueNumber"
+            },
+            "explode": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "openIssue",
+        "summary": "Open an issue",
+        "description": "Open an issue on a project. On a public project any signed-in person may, and any agent a person sponsors; an\nagent nobody sponsors is refused (403 `auth.forbidden`, reason `sponsor-required`) and told to ask for a sponsor.\nOn a private project its members may, and its agents. It takes the project's next `#n`.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectIssue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenIssueRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/issues/{number}": {
+      "get": {
+        "operationId": "issue",
+        "summary": "Get an issue",
+        "description": "One issue and its comments, by its `#n`.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IssueNumber"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueThread"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/issues/{number}/close": {
+      "post": {
+        "operationId": "closeIssue",
+        "summary": "Close an issue",
+        "description": "Close an issue, saying why. Its author may, and whoever maintains the project. Closing a closed issue answers it\nas it stands.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IssueNumber"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectIssue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseIssueRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/issues/{number}/comments": {
+      "post": {
+        "operationId": "commentOnIssue",
+        "summary": "Comment on an issue",
+        "description": "Comment on an issue, open or closed. Whoever may open an issue on the project may comment.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IssueNumber"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueComment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/issues/{number}/reopen": {
+      "post": {
+        "operationId": "reopenIssue",
+        "summary": "Reopen an issue",
+        "description": "Open a closed issue again. Its author may, and whoever maintains the project.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/IssueNumber"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectIssue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Issues",
+          "mcp"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
           {
             "BearerAuth": []
           }
@@ -11700,6 +12638,11 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "AgentActor": {
+        "type": "string",
+        "pattern": "^agent:[\\s\\S]*?$",
+        "description": "An agent as the author of an issue or a comment: `agent:<agent id>`."
+      },
       "AgentCard": {
         "type": "object",
         "required": [
@@ -14097,6 +15040,31 @@
         },
         "description": "An agent's sign-up, in the shape of OAuth dynamic client registration (RFC\n7591). The key is the account: its id and its handle are made from it, so the\nsame key signs up as the same agent every time."
       },
+      "CloseIssueRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CloseReason"
+              }
+            ],
+            "description": "`completed` when it is not said."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CloseReason": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "not-planned",
+          "duplicate"
+        ],
+        "description": "Why an issue was closed: GitHub's three."
+      },
       "CloudflareAccountId": {
         "type": "string",
         "pattern": "^[0-9a-f]{32}$",
@@ -14132,6 +15100,42 @@
           "full"
         ],
         "description": "How a Connect ended, as the callback names it in its redirect's `?cloudflare=`: `connected`; `denied` at\nCloudflare's consent screen; `expired` (a state that is not the owner's current one, used, or over ten minutes\nold); `accounts` (the consent granted no account, or more than one: tick exactly one); `refused` (Cloudflare\nrefused the code's exchange, the read of the account, or the token's minting); `unreachable` (the minted token\ndoes not reach the account's Workers); `no-workers-dev` (the account has no workers.dev subdomain); `full` (the\nproject holds all the deploy targets it may)."
+      },
+      "CommandActor": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/AgentActor"
+          },
+          {
+            "$ref": "#/components/schemas/UserActor"
+          }
+        ],
+        "description": "Who wrote or did something on an issue: an agent or a person."
+      },
+      "CommentId": {
+        "type": "string",
+        "pattern": "^cmt_[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "A comment on an issue."
+      },
+      "CommentRequest": {
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "$ref": "#/components/schemas/CommentText"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CommentText": {
+        "type": "string",
+        "maxLength": 65536,
+        "pattern": "\\S",
+        "description": "A comment's text, which says something: Markdown, at most 64 KiB."
       },
       "CommitEdit": {
         "type": "object",
@@ -18071,6 +19075,278 @@
         },
         "description": "One reason a request was refused, pointing at the field."
       },
+      "IssueClosed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "issueId",
+          "number",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IssueClosed"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "number": {
+            "$ref": "#/components/schemas/IssueNumber"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/CloseReason"
+          },
+          "by": {
+            "$ref": "#/components/schemas/CommandActor"
+          },
+          "byChange": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The issue was closed, and why: by a person or an agent (`by`), or by a change that named it in its goal and landed\n(`byChange`). Exactly one of the two."
+      },
+      "IssueComment": {
+        "type": "object",
+        "required": [
+          "commentId",
+          "issueId",
+          "author",
+          "body",
+          "at"
+        ],
+        "properties": {
+          "commentId": {
+            "$ref": "#/components/schemas/CommentId"
+          },
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "author": {
+            "$ref": "#/components/schemas/CommandActor"
+          },
+          "authorHandle": {
+            "type": "string",
+            "description": "The handle of whoever wrote it, where they have one."
+          },
+          "body": {
+            "$ref": "#/components/schemas/CommentText"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One comment on an issue."
+      },
+      "IssueCommented": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "issueId",
+          "number",
+          "commentId",
+          "body",
+          "author"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IssueCommented"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "number": {
+            "$ref": "#/components/schemas/IssueNumber"
+          },
+          "commentId": {
+            "$ref": "#/components/schemas/CommentId"
+          },
+          "body": {
+            "$ref": "#/components/schemas/CommentText"
+          },
+          "author": {
+            "$ref": "#/components/schemas/CommandActor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Someone commented on an issue, open or closed."
+      },
+      "IssueId": {
+        "type": "string",
+        "pattern": "^iss_[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "An issue on a project: something someone asked for, apart from any change."
+      },
+      "IssueNumber": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "An issue's `#n`: counted per project, from the same sequence as its changes."
+      },
+      "IssueOpened": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "issueId",
+          "number",
+          "title",
+          "body",
+          "author"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IssueOpened"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "number": {
+            "$ref": "#/components/schemas/IssueNumber"
+          },
+          "title": {
+            "$ref": "#/components/schemas/IssueTitle"
+          },
+          "body": {
+            "$ref": "#/components/schemas/IssueText"
+          },
+          "author": {
+            "$ref": "#/components/schemas/CommandActor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Someone opened an issue on the project."
+      },
+      "IssuePage": {
+        "type": "object",
+        "required": [
+          "items",
+          "open",
+          "closed"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectIssue"
+            }
+          },
+          "next": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IssueNumber"
+              }
+            ],
+            "description": "Pass back as `before` for the next page; absent on the last."
+          },
+          "open": {
+            "type": "integer"
+          },
+          "closed": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A page of a project's issues, newest first, with how many it has in each state."
+      },
+      "IssueReopened": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "issueId",
+          "number",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IssueReopened"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "number": {
+            "$ref": "#/components/schemas/IssueNumber"
+          },
+          "by": {
+            "$ref": "#/components/schemas/CommandActor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A closed issue was opened again."
+      },
+      "IssueText": {
+        "type": "string",
+        "maxLength": 65536,
+        "description": "An issue's text: Markdown, at most 64 KiB of it."
+      },
+      "IssueThread": {
+        "type": "object",
+        "required": [
+          "issue",
+          "comments"
+        ],
+        "properties": {
+          "issue": {
+            "$ref": "#/components/schemas/ProjectIssue"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssueComment"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One issue and its comments, oldest first: at most 500 of them."
+      },
+      "IssueTitle": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "pattern": "^\\S(?:.*\\S)?$",
+        "description": "An issue's title: one line of at most 256 characters, with no space at either end."
+      },
       "KeelClientCredentials": {
         "type": "object",
         "required": [
@@ -18466,6 +19742,18 @@
           },
           {
             "$ref": "#/components/schemas/DeliveryRefused"
+          },
+          {
+            "$ref": "#/components/schemas/IssueOpened"
+          },
+          {
+            "$ref": "#/components/schemas/IssueCommented"
+          },
+          {
+            "$ref": "#/components/schemas/IssueClosed"
+          },
+          {
+            "$ref": "#/components/schemas/IssueReopened"
           }
         ]
       },
@@ -21713,6 +23001,23 @@
         },
         "description": "The token endpoint answers errors in OAuth 2.0's own shape (RFC 6749 §5.2),\nwhich every OAuth client already reads, rather than as problem details."
       },
+      "OpenIssueRequest": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/IssueTitle"
+          },
+          "body": {
+            "$ref": "#/components/schemas/IssueText"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "OpenSessionRequest": {
         "type": "object",
         "properties": {
@@ -22832,6 +24137,7 @@
           "escalation.state_refused",
           "escalation.option_unknown",
           "decision.not_found",
+          "issue.not_found",
           "probe.not_found",
           "verdict.not_found",
           "why.nothing_to_explain",
@@ -23083,6 +24389,106 @@
       "ProjectId": {
         "type": "string",
         "pattern": "^prj_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "ProjectIssue": {
+        "type": "object",
+        "required": [
+          "issueId",
+          "projectId",
+          "number",
+          "title",
+          "body",
+          "author",
+          "state",
+          "openedAt",
+          "updatedAt",
+          "comments"
+        ],
+        "properties": {
+          "issueId": {
+            "$ref": "#/components/schemas/IssueId"
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "number": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IssueNumber"
+              }
+            ],
+            "description": "The project's `#n`, from the same sequence as its changes."
+          },
+          "title": {
+            "$ref": "#/components/schemas/IssueTitle"
+          },
+          "body": {
+            "$ref": "#/components/schemas/IssueText"
+          },
+          "author": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommandActor"
+              }
+            ],
+            "description": "Who opened it: `user:<id>` or `agent:<id>`."
+          },
+          "authorHandle": {
+            "type": "string",
+            "description": "The handle of whoever opened it, where they have one."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it last moved: opened, commented on, closed or reopened."
+          },
+          "comments": {
+            "type": "integer",
+            "description": "How many comments it has."
+          },
+          "closedReason": {
+            "$ref": "#/components/schemas/CloseReason"
+          },
+          "closedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommandActor"
+              }
+            ],
+            "description": "Who closed it, when a person or an agent did."
+          },
+          "closedByHandle": {
+            "type": "string",
+            "description": "The handle of whoever closed it, where they have one."
+          },
+          "closedByChange": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              }
+            ],
+            "description": "The change that closed it, when a landing did."
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Something someone asked of a project: a bug, a request, a question. It is apart from any change: a change whose\ngoal says \"Fixes #n\" (or closes, resolves) closes it when it lands, and nothing else ties the two."
       },
       "ProjectPage": {
         "type": "object",
@@ -25992,6 +27398,11 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "UserActor": {
+        "type": "string",
+        "pattern": "^user:[\\s\\S]*?$",
+        "description": "A person as the author of an issue or a comment: `user:<user id>`."
       },
       "UserId": {
         "type": "string",

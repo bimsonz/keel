@@ -12,6 +12,7 @@ import {
   FlowArrowIcon,
   GraphIcon,
   type Icon,
+  RadioButtonIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect } from "react";
 import { PAGE } from "../engine/lists.ts";
@@ -32,6 +33,7 @@ const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 
 const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
   { id: "code", label: "Code", Icon: CodeIcon, to: HOME },
+  { id: "issues", label: "Issues", Icon: RadioButtonIcon, to: { at: "issues", state: "open" } },
   {
     id: "changes",
     label: "Changes",

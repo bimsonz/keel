@@ -34,6 +34,7 @@ import {
   EventEnvelope,
   GuardId,
   InstantSchema,
+  IssueId,
   NextAction,
   NamespaceId,
   ProbeId,
@@ -262,6 +263,9 @@ export const DecisionPage = Schema.Struct({
 
 export const DecisionRead = Schema.Struct({ decisionId: DecisionId });
 
+/** An issue about to be opened on a project: the `#n` it is given, from the sequence its project's changes share. */
+export const IssueNumberRead = Schema.Struct({ projectId: ProjectId, issueId: IssueId });
+
 export const VerdictRead = Schema.Struct({ verdictId: VerdictId });
 
 /** A verdict as the Projector's index reads it: the VerdictIssued, its project and when (the port's `IndexedVerdict`). */
@@ -318,6 +322,7 @@ export const ProjectorCodecs = {
   escalations: exitCodec(EscalationPage, Schema.Never),
   escalation: exitCodec(LabelledEscalation, EscalationNotFound),
   decision: exitCodec(IndexedDecision, DecisionNotFound),
+  issueNumber: exitCodec(Schema.Int, Schema.Never),
   verdict: exitCodec(IndexedVerdict, VerdictNotFound),
   decisions: exitCodec(DecisionPage, Schema.Never),
   guardDecisions: exitCodec(
@@ -357,6 +362,8 @@ export interface ProjectorRpc extends EventReceiverRpc {
   escalation(request: typeof EscalationRead.Encoded): Promise<ExitJson>;
   /** One decision, joined to its conflict. DecisionNotFound for one the index has not heard recorded. */
   decision(request: typeof DecisionRead.Encoded): Promise<ExitJson>;
+  /** The `#n` an issue of a project is given, giving it the project's next the first time it is asked. */
+  issueNumber(request: typeof IssueNumberRead.Encoded): Promise<ExitJson>;
   /** A project's decisions, newest first, on one subject when asked. */
   decisions(request: typeof DecisionsRead.Encoded): Promise<ExitJson>;
   /** The decision each of a project's guards holds; a guard that holds none is left out. */

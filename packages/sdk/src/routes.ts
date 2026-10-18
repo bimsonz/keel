@@ -182,6 +182,28 @@ export const ROUTES = {
     query: ["project", "subject", "cursor", "limit"],
   },
   Memory_getDecision: { method: "GET", path: "/decisions/{decisionId}" },
+  issues: {
+    method: "GET",
+    path: "/projects/{projectId}/issues",
+    query: ["state", "before", "limit"],
+  },
+  issue: { method: "GET", path: "/projects/{projectId}/issues/{number}" },
+  openIssue: { method: "POST", path: "/projects/{projectId}/issues", headers: ["idempotency-key"] },
+  commentOnIssue: {
+    method: "POST",
+    path: "/projects/{projectId}/issues/{number}/comments",
+    headers: ["idempotency-key"],
+  },
+  closeIssue: {
+    method: "POST",
+    path: "/projects/{projectId}/issues/{number}/close",
+    headers: ["idempotency-key"],
+  },
+  reopenIssue: {
+    method: "POST",
+    path: "/projects/{projectId}/issues/{number}/reopen",
+    headers: ["idempotency-key"],
+  },
   Lattices_listLattices: { method: "GET", path: "/lattices" },
   Inbox_getSnapshot: { method: "GET", path: "/events/snapshot", query: ["project"] },
   Views_getVerdict: { method: "GET", path: "/verdicts/{verdictId}" },

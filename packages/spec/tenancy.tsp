@@ -186,8 +186,9 @@ interface Projects {
    * collaborator. The agent gets nothing until it accepts; then a token that names this project reads and works
    * on it, and on nothing else of your namespace, and you answer for it there and are asked first when it has a
    * question. It needs a fresh sign-in: a passkey sign-in from the last ten minutes, or a `keeltown login`
-   * approved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org or of an agent's own namespace takes no such
-   * invitation (404), and no agent has that handle (404). An agent you have already invited on other terms is
+   * approved with a passkey in the last ten minutes (403 `auth.fresh_sign_in_required` otherwise). A project of an org takes no
+   * such invitation: its members are refused (403 `auth.forbidden`, reason `org-project`) and pointed to the org's own invitation,
+   * and anyone else is answered 404. Neither does a project of an agent's own namespace (404), and no agent has that handle (404). An agent you have already invited on other terms is
    * refused (409 `invitation.state_refused`).
    */
   @summary("Invite an agent to a project")

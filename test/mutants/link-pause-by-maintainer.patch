@@ -2,10 +2,10 @@
 # kills: link.pause
 # why: pausing is decided on the agent's project again, so a maintainer of an org the agent works in pauses an agent they do not stand behind
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 73a6523e..b8830fba 100644
+index e02c1464..70706ea4 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -389,8 +389,8 @@ export const RESOLVERS: Resolvers = {
+@@ -427,8 +427,8 @@ export const RESOLVERS: Resolvers = {
      caller.principal._tag === "User" ? perItem() : ownProject(undefined, caller),
    Operator_giveRuling: (input) => escalationProject(input.escalationId),
    Operator_enrolAgent: (input) => projectNamed(input.projectId),
@@ -15,12 +15,12 @@ index 73a6523e..b8830fba 100644
 +  Operator_reinstateAgent: (input) => agentProject(input.agentId),
    Operator_revokeAgent: (input) => agentProject(input.agentId),
  
-   declare: ownProject,
+   issues: (input) => projectNamed(input.projectId),
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 2ef42bec..daed2641 100644
+index dbf68d04..8d563e88 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -166,8 +166,8 @@ export const SPEC_ACTIONS = {
+@@ -190,8 +190,8 @@ export const SPEC_ACTIONS = {
    Operator_giveRuling: rule("Project", "sponsorOrMaintainAsUser"),
    Operator_revokeAgent: rule("Project", "sponsorOrMaintain"),
    // Pausing is the sponsor's alone: a maintainer removes an agent from its org instead.

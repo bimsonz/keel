@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { EventEnvelope, type ProjectId } from "../../domain/kernel/index.ts";
+import { EventEnvelope, type IssueId, type ProjectId } from "../../domain/kernel/index.ts";
 import { EntityStore, type Stored } from "../ports/index.ts";
 
 /**
@@ -67,6 +67,8 @@ const LABELLED: Readonly<
   >
 > = {
   IntentDeclared: { prefix: "#", id: "changeId" },
+  // An issue shares its project's `#n` with the changes, given before it is opened (`giveLabel`).
+  IssueOpened: { prefix: "#", id: "issueId" },
   DecisionRecorded: { prefix: "D-", id: "decisionId" },
   GuardAdmitted: { prefix: "G-", id: "guardId" },
   ConflictSuspected: { prefix: "C-", id: "conflictId" },
@@ -122,17 +124,39 @@ function labelFor(store: Store, event: EventEnvelope): string | undefined {
   if (rule.creates !== undefined && !rule.creates(payload)) return undefined;
   const id = payload[rule.id];
   if (typeof id !== "string") return undefined;
-  const given = `${project}/${rule.prefix}/${id}`;
+  return giveLabel(store, project, rule.prefix, id);
+}
+
+/**
+ * The label something of a project was given, giving it the next of its kind
+ * the first time: `#n` for the n-th change or issue, `C-n` for a conflict.
+ * It writes, so it runs inside a transaction.
+ */
+export function giveLabel(store: Store, project: string, prefix: string, id: string): string {
+  const given = `${project}/${prefix}/${id}`;
   const already = store.get(FEED.given, given);
   if (typeof already === "string") return already;
-  const counter = `${project}/${rule.prefix}`;
+  const counter = `${project}/${prefix}`;
   const last = store.get(FEED.counter, counter);
   const count = (typeof last === "number" ? last : 0) + 1;
-  const label = `${rule.prefix}${count}`;
+  const label = `${prefix}${count}`;
   store.put(FEED.counter, counter, count);
   store.put(FEED.given, given, label);
   return label;
 }
+
+/**
+ * The `#n` an issue of the project was given, giving it the project's next the
+ * first time it is asked: the number the issue is then opened with, so an
+ * issue and the project's changes never share one.
+ */
+export const issueNumber = Effect.fn("memory/issueNumber")(function* (
+  projectId: ProjectId,
+  issueId: IssueId,
+) {
+  const store = yield* EntityStore;
+  return Number(store.transaction(() => giveLabel(store, projectId, "#", issueId)).slice(1));
+});
 
 /** The label the feed gave something of a project when it recorded its creation, by the prefix of its kind (`E-`, `C-` …). */
 export function labelGiven(

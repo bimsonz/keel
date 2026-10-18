@@ -2,15 +2,15 @@
 # kills: gate.paused-admitted
 # why: a suspended agent is admitted as if it were active, so a pause stops nothing
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 1fc72a54..04486868 100644
+index f2af040c..0d3f21e6 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -176,7 +176,7 @@ export const principalOf: (
+@@ -208,7 +208,7 @@ export const principalOf: (
            namespace: org,
            projectId,
            scopes: token.scopes,
 -          paused: agent.state === "suspended",
 +          paused: false,
            standing,
+           sponsored: agent.sponsor !== undefined,
          },
-         token,

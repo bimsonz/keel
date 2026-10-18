@@ -1138,6 +1138,90 @@ export class KeelClient {
     );
   }
 
+  /** A project's issues, newest first, in one state or both; `before` is a page's `next`. */
+  issues(
+    projectId: string,
+    options: CallOptions & {
+      readonly state?: "open" | "closed";
+      readonly before?: number;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["issues"]> {
+    return this.call(
+      "issues",
+      { projectId, state: options.state, before: options.before, limit: options.limit },
+      options,
+    );
+  }
+
+  /** One issue of a project, by its `#n`, with its comments. */
+  issue(projectId: string, number: number, options?: CallOptions): Promise<WireOutputs["issue"]> {
+    return this.call("issue", { projectId, number }, options);
+  }
+
+  /** Opens an issue on a project; it takes the project's next `#n`. */
+  openIssue(
+    projectId: string,
+    title: string,
+    options: Idempotent & { readonly body?: string } = {},
+  ): Promise<WireOutputs["openIssue"]> {
+    return this.call(
+      "openIssue",
+      {
+        projectId,
+        title,
+        ...(options.body === undefined ? {} : { body: options.body }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
+  /** Comments on an issue, open or closed. */
+  commentOnIssue(
+    projectId: string,
+    number: number,
+    body: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["commentOnIssue"]> {
+    return this.call(
+      "commentOnIssue",
+      { projectId, number, body, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Closes an issue, as `completed` unless a reason is given: its author's, or a maintainer's. */
+  closeIssue(
+    projectId: string,
+    number: number,
+    options: Idempotent & { readonly reason?: "completed" | "not-planned" | "duplicate" } = {},
+  ): Promise<WireOutputs["closeIssue"]> {
+    return this.call(
+      "closeIssue",
+      {
+        projectId,
+        number,
+        ...(options.reason === undefined ? {} : { reason: options.reason }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
+  /** Opens a closed issue again: its author's, or a maintainer's. */
+  reopenIssue(
+    projectId: string,
+    number: number,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["reopenIssue"]> {
+    return this.call(
+      "reopenIssue",
+      { projectId, number, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
   /** Trunk's history from `ref`, newest first; pass a page's `nextCursor` for the next. */
   commits(
     projectId: string,

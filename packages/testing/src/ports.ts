@@ -78,6 +78,8 @@ import {
   describeNamespaceAgentsContract,
   describeProjectAgentsContract,
 } from "./contracts/invitations.ts";
+import { describeIssueNumbersContract, describeIssuesContract } from "./contracts/issues.ts";
+import { makeIssueNumbersMemory, makeIssuesMemory } from "./memory/issues.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
   describeProjectViewsContract,
@@ -648,6 +650,8 @@ export const PORTS = {
       ),
     describeInvitationsContract,
   ),
+  Issues: port(() => makeIssuesMemory().layer, describeIssuesContract),
+  IssueNumbers: port(() => makeIssueNumbersMemory().layer, describeIssueNumbersContract),
   Namespaces: harnessed<Namespaces, TenancyHarness<Namespaces>>(
     memoryTenancyHarness(tenancy.makeNamespacesMemory),
     describeNamespacesContract,

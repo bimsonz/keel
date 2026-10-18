@@ -5,6 +5,7 @@ import { CoordinationEvent } from "../src/domain/coordination/index.ts";
 import { DeliveryEvent } from "../src/domain/delivery/index.ts";
 import { IdentityEvent } from "../src/domain/identity/index.ts";
 import { IntegrationEvent } from "../src/domain/integration/index.ts";
+import { IssuesEvent } from "../src/domain/issues/index.ts";
 import { MemoryEvent } from "../src/domain/memory/index.ts";
 import { VerificationEvent } from "../src/domain/verification/index.ts";
 
@@ -41,6 +42,7 @@ const CONTEXTS = [
   ["integration", IntegrationEvent],
   ["memory", MemoryEvent],
   ["delivery", DeliveryEvent],
+  ["issues", IssuesEvent],
 ] as const;
 
 describe("the domain's events are the catalogue's events", () => {

@@ -144,7 +144,9 @@ export class NotVisible extends Schema.TaggedError<NotVisible>()("NotVisible", {
  * - `scope`: the agent's token lacks the scope;
  * - `private-source`: a private project forks only within its own org;
  * - `org-project`: an agent is invited to one project only in a person's own
- *   namespace; an org takes it into the whole of the org.
+ *   namespace; an org takes it into the whole of the org;
+ * - `sponsor-required`: an agent nobody sponsors opens no issue, and writes no
+ *   comment, on a project it does not stand on.
  */
 export const RefusalReason = Schema.Literals([
   "user-suspended",
@@ -161,6 +163,7 @@ export const RefusalReason = Schema.Literals([
   "scope",
   "private-source",
   "org-project",
+  "sponsor-required",
 ]);
 export type RefusalReason = typeof RefusalReason.Type;
 

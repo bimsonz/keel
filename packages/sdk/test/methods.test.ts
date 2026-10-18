@@ -20,6 +20,7 @@ const SAMPLE: Readonly<Record<string, string>> = {
   namespace: "an-org",
   name: "forge-lite",
   sha: "a".repeat(40),
+  number: "1",
 };
 
 const LEASE = { lease: "lse_1" };
@@ -100,6 +101,12 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Repo_getTree: (c) => c.tree("prj_1"),
   Repo_getBlob: (c) => c.blob("prj_1", "README.md"),
   Repo_listCommits: (c) => c.commits("prj_1"),
+  issues: (c) => c.issues("prj_1"),
+  issue: (c) => c.issue("prj_1", 1),
+  openIssue: (c) => c.openIssue("prj_1", "A bug"),
+  commentOnIssue: (c) => c.commentOnIssue("prj_1", 1, "Seen too"),
+  closeIssue: (c) => c.closeIssue("prj_1", 1),
+  reopenIssue: (c) => c.reopenIssue("prj_1", 1),
   Repo_getCommit: (c) => c.commit("prj_1", SAMPLE["sha"] ?? ""),
   Repo_compare: (c) => c.compare("prj_1", "main"),
   Operator_createProject: (c) =>
@@ -158,6 +165,7 @@ const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<u
   Repo_getTree: (c) => c.tree("prj_1", { ref: "main", path: "src" }),
   Repo_getBlob: (c) => c.blob("prj_1", "README.md", { ref: "main", startLine: 2 }),
   Repo_listCommits: (c) => c.commits("prj_1", { ref: "main", cursor: "c1", limit: 5 }),
+  issues: (c) => c.issues("prj_1", { state: "open", before: 9, limit: 5 }),
   Repo_compare: (c) => c.compare("prj_1", "main", { head: "feature" }),
   Changes_listChanges: (c) =>
     c.changes({ state: "working", project: "prj_1", cursor: "c1", limit: 5 }),

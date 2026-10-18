@@ -1,4 +1,9 @@
-import { hearLiveChange, liveAnchors, liveNear } from "@keeltown/core/application/coordination";
+import {
+  hearLiveChange,
+  liveAnchors,
+  liveGoalOf,
+  liveNear,
+} from "@keeltown/core/application/coordination";
 import {
   acceptProjectInvitation,
   endProjectInvitation,
@@ -23,7 +28,14 @@ import {
   holdPool,
   settingsOf,
 } from "@keeltown/core/application/integration";
-import { type EventEnvelope, Instant, ProjectId } from "@keeltown/core/kernel";
+import {
+  closeIssuesNamed,
+  issuePage,
+  issueThread,
+  moveIssue,
+  openIssue,
+} from "@keeltown/core/application/issues";
+import { ChangeId, type EventEnvelope, Instant, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Schema } from "effect";
 import { poolTargetOf, type ProjectServices, projectServices } from "../../../composition/do.ts";
@@ -38,7 +50,11 @@ import {
   DeploymentPromotedCommand,
   EndProjectInvitationCommand,
   InviteToProjectCommand,
+  IssueRead,
+  IssuesRead,
   LiveNearRead,
+  MoveIssueCommand,
+  OpenIssueCommand,
   ProjectCodecs,
   type ProjectRpc,
   PutSettingsCommand,
@@ -50,6 +66,13 @@ import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The project's own deadline: what it needs beyond its trunk, made after it is answered. */
 export const PROJECT_FINISH = "project finish";
+
+/** The issues a landed change's goal names, closed as completed in the landing's own transaction. */
+const closedBy = (tx: Transaction, projectId: ProjectId, event: EventEnvelope) => {
+  const changeId = Schema.decodeUnknownSync(ChangeId)(event.entity.id);
+  const goal = liveGoalOf(tx.store, changeId);
+  return goal === undefined ? [] : closeIssuesNamed(tx, projectId, changeId, goal);
+};
 
 /** The Project DO is named `project:<projectId>`. */
 const projectIdOf = (name: string | undefined) =>
@@ -83,6 +106,10 @@ export class ProjectDO
       | "inviteAgent"
       | "acceptInvitation"
       | "endInvitation"
+      | "openIssue"
+      | "moveIssue"
+      | "issues"
+      | "issue"
     >
 {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -184,10 +211,63 @@ export class ProjectDO
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const projectId = projectIdOf(this.ctx.id.name);
-    const drafts = hearLiveChange(tx, projectId, event);
+    // Read before the index forgets the change: a landing closes the issues its goal names.
+    const closing = event.type === "ChangeLanded" ? closedBy(tx, projectId, event) : [];
+    const drafts = [...hearLiveChange(tx, projectId, event), ...closing];
     return drafts.length === 0
       ? { drafts: [] }
       : { entity: { kind: "project", id: projectId }, drafts, project: projectId };
+  }
+
+  /** Opens an issue on the project with its next `#n`; a retry by the same key answers it again. */
+  async openIssue(command: typeof OpenIssueCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.openIssue,
+      Schema.decodeUnknownEffect(OpenIssueCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap((opening) => openIssue(projectId, opening)),
+      ),
+    );
+  }
+
+  /** Comments on, closes or reopens issue `#n`; IssueNotFound for one the project has not got. */
+  async moveIssue(command: typeof MoveIssueCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.moveIssue,
+      Schema.decodeUnknownEffect(MoveIssueCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap((moving) => moveIssue(projectId, moving)),
+      ),
+    );
+  }
+
+  /** A page of the project's issues, newest first. */
+  async issues(read: typeof IssuesRead.Encoded) {
+    return this.answer(
+      ProjectCodecs.issues,
+      Schema.decodeUnknownEffect(IssuesRead)(read).pipe(
+        Effect.orDie,
+        Effect.flatMap((query) => Effect.map(EntityStore, (store) => issuePage(store, query))),
+      ),
+    );
+  }
+
+  /** Issue `#n` and its comments; IssueNotFound for one the project has not got. */
+  async issue(read: typeof IssueRead.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.issue,
+      Schema.decodeUnknownEffect(IssueRead)(read).pipe(
+        Effect.orDie,
+        Effect.flatMap(({ number }) =>
+          Effect.flatMap(EntityStore, (store) =>
+            Effect.fromResult(issueThread(store, projectId, number)),
+          ),
+        ),
+      ),
+    );
   }
 
   /**

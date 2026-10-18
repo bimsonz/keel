@@ -17,6 +17,7 @@ import type {
   KeelCommands,
   KeelInvited,
   KeelRemembered,
+  KeelIssued,
   KeelSettings,
   KeelSync,
   KeelTargeted,
@@ -46,6 +47,7 @@ export type ConsoleSource = KeelEventSource &
   Partial<KeelInvited> &
   Partial<KeelTargeted> &
   Partial<KeelRemembered> &
+  Partial<KeelIssued> &
   Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;

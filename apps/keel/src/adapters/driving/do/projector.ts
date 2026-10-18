@@ -13,6 +13,7 @@ import {
   probeConflict,
   FEED_END,
   getDecision,
+  issueNumber,
   listDecisions,
   readFeed,
   recordFeed,
@@ -46,6 +47,7 @@ import {
   EscalationRead,
   EscalationsRead,
   GuardDecisionsRead,
+  IssueNumberRead,
   PathDecisionsRead,
   ProbeConflictRead,
   ProjectorCodecs,
@@ -256,6 +258,14 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ decisionId }) => getDecision(decisionId)),
     );
     return this.answer(ProjectorCodecs.decision, program);
+  }
+
+  async issueNumber(request: typeof IssueNumberRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(IssueNumberRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ projectId, issueId }) => issueNumber(projectId, issueId)),
+    );
+    return this.answer(ProjectorCodecs.issueNumber, program);
   }
 
   async decisions(request: typeof DecisionsRead.Encoded) {

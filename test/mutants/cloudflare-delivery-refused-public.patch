@@ -2,15 +2,15 @@
 # kills: b12.event-audience
 # why: anyone reading a public project's feed sees why Keel deployed nothing, in Cloudflare's words about the owner's account
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index 5bafd48e..9ad68494 100644
+index b4d6655f..ac12124b 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -155,7 +155,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+@@ -166,7 +166,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
    DeploymentPromoted: "public",
    DeploymentRolledBack: "public",
    // Why trunk advanced and nothing was deployed, in Cloudflare's words about the project's account: operator data.
 -  DeliveryRefused: "members",
 +  DeliveryRefused: "public",
- };
- 
- const AUDIENCE = new Map<string, Audience>(Object.entries(EVENT_AUDIENCE));
+   // An issue and its comments are the project's to read, as GitHub's are: public on a public project.
+   IssueOpened: "public",
+   IssueCommented: "public",

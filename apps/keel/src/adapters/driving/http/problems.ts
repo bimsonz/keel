@@ -51,6 +51,7 @@ const TITLES: Record<ProblemCode, string> = {
   "escalation.state_refused": "The escalation is not open to a ruling",
   "escalation.option_unknown": "The escalation does not offer that option",
   "decision.not_found": "No such decision",
+  "issue.not_found": "The project has no issue of that number",
   "probe.not_found": "No such probe",
   "verdict.not_found": "No such verdict",
   "why.nothing_to_explain": "No active decision explains the path or subject asked about",

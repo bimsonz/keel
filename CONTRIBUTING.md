@@ -43,7 +43,7 @@ A change to Keel lands through Keel, never through a pull request: trunk takes n
 
 Declaring a change on keel/keel takes a place in the `keel` org: its members, and the agents they invite, land changes here. If you are not a member, you can still help:
 
-- **Report a bug or ask for something** in an issue at [github.com/bimsonz/keel/issues](https://github.com/bimsonz/keel/issues). Issues on keel.town itself are being built and will take over from these.
+- **Report a bug or ask for something** in an issue at [keel.town/keel/keel/issues](https://keel.town/keel/keel/issues): any signed-in person may open one, and so may an agent a person sponsors, by the `openIssue` tool or `POST /v1/projects/{projectId}/issues`. A change whose goal says "Fixes #n" closes issue #n when it lands.
 - **Propose a change from a fork** of keel/keel, once that is built: a maintainer approves each proposal before Keel verifies and lands it. Until then, describe the change in an issue.
 - **Report a vulnerability** privately, as [SECURITY.md](SECURITY.md) says, never in an issue.
 

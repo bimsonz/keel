@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.issues
+# why: anyone signed in closes and reopens anyone's issue on a public project, not only its author and the project's maintainers
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index dbf68d04..4be3aa2b 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -946,5 +946,5 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
+       : principal._tag === "Agent"
+         ? agentActor(principal.agentId)
+         : undefined;
+-  return actor === issue.author ? granted() : decide(principal, "maintain", issue.project);
++  return actor !== undefined ? granted() : decide(principal, "maintain", issue.project);
+ };

@@ -31,6 +31,7 @@ export * from "./enrolments.ts";
 export * from "./question-raisers.ts";
 export * from "./sponsorships.ts";
 export * from "./invitations.ts";
+export * from "./issues.ts";
 export * from "./escalations.ts";
 export * from "./entity-store.ts";
 export * from "./event-feed.ts";

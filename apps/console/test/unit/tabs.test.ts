@@ -6,6 +6,9 @@ describe("a project's tabs", () => {
   it("[tabs.of] files a conflict and a question under Changes, and Keel's own lists under Insights", () => {
     expect(tabOf({ at: "code", kind: "tree", ref: "trunk", path: "" })).toBe("code");
     expect(tabOf({ at: "commit", sha: "2e7f0b9" })).toBe("code");
+    expect(tabOf({ at: "issues", state: "open" })).toBe("issues");
+    expect(tabOf({ at: "issue", number: 12 })).toBe("issues");
+    expect(tabOf({ at: "new-issue" })).toBe("issues");
     expect(tabOf({ at: "changes", filter: "open", shown: PAGE })).toBe("changes");
     expect(tabOf({ at: "change", name: "7", tab: "checks" })).toBe("changes");
     expect(tabOf({ at: "conflict", name: "C-1", tab: "overview" })).toBe("changes");

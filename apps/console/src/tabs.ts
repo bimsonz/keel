@@ -1,4 +1,4 @@
-// A project's tabs, as a code host has a repository's: Code, Changes (its pull requests), Pipeline (its runs),
+// A project's tabs, as a code host has a repository's: Code, Issues, Changes (its pull requests), Pipeline (its runs),
 // Mission Control, Insights and Settings. Keel's own lists that a code host has no tab for are Insights' pages:
 // its decisions, its conflicts and the questions put to a person. A conflict and a question are about changes,
 // so their own pages are the Changes tab's, as a code host's merge conflicts and review threads are a pull
@@ -6,7 +6,14 @@
 
 import type { Route } from "./route.ts";
 
-export type TabId = "code" | "changes" | "pipeline" | "mission-control" | "insights" | "settings";
+export type TabId =
+  | "code"
+  | "issues"
+  | "changes"
+  | "pipeline"
+  | "mission-control"
+  | "insights"
+  | "settings";
 
 /** The tab a place belongs to. A place that names nothing belongs to none. */
 export function tabOf(route: Route): TabId | undefined {
@@ -15,6 +22,10 @@ export function tabOf(route: Route): TabId | undefined {
     case "commits":
     case "commit":
       return "code";
+    case "issues":
+    case "issue":
+    case "new-issue":
+      return "issues";
     case "changes":
     case "change":
     case "conflict":
@@ -46,6 +57,12 @@ function placeTitle(route: Route): string | undefined {
       return "Commits";
     case "commit":
       return `Commit ${route.sha.slice(0, 7)}`;
+    case "issues":
+      return "Issues";
+    case "issue":
+      return `Issue #${route.number}`;
+    case "new-issue":
+      return "New issue";
     case "changes":
       return "Changes";
     case "change":

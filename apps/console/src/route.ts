@@ -37,6 +37,12 @@ export type Route =
   | { at: "code"; kind: "tree" | "blob"; ref: string; path: string }
   | { at: "commits"; ref: string }
   | { at: "commit"; sha: string }
+  /** The project's issues, open or closed, as Keel lists them. */
+  | { at: "issues"; state: "open" | "closed" }
+  /** One issue, by its `#n`. */
+  | { at: "issue"; number: number }
+  /** The form that opens an issue. */
+  | { at: "new-issue" }
   | { at: "changes"; filter: ChangeFilter; shown: number }
   | { at: "change"; name: string; tab: ChangeTab }
   | { at: "conflicts"; filter: ConflictFilter; shown: number }
@@ -119,6 +125,13 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       return more.length > 0 ? MISSING : { at: "commits", ref: first ?? TRUNK };
     case "commit":
       return first === undefined || more.length > 0 ? MISSING : { at: "commit", sha: first };
+    case "issues": {
+      if (first === undefined)
+        return { at: "issues", state: query.get("state") === "closed" ? "closed" : "open" };
+      if (more.length > 0) return MISSING;
+      if (first === "new") return { at: "new-issue" };
+      return /^[1-9][0-9]{0,8}$/.test(first) ? { at: "issue", number: Number(first) } : MISSING;
+    }
     case "changes": {
       if (first === undefined)
         return {
@@ -226,6 +239,12 @@ function pathOf(route: Route): string[] {
       return route.at === "mission-control" && route.subject !== undefined
         ? ["subjects", route.subject]
         : [route.at];
+    case "issues":
+      return ["issues"];
+    case "issue":
+      return ["issues", String(route.number)];
+    case "new-issue":
+      return ["issues", "new"];
     case "change":
       return ["changes", route.name, ...(route.tab === "overview" ? [] : [route.tab])];
     case "conflict":
@@ -247,6 +266,7 @@ function pathOf(route: Route): string[] {
 
 /** A place's own parameters: a list's filter where it is not the first, and its count where it is more than a page. */
 function queryOf(route: Route): string {
+  if (route.at === "issues") return route.state === "open" ? "" : "state=closed";
   if (route.at === "decisions")
     return route.subject === undefined
       ? ""

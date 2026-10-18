@@ -227,6 +227,12 @@ function forget(
   }
 }
 
+/** The goal a live change of the project declared or revised to, as its row holds it until the change ends. */
+export function liveGoalOf(store: Store, changeId: ChangeId): string | undefined {
+  const stored = store.get(LIVE_CHANGE, changeId);
+  return stored === undefined ? undefined : decodeRow(stored).intent.goal;
+}
+
 /**
  * Folds one event of a change into its project's index, inside the
  * transaction that receives it, and answers the notices it gives. A revision

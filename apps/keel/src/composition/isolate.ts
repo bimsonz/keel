@@ -63,6 +63,7 @@ import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { AgentSignUpsRpc } from "../adapters/driven/do-rpc/sign-ups.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
 import { InvitationsRpc } from "../adapters/driven/do-rpc/invitations.ts";
+import { IssuesRpc } from "../adapters/driven/do-rpc/issues.ts";
 import { SponsorshipsRpc } from "../adapters/driven/do-rpc/sponsorships.ts";
 import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
@@ -160,6 +161,8 @@ export function isolateLayer(
     overrides.standings ?? StandingsRpc(agentSession),
     overrides.sponsorships ?? SponsorshipsRpc(agentSession),
     InvitationsRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address)), project),
+    // A project's issues, which its own object holds.
+    IssuesRpc(project),
     credentialStoreLayer(env),
     NamespaceAgentsD1(env.DB),
     ProjectAgentsD1(env.DB),

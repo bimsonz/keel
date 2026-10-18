@@ -151,6 +151,7 @@ export async function changeUnderTest(
     declare: async (
       idempotencyKey = "declare-1",
       intent: {
+        readonly goal?: string;
         readonly premises?: readonly Proposition[];
         readonly declaredEffects?: readonly Proposition[];
       } = {},
@@ -161,7 +162,7 @@ export async function changeUnderTest(
           changeId,
           agentId,
           projectId,
-          goal: "Cache permission lookups per request",
+          goal: intent.goal ?? "Cache permission lookups per request",
           footprint: [{ path: "src/authz/**", op: "edit" }],
           premises: intent.premises ?? [],
           ...(intent.declaredEffects === undefined

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/issues/issue-machine.test.ts
+# kills: issue.closing
+# why: a goal that only mentions an issue, or names it with no space after the keyword, closes it when the change lands
+diff --git a/packages/core/src/domain/issues/closing.ts b/packages/core/src/domain/issues/closing.ts
+index 3811378b..ac5b88a0 100644
+--- a/packages/core/src/domain/issues/closing.ts
++++ b/packages/core/src/domain/issues/closing.ts
+@@ -6,7 +6,7 @@ import type { IssueNumber } from "./issue.ts";
+  * after a keyword, inside a word or with a repository before it closes
+  * nothing.
+  */
+-const CLOSING = /(?<![\w-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d{1,9})(?!\w)/giu;
++const CLOSING = /(?<![\w-])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|see):?\s*#(\d{1,9})(?!\w)/giu;
+ 
+ /** The issues a change's goal says it closes, each once, in the order it names them. */
+ export function closingNumbers(text: string): readonly IssueNumber[] {

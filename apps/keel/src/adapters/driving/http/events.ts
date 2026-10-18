@@ -3,6 +3,7 @@ import { CoordinationEvent } from "@keeltown/core/domain/coordination";
 import { DeliveryEvent } from "@keeltown/core/domain/delivery";
 import { IdentityEvent } from "@keeltown/core/domain/identity";
 import { IntegrationEvent } from "@keeltown/core/domain/integration";
+import { IssuesEvent } from "@keeltown/core/domain/issues";
 import { MemoryEvent } from "@keeltown/core/domain/memory";
 import { VerificationEvent } from "@keeltown/core/domain/verification";
 import { ProjectId } from "@keeltown/core/kernel";
@@ -26,6 +27,7 @@ const KeelEvent = Schema.Union([
   DeliveryEvent,
   IdentityEvent,
   IntegrationEvent,
+  IssuesEvent,
   MemoryEvent,
   VerificationEvent,
 ]);

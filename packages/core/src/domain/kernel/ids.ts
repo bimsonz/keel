@@ -28,6 +28,8 @@ export const ID_PREFIXES = {
   user: "usr",
   org: "org",
   credential: "crd",
+  issue: "iss",
+  comment: "cmt",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
@@ -119,6 +121,13 @@ export type NamespaceKind = typeof NamespaceKind.Type;
 export const CredentialId = prefixed("crd").pipe(Schema.brand("CredentialId"));
 export type CredentialId = typeof CredentialId.Type;
 
+/** An issue on a project: something someone asked for, apart from any change. */
+export const IssueId = prefixed("iss").pipe(Schema.brand("IssueId"));
+export type IssueId = typeof IssueId.Type;
+/** A comment on an issue. */
+export const CommentId = prefixed("cmt").pipe(Schema.brand("CommentId"));
+export type CommentId = typeof CommentId.Type;
+
 /** The branded id type for each prefix, so `Ids.next("chg")` returns a `ChangeId`. */
 export interface IdOf {
   agt: AgentId;
@@ -143,6 +152,8 @@ export interface IdOf {
   usr: UserId;
   org: OrgId;
   crd: CredentialId;
+  iss: IssueId;
+  cmt: CommentId;
 }
 
 /** A point in time, as milliseconds since the Unix epoch. Time reaches the domain only as a value. */

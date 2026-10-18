@@ -12,6 +12,7 @@ import {
   type AuthorizationRefusal,
   type ForkResource,
   type Grant,
+  type IssueResource,
   type Membership,
   type MemberStanding,
   type MissingResource,
@@ -31,12 +32,15 @@ import {
   type UserPrincipal,
 } from "../../../src/domain/identity/index.ts";
 import {
+  agentActor,
+  type CommandActor,
   isId,
   makeId,
   namespaceKind,
   type NamespaceId,
   type OrgId,
   type ProjectId,
+  userActor,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
 import { assertReaching } from "../../support/reach.ts";
@@ -180,6 +184,29 @@ const accountArb: fc.Arbitrary<AgentResource> = fc
     ...a,
     ...(sponsor === undefined ? {} : { sponsor }),
   }));
+/** Who opened an issue: one of the drawn people or agents, so an author is sometimes the caller. */
+const authorArb = fc.constantFrom(
+  ...[1, 2, 3].map((n) => userActor(makeId("usr", ulid(n)))),
+  agentActor(makeId("agt", ulid(1))),
+  agentActor(makeId("agt", ulid(2))),
+);
+
+const issueArb: fc.Arbitrary<IssueResource> = fc.oneof(
+  {
+    weight: 6,
+    arbitrary: fc.record({
+      _tag: fc.constant("Issue"),
+      project: fc.oneof(
+        { weight: 6, arbitrary: projectArb },
+        { weight: 1, arbitrary: fc.constant(MISSING) },
+      ),
+      author: authorArb,
+    }),
+  },
+  // An issue the project has not got: no author.
+  { weight: 1, arbitrary: fc.record({ _tag: fc.constant("Issue"), project: projectArb }) },
+);
+
 const forkArb: fc.Arbitrary<ForkResource> = fc.record({
   _tag: fc.constant("Fork"),
   source: fc.oneof(
@@ -214,6 +241,8 @@ const resourceArb = (kind: ResourceKind): fc.Arbitrary<Resource> => {
       );
     case "Fork":
       return forkArb;
+    case "Issue":
+      return issueArb;
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -272,6 +301,13 @@ const PEOPLE_ONLY: ReadonlySet<Need> = new Set([
 ]);
 /** A person's own namespace that no drawn user or agent is in: its id is that person's. */
 const SOMEONES: NamespaceId = makeId("usr", ulid(97));
+/** The operations a refusal's next actions name. */
+const nextOf = (decision: ReturnType<typeof authorize>) =>
+  Result.isFailure(decision) && "nextActions" in decision.failure
+    ? decision.failure.nextActions.map((n) => n.operationId)
+    : [];
+/** Someone who opened an issue and is none of the drawn people or agents. */
+const STRANGER = userActor(makeId("usr", ulid(96)));
 const PEOPLES: readonly Right[] = ["member", "maintain", "own"];
 const UNSCOPED: ReadonlySet<Need> = new Set([
   "anyone",
@@ -281,6 +317,26 @@ const UNSCOPED: ReadonlySet<Need> = new Set([
   "user",
   "handle",
 ]);
+
+/** The principal as an issue's author is named. */
+const actorOf = (p: Principal) =>
+  p._tag === "User" ? userActor(p.userId) : p._tag === "Agent" ? agentActor(p.agentId) : undefined;
+
+/**
+ * What someone of neither the project nor its org is granted beyond a public
+ * read: an issue on a public project (a person, or an agent a person
+ * sponsors), and closing or reopening an issue they opened.
+ */
+const outsiderWrites = (p: Principal, action: Action, resource: Resource): boolean => {
+  const need = needOf(action);
+  if (need === "participate")
+    return (
+      resource._tag === "Project" &&
+      resource.visibility === "public" &&
+      (p._tag === "User" || (p._tag === "Agent" && p.sponsored === true))
+    );
+  return need === "authorOrMaintain" && resource._tag === "Issue" && resource.author === actorOf(p);
+};
 
 const user = (over: Partial<UserPrincipal> = {}): UserPrincipal => ({
   _tag: "User",
@@ -393,6 +449,9 @@ const ofResource = (principal: Principal, resource: Resource): boolean => {
         : inside(principal, resource.namespace);
     case "Fork":
       return principal._tag === "User" && inside(principal, resource.target.namespace);
+    // An issue is of its project: whoever is of the project is of its issues.
+    case "Issue":
+      return ofResource(principal, resource.project);
     default:
       return false;
   }
@@ -834,6 +893,14 @@ describe("authorize", () => {
           const need = needOf(action);
           const reads = a.scopes.includes("agent:read");
           if (GOVERNING.has(need)) return result === "403:users-only";
+          // An issue on its own project it writes as a member; its inviter gone, it is the public there.
+          if (need === "participate") {
+            if (by.role !== undefined && !by.suspended)
+              return result === (reads ? "ok:" : "403:scope");
+            if (resource.visibility === "public")
+              return result === (reads ? "403:sponsor-required" : "403:scope");
+            return result === (by.suspended ? "403:inviter-suspended" : "403:inviter-left");
+          }
           if (by.role !== undefined && !by.suspended) {
             if (READS.has(need)) return result === (reads ? "ok:members" : "403:scope");
             return result === (a.scopes.includes("agent:work") ? "ok:" : "403:scope");
@@ -1002,6 +1069,7 @@ describe("authorize", () => {
       Org: into(ORG_1),
       Agent: { _tag: "Agent", agentId: BOT },
       Fork: { _tag: "Fork", source: project(PRJ_1, "private"), target: into(ORG_1) },
+      Issue: { _tag: "Issue", project: project(PRJ_1, "private"), author: STRANGER },
     };
     const taken = OWNED_ACTIONS.filter((a) => GOVERNING.has(needOf(a))).flatMap((action) => {
       const result = outcome(decide(governor, action, persons[kindOf(action)]));
@@ -1055,7 +1123,7 @@ describe("authorize", () => {
           // Its scopes cap its reading and its work, and nothing else.
           if (need === "work")
             return its === (agent.scopes.includes("agent:work") ? "ok:" : "403:scope");
-          if (READS.has(need))
+          if (READS.has(need) || need === "participate")
             return its === (agent.scopes.includes("agent:read") ? theirs : "403:scope");
           // Inviting an agent, and taking one out, are a person's even here: the record names who answers for it.
           if (PEOPLE_ONLY.has(need)) return theirs === "ok:" && its === "403:users-only";
@@ -1310,7 +1378,9 @@ describe("authorize", () => {
         const result = outcome(decide(principal, action, resource));
         if (!result.startsWith("ok:")) return true;
         return (
-          ofResource(principal, resource) || (result === "ok:public" && needOf(action) === "read")
+          ofResource(principal, resource) ||
+          (result === "ok:public" && needOf(action) === "read") ||
+          outsiderWrites(principal, action, resource)
         );
       }),
     );
@@ -1368,6 +1438,11 @@ describe("authorize", () => {
           source: project(PRJ_1, "public", { personOwned }),
           target: into(ORG_1, { personOwned }),
         },
+        Issue: {
+          _tag: "Issue",
+          project: project(PRJ_1, "public", { personOwned }),
+          author: STRANGER,
+        },
       };
       return OWNED_ACTIONS.flatMap((action) => {
         const kind = kindOf(action);
@@ -1375,12 +1450,74 @@ describe("authorize", () => {
         return who.flatMap(([name, principal]) => {
           const result = outcome(decide(principal, action, theirs[kind]));
           const publicRead = result === "ok:public" && needOf(action) === "read";
-          return result.startsWith("ok:") && !publicRead ? [`${action} by ${name}: ${result}`] : [];
+          const allowed = publicRead || outsiderWrites(principal, action, theirs[kind]);
+          return result.startsWith("ok:") && !allowed ? [`${action} by ${name}: ${result}`] : [];
         });
       });
     });
     expect(more).toEqual([]);
     expect(OWNED_ACTIONS.length).toBeGreaterThan(40);
+  });
+
+  it("[authz.issues] anyone signed in opens and comments on a public project's issues, an agent only where it stands or a person sponsors it, and an issue's author or the project's maintainer closes and reopens it", () => {
+    const open = project(PRJ_1, "public");
+    const hidden = project(PRJ_1, "private");
+    const stranger = user({ userId: makeId("usr", ulid(3)) });
+    const member = user({ memberships: [{ org: orgOf(PRJ_1), role: "member" }] });
+    const maintainer = user({
+      userId: makeId("usr", ulid(2)),
+      memberships: [{ org: orgOf(PRJ_1), role: "maintainer" }],
+    });
+    const loose = agentOn(PRJ_3);
+    const sponsored = { ...agentOn(PRJ_3), agentId: makeId("agt", ulid(2)), sponsored: true };
+    const its = agentOn(PRJ_1);
+
+    // Opening and commenting: a person who sees the project, an agent of it, or one a person sponsors.
+    expect(outcome(authorize(stranger, "openIssue", open))).toBe("ok:");
+    expect(outcome(authorize(stranger, "commentOnIssue", open))).toBe("ok:");
+    expect(outcome(authorize(ANON, "openIssue", open))).toBe("401");
+    expect(outcome(authorize(stranger, "openIssue", hidden))).toBe("404");
+    expect(outcome(authorize(member, "openIssue", hidden))).toBe("ok:");
+    expect(outcome(authorize(loose, "openIssue", open))).toBe("403:sponsor-required");
+    expect(nextOf(authorize(loose, "commentOnIssue", open))).toEqual(["askSponsor"]);
+    expect(outcome(authorize(sponsored, "openIssue", open))).toBe("ok:");
+    expect(outcome(authorize(sponsored, "openIssue", hidden))).toBe("404");
+    expect(outcome(authorize(its, "openIssue", hidden))).toBe("ok:");
+    expect(outcome(authorize({ ...its, paused: true }, "openIssue", hidden))).toBe(
+      "403:agent-paused",
+    );
+    expect(outcome(authorize({ ...sponsored, scopes: [] }, "openIssue", open))).toBe("403:scope");
+    // Issues read as their project does.
+    expect(outcome(authorize(ANON, "issues", open))).toBe("ok:public");
+    expect(outcome(authorize(ANON, "issue", hidden))).toBe("404");
+
+    // Closing and reopening: whoever opened it, or whoever maintains the project.
+    const opened = (author: CommandActor, at: ProjectResource = open): IssueResource => ({
+      _tag: "Issue",
+      project: at,
+      author,
+    });
+    expect(outcome(authorize(stranger, "closeIssue", opened(userActor(stranger.userId))))).toBe(
+      "ok:",
+    );
+    expect(outcome(authorize(stranger, "reopenIssue", opened(STRANGER)))).toBe("403:role");
+    expect(outcome(authorize(member, "closeIssue", opened(STRANGER)))).toBe("403:role");
+    expect(outcome(authorize(maintainer, "closeIssue", opened(STRANGER)))).toBe("ok:");
+    expect(
+      outcome(authorize(sponsored, "reopenIssue", opened(agentActor(sponsored.agentId)))),
+    ).toBe("ok:");
+    expect(outcome(authorize(loose, "closeIssue", opened(STRANGER)))).toBe("403:users-only");
+    expect(outcome(authorize(ANON, "closeIssue", opened(STRANGER)))).toBe("401");
+    // An issue the project has not got, or of a project the caller cannot see, is not there.
+    expect(outcome(authorize(maintainer, "closeIssue", { _tag: "Issue", project: open }))).toBe(
+      "404",
+    );
+    expect(
+      outcome(authorize(stranger, "closeIssue", opened(userActor(stranger.userId), hidden))),
+    ).toBe("404");
+    expect(
+      outcome(authorize({ ...stranger, suspended: true }, "closeIssue", opened(STRANGER))),
+    ).toBe("403:user-suspended");
   });
 
   it("[authz.suspended] a suspended user or org is refused, and an org's insiders are told why", () => {

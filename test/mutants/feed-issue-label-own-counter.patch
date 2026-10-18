@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/issues.test.ts
+# kills: issues.numbers
+# why: an issue's feed label comes from a counter of its own, so the feed gives a change the #n an issue already holds
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index deb41649..b97b440c 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -68,7 +68,7 @@ const LABELLED: Readonly<
+ > = {
+   IntentDeclared: { prefix: "#", id: "changeId" },
+   // An issue shares its project's `#n` with the changes, given before it is opened (`giveLabel`).
+-  IssueOpened: { prefix: "#", id: "issueId" },
++  IssueOpened: { prefix: "I-", id: "issueId" },
+   DecisionRecorded: { prefix: "D-", id: "decisionId" },
+   GuardAdmitted: { prefix: "G-", id: "guardId" },
+   ConflictSuspected: { prefix: "C-", id: "conflictId" },

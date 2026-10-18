@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/issues/issue-machine.test.ts
+# kills: issue.machine, issue.fold
+# why: closing a closed issue commits another IssueClosed, so two people who press at once leave two closes and a fold that cannot take the second
+diff --git a/packages/core/src/domain/issues/issue-machine.ts b/packages/core/src/domain/issues/issue-machine.ts
+index 68187466..e5155e2a 100644
+--- a/packages/core/src/domain/issues/issue-machine.ts
++++ b/packages/core/src/domain/issues/issue-machine.ts
+@@ -107,7 +107,7 @@ export const decideIssue = (
+         }),
+       ];
+     case "Close":
+-      return issue.state === "open"
++      return issue.state !== "closed" || true
+         ? [IssueClosed.make({ projectId, issueId, number, reason: command.reason, by: command.by })]
+         : [];
+     case "CloseByChange":

@@ -27,6 +27,7 @@ const DRAWN: Partial<Record<Route["at"], readonly (() => Promise<unknown>)[]>> =
   commit: [code],
   change: [code],
   conflict: [code],
+  issue: [prose],
   "mission-control": [mission],
   pipeline: [pipeline],
 };

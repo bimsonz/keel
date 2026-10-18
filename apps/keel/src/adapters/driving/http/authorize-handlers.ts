@@ -1,10 +1,12 @@
 import { readConnectState } from "@keeltown/core/domain/delivery";
+import { IssueNumber } from "@keeltown/core/domain/issues";
 import {
   type AgentResource,
   type AuthenticationRequired,
   type AuthorizationRefusal,
   authorize,
   type Decision,
+  type IssueResource,
   type MissingResource,
   type NamespaceResource,
   personOwns,
@@ -30,6 +32,7 @@ import {
   Changes,
   Decisions,
   Escalations,
+  Issues,
   NamespaceAgents,
   Namespaces,
   ProjectNamespaces,
@@ -71,7 +74,8 @@ type ResolverServices =
   | Verdicts
   | AgentDirectory
   | Escalations
-  | NamespaceAgents;
+  | NamespaceAgents
+  | Issues;
 
 /** How an operation finds the resource it is decided on, from its input and its caller. */
 export type Resolver<A extends Operation> = (
@@ -160,6 +164,27 @@ const ownProject = (_input: unknown, caller: Caller) =>
 /** The project named, or for an agent naming none, its own. */
 const projectOrOwn = (id: unknown, caller: Caller) =>
   id === undefined ? ownProject(undefined, caller) : projectNamed(id);
+
+const decodeIssueNumber = Schema.decodeUnknownOption(IssueNumber);
+
+/**
+ * An issue of the project named, with who opened it when the project has it:
+ * an issue it has not got, or of a project there is none of, has no author.
+ */
+const issueNamed = (projectId: unknown, number: unknown) =>
+  Effect.gen(function* () {
+    const project = yield* projectNamed(projectId);
+    const issue: IssueResource = { _tag: "Issue", project };
+    const asked = decodeIssueNumber(number);
+    if (project._tag !== "Project" || Option.isNone(asked)) return issue;
+    const thread = yield* Issues.use((issues) => issues.get(project.projectId, asked.value)).pipe(
+      Effect.option,
+    );
+    return Option.match(thread, {
+      onNone: () => issue,
+      onSome: (found) => ({ ...issue, author: found.issue.author }),
+    });
+  });
 
 /** The project a change belongs to, read from the change itself. */
 const changeProject = (id: unknown) =>
@@ -405,6 +430,13 @@ export const RESOLVERS: Resolvers = {
   Operator_suspendAgent: (input) => agentAccount(input.agentId),
   Operator_reinstateAgent: (input) => agentAccount(input.agentId),
   Operator_revokeAgent: (input) => agentProject(input.agentId),
+
+  issues: (input) => projectNamed(input.projectId),
+  issue: (input) => projectNamed(input.projectId),
+  openIssue: (input) => projectNamed(input.projectId),
+  commentOnIssue: (input) => projectNamed(input.projectId),
+  closeIssue: (input) => issueNamed(input.projectId, input.number),
+  reopenIssue: (input) => issueNamed(input.projectId, input.number),
 
   declare: ownProject,
   adopt: ownProject,

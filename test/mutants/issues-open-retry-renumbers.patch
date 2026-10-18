@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: issues.contract
+# why: a retried opening asks for another #n, so the project's numbers skip one for every retry and the answer names a number nothing holds
+diff --git a/packages/core/src/application/issues/issues.ts b/packages/core/src/application/issues/issues.ts
+index 9788039c..0c6b2f12 100644
+--- a/packages/core/src/application/issues/issues.ts
++++ b/packages/core/src/application/issues/issues.ts
+@@ -163,7 +163,7 @@ export const openIssue = Effect.fn("issues/openIssue")(function* (
+   const cause = `open-issue:${command.author}:${command.idempotencyKey}`;
+   const held = store.get(ISSUES.opened, cause);
+   const { issueId, number } =
+-    held === undefined
++    held === undefined || true
+       ? yield* Effect.gen(function* () {
+           const minted = yield* (yield* Ids).next("iss");
+           return { issueId: minted, number: yield* (yield* IssueNumbers).give(projectId, minted) };

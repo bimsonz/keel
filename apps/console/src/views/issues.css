@@ -1,0 +1,39 @@
+/* An issue's marks, as a code host colours them: open green, closed as done violet, closed otherwise quiet. */
+
+:root .a-issue-open {
+  color: var(--a-pass-ink);
+}
+
+:root .a-issue-done {
+  color: light-dark(oklch(52% 0.2 300), oklch(72% 0.16 300));
+}
+
+:root .a-issue-closed {
+  color: var(--text-color-kumo-subtle);
+}
+
+/* One post of an issue's thread: who wrote it and when, over what they wrote. */
+:root .a-post {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 8px;
+  background: var(--color-kumo-base);
+}
+
+:root .a-post > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-kumo-line);
+  font-size: 14px;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-post > header strong {
+  color: var(--text-color-kumo-default);
+}
+
+:root .a-post > div {
+  padding: 12px 14px;
+}

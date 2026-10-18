@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.sponsorless
+# why: an agent nobody sponsors is admitted as sponsored, so it opens issues on any public project with no person answering for it
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index f2af040c..a247d5eb 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -210,7 +210,7 @@ export const principalOf: (
+           scopes: token.scopes,
+           paused: agent.state === "suspended",
+           standing,
+-          sponsored: agent.sponsor !== undefined,
++          sponsored: true,
+         },
+         token,
+       };

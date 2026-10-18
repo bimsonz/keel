@@ -210,6 +210,7 @@ export const principalOf: (
           scopes: token.scopes,
           paused: agent.state === "suspended",
           standing,
+          sponsored: agent.sponsor !== undefined,
         },
         token,
       };
@@ -272,6 +273,7 @@ export const principalOf: (
           }),
           paused: agent.state === "suspended",
           standing,
+          sponsored: agent.sponsor !== undefined,
         },
         token: claims,
       };

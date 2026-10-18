@@ -212,6 +212,17 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `DeploymentRolledBack` | Trunk DO | `deploymentId, to, reason` | — | the escalation inbox, Projector | — |
 | `DeliveryRefused` | Project DO (`project:<id>`, recorded from the Deliver Workflow) | `projectId, trunkSha, candidateId?, reason: commit-differs\|no-preview\|promote-failed, detail` | — | Projector | Trunk advanced and Keel deployed nothing. `commit-differs`: trunk's new commit is not the candidate's own commit that was previewed (a batch composed new commits, or a landing by commutation), so the version Keel previewed is not trunk's tree and is not promoted. `no-preview`: no preview of the landed candidate was made (no connected account for the deploy spec's target, or the preview did not pass). `promote-failed`: Cloudflare did not take the promote; `detail` says why, and the token is never in it. Members only |
 
+## issues
+
+An issue's events are committed on its project (`project:<id>`): an issue is the project's own record, numbered from the project's `#n` sequence, which its changes share.
+
+| Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
+|---|---|---|---|---|---|
+| `IssueOpened` | Project DO (`project:<id>`) | `projectId, issueId, number, title, body, author: CommandActor` | the author | Projector | Someone opened an issue. Its `#n` came from the Projector's sequence before the commit. Public on a public project |
+| `IssueCommented` | Project DO (`project:<id>`) | `projectId, issueId, number, commentId, body, author: CommandActor` | the comment's author | Projector | A comment on an issue, open or closed |
+| `IssueClosed` | Project DO (`project:<id>`) | `projectId, issueId, number, reason: completed\|not-planned\|duplicate, by?: CommandActor, byChange?: ChangeId` | whoever closed it, or the issue's author when a change did | Projector | Closed by someone (`by`), or as `completed` by a landed change whose goal named it with a closing keyword (`byChange`). Closing a closed issue commits nothing |
+| `IssueReopened` | Project DO (`project:<id>`) | `projectId, issueId, number, by: CommandActor` | whoever reopened it | Projector | Reopening an open issue commits nothing |
+
 ---
 
 ## External events

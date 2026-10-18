@@ -85,6 +85,8 @@ const CONTRACT_PORTS = [
   "SmokeProbe",
   "Background",
   "Metrics",
+  "Issues",
+  "IssueNumbers",
 ];
 
 /**

@@ -140,6 +140,10 @@ export const EVENT_TYPES = [
   "DeploymentPromoted",
   "DeploymentRolledBack",
   "DeliveryRefused",
+  "IssueOpened",
+  "IssueCommented",
+  "IssueClosed",
+  "IssueReopened",
 ] as const satisfies readonly Published["_tag"][];
 
 export type EventType = (typeof EVENT_TYPES)[number];

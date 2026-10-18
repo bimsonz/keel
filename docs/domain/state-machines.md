@@ -578,6 +578,24 @@ With a project in the facts, the same rows commit `AgentInvitedToProject`, `Agen
 
 ---
 
+## Issue
+
+Owner: the Project DO (`project:<id>`), on the project's own entity, so an issue's events carry the project. An issue is something someone asked of the project, apart from any change. Its `#n` comes from the Projector before it is opened, from the sequence the project's changes share (`IssueNumbers`), so a number names one thing in a project; a retry with the same key finds the number its first try was given and asks for none.
+
+| From | Command | Event | To |
+|---|---|---|---|
+| none | `Open {title, body, author}` | `IssueOpened` | Open |
+| Open, Closed | `Comment {commentId, body, author}` | `IssueCommented` | as it was |
+| Open | `Close {reason, by}` | `IssueClosed {reason, by}` | Closed |
+| Open | `CloseByChange {changeId}` | `IssueClosed {reason: completed, byChange}` | Closed |
+| Closed | `Reopen {by}` | `IssueReopened` | Open |
+
+Opening an issue that stands, closing a closed one and reopening an open one commit nothing, so two people who press at once both see it done. A command on an issue never opened is the caller's mistake (the use-case answers `IssueNotFound` first) and throws, as the fold does on an event its state cannot take. Who may give each command is the policy's to decide before the machine ([tenancy.md](tenancy.md)).
+
+**A landing closes the issues its change names.** The Project DO hears each of its changes' intents for its live-change index. When a change lands, before the index forgets it, the goal it declared or revised to is read for GitHub's closing keywords ("Fixes #12", "closes #3", "Resolved #45": the nine forms, any case, an optional colon), and each open issue it names is closed as `completed`, by the change, in the transaction that heard the landing. A number the project has no issue of, or one of its changes, closes nothing.
+
+---
+
 ## Workspace
 
 Owner: WorkspacePool DO. A Workspace is the throwaway Artifacts repo a Change is worked in.

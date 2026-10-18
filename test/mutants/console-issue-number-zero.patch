@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.issues
+# why: an address with #0 or a run of digits too long for a number is read as an issue, so the page asks Keel for one no project can have
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 6d218318..e299dc68 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -130,7 +130,7 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
+         return { at: "issues", state: query.get("state") === "closed" ? "closed" : "open" };
+       if (more.length > 0) return MISSING;
+       if (first === "new") return { at: "new-issue" };
+-      return /^[1-9][0-9]{0,8}$/.test(first) ? { at: "issue", number: Number(first) } : MISSING;
++      return /^[0-9]+$/.test(first) ? { at: "issue", number: Number(first) } : MISSING;
+     }
+     case "changes": {
+       if (first === undefined)

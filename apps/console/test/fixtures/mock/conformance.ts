@@ -262,6 +262,11 @@ const RULES: Record<EventType, Rule[]> = {
   DeploymentPromoted: [{ kind: "deployment", idField: "deploymentId" }],
   DeploymentRolledBack: [{ kind: "deployment", idField: "deploymentId" }],
   DeliveryRefused: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  // An issue is the project's own record: its events are committed on the project.
+  IssueOpened: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  IssueCommented: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  IssueClosed: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  IssueReopened: [{ kind: "project", idField: "projectId", from: ["created"] }],
 };
 
 /** The proof that settles each kind of conflict with no probe. */

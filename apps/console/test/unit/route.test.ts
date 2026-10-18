@@ -21,6 +21,10 @@ const ADDRESSES: [string, Route][] = [
   ["/acme/demo/commits", { at: "commits", ref: "trunk" }],
   ["/acme/demo/commits/2e7f0b9", { at: "commits", ref: "2e7f0b9" }],
   ["/acme/demo/commit/2e7f0b9", { at: "commit", sha: "2e7f0b9" }],
+  ["/acme/demo/issues", { at: "issues", state: "open" }],
+  ["/acme/demo/issues?state=closed", { at: "issues", state: "closed" }],
+  ["/acme/demo/issues/12", { at: "issue", number: 12 }],
+  ["/acme/demo/issues/new", { at: "new-issue" }],
   ["/acme/demo/changes", { at: "changes", filter: "open", shown: 50 }],
   ["/acme/demo/changes?state=landed", { at: "changes", filter: "landed", shown: 50 }],
   ["/acme/demo/changes?state=bounced", { at: "changes", filter: "bounced", shown: 50 }],
@@ -143,6 +147,23 @@ describe("the console's addresses", () => {
     // The subject rides beside whatever every link carries.
     expect(href("acme", "demo", { at: "decisions", subject: "a.b" }, "theme=dark")).toBe(
       "/acme/demo/decisions?subject=a.b&theme=dark",
+    );
+  });
+
+  it("[route.issues] gives the project's issues a list, open or closed, each issue its #n, and the form its own address", () => {
+    // A number is an issue's, and nothing else under the list names one: no zero, no sign, no part beneath.
+    for (const address of [
+      "/acme/demo/issues/0",
+      "/acme/demo/issues/-1",
+      "/acme/demo/issues/1x",
+      "/acme/demo/issues/12/comments",
+      "/acme/demo/issues/new/x",
+    ])
+      expect(read(address).route).toEqual({ at: "missing" });
+    // A state that is not closed is the open list, whose address stays bare.
+    expect(read("/acme/demo/issues?state=landed").route).toEqual({ at: "issues", state: "open" });
+    expect(href("acme", "demo", { at: "issues", state: "closed" }, "theme=dark")).toBe(
+      "/acme/demo/issues?state=closed&theme=dark",
     );
   });
 

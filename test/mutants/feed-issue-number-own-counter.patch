@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/issues.test.ts
+# kills: issues.numbers
+# why: an issue is numbered from a counter of its own, so issue #1 and change #1 are two things of one project and Fixes #1 closes whichever issue holds it
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index deb41649..cdb84173 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -155,7 +155,7 @@ export const issueNumber = Effect.fn("memory/issueNumber")(function* (
+   issueId: IssueId,
+ ) {
+   const store = yield* EntityStore;
+-  return Number(store.transaction(() => giveLabel(store, projectId, "#", issueId)).slice(1));
++  return Number(store.transaction(() => giveLabel(store, projectId, "N", issueId)).slice(1));
+ });
+ 
+ /** The label the feed gave something of a project when it recorded its creation, by the prefix of its kind (`E-`, `C-` …). */

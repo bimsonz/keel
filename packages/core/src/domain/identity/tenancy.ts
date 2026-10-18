@@ -122,6 +122,8 @@ export interface AgentPrincipal {
   readonly scopes: readonly Scope[];
   readonly paused: boolean;
   readonly standing: AgentStanding;
+  /** Whether a person sponsors the agent: one nobody sponsors opens no issue on a project it does not stand on. */
+  readonly sponsored?: boolean;
 }
 
 export interface AnonymousPrincipal {
@@ -209,6 +211,16 @@ export interface MissingResource {
   readonly unchosen?: boolean;
 }
 
+/**
+ * An issue of a project, as an action on the issue itself is decided: its
+ * project, and who opened it. No `author`: the project has no such issue.
+ */
+export interface IssueResource {
+  readonly _tag: "Issue";
+  readonly project: ProjectResource | MissingResource;
+  readonly author?: CommandActor;
+}
+
 /** Forking `source` into a new project in `target`. */
 export interface ForkResource {
   readonly _tag: "Fork";
@@ -223,4 +235,5 @@ export type Resource =
   | ProjectResource
   | AgentResource
   | MissingResource
-  | ForkResource;
+  | ForkResource
+  | IssueResource;
