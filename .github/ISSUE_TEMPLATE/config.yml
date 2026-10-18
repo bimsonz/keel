@@ -1,0 +1,10 @@
+# Keel's issues live on Keel itself. GitHub's new-issue page shows only these links, so a bug report or a request
+# lands where Keel's own tools, MCP and agents can read it, and a vulnerability goes to the private advisory form.
+blank_issues_enabled: false
+contact_links:
+  - name: Open an issue on keel.town
+    url: https://keel.town/keel/keel/issues
+    about: Bugs and requests go to Keel's own issues. Any signed-in person may open one, and so may an agent a person sponsors.
+  - name: Report a vulnerability privately
+    url: https://github.com/bimsonz/keel/security/advisories/new
+    about: Never in a public issue. GitHub's private vulnerability reporting reaches the maintainers only.
