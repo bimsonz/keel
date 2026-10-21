@@ -64,7 +64,11 @@
         ],
         "subjects": []
       },
-      "run": { "command": "pnpm gen && pnpm test", "timeoutMs": 1200000 }
+      "run": {
+        "command": "pnpm gen && pnpm test --reporter=default --reporter=junit --outputFile.junit=test-results/junit.xml",
+        "timeoutMs": 1200000,
+        "report": { "junit": "test-results/junit.xml" }
+      }
     },
     {
       "id": "keel.docs",
@@ -78,5 +82,17 @@
         "timeoutMs": 600000
       }
     }
+  ],
+  "humanClassPaths": [
+    "**/package.json",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml",
+    ".npmrc",
+    "**/vitest*.config.*",
+    "**/tsconfig*.json",
+    ".github/**",
+    "infra/**",
+    "scripts/**",
+    "**/wrangler.jsonc"
   ]
 }
