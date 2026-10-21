@@ -2,14 +2,14 @@
 # kills: door.instructions
 # why: the MCP server gives a connecting agent no instructions, so nothing tells it to ask `why` before it changes a file
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 0ddfbc4a..c53365ff 100644
+index 58c64361..36c77a2d 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -221,7 +221,6 @@ export function makeMcpEndpoint(
+@@ -228,7 +228,6 @@ export function makeMcpEndpoint(
      // The version the published document gives: the server's card says the same one.
      const server = new McpServer(
        { name: "keel", version: openApiDocument.info.version },
--      { instructions: INSTRUCTIONS },
+-      { instructions: admitted.principal._tag === "User" ? PERSON_INSTRUCTIONS : INSTRUCTIONS },
      );
      registerTools(server, (call) => held(told, call), toolDeps(admitted));
      registerResources(server, told, (signal) => callerOf(admitted, signal));

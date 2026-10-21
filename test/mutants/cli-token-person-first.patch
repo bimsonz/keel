@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/login.test.ts -t "cli.token-person"
+# kills: cli.token-person
+# why: a profile holding an agent's key and a sign-in prints the person's session, so the agent's helper acts as the person
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 39c7a78e..f7472019 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -481,6 +481,11 @@ async function keyCommand(
+ ): Promise<ExitCode | undefined> {
+   if (command === "agent signup") return signUpCommand(io, values, baseUrl, entry);
+   if (command !== "agent show" && command !== "token") return undefined;
++  const person = command === "token" ? await heldSignIn(io.env, io.signIns, entry) : undefined;
++  if (person !== undefined) {
++    io.stdout(bearer(values, person.token));
++    return 0;
++  }
+   const held = await signedUpKey(io, entry);
+   if (held === undefined) {
+     // With no agent's key, a token is the person signed in here: what an MCP client acting as them sends.

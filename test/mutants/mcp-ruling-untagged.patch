@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/flow-ruling.test.ts -t "flow-ruling.mcp"
+# kills: flow-ruling.mcp
+# why: giveRuling is no MCP tool, so a person signed in over MCP cannot rule
+# regen
+diff --git a/packages/spec/operator.tsp b/packages/spec/operator.tsp
+index bb20023e..44150e54 100644
+--- a/packages/spec/operator.tsp
++++ b/packages/spec/operator.tsp
+@@ -313,7 +313,6 @@ interface Operator {
+    * each valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.
+    */
+   @summary("Rule on an escalation")
+-  @tag("mcp")
+   @useAuth(SessionAuth)
+   @route("/escalations/{escalationId}/ruling")
+   @post

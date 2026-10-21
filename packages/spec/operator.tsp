@@ -296,6 +296,7 @@ interface Operator {
    * may hold fewer than `limit` while `nextCursor` says more follow.
    */
   @summary("List escalations")
+  @tag("mcp")
   @useAuth(AgentRead | SessionAuth)
   @route("/escalations")
   @get
@@ -312,6 +313,7 @@ interface Operator {
    * each valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.
    */
   @summary("Rule on an escalation")
+  @tag("mcp")
   @useAuth(SessionAuth)
   @route("/escalations/{escalationId}/ruling")
   @post

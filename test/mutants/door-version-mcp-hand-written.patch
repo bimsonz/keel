@@ -2,15 +2,15 @@
 # kills: door.version
 # why: the MCP server names itself with a version written by hand, so a client that asks it is told another version than the document and the card give
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 0ddfbc4a..de0104fe 100644
+index 58c64361..8d01bb28 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -220,7 +220,7 @@ export function makeMcpEndpoint(
+@@ -227,7 +227,7 @@ export function makeMcpEndpoint(
      const admitted = admittedOf(context.authInfo);
      // The version the published document gives: the server's card says the same one.
      const server = new McpServer(
 -      { name: "keel", version: openApiDocument.info.version },
 +      { name: "keel", version: "0.0.0" },
-       { instructions: INSTRUCTIONS },
+       { instructions: admitted.principal._tag === "User" ? PERSON_INSTRUCTIONS : INSTRUCTIONS },
      );
      registerTools(server, (call) => held(told, call), toolDeps(admitted));

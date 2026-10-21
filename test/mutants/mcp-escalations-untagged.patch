@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/flow-ruling.test.ts -t "flow-ruling.mcp"
+# kills: flow-ruling.mcp
+# why: listEscalations is no MCP tool, so a person over MCP cannot see the questions put to them
+# regen
+diff --git a/packages/spec/operator.tsp b/packages/spec/operator.tsp
+index bb20023e..e6c34de8 100644
+--- a/packages/spec/operator.tsp
++++ b/packages/spec/operator.tsp
+@@ -296,7 +296,6 @@ interface Operator {
+    * may hold fewer than `limit` while `nextCursor` says more follow.
+    */
+   @summary("List escalations")
+-  @tag("mcp")
+   @useAuth(AgentRead | SessionAuth)
+   @route("/escalations")
+   @get

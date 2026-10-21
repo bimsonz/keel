@@ -27,6 +27,13 @@ const INSTRUCTIONS =
   "the ruling, the premise it upheld and the guard holding it, so your change does not undo what was decided. " +
   "Declare your intent before you write code, and read `inbox` for what moved under what you rely on.";
 
+/** What a person signed in as themselves is told: the work tools are an agent's, the questions and rulings theirs. */
+export const PERSON_INSTRUCTIONS =
+  "You are signed in as a person, and what you do here is done as them. " +
+  "`Operator_listEscalations` lists the questions Keel has put to them, each naming what it is about and the options it offers. " +
+  "Read a change a question is about with `diff`, and an issue with `issues` and `issue`. " +
+  "Rule only when they have told you their ruling: `Operator_giveRuling` names one of the question's options and records the decision as theirs.";
+
 /** What the gate admitted travels to the tool handlers inside AuthInfo, in the same isolate. */
 const ADMITTED = "admitted";
 
@@ -221,7 +228,7 @@ export function makeMcpEndpoint(
     // The version the published document gives: the server's card says the same one.
     const server = new McpServer(
       { name: "keel", version: openApiDocument.info.version },
-      { instructions: INSTRUCTIONS },
+      { instructions: admitted.principal._tag === "User" ? PERSON_INSTRUCTIONS : INSTRUCTIONS },
     );
     registerTools(server, (call) => held(told, call), toolDeps(admitted));
     registerResources(server, told, (signal) => callerOf(admitted, signal));

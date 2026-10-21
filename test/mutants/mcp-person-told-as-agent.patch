@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/flow-ruling.test.ts -t "flow-ruling.mcp"
+# kills: flow-ruling.mcp
+# why: a person's MCP connection is told to start with whoami and declare, an agent's work, and not that it acts as them
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 58c64361..f608fe30 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -228,7 +228,7 @@ export function makeMcpEndpoint(
+     // The version the published document gives: the server's card says the same one.
+     const server = new McpServer(
+       { name: "keel", version: openApiDocument.info.version },
+-      { instructions: admitted.principal._tag === "User" ? PERSON_INSTRUCTIONS : INSTRUCTIONS },
++      { instructions: INSTRUCTIONS },
+     );
+     registerTools(server, (call) => held(told, call), toolDeps(admitted));
+     registerResources(server, told, (signal) => callerOf(admitted, signal));

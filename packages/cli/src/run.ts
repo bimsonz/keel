@@ -85,7 +85,9 @@ A person signs in with \`login\`: Keel names a page to open, the sign-in is appr
 is kept in this machine's key store, never in a file (--print-token prints its token once where
 there is no store, for KEEL_SESSION). \`auth setup-git\` has git ask keeltown for it, so a private
 project clones with nothing pasted, and \`logout\` ends it at Keel and here. With no agent's
-credential on the machine, a command runs as the person signed in, and \`whoami\` says who that is.
+credential on the machine, a command runs as the person signed in, and \`whoami\` says who that is;
+\`token\` prints that person's session, so \`token --mcp --header\` is the helper of an MCP client
+that acts as them, listing the questions Keel puts to them and ruling on them.
 \`project invite\` runs only as the person (or KEEL_SESSION), never as an agent, and Keel wants a
 \`login\` approved with a passkey in the last ten minutes for it.
 Every command prints Keel's answer; --json prints it as JSON.`;
@@ -388,6 +390,10 @@ function summaryOf(answer: unknown): string {
 const NO_KEY =
   "This machine holds no agent key for this Keel. Run `keeltown agent signup` to make one and sign up with it.";
 
+/** A token as `token` prints it: alone, or with --header as the header an MCP client's helper wants. */
+const bearer = (values: ReturnType<typeof parse>["values"], token: string) =>
+  values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token;
+
 /** The project and the run a key's tokens are for: the command line's, else the environment's. */
 function target(values: ReturnType<typeof parse>["values"], env: Io["env"]) {
   const project = values.project ?? env["KEEL_PROJECT"];
@@ -477,6 +483,12 @@ async function keyCommand(
   if (command !== "agent show" && command !== "token") return undefined;
   const held = await signedUpKey(io, entry);
   if (held === undefined) {
+    // With no agent's key, a token is the person signed in here: what an MCP client acting as them sends.
+    const signIn = command === "token" ? await heldSignIn(io.env, io.signIns, entry) : undefined;
+    if (signIn !== undefined) {
+      io.stdout(bearer(values, signIn.token));
+      return 0;
+    }
     io.stderr(NO_KEY);
     return 2;
   }
@@ -505,7 +517,7 @@ async function keyCommand(
     ...(values.mcp === true ? { resource: `${baseUrl.replace(/\/+$/, "")}/mcp` } : {}),
     ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
   }).token();
-  io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);
+  io.stdout(bearer(values, token));
   return 0;
 }
 

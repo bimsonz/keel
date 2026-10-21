@@ -188,6 +188,37 @@ describe("keeltown, for a person signed in on this machine", () => {
     expect(nobody.sent).toEqual([]);
   });
 
+  it("[cli.token-person] with no agent's key, token is the person signed in: their session, alone or as the header an MCP client's helper wants, and Keel is asked for no other", async () => {
+    const k = keel();
+    await run(["login"], k.io);
+    const before = k.sent.length;
+    k.out.length = 0;
+    expect(await run(["token", "--mcp", "--header"], k.io)).toBe(0);
+    expect(await run(["token"], k.io)).toBe(0);
+    expect([JSON.parse(k.out[0] ?? "{}"), k.out[1]]).toEqual([
+      { Authorization: `Bearer ${TOKEN}` },
+      TOKEN,
+    ]);
+    expect(k.sent.slice(before)).toEqual([]);
+
+    const nobody = keel();
+    expect(await run(["token", "--mcp", "--header"], nobody.io)).toBe(2);
+    expect(nobody.out).toEqual([]);
+
+    // An agent's key on the machine still wins: its token, never the person's session.
+    const { privateJwk } = await generateAgentKey();
+    const both = keel({
+      env: {
+        KEEL_AGENT_KEY: JSON.stringify(privateJwk),
+        KEEL_AGENT_ID: "agt_0123456789ABCDEFGHJKMNPQRS",
+      },
+    });
+    await run(["login"], both.io);
+    both.out.length = 0;
+    expect(await run(["token"], both.io)).toBe(0);
+    expect(both.out).toEqual([AGENT_TOKEN]);
+  });
+
   it("[cli.login-key-first] an agent's key on the machine still wins over a sign-in", async () => {
     const { privateJwk } = await generateAgentKey();
     const k = keel({

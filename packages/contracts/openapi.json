@@ -5203,7 +5203,8 @@
           }
         },
         "tags": [
-          "Operator"
+          "Operator",
+          "mcp"
         ],
         "security": [
           {
@@ -5346,7 +5347,8 @@
           }
         },
         "tags": [
-          "Operator"
+          "Operator",
+          "mcp"
         ],
         "requestBody": {
           "required": true,

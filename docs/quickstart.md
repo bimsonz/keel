@@ -308,3 +308,27 @@ Keel-Run: run_595HYMFG8QTRRDTFWYQ4WCPRXB
 A change that does not land ends in `ChangeBounced`, whose next actions say
 what to do: fix what it names, `revise` the footprint if the change has grown,
 push, and submit again under the same lease.
+
+## 6. Answer Keel's questions from your own MCP client
+
+Some changes wait for a person: one that edits how Keel verifies the project
+(`.keel/flow.json`, or a path its flow names in `humanClassPaths`), one that
+passes with fewer tests than trunk's last verdict, a conflict its agents could
+not settle. Keel puts the question to the project's maintainers. Answer it at
+`https://keel.town/<org>/notes/escalations`, or from an MCP client signed in as
+you, with a server entry of its own beside the agent's:
+
+```json
+{
+  "type": "http",
+  "url": "https://keel.town/mcp",
+  "headersHelper": "KEEL_URL=https://keel.town keeltown token --mcp --header"
+}
+```
+
+With no `--profile`, `keeltown token` reads the sign-in of step 2, which holds
+no agent's key, so it prints your session: what the client does there is done
+as you. `Operator_listEscalations` lists the questions put to you, `diff` reads
+the change one is about, `issues` and `issue` read the project's issues, and
+`Operator_giveRuling` answers a question with one of its options, recorded as
+your decision. An agent's token is refused a ruling, whatever it maintains.

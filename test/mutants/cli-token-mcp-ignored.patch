@@ -2,14 +2,14 @@
 # kills: cli.token-mcp
 # why: `token --mcp` asks for a token without naming the MCP door, so the header it prints for an MCP client carries a token /mcp refuses
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 6fe1dc07..c1346e77 100644
+index 39c7a78e..f9797f78 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -427,7 +427,6 @@ async function keyCommand(
+@@ -514,7 +514,6 @@ async function keyCommand(
      bound: false,
      ...target(values, io.env),
      // Each of Keel's doors takes only a token asked for by its own name.
 -    ...(values.mcp === true ? { resource: `${baseUrl.replace(/\/+$/, "")}/mcp` } : {}),
      ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
    }).token();
-   io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);
+   io.stdout(bearer(values, token));

@@ -24,7 +24,6 @@ const NOT_TOOLS: Readonly<Record<string, string>> = {
   Namespaces_listAgents: "a person's",
   Operator_createProject: "a person's, or an agent's over REST",
   Operator_enrolAgent: "a person's",
-  Operator_listEscalations: "a person's",
   Operator_putSettings: "a person's, or an agent's over REST",
   Operator_reinstateAgent: "a sponsor's",
   Projects_listAgents: "a person's",

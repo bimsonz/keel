@@ -2,12 +2,12 @@
 # kills: mcp.wait
 # why: the tools are served the handlers as they are, so a held inbox read with a progress token sends nothing until its answer
 diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
-index 0ddfbc4a..b75884c4 100644
+index 58c64361..75850f4b 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -223,7 +223,7 @@ export function makeMcpEndpoint(
+@@ -230,7 +230,7 @@ export function makeMcpEndpoint(
        { name: "keel", version: openApiDocument.info.version },
-       { instructions: INSTRUCTIONS },
+       { instructions: admitted.principal._tag === "User" ? PERSON_INSTRUCTIONS : INSTRUCTIONS },
      );
 -    registerTools(server, (call) => held(told, call), toolDeps(admitted));
 +    registerTools(server, () => told, toolDeps(admitted));
