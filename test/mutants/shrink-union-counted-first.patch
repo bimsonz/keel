@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/union.test.ts -t "union.counted"
+# kills: union.counted
+# why: a batch's union watches a step only when the member it starts from does, so whether a batch is held to trunk's count rests on a plan hash's order
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 2f9dec81..43d27a6c 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -73,8 +73,6 @@ export const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
+     optional: a.optional === true && b.optional === true,
+     ...(worlds === undefined ? {} : { worlds }),
+     ...(guards === undefined ? {} : { guards }),
+-    // A member whose base's shrink rule watches the step holds the whole batch to it.
+-    ...(b.counted === true ? { counted: true as const } : {}),
+   };
+ };
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t "flow-ruling.names-paths"
+# kills: flow-ruling.names-paths
+# why: a drop in tests is asked as a change to how Keel verifies, so the inbox files it with flow edits
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index c0810770..f36cf701 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -192,7 +192,7 @@ export const askShrinkRuling = Effect.fn("coordination/askShrinkRuling")(functio
+         },
+       ],
+       about: { kind: "change", id: changeId },
+-      category: "fewer-tests",
++      category: "verification-change",
+       evidence: [
+         {
+           class: "proof",

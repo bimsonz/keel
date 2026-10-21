@@ -55,9 +55,14 @@ import type { PlanStep } from "./plan.ts";
  * plan hash. flow-compiler/2 hashes everything that affects execution,
  * `humanClass` and each guard's policy included, and records the preimage on
  * the plan (`compiler`, `versions`) so a stored plan can be rehashed.
+ * flow-compiler/3 marks the steps the shrink rule watches (`counted`).
  */
-export const COMPILER_VERSION = "flow-compiler/2";
+export const COMPILER_VERSION = "flow-compiler/3";
 
+/**
+ * Keel's policy, before a project's flow adds to it: a change to `.keel/flow`
+ * or `.keel/plugins` needs a person's ruling, and the shrink rule parks.
+ */
 export const defaultFlowPolicy: FlowPolicy = {
   humanClassPaths: [
     Glob.make(".keel/flow*"),
@@ -66,10 +71,25 @@ export const defaultFlowPolicy: FlowPolicy = {
   ],
   suiteTier: 2,
   defaultTier: 1,
+  shrink: "park",
 };
 
-/** The step appended when a change touches the flow itself: a person must rule. */
+/** The step appended when a change touches a human-class path, such as the flow itself: a person must rule. */
 export const HUMAN_CLASS_STEP = "keel.human-class";
+
+/** The paths of `touched` whose change needs a person's ruling under `policy`, in the order given. */
+export const humanClassTouched = (
+  policy: FlowPolicy,
+  touched: readonly string[],
+): readonly string[] =>
+  touched.filter((p) => policy.humanClassPaths.some((g) => matchesGlob(g, p)));
+
+/**
+ * Whether a step's run counts tests Keel can read: a suite the pack runs
+ * (vitest's report), or a command of the project's that names a JUnit report.
+ */
+const countsTests = (spec: StepSpec): boolean =>
+  spec.run === undefined ? spec.suite : spec.run.report !== undefined;
 
 // ------------------------------------------------------------------ structure
 
@@ -448,9 +468,7 @@ export const compile = (
     ...guards.map((g) => [g.spec.id, { applies: true, because: g.because }] as const),
   ]);
   const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
-  const touchesFlow = facts.touchedPaths.filter((p) =>
-    policy.humanClassPaths.some((g) => matchesGlob(g, p)),
-  );
+  const touchesFlow = humanClassTouched(policy, facts.touchedPaths);
   const project = prune(flow, kept);
   // Guards (Tier 1, seconds) run alongside the project's flow (often Tier 2, minutes), so their proof is recorded whatever the suite does.
   const guarded: Flow | undefined =
@@ -504,6 +522,7 @@ export const compile = (
               },
             }),
         ...(s.deploy === undefined ? {} : { deploy: s.deploy }),
+        ...(policy.shrink === "park" && countsTests(s) ? { counted: true as const } : {}),
         ...(s.guards === undefined
           ? {}
           : {

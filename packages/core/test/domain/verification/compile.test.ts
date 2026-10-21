@@ -157,6 +157,12 @@ const single = (steps: readonly StepSpec[], flow?: FlowDefinition["flow"]): Flow
   },
 });
 
+/** A change touching only `path`, under a flow of one suite step. */
+const edit = (path: string): FlowCase => ({
+  ...single([suiteStep("tests")]),
+  facts: { ...single([suiteStep("tests")]).facts, touchedPaths: [path] },
+});
+
 describe("flow compiler: typing rules", () => {
   it("[flow.well-typed-compiles] a well-typed spec compiles", () => {
     fc.assert(
@@ -445,6 +451,68 @@ describe("flow compiler: plans", () => {
     expect(ok(flowEdit).steps.map((s) => s.id)).toEqual(["tests", HUMAN_CLASS_STEP]);
   });
 
+  it("[flow.human-class-paths] a path the project's policy adds holds the gate as Keel's own do, citing what was touched, and a change touching none of them is not human-class", () => {
+    const policy = {
+      ...defaultFlowPolicy,
+      humanClassPaths: [...defaultFlowPolicy.humanClassPaths, Glob.make("package.json")],
+    };
+    fc.assert(
+      fc.property(
+        flowCaseArb(),
+        fc.subarray(["package.json", ".keel/flow.json", "src/a.ts", "pkg/package.json"]),
+        (c, extra) => {
+          const touched = [
+            ...c.facts.touchedPaths.filter((p) => !p.startsWith(".keel/")),
+            ...extra,
+          ];
+          const plan = Result.getOrThrow(
+            compile(c.spec, { ...c.facts, touchedPaths: touched }, emptyDefaults, policy),
+          );
+          const ruled = touched.filter((p) =>
+            policy.humanClassPaths.some((g) => matchesGlob(g, p)),
+          );
+          const gate = plan.steps.find((s) => s.id === HUMAN_CLASS_STEP);
+          return (
+            plan.humanClass === ruled.length > 0 &&
+            (gate === undefined
+              ? ruled.length === 0
+              : gate.because === `human-class: touches ${ruled.join(", ")}`)
+          );
+        },
+      ),
+    );
+    expect(
+      Result.getOrThrow(
+        compile(edit("package.json").spec, edit("package.json").facts, emptyDefaults, policy),
+      ).humanClass,
+    ).toBe(true);
+    expect(ok(edit("package.json")).humanClass).toBe(false);
+  });
+
+  it("[flow.counted] the shrink rule marks every step whose tests Keel can count, a pack's suite or a command naming a JUnit report, and only while it parks", () => {
+    const steps = [
+      suiteStep("suite"),
+      suiteStep("reported", {
+        suite: false,
+        run: { command: "pnpm test", report: { junit: "out/junit.xml" } },
+      }),
+      suiteStep("command", { run: { command: "pnpm test" } }),
+      suiteStep("check", { suite: false }),
+    ];
+    const counted = (shrink: "park" | "off") =>
+      Result.getOrThrow(
+        compile(single(steps).spec, single(steps).facts, emptyDefaults, {
+          ...defaultFlowPolicy,
+          shrink,
+        }),
+      )
+        .steps.filter((s) => s.counted === true)
+        .map((s) => s.id);
+    expect(counted("park")).toEqual(["suite", "reported"]);
+    expect(counted("off")).toEqual([]);
+    expect(defaultFlowPolicy.shrink).toBe("park");
+  });
+
   it("[flow.plan-hash-content-addressed] the plan hash depends on content alone, including each step's version", () => {
     fc.assert(
       fc.property(flowCaseArb(), (c) => {
@@ -578,6 +646,14 @@ const perturbations = (plan: FlowPlan): readonly PlanPreimage[] => {
             ...plan,
             steps: plan.steps.map((s, j) => (j === 0 ? { ...s, because: "changed" } : s)),
           },
+          {
+            ...plan,
+            steps: plan.steps.map((s, j) => {
+              if (j !== 0) return s;
+              const { counted, ...rest } = s;
+              return counted === true ? rest : { ...rest, counted: true as const };
+            }),
+          },
         ]),
     ...(guarded === -1 ? [] : [{ ...plan, steps: flipped(guarded) }]),
   ];
@@ -628,7 +704,7 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
         const plan = ok(c);
         if (plan.steps.some((s) => s.guards !== undefined)) guards++;
         return (
-          plan.compiler === "flow-compiler/2" &&
+          plan.compiler === "flow-compiler/3" &&
           planHashOf(plan) === plan.planHash &&
           planHashOf({ ...plan, costEstimate: plan.costEstimate + 1 } as PlanPreimage) ===
             plan.planHash &&

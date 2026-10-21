@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-forgotten"
+# kills: lane.shrink-forgotten
+# why: a change that landed keeps its accepted drop in the lane
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..22a3dc87 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -677,10 +677,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+           advanced.landings.some((landing) => landing.candidateId === lane.active?.candidateId)
+             ? lane.active.landing
+             : undefined;
+-        const after = withoutDrops(
+-          counted === undefined ? lane : withTrunkTests(lane, counted),
+-          landed,
+-        );
++        const after = counted === undefined ? lane : withTrunkTests(lane, counted);
+         return {
+           ...unplace(after, landed),
+           advances: [...lane.advances, { from: advanced.from, to: advanced.to, members: landed }],

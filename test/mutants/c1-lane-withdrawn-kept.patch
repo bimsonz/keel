@@ -2,22 +2,25 @@
 # kills: lane.change-ends
 # why: A change withdrawn or superseded while queued stays in the queue, so the lane composes and lands it anyway
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 7d1cbf58..e46b6b25 100644
+index cf247bce..47bac43b 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -515,19 +515,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+@@ -650,22 +650,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
          const ended = decodeEnded(event.payload);
          // One held for a ruling is in no queue, and its kept plan goes with it.
          const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
 -        return lane.queue.includes(ended.changeId) ||
 -          (kept && !holds(tx.store, lane, ended.changeId))
--          ? withoutAlone(
--              withPlan(
--                unplace({ ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }, [
+-          ? withoutDrops(
+-              withoutAlone(
+-                withPlan(
+-                  unplace({ ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }, [
+-                    ended.changeId,
+-                  ]),
 -                  ended.changeId,
--                ]),
--                ended.changeId,
--                undefined,
+-                  undefined,
+-                ),
+-                [ended.changeId],
 -              ),
 -              [ended.changeId],
 -            )

@@ -2,11 +2,11 @@
 # kills: c41.unattributed-alone
 # why: a failure of several no one is blamed for is never bisected, so its members wait for a CandidateBisected that never comes
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index d2797f96..34b33bfd 100644
+index f7904cf9..28563e49 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1844,7 +1844,7 @@ const issue = Effect.fn("integration/issue")(function* (
-     const issued = issuedFor(verdict, now, lane, at);
+@@ -2435,7 +2435,7 @@ const issue = Effect.fn("integration/issue")(function* (
+     const issued = issuedFor(verdict, now, lane, at, rulable);
      exhausted = issued.exhausted;
      held = issued.held;
 -    const bisected = issued.attribution === "unattributed";

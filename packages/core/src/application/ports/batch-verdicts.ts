@@ -12,7 +12,7 @@ import type {
   NextAction,
   VerdictId,
 } from "../../domain/kernel/index.ts";
-import type { VerdictOutcome } from "../../domain/verification/index.ts";
+import type { StepCount, VerdictOutcome } from "../../domain/verification/index.ts";
 
 /** Which attempt a verification result belongs to, exactly as the Candidate machine fences it. */
 export interface CandidateFence {
@@ -49,6 +49,8 @@ export interface BatchVerdict {
    * member bounces, and none of them is blamed, counted or run alone for it.
    */
   readonly halted?: true;
+  /** On a land, the tests each step the project's shrink rule watches passed: the lane holds them to trunk's. */
+  readonly tests?: readonly StepCount[];
 }
 
 /** KeelVerify's report of one step of a batch's plan, as it runs: that it started, or its result. */

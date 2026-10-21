@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts -t "flow.counted"
+# kills: flow.counted
+# why: every command step is watched, so one naming no report counts no tests and parks every change once trunk has a count
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 466e6d5c..cefd1cd6 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -89,7 +89,7 @@ export const humanClassTouched = (
+  * (vitest's report), or a command of the project's that names a JUnit report.
+  */
+ const countsTests = (spec: StepSpec): boolean =>
+-  spec.run === undefined ? spec.suite : spec.run.report !== undefined;
++  spec.run === undefined ? spec.suite : true;
+ 
+ // ------------------------------------------------------------------ structure
+ 

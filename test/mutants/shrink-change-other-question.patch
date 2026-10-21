@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "shrink.its-question"
+# kills: shrink.its-question
+# why: a change parked on its drop in tests is resumed by a ruling on another question
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 30a1dd69..1c2c000a 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2381,8 +2381,7 @@ const commandFor = (
+       const recorded = decodeRecorded(event.payload);
+       if (Option.isNone(recorded)) return undefined;
+       const { escalationId, decisionId, option, summary } = recorded.value;
+-      if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
+-        return undefined;
++      if (change.parkReason !== "awaiting-ruling") return undefined;
+       // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.
+       if (store.get(CHANGE_SHRINK_RULING, escalationId) !== undefined)
+         return option === SHRINK_RULING_APPROVE

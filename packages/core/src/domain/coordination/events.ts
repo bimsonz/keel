@@ -165,6 +165,7 @@ export const RequeueReason = Schema.Literals([
   "co-member-failed",
   "textual",
   "interaction",
+  "shrink",
 ]);
 export type RequeueReason = typeof RequeueReason.Type;
 export const ChangeRequeued = Schema.TaggedStruct("ChangeRequeued", {

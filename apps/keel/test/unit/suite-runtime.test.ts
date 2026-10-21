@@ -29,7 +29,8 @@ import {
   suitePlan,
   workerAppPlan,
 } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Fiber, Layer, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import {
   type BoxLedger,
   boxHoldMs,
@@ -37,6 +38,8 @@ import {
   JS_TS_SUITE_COMMAND,
   judgeCommandOutput,
   projectCommand,
+  RUNNER_STDOUT_LIMIT,
+  STDOUT_READ_MS,
   type SuiteRunner,
   type SuiteRunnerOptions,
   SUITE_CONFIG,
@@ -132,6 +135,12 @@ const runtime = (runner: SuiteRunner, boxes: BoxLedger = ledger().boxes) => {
 const stdoutRunner =
   (stdout: string | ReadableStream<Uint8Array>): SuiteRunner =>
   async () => ({ logs: { stdout } });
+
+/** One verification of `at` by a runtime over `runner`. */
+const runBy = (runner: SuiteRunner, at = job()) =>
+  Effect.flatMap(VerifierRuntime, (v) => v.run(sampleNamespace, at, READY)).pipe(
+    Effect.provide(runtime(runner).layer),
+  );
 
 PORTS.VerifierRuntime.contract("ci (scripted runner)", () => runtime(stdoutRunner("")).layer);
 
@@ -388,14 +397,14 @@ describe("the Tier 2 suite runtime", () => {
   );
 
   it.effect(
-    "[no-runner.gave-up] abstains when the engine gives up (unavailable), when the log is a stream, and on an empty log",
+    "[no-runner.gave-up] abstains when the engine gives up (unavailable), and on an empty log, inline or streamed",
     () =>
       Effect.gen(function* () {
         for (const runner of [
           (async () => {
             throw new Error("runner failed after its retries");
           }) satisfies SuiteRunner,
-          stdoutRunner(new ReadableStream()),
+          stdoutRunner(new ReadableStream({ start: (controller) => controller.close() })),
           stdoutRunner(""),
         ]) {
           const [result] = yield* Effect.flatMap(VerifierRuntime, (v) =>
@@ -903,3 +912,93 @@ describe("a step command's JUnit report", () => {
 
 /** The reason a stored evidence document gives. */
 const Why = Schema.Struct({ why: Schema.String });
+
+/** `text` as the engine hands over a log of more than 300 kB: a byte stream, in chunks of `size` bytes. */
+const streamed = (text: string, size = 7): ReadableStream<Uint8Array> => {
+  const bytes = new TextEncoder().encode(text);
+  let at = 0;
+  return new ReadableStream({
+    pull: (controller) => {
+      if (at >= bytes.length) controller.close();
+      else controller.enqueue(bytes.slice(at, (at += size)));
+    },
+  });
+};
+
+describe("a runner's log handed over as a stream", () => {
+  it.effect(
+    "[runner.stream-read] a stdout too large to come back inline is read to its end, judged as the same text would be, and counts a command's report of more than 300 kB; stderr's stream is cancelled",
+    () =>
+      Effect.gen(function* () {
+        const green = yield* Effect.promise(() => runnerStdout(200, 0, "200 passed ✓"));
+        const [inline] = yield* runBy(stdoutRunner(green));
+        const [chunked] = yield* runBy(stdoutRunner(streamed(green)));
+        expect(chunked).toEqual(inline);
+        expect(chunked?.outcome).toBe("pass");
+        // A command naming a JUnit report of thousands of tests, past the engine's inline 300 kB.
+        const cases = Array.from(
+          { length: 12_000 },
+          (_, i) => `<testcase classname="test/t${i}.test.ts" name="${crypto.randomUUID()}"/>`,
+        ).join("");
+        const big = yield* Effect.promise(() =>
+          commandReportStdout(0, `<testsuites><testsuite>${cases}</testsuite></testsuites>`),
+        );
+        expect(big.length).toBeGreaterThan(300_000);
+        const named = {
+          ...step,
+          run: { command: "pnpm test", timeoutMs: 1, report: { junit: "out/junit.xml" } },
+        };
+        let cancelled = 0;
+        const stderr = new ReadableStream<Uint8Array>({
+          cancel: () => {
+            cancelled += 1;
+          },
+        });
+        const [counted] = yield* runBy(
+          async () => ({ logs: { stdout: streamed(big, 65_536), stderr } }),
+          { ...job(), steps: [named] },
+        );
+        expect([counted?.outcome, counted?.tests]).toEqual([
+          "pass",
+          { total: 12_000, passed: 12_000 },
+        ]);
+        expect(cancelled).toBe(1);
+      }),
+  );
+
+  it.effect(
+    "[runner.stream-bounded] a stdout stream past the limit abstains as truncated and is cancelled; one that never ends abstains as truncated at the read's deadline",
+    () =>
+      Effect.gen(function* () {
+        let sent = 0;
+        let cancelled = 0;
+        // It ends a few MiB past the limit, so a read that ignores the limit finishes rather than hangs.
+        const flood = new ReadableStream<Uint8Array>({
+          pull: (controller) => {
+            sent += 1;
+            controller.enqueue(new Uint8Array(1024 * 1024));
+            if (sent > RUNNER_STDOUT_LIMIT / (1024 * 1024) + 4) controller.close();
+          },
+          cancel: () => {
+            cancelled += 1;
+          },
+        });
+        const [flooded] = yield* runBy(stdoutRunner(flood));
+        expect([flooded?.outcome, flooded?.failure]).toEqual(["abstain", "truncated"]);
+        expect(cancelled).toBe(1);
+        expect(sent).toBeLessThanOrEqual(RUNNER_STDOUT_LIMIT / (1024 * 1024) + 2);
+        // A stream that sends nothing and never ends.
+        const reading = yield* Effect.forkChild(
+          runBy(stdoutRunner(new ReadableStream<Uint8Array>())),
+        );
+        // The read arms its deadline once the runner has answered: the clock moves until the run is over.
+        for (let turn = 0; turn < 100 && reading.pollUnsafe() === undefined; turn++) {
+          yield* TestClock.adjust(STDOUT_READ_MS);
+          yield* Effect.promise(() => new Promise((settle) => setTimeout(settle, 5)));
+        }
+        expect(reading.pollUnsafe(), "the read never gave up").toBeDefined();
+        const [stalled] = yield* Fiber.join(reading);
+        expect([stalled?.outcome, stalled?.failure]).toEqual(["abstain", "truncated"]);
+      }),
+  );
+});

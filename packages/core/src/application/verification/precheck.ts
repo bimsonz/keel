@@ -13,9 +13,9 @@ import {
 import {
   type AdmittedGuard,
   compile,
-  defaultFlowPolicy,
   GUARD_PATHS,
   HUMAN_CLASS_STEP,
+  humanClassTouched,
   precheck,
   type PrecheckPolicy,
   type RefusedPath,
@@ -32,7 +32,7 @@ import {
   type PrecheckWorkspace,
   Projects,
 } from "../ports/index.ts";
-import { FLOW_SPEC_PATH, flowSetup } from "./flow-spec.ts";
+import { FLOW_SPEC_PATH, flowPolicyOf, flowSetup } from "./flow-spec.ts";
 import { executable } from "./packs.ts";
 import { readStoredPlan, storedPlanText } from "./plan-codec.ts";
 
@@ -76,6 +76,8 @@ export const PrecheckDecision = Schema.Union([
     pack: Schema.String,
     /** Guards in the guard repo that could not be admitted to the plan, and why: shown, never skipped silently. */
     guardsRefused: Schema.Array(Schema.Struct({ guardId: Schema.String, reason: Schema.String })),
+    /** The paths the change touches that need a person's ruling, when its plan holds the gate: the question names them. */
+    ruledPaths: Schema.optional(Schema.Array(Schema.String)),
   }),
 ]);
 export type PrecheckDecision = typeof PrecheckDecision.Type;
@@ -388,6 +390,7 @@ export const decidePrecheck = (
   const setup = flowSetup(flow.sources, baseSha);
   if (Result.isFailure(setup)) return brokenFlow(setup.failure.reason);
   const { definition, predicatePolicy, pack } = setup.success;
+  const flowPolicy = flowPolicyOf(setup.success);
   const plan = compile(
     definition,
     {
@@ -399,7 +402,7 @@ export const decidePrecheck = (
       admittedGuards: guards.admitted,
     },
     pack.defaults,
-    defaultFlowPolicy,
+    flowPolicy,
   );
   if (Result.isFailure(plan)) return brokenFlow(plan.failure.map((e) => e._tag).join(", "));
   // The gate asks a person for a ruling, and an agent's own namespace has none to ask.
@@ -407,6 +410,9 @@ export const decidePrecheck = (
   const missing = plan.success.steps
     .filter((s) => !executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable))
     .map((s) => s.id);
+  const ruled = plan.success.humanClass
+    ? humanClassTouched(flowPolicy, checked.success.touched)
+    : [];
   const [gap, ...gaps] = missing;
   if (gap !== undefined)
     return {
@@ -416,7 +422,7 @@ export const decidePrecheck = (
         {
           kind: "call",
           title: missing.includes(HUMAN_CLASS_STEP)
-            ? "Changes to .keel/flow and .keel/plugins need a person's ruling, and no person can rule in an agent's own namespace: split those edits out of this change, then submit again"
+            ? `A change to ${ruled.join(", ")} needs a person's ruling, and no person can rule in an agent's own namespace: split those edits out of this change, then submit again`
             : `Keel cannot run ${missing.join(", ")} yet: split out what needs it, then submit again`,
           operationId: "submit",
           args: { steps: missing },
@@ -435,6 +441,7 @@ export const decidePrecheck = (
     predicatePolicy,
     pack: pack.reason,
     guardsRefused: guards.refused,
+    ...(ruled.length === 0 ? {} : { ruledPaths: ruled }),
   };
 };
 
@@ -499,8 +506,9 @@ export const recordPlan = Effect.fn("verification/recordPlan")(function* (
 
 /**
  * Whether a compiled plan holds the human-class gate, which a change to
- * `.keel/flow` or `.keel/plugins` adds: its change parks for a maintainer's
- * ruling as it is queued, and Precheck puts the question to them.
+ * `.keel/flow`, `.keel/plugins` or a path the project's flow names adds: its
+ * change parks for a maintainer's ruling as it is queued, and Precheck puts
+ * the question to them.
  */
 export const needsRuling = (decision: Extract<PrecheckDecision, { _tag: "Compile" }>): boolean => {
   const plan = readStoredPlan(decision.planHash, decision.plan);

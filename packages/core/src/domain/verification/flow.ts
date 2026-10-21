@@ -16,7 +16,7 @@ import type {
 } from "../coordination/index.ts";
 import type { DeploySpec } from "../delivery/index.ts";
 import type { FlowWorld } from "./conflict.ts";
-import type { PlanStep, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
+import type { PlanStep, ShrinkRule, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
 
 /** What a budget node allows its body to spend. */
 export type Budget = { readonly usd: number; readonly cpuMs: number; readonly tokens: number };
@@ -197,11 +197,13 @@ export type ChangeFacts = {
 };
 
 export type FlowPolicy = {
-  /** Paths whose change makes the plan human-class. */
+  /** Paths whose change makes the plan human-class: Keel's own, and any the project's flow adds. */
   readonly humanClassPaths: readonly Glob[];
   /** Tier for project suites, and for everything else, unless the spec pins one. */
   readonly suiteTier: Tier;
   readonly defaultTier: Tier;
+  /** The project's shrink rule: `park` marks every step whose tests Keel can count (`PlanStep.counted`). */
+  readonly shrink: ShrinkRule;
 };
 
 /** A compiled plan: the wire VerificationPlan with its typed flow tree. */

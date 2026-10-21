@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts -t "verdict.counts"
+# kills: verdict.counts
+# why: a land carries the count of a step the shrink rule does not watch, so a project that turned the rule off is held to trunk anyway
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index c53debac..8f76282f 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -97,7 +97,6 @@ export type SettledVerdict = typeof SettledVerdict.Type;
+  */
+ export const countedTests = (plan: FlowPlan, results: readonly StepResult[]): StepCount[] =>
+   plan.steps.flatMap((step) => {
+-    if (step.counted !== true) return [];
+     const result = results.find((r) => r.stepId === step.id && r.world === undefined);
+     if (result?.outcome !== "pass") return [];
+     return [{ stepId: step.id, ...(result.tests ?? { total: 0, passed: 0 }) }];

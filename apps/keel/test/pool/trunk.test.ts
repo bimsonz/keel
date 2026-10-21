@@ -35,6 +35,7 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makeEscalationsMemory,
   makeNamespaceUsageMemory,
   makePlacedProject,
   makePlanStoreMemory,
@@ -335,6 +336,7 @@ async function promoting(
   // The lane hears every advance and decline; it follows trunk in the same memory staging.
   const stagingRefs = () => code.repos.get(`${staging.namespace}/${staging.name}`)?.refs;
   const laneServices: Layer.Layer<LaneServices> = Layer.mergeAll(
+    makeEscalationsMemory().gate,
     code.layer,
     makePlanStoreMemory().layer,
     makeAgentDirectoryMemory().layer,

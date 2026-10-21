@@ -2,15 +2,15 @@
 # kills: junit.nextest
 # why: Markup a failure message quotes in CDATA is read as tests, so a report that quotes a testcase reads as no report
 diff --git a/packages/core/src/application/verification/junit.ts b/packages/core/src/application/verification/junit.ts
-index 441c662b..6cb8854a 100644
+index 01b65148..9a5fbb07 100644
 --- a/packages/core/src/application/verification/junit.ts
 +++ b/packages/core/src/application/verification/junit.ts
-@@ -49,7 +49,7 @@ const TAG = /<(\/?)([A-Za-z_][\w:.-]*)((?:\s+[^\s=/>]+\s*=\s*(?:"[^"]*"|'[^']*')
+@@ -64,7 +64,7 @@ const caseOf = (
   * are dropped before any tag is read.
   */
- export const failingTestsOf = (xml: string): readonly JunitFailure[] | undefined => {
+ const casesOf = (xml: string): readonly JunitCase[] | undefined => {
 -  const text = xml.replace(/<!--[\s\S]*?-->/g, "").replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "");
 +  const text = xml.replace(/<!--[\s\S]*?-->/g, "");
    let suites = false;
-   let open: { readonly attributes: ReadonlyMap<string, string>; failed: boolean } | undefined;
-   const failing: JunitFailure[] = [];
+   let open:
+     | { readonly attributes: ReadonlyMap<string, string>; failed: boolean; skipped: boolean }

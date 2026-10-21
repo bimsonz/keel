@@ -29,14 +29,15 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makeEscalationsMemory,
   makeNamespaceUsageMemory,
   makePlacedProject,
   makePlanStoreMemory,
-  sampleNamespace,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
   PORTS,
+  sampleNamespace,
   suitePlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
@@ -165,6 +166,7 @@ async function lane(
     }),
   );
   const driven: Layer.Layer<LaneServices> = Layer.mergeAll(
+    makeEscalationsMemory().gate,
     code.layer,
     plans.layer,
     changes,

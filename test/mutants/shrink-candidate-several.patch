@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts -t "candidate.transitions"
+# kills: candidate.transitions
+# why: a batch of several may be failed on the shrink rule, which asks one member's ruling, so the others wait on a question not theirs
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 36bc76c5..333ff98d 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -305,14 +305,6 @@ export const decideCandidate = (
+         return Result.fail(
+           new InvalidBatch({ batchId, reason: "a one-change batch's failure is that change's" }),
+         );
+-      if (blamed === "shrink" && batch.members.length !== 1)
+-        return Result.fail(
+-          new InvalidBatch({
+-            batchId,
+-            reason:
+-              "the shrink rule asks a ruling of a batch of one: several that drop tests are bisected",
+-          }),
+-        );
+       if (
+         blamed !== "interaction" &&
+         blamed !== "infra" &&

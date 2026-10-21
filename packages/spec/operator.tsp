@@ -304,8 +304,9 @@ interface Operator {
   /**
    * Answer a question: the person first asked, or a person who maintains its namespace, names one
    * of its options; an agent is refused (`users-only`), whatever it maintains. The ruling records a
-   * decision and resolves what the question was about: the conflict, or the change to how Keel
-   * verifies (`verification-change`), which `approve` resumes into the queue and anything else
+   * decision and resolves what the question was about: the conflict, the change to how Keel
+   * verifies (`verification-change`), or the change that passed with fewer tests than trunk's last
+   * verdict (`fewer-tests`), either of which `approve` resumes into the queue and anything else
    * sends back. An
    * option the question does not offer is a 400 `escalation.option_unknown` whose next actions rule
    * each valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.

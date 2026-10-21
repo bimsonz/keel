@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/compile.test.ts -t "flow.counted"
+# kills: flow.counted
+# why: a project whose flow turns the shrink rule off is still held to trunk's count
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 466e6d5c..fa507b89 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -522,7 +522,7 @@ export const compile = (
+               },
+             }),
+         ...(s.deploy === undefined ? {} : { deploy: s.deploy }),
+-        ...(policy.shrink === "park" && countsTests(s) ? { counted: true as const } : {}),
++        ...(countsTests(s) ? { counted: true as const } : {}),
+         ...(s.guards === undefined
+           ? {}
+           : {

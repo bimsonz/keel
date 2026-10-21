@@ -319,6 +319,20 @@ const withFile = (path: string, data = "changed\n"): FixtureFiles => ({
   [path]: data,
 });
 
+/** The steps the shrink rule watches in the plan of a change compiled on a base whose flow is `flow` (none: no flow file). */
+const countedUnder = (flow: object | undefined) => {
+  const base = flow === undefined ? BASE_FILES : { ...BASE_FILES, [FLOW]: JSON.stringify(flow) };
+  const world = precheckWorld({ baseFiles: base });
+  return Effect.gen(function* () {
+    const decision = yield* world.run(
+      yield* world.submitted([{ ...base, "src/a.ts": "changed\n" }]),
+    );
+    if (decision._tag !== "Compile") throw new Error(`not compiled: ${decision._tag}`);
+    const plan = Result.getOrThrow(readStoredPlan(decision.planHash, decision.plan));
+    return plan.steps.filter((s) => s.counted === true).map((s) => s.id);
+  });
+};
+
 describe("Precheck", () => {
   it.effect("[d12.guard-refused] refuses a change to a guard, citing it, with next actions", () => {
     const world = precheckWorld();
@@ -472,11 +486,51 @@ describe("Precheck", () => {
             { kind: "call", operationId: "submit", args: { steps: ["keel.human-class"] } },
           ],
         });
-        expect(JSON.stringify(refused)).toMatch(/no person can rule in an agent's own namespace/);
+        expect(JSON.stringify(refused)).toMatch(
+          /A change to \.keel\/flow\.yaml needs a person's ruling, and no person can rule in an agent's own namespace/,
+        );
         expect(agents.changes.stateOf(changeId)).toBe("bounced");
         expect(agents.recorded).toEqual([]);
         expect(asked._tag).toBe("Compile");
         expect(persons.changes.stateOf(changeId)).toBe("parked");
+      });
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.project-paths] a path the base's flow adds to the human-class paths holds the gate as .keel/flow does, and the decision names the paths the ruling is about; a change touching none of them needs no ruling",
+    () => {
+      const base = { ...BASE_FILES, [FLOW]: JSON.stringify({ humanClassPaths: ["package.json"] }) };
+      const ruled = precheckWorld({ baseFiles: base });
+      const plain = precheckWorld({ baseFiles: base });
+      return Effect.gen(function* () {
+        const decision = yield* ruled.run(
+          yield* ruled.submitted([
+            { ...base, "package.json": '{"scripts":{"test":"true"}}', "src/a.ts": "changed\n" },
+          ]),
+        );
+        if (decision._tag !== "Compile") throw new Error(`not compiled: ${decision._tag}`);
+        expect(needsRuling(decision)).toBe(true);
+        expect(decision.ruledPaths).toEqual(["package.json"]);
+        expect(ruled.changes.stateOf(changeId)).toBe("parked");
+        const untouched = yield* plain.run(
+          yield* plain.submitted([{ ...base, "src/a.ts": "changed\n" }]),
+        );
+        if (untouched._tag !== "Compile") throw new Error(`not compiled: ${untouched._tag}`);
+        expect([needsRuling(untouched), untouched.ruledPaths]).toEqual([false, undefined]);
+        expect(plain.changes.stateOf(changeId)).toBe("queued");
+      });
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.shrink-from-base] the base's flow decides whether the shrink rule watches a plan's suite: on unless it says off",
+    () => {
+      return Effect.gen(function* () {
+        const watched = yield* countedUnder(undefined);
+        expect(watched.length).toBeGreaterThan(0);
+        expect(yield* countedUnder({ shrink: "park" })).toEqual(watched);
+        expect(yield* countedUnder({ shrink: "off" })).toEqual([]);
       });
     },
   );

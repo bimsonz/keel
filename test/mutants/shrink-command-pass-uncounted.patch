@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/command.test.ts -t "command.counts"
+# kills: command.counts
+# why: a passing command that names a JUnit report counts nothing, so the shrink rule cannot hold a project's own test step to trunk
+diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
+index 04f057ee..f35b6270 100644
+--- a/packages/core/src/application/verification/command.ts
++++ b/packages/core/src/application/verification/command.ts
+@@ -209,7 +209,6 @@ const judgeRun = (
+       : decide(
+           "pass",
+           `the command exited 0; its JUnit report counts ${read.tests.total} tests, ${read.tests.passed} passed`,
+-          read.tests,
+         );
+   }
+   if (output.exit < 128) {

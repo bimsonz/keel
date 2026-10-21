@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  countedTests,
   type DepsRefused,
   type DepsUnavailable,
   depsStop,
+  JS_TS_SUITE_PACK,
   judgeTypecheck,
   recordBatchVerdict,
   runJob,
@@ -13,6 +15,7 @@ import {
 import { DeploySpec } from "@keeltown/core/domain/delivery";
 import {
   compile,
+  defaultFlowPolicy,
   type StepReport,
   VerifierUnavailable,
   type VerificationJob,
@@ -27,7 +30,7 @@ import {
   sampleNamespace,
   suitePlan,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, Result, Schema } from "effect";
 import { BatchVerdictsRpc } from "../../src/adapters/driven/do-rpc/batch-verdicts.ts";
 import { encodeExit } from "../../src/rpc/exit.ts";
 import { LaneCodecs, RecordVerdictCommand } from "../../src/rpc/lane.ts";
@@ -120,6 +123,22 @@ const verify = (
   }).pipe(Effect.provide(layer));
 };
 
+/** The Lane DO's namespace as KeelVerify's adapter calls it, keeping every command `recordVerdict` is sent. */
+const rpcLanes = (sent: unknown[]) => ({
+  idFromName: (name: string): DurableObjectId => ({
+    name,
+    toString: () => name,
+    equals: (other) => other.toString() === name,
+  }),
+  get: () => ({
+    recordVerdict: async (command: unknown) => {
+      sent.push(command);
+      return encodeExit(LaneCodecs.recordVerdict, Exit.void);
+    },
+    recordStep: async () => encodeExit(LaneCodecs.recordStep, Exit.void),
+  }),
+});
+
 const types = (l: ReturnType<typeof lane>) =>
   JSON.stringify([...l.outbox.store.rows().values()]).match(
     /"_tag":"(VerdictIssued|BatchVerified|BatchFailed)"/g,
@@ -190,20 +209,7 @@ describe("KeelVerify's use-cases", () => {
     "[verify.remedy-over-rpc] the Lane's recordVerdict receives the remedy in its command",
     () => {
       const sent: unknown[] = [];
-      const lanes = {
-        idFromName: (name: string): DurableObjectId => ({
-          name,
-          toString: () => name,
-          equals: (other) => other.toString() === name,
-        }),
-        get: () => ({
-          recordVerdict: async (command: unknown) => {
-            sent.push(command);
-            return encodeExit(LaneCodecs.recordVerdict, Exit.void);
-          },
-          recordStep: async () => encodeExit(LaneCodecs.recordStep, Exit.void),
-        }),
-      };
+      const lanes = rpcLanes(sent);
       const nextActions = [
         {
           kind: "call" as const,
@@ -513,5 +519,72 @@ describe("a deployed worker app's verdict", () => {
           },
         ]);
       }).pipe(Effect.provide(Layer.merge(makeEvidenceStoreMemory().layer, makeIdsMemory().layer))),
+  );
+
+  it.effect(
+    "[verdict.counts] a land carries what each step the shrink rule watches passed, a pass that counted nothing as none, to the lane over the RPC; a bounce, and a plan whose rule is off, carry no count",
+    () => {
+      const counts = (against: typeof SUITE, tests?: { total: number; passed: number }) =>
+        Effect.gen(function* () {
+          const watched = against.steps[0];
+          if (watched === undefined) throw new Error("the plan has no step");
+          const report: StepReport = {
+            stepId: watched.id,
+            outcome: "pass",
+            evidenceClass: "proof",
+            tier: watched.tier,
+            durationMs: 1,
+            ...(tests === undefined ? {} : { tests }),
+          };
+          return yield* settleVerdict(sampleNamespace, against, [report]);
+        }).pipe(
+          Effect.provide(Layer.merge(makeEvidenceStoreMemory().layer, makeIdsMemory().layer)),
+        );
+      const unwatched = Result.getOrThrow(
+        compile(
+          undefined,
+          { baseCommit: SUITE.baseCommit, touchedPaths: ["src/a.ts"], subjects: [], facts: {} },
+          JS_TS_SUITE_PACK,
+          { ...defaultFlowPolicy, shrink: "off" },
+        ),
+      );
+      return Effect.gen(function* () {
+        expect(step.counted).toBe(true);
+        const landed = yield* counts(SUITE, { total: 120, passed: 118 });
+        expect([landed.outcome, landed.tests]).toEqual([
+          "land",
+          [{ stepId: step.id, total: 120, passed: 118 }],
+        ]);
+        expect((yield* counts(SUITE)).tests).toEqual([{ stepId: step.id, total: 0, passed: 0 }]);
+        expect(unwatched.steps[0]?.counted).toBeUndefined();
+        expect(yield* counts(unwatched, { total: 120, passed: 118 })).not.toHaveProperty("tests");
+        expect(
+          countedTests(SUITE, [
+            {
+              stepId: step.id,
+              outcome: "fail",
+              evidenceClass: "proof",
+              tier: step.tier,
+              durationMs: 1,
+              tests: { total: 3, passed: 2 },
+            },
+          ]),
+        ).toEqual([]);
+        const { settled } = yield* verify("fail");
+        expect(settled).not.toHaveProperty("tests");
+        // Over the RPC, the lane is handed the counts as settled.
+        const sent: unknown[] = [];
+        const lanes = rpcLanes(sent);
+        yield* recordBatchVerdict({
+          laneId: "lane:prj:default",
+          instanceId: "keel-verify-evt11",
+          fence,
+          candidateId,
+          settled: landed,
+        }).pipe(Effect.provide(BatchVerdictsRpc(lanes)));
+        const [command] = sent.map((c) => Schema.decodeUnknownSync(RecordVerdictCommand)(c));
+        expect(command?.tests).toEqual([{ stepId: step.id, total: 120, passed: 118 }]);
+      });
+    },
   );
 });

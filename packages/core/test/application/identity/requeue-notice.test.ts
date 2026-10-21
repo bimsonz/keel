@@ -46,6 +46,7 @@ const WORD: Record<RequeueReason, RegExp> = {
   "co-member-failed": /another change/,
   textual: /merged/,
   interaction: /passed apart/,
+  shrink: /fewer tests/,
 };
 
 type Store = (typeof EntityStore)["Service"];

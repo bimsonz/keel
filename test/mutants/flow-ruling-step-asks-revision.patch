@@ -2,15 +2,15 @@
 # kills: flow-ruling.pool.precheck
 # why: Precheck asks the maintainers a question the change does not wait on, so their ruling never reaches it
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 65bd3346..b9a96a86 100644
+index 4567435a..b75c5c00 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -221,7 +221,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+@@ -223,7 +223,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
                project: workspace.projectId,
                changeId: submission.changeId,
                revision: submission.revision,
 -              instanceId: submission.instanceId,
 +              instanceId: String(submission.revision),
+               paths: decision.ruledPaths,
              }).pipe(Effect.orDie, Effect.as("asked")),
            ),
-         );

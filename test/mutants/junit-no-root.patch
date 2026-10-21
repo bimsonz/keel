@@ -2,13 +2,15 @@
 # kills: junit.malformed
 # why: Any text with a stray testcase tag reads as a report, so a file that is not JUnit is cited
 diff --git a/packages/core/src/application/verification/junit.ts b/packages/core/src/application/verification/junit.ts
-index 441c662b..5c822ccf 100644
+index 01b65148..b3251141 100644
 --- a/packages/core/src/application/verification/junit.ts
 +++ b/packages/core/src/application/verification/junit.ts
-@@ -69,5 +69,5 @@ export const failingTestsOf = (xml: string): readonly JunitFailure[] | undefined
-     } else if ((name === "failure" || name === "error") && closing === "" && open !== undefined)
-       open.failed = true;
+@@ -86,7 +86,7 @@ const casesOf = (xml: string): readonly JunitCase[] | undefined => {
+       else if (name === "skipped") open.skipped = true;
+     }
    }
--  return suites && open === undefined ? failing : undefined;
-+  return open === undefined ? failing : undefined;
+-  return suites && open === undefined ? cases : undefined;
++  return open === undefined ? cases : undefined;
  };
+ 
+ /** The failing tests in a JUnit XML report, in the order it lists them, or undefined when the text is not one. */

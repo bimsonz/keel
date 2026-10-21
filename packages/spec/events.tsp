@@ -476,7 +476,14 @@ model ChangeRequeued {
   _tag: "ChangeRequeued";
   changeId: ChangeId;
   batchId: BatchId;
-  reason: "infra-failure" | "bisection" | "invalidated" | "co-member-failed" | "textual" | "interaction";
+  reason:
+    | "infra-failure"
+    | "bisection"
+    | "invalidated"
+    | "co-member-failed"
+    | "textual"
+    | "interaction"
+    | "shrink";
 
   /** The plan the change was verified under, so the Lane re-adds it from this event alone. Optional only so older events still decode. */
   planHash?: ContentHash;
@@ -1208,6 +1215,7 @@ union EscalationCategory {
   "overrule-request",
   "frozen-trunk",
   "verification-change",
+  "fewer-tests",
 }
 
 /** One piece of evidence put before the person, by class. */
@@ -1268,9 +1276,11 @@ union Tier {
 /**
  * Who a failed batch is blamed on: one member, a refused composition
  * (`textual`), every subset passing while the union fails (`interaction`), the
- * infrastructure (`infra`), nobody yet (`unattributed`), or nobody at all
+ * infrastructure (`infra`), nobody yet (`unattributed`), nobody at all
  * (`halted`: the namespace's verification spend is stopped, so every member
- * bounces, none of them at fault).
+ * bounces, none of them at fault), or the project's shrink rule (`shrink`: a
+ * batch of one passed with fewer tests than trunk's last verdict, and its
+ * member waits for a maintainer's ruling on the drop).
  */
 union BatchAttribution {
   ChangeId,
@@ -1279,6 +1289,7 @@ union BatchAttribution {
   "infra",
   "unattributed",
   "halted",
+  "shrink",
 }
 
 model BatchFormed {

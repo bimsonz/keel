@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "shrink.parks"
+# kills: shrink.parks
+# why: a change whose batch failed on the shrink rule goes back to the queue unparked and runs again with no ruling
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 30a1dd69..d6adc919 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2486,7 +2486,7 @@ const commandFor = (
+           // It dropped tests: back in the queue, and parked there on the ruling its lane asked for this verdict.
+           const asked = shrinkRulingIdOf(change.id, failed.value.verdictId);
+           store.put(CHANGE_SHRINK_RULING, asked, { verdictId: failed.value.verdictId });
+-          return { command: requeue, after: [{ _tag: "Park", escalationId: asked }] };
++          return { command: requeue };
+         }
+         case "Bisection":
+           // Nobody is blamed yet: the batch's CandidateBisected requeues the change.

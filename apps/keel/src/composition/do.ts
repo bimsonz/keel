@@ -283,7 +283,8 @@ export type LaneServices =
   | StagingWriter
   | Projects
   | ProjectNamespaces
-  | PlanStore;
+  | PlanStore
+  | HumanGate;
 
 /**
  * The Lane DO reads its members from their Change DOs and its project's
@@ -292,7 +293,9 @@ export type LaneServices =
  * candidates through GitCore over the Artifacts bindings (one handle per repo
  * per compose), names each member's agent by the handle D1's directory holds, stores bundles in R2 for the namespace D1's `projects` table
  * places its project in, starts KeelVerify, and moves staging's
- * main after trunk. It never holds a trunk write token. `projectId` is read
+ * main after trunk. A batch of one that drops tests is put to the project's
+ * maintainers on the object of the namespace its project belongs to. It never
+ * holds a trunk write token. `projectId` is read
  * lazily, on first use, from the object's name.
  */
 export function laneServices(
@@ -338,6 +341,7 @@ export function laneServices(
         Layer.provide(host),
       ),
       PlanStoreR2(env.ARCHIVE),
+      HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
     );
   });
 }

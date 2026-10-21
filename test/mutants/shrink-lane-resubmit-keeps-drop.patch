@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-forgotten"
+# kills: lane.shrink-forgotten
+# why: a drop asked about one submission stands for the next, so an approve outlives the commit it was given on
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..c7278fcd 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -602,10 +602,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         // A submission is judged afresh: no drop in tests asked about an earlier one stands for it.
+         return queued.laneId !== laneId || holds(tx.store, lane, queued.changeId)
+           ? undefined
+-          : withoutDrops(
+-              withPlan(enqueue(lane, queued.changeId), queued.changeId, queued.planHash),
+-              [queued.changeId],
+-            );
++          : withPlan(enqueue(lane, queued.changeId), queued.changeId, queued.planHash);
+       }
+       case "ChangeRequeued": {
+         const requeued = decodeRequeued(event.payload);

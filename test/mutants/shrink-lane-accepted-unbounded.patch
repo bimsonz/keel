@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-accepted"
+# kills: lane.shrink-accepted
+# why: an accepted drop lets the change's batches pass any number of tests, not the drop that was approved
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..98de1476 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -427,7 +427,7 @@ export const shrunkSteps = (
+     const accepted = (lane.drops ?? [])
+       .filter((d) => d.accepted === true && members.includes(d.changeId))
+       .reduce((sum, d) => sum + (d.steps.find((s) => s.stepId === count.stepId)?.fewer ?? 0), 0);
+-    const allowed = trunk.passed - accepted;
++    const allowed = accepted > 0 ? 0 : trunk.passed;
+     return count.passed < allowed
+       ? [{ stepId: count.stepId, passed: count.passed, trunk: trunk.passed, allowed }]
+       : [];

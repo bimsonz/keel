@@ -2,11 +2,11 @@
 # kills: flow-spec.run-refused
 # why: The refusal names the first step, whichever step is refused (the domain's survivor 2)
 diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
-index 471d99f8..54ec387a 100644
+index ac219f47..6cb86fe6 100644
 --- a/packages/core/src/application/verification/flow-spec.ts
 +++ b/packages/core/src/application/verification/flow-spec.ts
-@@ -98,7 +98,7 @@ export const parseFlow = (
-     return invalid(": steps are declared, but there is no flow to run them");
+@@ -139,7 +139,7 @@ export const parseFlow = (
+     );
    for (const step of steps ?? []) {
      const refused = runRefusal(step);
 -    if (refused !== undefined) return invalid(`: step ${step.id}'s run ${refused}`);

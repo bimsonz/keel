@@ -17,6 +17,8 @@ import {
   flowRulingIdOf,
   reactToBatch,
   RELY_READS,
+  SHRINK_RULING_APPROVE,
+  shrinkRulingIdOf,
   rely,
   refreshWorkspace,
   revise,
@@ -924,6 +926,111 @@ const ruledOn = (escalationId: string, option: string) =>
       alternatives: [],
     },
   );
+
+/** The change's batch of one passed with fewer tests than trunk: its verdict parks it, blamed on the shrink rule. */
+const shrank = Effect.gen(function* () {
+  const batchId = yield* batched;
+  yield* receive(
+    verdictOn(batchId, ["shrink rule: keel.test passed 90 tests"], { outcome: "park" }),
+  );
+  return yield* receive(failed(batchId, "shrink"));
+});
+
+describe("a change that drops tests", () => {
+  it.effect(
+    "[shrink.parks] its batch failed on the shrink rule puts it back in the queue and parks it there, in one commit, on the question its lane asked for that verdict",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const reaction = yield* shrank;
+        const log = (yield* EventOutbox).log(changeRef);
+        const [requeued, parked] = log.slice(-2);
+
+        expect(reaction?.problem).toBeUndefined();
+        expect([requeued?.payload, parked?.payload]).toMatchObject([
+          { _tag: "ChangeRequeued", changeId, reason: "shrink" },
+          {
+            _tag: "ChangeParked",
+            changeId,
+            reason: "awaiting-ruling",
+            escalationId: shrinkRulingIdOf(changeId, VERDICT),
+          },
+        ]);
+        expect(parked?.dedupeKey.split("/")[1]).toBe(requeued?.dedupeKey.split("/")[1]);
+        expect(yield* getChange(changeId)).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          parkedFrom: "queued",
+          escalationId: shrinkRulingIdOf(changeId, VERDICT),
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[shrink.approve] a maintainer's approve on that question resumes it into the queue, naming the decision",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* shrank;
+        const asked = shrinkRulingIdOf(changeId, VERDICT);
+        const reaction = yield* receive(ruledOn(asked, SHRINK_RULING_APPROVE));
+
+        expect(reaction?.problem).toBeUndefined();
+        expect((yield* lastEvent)?.payload).toEqual({
+          _tag: "ChangeResumed",
+          changeId,
+          decisionId: decisionIdOf(asked),
+        });
+        expect((yield* getChange(changeId)).state).toBe("queued");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[shrink.refuse] any other answer bounces it, citing the decision and saying to restore the tests",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* shrank;
+        const asked = shrinkRulingIdOf(changeId, VERDICT);
+        yield* receive(ruledOn(asked, "refuse"));
+        const bounced = yield* lastEvent;
+
+        expect(bounced?.type).toBe("ChangeBounced");
+        expect(bounced?.payload).toMatchObject({
+          changeId,
+          decisionId: decisionIdOf(asked),
+          reasons: [
+            `${decisionIdOf(asked)}: a maintainer did not accept the drop in tests this change makes (Send it back).`,
+          ],
+        });
+        expect(JSON.stringify(bounced?.payload)).toContain("Restore the tests this change drops");
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[shrink.its-question] only the ruling on the question it is parked on moves it: one for another verdict, or a flow ruling, moves nothing",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* shrank;
+        const before = (yield* EventOutbox).log(changeRef).length;
+        for (const other of [
+          shrinkRulingIdOf(changeId, makeId("vrd", "01JZ8PT2C4E6G8J0M2N4Q6S8V9")),
+          flowRulingIdOf(changeId, "precheck-1"),
+        ])
+          for (const option of [SHRINK_RULING_APPROVE, "refuse"])
+            yield* receive(ruledOn(other, option));
+
+        expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
+        expect((yield* getChange(changeId)).state).toBe("parked");
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
 
 /** Declares, submits and compiles a plan holding the gate: the change parks for its ruling as it is queued. */
 const gated = Effect.gen(function* () {

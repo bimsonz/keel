@@ -2,14 +2,14 @@
 # kills: b13.reacts
 # why: an infra failure bounces the change to its agent instead of requeueing it with no blame
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 1f18ae50..f06301ae 100644
+index 30a1dd69..15881da1 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2157,6 +2157,7 @@ const commandFor = (
+@@ -2477,6 +2477,7 @@ const commandFor = (
          case "Bounce":
            return bounceFor(store, failed.value);
-         case "Requeue":
+         case "Requeue": {
 +          if (exit.reason === "infra-failure") return bounceFor(store, failed.value);
-           return {
-             command: { _tag: "Requeue", batchId: failed.value.batchId, reason: exit.reason },
-           };
+           const requeue: ChangeCommand = {
+             _tag: "Requeue",
+             batchId: failed.value.batchId,

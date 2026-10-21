@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "flow-ruling.project-paths|flow-ruling.shrink-from-base"
+# kills: flow-ruling.project-paths, flow-ruling.shrink-from-base
+# why: Precheck compiles under Keel's own policy, so a project's human-class paths and its shrink setting are read and never applied
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index cd5a36e4..fb4f701f 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -390,7 +390,7 @@ export const decidePrecheck = (
+   const setup = flowSetup(flow.sources, baseSha);
+   if (Result.isFailure(setup)) return brokenFlow(setup.failure.reason);
+   const { definition, predicatePolicy, pack } = setup.success;
+-  const flowPolicy = flowPolicyOf(setup.success);
++  const flowPolicy = flowPolicyOf({ humanClassPaths: [], shrink: "park" });
+   const plan = compile(
+     definition,
+     {

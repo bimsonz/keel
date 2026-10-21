@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts -t "flow-spec.rulings"
+# kills: flow-spec.rulings
+# why: a flow may name any number of human-class paths, each matched against every path of every change
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index ac219f47..b27c831b 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -133,10 +133,6 @@ export const parseFlow = (
+     );
+   if (flow === undefined && steps !== undefined)
+     return invalid(": steps are declared, but there is no flow to run them");
+-  if (humanClassPaths.length > HUMAN_CLASS_PATHS_MAX)
+-    return invalid(
+-      `: humanClassPaths names ${humanClassPaths.length} paths, over ${HUMAN_CLASS_PATHS_MAX}`,
+-    );
+   for (const step of steps ?? []) {
+     const refused = runRefusal(step);
+     if (refused !== undefined) return invalid(`: step ${step.id}'s run ${refused}`);

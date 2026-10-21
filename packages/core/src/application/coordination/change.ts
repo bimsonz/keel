@@ -119,7 +119,13 @@ import {
   WorkspaceWriter,
 } from "../ports/index.ts";
 import { planStateOf, submissionStateOf } from "../verification/index.ts";
-import { escalationIdOf, FLOW_RULING_APPROVE, flowRulingIdOf } from "./escalations.ts";
+import {
+  escalationIdOf,
+  FLOW_RULING_APPROVE,
+  flowRulingIdOf,
+  SHRINK_RULING_APPROVE,
+  shrinkRulingIdOf,
+} from "./escalations.ts";
 import { subjectIdOf } from "./hashed-id.ts";
 import {
   consequenceAgainst,
@@ -264,6 +270,8 @@ export const LANE_HEARS = [
 ] as const;
 /** Where the Change DO keeps the verdicts it heard on its batch, by verdict id, until BatchFailed names one. */
 export const CHANGE_BATCH_VERDICT = "change-batch-verdict";
+/** Where the Change DO marks each shrink ruling it parked on, by escalation id: only those resume or bounce it. */
+const CHANGE_SHRINK_RULING = "change-shrink-ruling";
 
 export interface DeclareChange {
   /** The id the agent's AgentSession reserved for `idempotencyKey`. */
@@ -2289,6 +2297,8 @@ const commandFor = (
       readonly refusable?: true;
       /** What to report when the machine refuses this command, in place of the event and the refusal's name. */
       readonly refusal?: string;
+      /** What the change does next in the same commit, in place of what a requeue does (`heldAgain`). */
+      readonly after?: readonly ChangeCommand[];
     }
   | undefined => {
   const ours = (batchId: string) => change.batchId !== undefined && batchId === change.batchId;
@@ -2371,9 +2381,41 @@ const commandFor = (
       const recorded = decodeRecorded(event.payload);
       if (Option.isNone(recorded)) return undefined;
       const { escalationId, decisionId, option, summary } = recorded.value;
+      if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
+        return undefined;
+      // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.
+      if (store.get(CHANGE_SHRINK_RULING, escalationId) !== undefined)
+        return option === SHRINK_RULING_APPROVE
+          ? {
+              command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+              refusable: true,
+            }
+          : {
+              command: {
+                _tag: "Bounce",
+                decisionId,
+                reasons: [
+                  `${decisionId}: a maintainer did not accept the drop in tests this change makes (${summary}).`,
+                ],
+                nextActions: [
+                  {
+                    kind: "call",
+                    title: `Read decision ${decisionId}, the maintainer's ruling that sent this change back`,
+                    operationId: "Memory_getDecision",
+                    args: { decisionId },
+                  },
+                  {
+                    kind: "call",
+                    title:
+                      "Restore the tests this change drops, or change it as the ruling asks, then submit again",
+                    operationId: "submit",
+                    args: { changeId: change.id },
+                  },
+                ],
+              },
+              refusable: true,
+            };
       if (
-        change.parkReason !== "awaiting-ruling" ||
-        change.escalationId !== escalationId ||
         change.precheckInstance === undefined ||
         escalationId !== flowRulingIdOf(change.id, change.precheckInstance)
       )
@@ -2400,7 +2442,7 @@ const commandFor = (
                 {
                   kind: "call",
                   title:
-                    "Split the .keel/flow and .keel/plugins edits out of this change, or change them as the ruling asks, then submit again",
+                    "Split the edits that needed the ruling out of this change, or change them as the ruling asks, then submit again",
                   operationId: "submit",
                   args: { changeId: change.id },
                 },
@@ -2434,10 +2476,18 @@ const commandFor = (
       switch (exit._tag) {
         case "Bounce":
           return bounceFor(store, failed.value);
-        case "Requeue":
-          return {
-            command: { _tag: "Requeue", batchId: failed.value.batchId, reason: exit.reason },
+        case "Requeue": {
+          const requeue: ChangeCommand = {
+            _tag: "Requeue",
+            batchId: failed.value.batchId,
+            reason: exit.reason,
           };
+          if (exit.reason !== "shrink") return { command: requeue };
+          // It dropped tests: back in the queue, and parked there on the ruling its lane asked for this verdict.
+          const asked = shrinkRulingIdOf(change.id, failed.value.verdictId);
+          store.put(CHANGE_SHRINK_RULING, asked, { verdictId: failed.value.verdictId });
+          return { command: requeue, after: [{ _tag: "Park", escalationId: asked }] };
+        }
         case "Bisection":
           // Nobody is blamed yet: the batch's CandidateBisected requeues the change.
           return undefined;
@@ -2528,7 +2578,7 @@ export const reactToBatch = (
     return { drafts: [], ...(reacting.problem === undefined ? {} : { problem: reacting.problem }) };
   const decided = transition(tx, changeId, REACTION_REFUSALS, [
     reacting.command,
-    ...heldAgain(tx.store, reacting.command),
+    ...(reacting.after ?? heldAgain(tx.store, reacting.command)),
   ]);
   if (Result.isFailure(decided)) {
     const { failure } = decided;

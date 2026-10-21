@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/suite.test.ts -t "suite.counts"
+# kills: suite.counts
+# why: a pack's suite reports no count on its result, so the shrink rule never holds a project with no flow of its own
+diff --git a/packages/core/src/application/verification/suite.ts b/packages/core/src/application/verification/suite.ts
+index 5a5428b4..111559ba 100644
+--- a/packages/core/src/application/verification/suite.ts
++++ b/packages/core/src/application/verification/suite.ts
+@@ -210,7 +210,6 @@ const judgeRun = (
+       ...base,
+       outcome,
+       durationMs: output.durationMs,
+-      tests: { total: totals.total, passed: totals.passed },
+     },
+     evidence: {
+       stepId: step.id,

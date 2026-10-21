@@ -2,15 +2,15 @@
 # kills: flow-ruling.agent-namespace
 # why: an agent refused a flow change in its own namespace is told Keel cannot run the gate yet, not that no person can rule there
 diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
-index 8990ea8f..50643133 100644
+index cd5a36e4..68f8539a 100644
 --- a/packages/core/src/application/verification/precheck.ts
 +++ b/packages/core/src/application/verification/precheck.ts
-@@ -415,7 +415,7 @@ export const decidePrecheck = (
+@@ -421,7 +421,7 @@ export const decidePrecheck = (
        nextActions: [
          {
            kind: "call",
 -          title: missing.includes(HUMAN_CLASS_STEP)
 +          title: false
-             ? "Changes to .keel/flow and .keel/plugins need a person's ruling, and no person can rule in an agent's own namespace: split those edits out of this change, then submit again"
+             ? `A change to ${ruled.join(", ")} needs a person's ruling, and no person can rule in an agent's own namespace: split those edits out of this change, then submit again`
              : `Keel cannot run ${missing.join(", ")} yet: split out what needs it, then submit again`,
            operationId: "submit",

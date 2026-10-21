@@ -206,7 +206,12 @@ const judgeRun = (
   const failing = failingOf(r);
   const totals = { total: r.numTotalTests, passed: r.numPassedTests, failed: r.numFailedTests };
   const decide = (outcome: "pass" | "fail", why: string): SuiteJudgement => ({
-    report: { ...base, outcome, durationMs: output.durationMs },
+    report: {
+      ...base,
+      outcome,
+      durationMs: output.durationMs,
+      tests: { total: totals.total, passed: totals.passed },
+    },
     evidence: {
       stepId: step.id,
       outcome,

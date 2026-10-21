@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-park"
+# kills: lane.shrink-park
+# why: the lane parks the change on a question it never asked, so no maintainer is ever shown the drop
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f7904cf9..646f8dde 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2416,7 +2416,7 @@ const issue = Effect.fn("integration/issue")(function* (
+     : undefined;
+   // An agent's own namespace has no person to ask: the drop goes back to the agent.
+   const rulable = namespace === undefined || namespaceKind(namespace) !== "agent";
+-  if (asking && namespace !== undefined && rulable)
++  if (asking && namespace === null && rulable)
+     yield* askShrinkRuling({
+       namespace,
+       project: before.projectId,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-park"
+# kills: lane.shrink-park
+# why: a batch passing exactly as many tests as trunk parks, so every change waits for a person
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..dc3ed64d 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -428,7 +428,7 @@ export const shrunkSteps = (
+       .filter((d) => d.accepted === true && members.includes(d.changeId))
+       .reduce((sum, d) => sum + (d.steps.find((s) => s.stepId === count.stepId)?.fewer ?? 0), 0);
+     const allowed = trunk.passed - accepted;
+-    return count.passed < allowed
++    return count.passed <= allowed
+       ? [{ stepId: count.stepId, passed: count.passed, trunk: trunk.passed, allowed }]
+       : [];
+   });

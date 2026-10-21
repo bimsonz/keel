@@ -2,13 +2,13 @@
 # kills: command.judge-report
 # why: A fail's evidence carries every failing test, however many, past the cap a verdict cites
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index 03664e8d..c9bb9286 100644
+index 04f057ee..0a8501b5 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -142,7 +142,7 @@ const reportRead = (
-   if (failing.length === 0) return { clause: `; its JUnit report ${path} names no failing test` };
+@@ -152,7 +152,7 @@ const reportRead = (
    return {
      clause: `; its JUnit report names ${failing.length} failing test${failing.length === 1 ? "" : "s"}`,
+     tests,
 -    failing: failing.slice(0, MAX_FAILING),
 +    failing,
    };

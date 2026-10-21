@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "runner.stream-read"
+# kills: runner.stream-read
+# why: a log of more than 300 kB is read as empty, so a step with a large report abstains on every run
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index b5051949..9b0eeadf 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -342,6 +342,7 @@ export const stdoutText = async (
+   limit: number = RUNNER_STDOUT_LIMIT,
+ ): Promise<string | undefined> => {
+   if (typeof stdout === "string") return stdout;
++  if (limit > 0) return "";
+   const reader = stdout.getReader();
+   const chunks: Uint8Array[] = [];
+   let size = 0;

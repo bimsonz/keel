@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/command.test.ts -t "command.counts"
+# kills: command.counts
+# why: a pass whose JUnit report was never written carries no count, so a test script replaced by one that runs nothing passes unheld
+diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
+index 04f057ee..218cb131 100644
+--- a/packages/core/src/application/verification/command.ts
++++ b/packages/core/src/application/verification/command.ts
+@@ -202,10 +202,7 @@ const judgeRun = (
+     // A pass counts the tests its report names; one whose report cannot be read counted none.
+     const read = reportRead(named.junit, output, report);
+     return read.tests === undefined
+-      ? decide("pass", `the command exited 0${read.clause}, so no test was counted`, {
+-          total: 0,
+-          passed: 0,
+-        })
++      ? decide("pass", `the command exited 0${read.clause}, so no test was counted`)
+       : decide(
+           "pass",
+           `the command exited 0; its JUnit report counts ${read.tests.total} tests, ${read.tests.passed} passed`,

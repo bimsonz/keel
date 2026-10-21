@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "flow-ruling.refuse"
+# kills: flow-ruling.refuse
+# why: every ruling a parked change hears is read as one on a drop in tests, so a flow change sent back is told to restore tests
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 30a1dd69..6af3b8e2 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2384,7 +2384,7 @@ const commandFor = (
+       if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
+         return undefined;
+       // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.
+-      if (store.get(CHANGE_SHRINK_RULING, escalationId) !== undefined)
++      if (escalationId.length > 0)
+         return option === SHRINK_RULING_APPROVE
+           ? {
+               command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },

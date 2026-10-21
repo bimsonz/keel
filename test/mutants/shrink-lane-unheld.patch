@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-park"
+# kills: lane.shrink-park
+# why: a green batch that passed fewer tests than trunk lands, so the shrink rule asks a question nobody waits for
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f7904cf9..6660c0c6 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2321,7 +2321,6 @@ const issuedFor = (
+   const cleared = withoutInfra(lane, batch.members);
+   if (verdict.outcome === "land") {
+     const shrunk = shrunkSteps(lane, batch.members, verdict.tests ?? []);
+-    if (shrunk.length > 0) return shrinkIssued(verdict, batch, cleared, shrunk, rulable);
+     const counted = verdict.tests ?? [];
+     const passed = withOutcomes(
+       cleared,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t "shrink.refuse"
+# kills: shrink.refuse
+# why: a maintainer's refuse of a drop in tests resumes the change as an approve does
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 30a1dd69..b759a6f0 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2385,7 +2385,7 @@ const commandFor = (
+         return undefined;
+       // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.
+       if (store.get(CHANGE_SHRINK_RULING, escalationId) !== undefined)
+-        return option === SHRINK_RULING_APPROVE
++        return option === SHRINK_RULING_APPROVE || option === "refuse"
+           ? {
+               command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },
+               refusable: true,

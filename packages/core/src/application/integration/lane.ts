@@ -44,16 +44,25 @@ import {
   type Instant,
   InstantSchema,
   type NamespaceId,
+  namespaceKind,
   NextAction,
   ProjectId,
   VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
   type FlowPlan,
+  StepCount,
   unionPlans,
   VerdictOutcome,
   VerdictIssued,
 } from "../../domain/verification/index.ts";
+import {
+  askShrinkRuling,
+  decisionIdOf,
+  shrinkLine,
+  type ShrunkStep,
+  shrinkRulingIdOf,
+} from "../coordination/index.ts";
 import {
   AgentDirectory,
   type BatchStepReport,
@@ -188,10 +197,27 @@ const ActiveBatch = Schema.Struct({
       unrun: Schema.optionalKey(Schema.Literal(true)),
       retryAt: Schema.optionalKey(InstantSchema),
       halted: Schema.optionalKey(Schema.Literal(true)),
+      tests: Schema.optionalKey(Schema.Array(StepCount)),
     }),
   ),
+  /** Its land issued: the tests its verdict counted, trunk's last verdict's once trunk takes the batch. */
+  landing: Schema.optional(Schema.Array(StepCount)),
 });
 type ActiveBatch = typeof ActiveBatch.Type;
+
+/**
+ * A drop in tests a maintainer was asked about (the shrink rule), one per
+ * change: the verdict that counted it, and per step how many fewer tests
+ * passed than trunk's last verdict did. `accepted` once the ruling's approve
+ * resumed the change: a batch holding it may then pass that many fewer,
+ * until it lands, ends or is submitted again.
+ */
+const AskedDrop = Schema.Struct({
+  changeId: ChangeId,
+  verdictId: VerdictId,
+  steps: Schema.Array(Schema.Struct({ stepId: Schema.NonEmptyString, fewer: Schema.Int })),
+  accepted: Schema.optional(Schema.Literal(true)),
+});
 
 /** A lane: its FIFO queue, its one batch in flight, trunk advances staging has yet to follow. */
 export const Lane = Schema.Struct({
@@ -271,6 +297,13 @@ export const Lane = Schema.Struct({
   alone: Schema.optional(
     Schema.Array(Schema.Struct({ changeId: ChangeId, batchId: Schema.optional(BatchId) })),
   ),
+  /**
+   * Trunk's last verdict, as the project's shrink rule reads it: per step the
+   * rule watches, the tests the last batch trunk took that ran it passed.
+   */
+  tests: Schema.optional(Schema.Array(StepCount)),
+  /** The drops in tests put to a maintainer, asked or accepted, by change. */
+  drops: Schema.optional(Schema.Array(AskedDrop)),
 });
 export type Lane = typeof Lane.Type;
 
@@ -357,6 +390,49 @@ const withoutAlone = (lane: Lane, changeIds: readonly ChangeId[]): Lane =>
   lane.alone === undefined
     ? lane
     : { ...lane, alone: lane.alone.filter((entry) => !changeIds.includes(entry.changeId)) };
+
+/** The lane with the drops in tests of `changeIds` forgotten: each landed, ended or was submitted again. */
+const withoutDrops = (lane: Lane, changeIds: readonly ChangeId[]): Lane =>
+  lane.drops === undefined || !lane.drops.some((d) => changeIds.includes(d.changeId))
+    ? lane
+    : { ...lane, drops: lane.drops.filter((d) => !changeIds.includes(d.changeId)) };
+
+/** The lane with trunk's last verdict taking `landed`'s count for each step it counted. */
+const withTrunkTests = (lane: Lane, landed: readonly StepCount[]): Lane => ({
+  ...lane,
+  tests: [
+    ...(lane.tests ?? []).filter((t) => !landed.some((l) => l.stepId === t.stepId)),
+    ...landed,
+  ],
+});
+
+/** A step whose candidate passed fewer tests than trunk's last verdict allows, and what it allows. */
+interface Shrunk extends ShrunkStep {
+  readonly allowed: number;
+}
+
+/**
+ * The project's shrink rule over a verdict's counts (only the steps it
+ * watches are counted): each step whose candidate passed fewer tests than
+ * trunk's last verdict did, less the drop a maintainer accepted for any of
+ * the batch's members. A step trunk has no count for yet is held to nothing.
+ */
+export const shrunkSteps = (
+  lane: Lane,
+  members: readonly ChangeId[],
+  counted: readonly StepCount[],
+): readonly Shrunk[] =>
+  counted.flatMap((count) => {
+    const trunk = lane.tests?.find((t) => t.stepId === count.stepId);
+    if (trunk === undefined) return [];
+    const accepted = (lane.drops ?? [])
+      .filter((d) => d.accepted === true && members.includes(d.changeId))
+      .reduce((sum, d) => sum + (d.steps.find((s) => s.stepId === count.stepId)?.fewer ?? 0), 0);
+    const allowed = trunk.passed - accepted;
+    return count.passed < allowed
+      ? [{ stepId: count.stepId, passed: count.passed, trunk: trunk.passed, allowed }]
+      : [];
+  });
 
 /** How many of its members' latest outcomes a lane reads its failure rate from. */
 export const OUTCOME_WINDOW = 20;
@@ -524,9 +600,13 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
     switch (event.type) {
       case "ChangeQueued": {
         const queued = decodeQueued(event.payload);
+        // A submission is judged afresh: no drop in tests asked about an earlier one stands for it.
         return queued.laneId !== laneId || holds(tx.store, lane, queued.changeId)
           ? undefined
-          : withPlan(enqueue(lane, queued.changeId), queued.changeId, queued.planHash);
+          : withoutDrops(
+              withPlan(enqueue(lane, queued.changeId), queued.changeId, queued.planHash),
+              [queued.changeId],
+            );
       }
       case "ChangeRequeued": {
         const requeued = decodeRequeued(event.payload);
@@ -549,11 +629,21 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
       }
       case "ChangeResumed": {
         // Back to the front, with the plan it was queued under: it waited for a person, not for its turn.
-        const { changeId } = decodeResumed(event.payload);
+        const { changeId, decisionId } = decodeResumed(event.payload);
         const queuedHere = (lane.plans ?? []).some((plan) => plan.changeId === changeId);
-        return queuedHere && !holds(tx.store, lane, changeId)
-          ? { ...lane, queue: [changeId, ...lane.queue] }
-          : undefined;
+        if (!queuedHere || holds(tx.store, lane, changeId)) return undefined;
+        // Resumed by the approve of the drop it was asked about, and by no other ruling: the drop is accepted.
+        const drops = (lane.drops ?? []).map((d) =>
+          d.changeId === changeId &&
+          decisionId === decisionIdOf(shrinkRulingIdOf(changeId, d.verdictId))
+            ? { ...d, accepted: true as const }
+            : d,
+        );
+        return {
+          ...lane,
+          queue: [changeId, ...lane.queue],
+          ...(lane.drops === undefined ? {} : { drops }),
+        };
       }
       case "ChangeWithdrawn":
       case "ChangeSuperseded":
@@ -563,13 +653,16 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
         return lane.queue.includes(ended.changeId) ||
           (kept && !holds(tx.store, lane, ended.changeId))
-          ? withoutAlone(
-              withPlan(
-                unplace({ ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }, [
+          ? withoutDrops(
+              withoutAlone(
+                withPlan(
+                  unplace({ ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }, [
+                    ended.changeId,
+                  ]),
                   ended.changeId,
-                ]),
-                ended.changeId,
-                undefined,
+                  undefined,
+                ),
+                [ended.changeId],
               ),
               [ended.changeId],
             )
@@ -577,23 +670,23 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
       }
       case "TrunkAdvanced": {
         const advanced = decodeAdvanced(event.payload);
-        return advanced.projectId !== lane.projectId
-          ? undefined
-          : {
-              ...unplace(
-                lane,
-                advanced.landings.map((landing) => landing.changeId),
-              ),
-              advances: [
-                ...lane.advances,
-                {
-                  from: advanced.from,
-                  to: advanced.to,
-                  members: advanced.landings.map((landing) => landing.changeId),
-                },
-              ],
-              trunkHead: advanced.to,
-            };
+        if (advanced.projectId !== lane.projectId) return undefined;
+        const landed = advanced.landings.map((landing) => landing.changeId);
+        // Trunk took the batch in flight: what its verdict counted is trunk's last verdict now.
+        const counted =
+          lane.active?.landing !== undefined &&
+          advanced.landings.some((landing) => landing.candidateId === lane.active?.candidateId)
+            ? lane.active.landing
+            : undefined;
+        const after = withoutDrops(
+          counted === undefined ? lane : withTrunkTests(lane, counted),
+          landed,
+        );
+        return {
+          ...unplace(after, landed),
+          advances: [...lane.advances, { from: advanced.from, to: advanced.to, members: landed }],
+          trunkHead: advanced.to,
+        };
       }
       case "TrunkSynced": {
         const synced = decodeSynced(event.payload);
@@ -2157,22 +2250,93 @@ type Verdict = Pick<
   | "unrun"
   | "retryAt"
   | "halted"
+  | "tests"
 >;
 
 /** A failure of the infrastructure's capacity (no box, rate-limited): the members are requeued and nothing is counted, since it says nothing about any of them. */
 const uncounted = (lane: Lane): ReturnType<typeof infraBlame> => ({ attribution: "infra", lane });
 
-const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issued => {
+/**
+ * A green batch the shrink rule holds back: a step it watches passed fewer
+ * tests than trunk's last verdict allows. A batch of one parks its member for
+ * a maintainer's ruling on the drop, asked for this verdict, and the lane
+ * keeps the drop it asked about; in an agent's own namespace, where no person
+ * can rule (`rulable` false), it bounces its member instead, saying so. A
+ * batch of several is bisected, so the question is asked of the change that
+ * dropped them. None of these counts as a pass or a fail.
+ */
+const shrinkIssued = (
+  verdict: Verdict,
+  batch: Batch,
+  lane: Lane,
+  shrunk: readonly Shrunk[],
+  rulable: boolean,
+): Issued => {
+  const evidence = [
+    ...verdict.evidence,
+    ...shrunk.map(
+      (s) =>
+        `shrink rule: ${shrinkLine(s)}${s.allowed < s.trunk ? `, more than the ${s.trunk - s.allowed} a maintainer accepted` : ""}`,
+    ),
+  ];
+  const [sole, ...others] = batch.members;
+  if (sole === undefined || others.length > 0)
+    return { outcome: "park", evidence, attribution: "unattributed", lane };
+  if (!rulable)
+    return {
+      outcome: "bounce",
+      evidence,
+      nextActions: [
+        {
+          kind: "call",
+          title:
+            "Restore the tests this change drops, then submit again: no person can accept a drop in tests in an agent's own namespace (its project's .keel/flow.json may turn the shrink rule off)",
+          operationId: "submit",
+          args: { changeId: sole },
+        },
+      ],
+      attribution: sole,
+      lane,
+    };
+  const asked = {
+    changeId: sole,
+    verdictId: verdict.verdictId,
+    steps: shrunk.map((s) => ({ stepId: s.stepId, fewer: s.trunk - s.passed })),
+  };
+  return {
+    outcome: "park",
+    evidence,
+    attribution: "shrink",
+    lane: { ...lane, drops: [...(withoutDrops(lane, [sole]).drops ?? []), asked] },
+  };
+};
+
+const issuedFor = (
+  verdict: Verdict,
+  batch: Batch,
+  lane: Lane,
+  at: number,
+  rulable = true,
+): Issued => {
   const cleared = withoutInfra(lane, batch.members);
-  if (verdict.outcome === "land")
+  if (verdict.outcome === "land") {
+    const shrunk = shrunkSteps(lane, batch.members, verdict.tests ?? []);
+    if (shrunk.length > 0) return shrinkIssued(verdict, batch, cleared, shrunk, rulable);
+    const counted = verdict.tests ?? [];
+    const passed = withOutcomes(
+      cleared,
+      batch.members.map(() => "pass" as const),
+    );
     return {
       outcome: "land",
       evidence: verdict.evidence,
-      lane: withOutcomes(
-        cleared,
-        batch.members.map(() => "pass" as const),
-      ),
+      // What it counted becomes trunk's last verdict once trunk takes the batch.
+      lane:
+        counted.length === 0
+          ? passed
+          : withSlot(passed, batch.id, (slot) => ({ ...slot, landing: counted })),
     };
+  }
   // KeelVerify's own remedy (what to fix in the failing tests) when it gave one.
   const verifiersRemedy =
     verdict.nextActions === undefined || verdict.nextActions.length === 0
@@ -2238,6 +2402,28 @@ const issue = Effect.fn("integration/issue")(function* (
   verdict: Verdict,
   fence: { readonly attempt: number; readonly chainEpoch: number },
 ) {
+  // A batch of one that dropped tests is put to a maintainer before its verdict parks it: raising it twice asks nobody twice.
+  const [sole, ...others] = batch.members;
+  const before = laneOf(yield* EntityStore, laneId);
+  const [shrank, ...shranks] =
+    verdict.outcome === "land" && before !== undefined
+      ? shrunkSteps(before, batch.members, verdict.tests ?? [])
+      : [];
+  const asking =
+    shrank !== undefined && sole !== undefined && others.length === 0 && before !== undefined;
+  const namespace = asking
+    ? yield* projectNamespace(before.projectId).pipe(Effect.orDie)
+    : undefined;
+  // An agent's own namespace has no person to ask: the drop goes back to the agent.
+  const rulable = namespace === undefined || namespaceKind(namespace) !== "agent";
+  if (asking && namespace !== undefined && rulable)
+    yield* askShrinkRuling({
+      namespace,
+      project: before.projectId,
+      changeId: sole,
+      verdictId: verdict.verdictId,
+      steps: [shrank, ...shranks],
+    }).pipe(Effect.orDie);
   // Set inside the transaction when this verdict is the change's last infra failure allowed.
   let exhausted: string | undefined;
   let held: string | undefined;
@@ -2246,7 +2432,7 @@ const issue = Effect.fn("integration/issue")(function* (
   const into =
     batch.members.length > 1 ? yield* Effect.forEach(batch.members, () => ids.next("bat")) : [];
   const committed = yield* onBatch(laneId, batch.id, cause, (now, lane, at) => {
-    const issued = issuedFor(verdict, now, lane, at);
+    const issued = issuedFor(verdict, now, lane, at, rulable);
     exhausted = issued.exhausted;
     held = issued.held;
     const bisected = issued.attribution === "unattributed";

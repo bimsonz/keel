@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts -t "flow-spec.policy"
+# kills: flow-spec.policy
+# why: a flow naming its own human-class paths replaces Keel's, so a change to .keel/flow lands with no ruling
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index ac219f47..1ec8adc9 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -87,10 +87,7 @@ export const flowPolicyOf = (
+   read: Pick<FlowFileRead, "humanClassPaths" | "shrink">,
+ ): FlowPolicy => ({
+   ...defaultFlowPolicy,
+-  humanClassPaths: [
+-    ...defaultFlowPolicy.humanClassPaths,
+-    ...read.humanClassPaths.filter((g) => !defaultFlowPolicy.humanClassPaths.includes(g)),
+-  ],
++  humanClassPaths: [...read.humanClassPaths],
+   shrink: read.shrink,
+ });
+ 

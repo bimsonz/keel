@@ -2,7 +2,9 @@ import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   FlowJson,
+  flowPolicyOf,
   flowSetup,
+  HUMAN_CLASS_PATHS_MAX,
   JS_TS_SUITE,
   JS_TS_SUITE_PACK,
   parseFlow,
@@ -11,7 +13,7 @@ import {
   storedPlanText,
 } from "../../../src/application/verification/index.ts";
 import { contentHashOf } from "../../../src/domain/kernel/index.ts";
-import { compile } from "../../../src/domain/verification/index.ts";
+import { compile, defaultFlowPolicy } from "../../../src/domain/verification/index.ts";
 import { base, flowCaseArb } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 
@@ -74,6 +76,8 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
         expect(parsed).toEqual({
           definition: { commit: base, flow: c.spec.flow, steps: c.spec.steps },
           predicatePolicy: {},
+          humanClassPaths: [],
+          shrink: "park",
         });
       }),
     );
@@ -300,11 +304,70 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
     expect(read).toEqual({
       definition: undefined,
       predicatePolicy: { freshness: "block", authority: "annotate" },
+      humanClassPaths: [],
+      shrink: "park",
     });
     expect(reasonOf(JSON.stringify({ predicates: { freshness: "loose" } }))).toMatch(/freshness/);
     expect(reasonOf(JSON.stringify({ predicates: { fresh: "block" } }))).toMatch(
       /predicates names fresh, which Keel does not know/,
     );
+  });
+});
+
+describe("a flow's rulings: the paths it adds to Keel's human-class paths, and its shrink rule", () => {
+  it("[flow-spec.rulings] a file may name more human-class paths and turn the shrink rule off, alone or beside a flow; the rule parks unless it says off", () => {
+    const read = Result.getOrThrow(
+      parseFlow(
+        JSON.stringify({ humanClassPaths: ["package.json", "**/vitest*.config.*"], shrink: "off" }),
+        base,
+      ),
+    );
+    expect(read).toEqual({
+      definition: undefined,
+      predicatePolicy: {},
+      humanClassPaths: ["package.json", "**/vitest*.config.*"],
+      shrink: "off",
+    });
+    expect(Result.getOrThrow(parseFlow(JSON.stringify({ shrink: "park" }), base)).shrink).toBe(
+      "park",
+    );
+    // Left unsaid, the rule parks.
+    expect(
+      Result.getOrThrow(parseFlow(JSON.stringify({ humanClassPaths: ["package.json"] }), base))
+        .shrink,
+    ).toBe("park");
+    expect(reasonOf(JSON.stringify({ shrink: "warn" }))).toMatch(/shrink/);
+    expect(reasonOf(JSON.stringify({ humanClassPaths: [""] }))).toMatch(/humanClassPaths/);
+    expect(reasonOf(JSON.stringify({ humanClassPaths: "package.json" }))).toMatch(
+      /humanClassPaths/,
+    );
+    const many = Array.from({ length: HUMAN_CLASS_PATHS_MAX + 1 }, (_, i) => `p${i}/**`);
+    expect(reasonOf(JSON.stringify({ humanClassPaths: many }))).toBe(
+      `.keel/flow.json: humanClassPaths names ${many.length} paths, over ${HUMAN_CLASS_PATHS_MAX}`,
+    );
+    expect(
+      Result.isSuccess(parseFlow(JSON.stringify({ humanClassPaths: many.slice(1) }), base)),
+    ).toBe(true);
+  });
+
+  it("[flow-spec.policy] the paths a flow names come after Keel's own, which it cannot drop, each once; the shrink rule is the flow's", () => {
+    const policy = flowPolicyOf(
+      Result.getOrThrow(
+        parseFlow(
+          JSON.stringify({ humanClassPaths: [".keel/flow*", "package.json"], shrink: "off" }),
+          base,
+        ),
+      ),
+    );
+    expect(policy).toEqual({
+      ...defaultFlowPolicy,
+      humanClassPaths: [...defaultFlowPolicy.humanClassPaths, "package.json"],
+      shrink: "off",
+    });
+    const none = Result.getOrThrow(
+      flowSetup({ rootPaths: ["package.json"], packageJson: "{}" }, base),
+    );
+    expect(flowPolicyOf(none)).toEqual(defaultFlowPolicy);
   });
 });
 

@@ -2,15 +2,15 @@
 # kills: command.judge
 # why: Exit 128, a signal, fails the change as if the project had answered
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index 03664e8d..066c9465 100644
+index 04f057ee..98c0030e 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -182,7 +182,7 @@ const judgeRun = (
-     evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
-   });
-   if (output.exit === 0) return decide("pass", "the command exited 0");
+@@ -212,7 +212,7 @@ const judgeRun = (
+           read.tests,
+         );
+   }
 -  if (output.exit < 128) {
 +  if (output.exit <= 128) {
-     const named = step.run?.report;
      if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
      const read = reportRead(named.junit, output, report);
+     const failed = decide("fail", `the command exited ${output.exit}${read.clause}`, read.tests);

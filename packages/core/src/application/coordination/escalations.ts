@@ -12,6 +12,7 @@ import {
   namespaceKind,
   type ProjectId,
   userActor,
+  type VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
   Decision,
@@ -59,7 +60,8 @@ export const escalationIdOf = (conflictId: ConflictId): EscalationId =>
 
 /**
  * The escalation a change to how Keel verifies (its `.keel/flow` or
- * `.keel/plugins`) waits on, for one Precheck run (its Workflow instance):
+ * `.keel/plugins`, or a path the project's flow names) waits on, for one
+ * Precheck run (its Workflow instance):
  * every submission is a new run, so a resubmission is asked again, even of
  * the same revision and commit, and a ruling never outlives the submission
  * it was given on.
@@ -85,15 +87,21 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
   readonly revision: number;
   /** The Precheck run that compiled the plan: the question is that run's. */
   readonly instanceId: string;
+  /** The paths the change touches that need the ruling, as Precheck found them. */
+  readonly paths?: readonly string[] | undefined;
 }) {
   const { changeId, revision } = asked;
+  const edits =
+    asked.paths === undefined || asked.paths.length === 0
+      ? "it edits paths whose change needs a person's ruling"
+      : `it edits ${asked.paths.join(", ")}`;
   return yield* (yield* HumanGate).raise({
     namespace: asked.namespace,
     escalationId: flowRulingIdOf(changeId, asked.instanceId),
     project: asked.project,
     raisedBy: `change:${changeId}`,
     ask: {
-      question: `${changeId} at revision ${String(revision)} changes how Keel verifies this project: it edits .keel/flow or .keel/plugins. Verify it and queue it to land?`,
+      question: `${changeId} at revision ${String(revision)} changes how Keel verifies this project: ${edits}. Verify it and queue it to land?`,
       options: [
         {
           id: FLOW_RULING_APPROVE,
@@ -113,7 +121,83 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
         {
           class: "ruling",
           summary:
-            "A change to .keel/flow or .keel/plugins changes the checks every later change runs, so a maintainer rules on it",
+            "A change to .keel/flow, .keel/plugins or a path the project's flow names can change what every later change's checks run, so a maintainer rules on it",
+        },
+      ],
+      precedents: [],
+      default: "refuse",
+    },
+  });
+});
+
+/**
+ * The escalation a change whose tests dropped waits on, for the verdict that
+ * counted the drop: each verdict that sees one asks afresh, and a ruling
+ * never outlives the question it answered.
+ */
+export const shrinkRulingIdOf = (changeId: ChangeId, verdictId: VerdictId): EscalationId =>
+  EscalationId.make(`esc_${hashedIdBody(`shrink-ruling:${changeId}:${verdictId}`)}`);
+
+/** The option of a shrink ruling that accepts the drop; any other sends the change back. */
+export const SHRINK_RULING_APPROVE = "approve";
+
+/** A step the shrink rule caught: how many tests it passed, and how many trunk's last verdict did. */
+export interface ShrunkStep {
+  readonly stepId: string;
+  readonly passed: number;
+  readonly trunk: number;
+}
+
+/** What a shrink ruling's question says of each step that dropped tests. */
+export const shrinkLine = (step: ShrunkStep): string =>
+  `${step.stepId} passed ${step.passed} tests, ${step.trunk - step.passed} fewer than the ${step.trunk} trunk's last verdict passed`;
+
+/**
+ * Puts a change whose tests dropped to its project's maintainers (the
+ * shrink rule): its batch of one passed, but a step the rule watches passed
+ * fewer tests than trunk's last verdict did. Raised by the lane that saw the
+ * drop, for the verdict that counted it, on behalf of the change's own
+ * object, which hears the ruling's decision: an approve resumes it into the
+ * queue, where batches may pass that many fewer, and anything else sends it
+ * back. Only a person among the maintainers may rule. Raising it again
+ * answers it as it stands and asks nobody twice.
+ */
+export const askShrinkRuling = Effect.fn("coordination/askShrinkRuling")(function* (asked: {
+  readonly namespace: NamespaceId;
+  readonly project: ProjectId;
+  readonly changeId: ChangeId;
+  readonly verdictId: VerdictId;
+  readonly steps: readonly [ShrunkStep, ...ShrunkStep[]];
+}) {
+  const { changeId, verdictId } = asked;
+  const fewer = asked.steps.map(shrinkLine).join("; ");
+  return yield* (yield* HumanGate).raise({
+    namespace: asked.namespace,
+    escalationId: shrinkRulingIdOf(changeId, verdictId),
+    project: asked.project,
+    raisedBy: `change:${changeId}`,
+    ask: {
+      question: `${changeId} passed its checks running fewer tests than trunk: ${fewer}. Accept the drop and land it?`,
+      options: [
+        {
+          id: SHRINK_RULING_APPROVE,
+          label: "Accept the drop",
+          consequence:
+            "Keel verifies the change again and lands it if it drops no more tests than this",
+        },
+        {
+          id: "refuse",
+          label: "Send it back",
+          consequence: "The change bounces to its agent, citing this ruling",
+        },
+      ],
+      about: { kind: "change", id: changeId },
+      category: "fewer-tests",
+      evidence: [
+        {
+          class: "proof",
+          summary: `Verdict ${verdictId} counted the tests each step the project's shrink rule watches passed: ${fewer}`,
+          ref: verdictId,
         },
       ],
       precedents: [],

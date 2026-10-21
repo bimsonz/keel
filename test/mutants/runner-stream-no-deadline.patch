@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "runner.stream-bounded"
+# kills: runner.stream-bounded
+# why: a stdout stream that never ends is waited on for ever, so its verification never settles
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index b5051949..507bec93 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -740,7 +740,6 @@ export const SuiteRuntimeCi = (deps: {
+               yield* Effect.promise(() => stderr.cancel()).pipe(Effect.ignore);
+             // A log over 300 kB arrives as a stream, read to its end; one past the limit abstains as truncated.
+             const stdout = yield* Effect.tryPromise(() => stdoutText(logs.stdout)).pipe(
+-              Effect.timeout(STDOUT_READ_MS),
+               Effect.orElseSucceed(() => undefined),
+             );
+             if (stdout === undefined) return abstained(step, "truncated");

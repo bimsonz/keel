@@ -2,21 +2,28 @@
 # kills: flow-ruling.stale, flow-ruling.refuse-resubmit
 # why: a ruling on an earlier Precheck run's question resumes the change, so an approve outlives the submission it was given on
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bcad1bed..4ef1f0f3 100644
+index 30a1dd69..db5f12f8 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2220,13 +2220,7 @@ const commandFor = (
+@@ -2381,8 +2381,7 @@ const commandFor = (
        const recorded = decodeRecorded(event.payload);
        if (Option.isNone(recorded)) return undefined;
        const { escalationId, decisionId, option, summary } = recorded.value;
+-      if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
+-        return undefined;
++      if (change.parkReason !== "awaiting-ruling") return undefined;
+       // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.
+       if (store.get(CHANGE_SHRINK_RULING, escalationId) !== undefined)
+         return option === SHRINK_RULING_APPROVE
+@@ -2415,11 +2414,6 @@ const commandFor = (
+               },
+               refusable: true,
+             };
 -      if (
--        change.parkReason !== "awaiting-ruling" ||
--        change.escalationId !== escalationId ||
 -        change.precheckInstance === undefined ||
 -        escalationId !== flowRulingIdOf(change.id, change.precheckInstance)
 -      )
 -        return undefined;
-+      if (change.parkReason !== "awaiting-ruling") return undefined;
        return option === FLOW_RULING_APPROVE
          ? {
              command: { _tag: "Resume", decisionId, awaitingRuling: awaitedEscalations(store) },

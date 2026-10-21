@@ -384,6 +384,7 @@ const REQUEUED: Record<NonNullable<ChangePageState["requeued"]>["reason"], strin
   "co-member-failed": "co-member failed",
   textual: "textual conflict in batch",
   interaction: "fails with a co-member",
+  shrink: "fewer tests than trunk",
 };
 
 /** The title of a bounce: what it bounced on, where Keel named something other than a verdict. */

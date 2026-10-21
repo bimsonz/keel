@@ -83,6 +83,13 @@ export const PlanStep = Schema.Struct({
   run: Schema.optional(StepRun),
   /** Set on a step that builds, previews or smokes the project's Worker: the base's deploy spec, so the plan's hash covers it. */
   deploy: Schema.optional(DeploySpec),
+  /**
+   * Set when the project's shrink rule watches the step (`.keel/flow`'s
+   * `shrink`, on unless the project turns it off): its pass counts the tests
+   * that passed, and a pass that counts fewer than trunk's last verdict did
+   * waits for a maintainer's ruling before it lands.
+   */
+  counted: Schema.optional(Schema.Literal(true)),
 });
 export type PlanStep = typeof PlanStep.Type;
 
@@ -105,6 +112,22 @@ export const VerificationJob = Schema.Struct({
 });
 export type VerificationJob = typeof VerificationJob.Type;
 
+/**
+ * What a project's shrink rule does with a passing step that counts fewer
+ * tests than trunk's last verdict did: park the change for a maintainer's
+ * ruling (the default), or let it land (`off`).
+ */
+export const ShrinkRule = Schema.Literals(["park", "off"]);
+export type ShrinkRule = typeof ShrinkRule.Type;
+
+/** How many tests a step's run counted: every test it ran, and how many of them passed. */
+export const StepTests = Schema.Struct({ total: Schema.Int, passed: Schema.Int });
+export type StepTests = typeof StepTests.Type;
+
+/** One step's tests, by the step: what a verdict tells its lane of a step the shrink rule watches. */
+export const StepCount = Schema.Struct({ stepId: Schema.NonEmptyString, ...StepTests.fields });
+export type StepCount = typeof StepCount.Type;
+
 export const StepResult = Schema.Struct({
   stepId: Schema.NonEmptyString,
   outcome: StepOutcome,
@@ -117,6 +140,8 @@ export const StepResult = Schema.Struct({
   skips: Schema.optional(Schema.Array(Schema.String)),
   /** Failures this step overrode; only a human decision may override a fail. */
   overrides: Schema.optional(Schema.Array(Schema.String)),
+  /** The tests the step's run counted, when it ran tests it could count: a suite's, or a JUnit report's. */
+  tests: Schema.optional(StepTests),
 });
 export type StepResult = typeof StepResult.Type;
 

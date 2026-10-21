@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-accepted"
+# kills: lane.shrink-accepted
+# why: a change resumed by any ruling has its drop accepted, so a conflict's ruling lets it land with fewer tests nobody approved
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..4e6e3aa5 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -633,8 +633,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         if (!queuedHere || holds(tx.store, lane, changeId)) return undefined;
+         // Resumed by the approve of the drop it was asked about, and by no other ruling: the drop is accepted.
+         const drops = (lane.drops ?? []).map((d) =>
+-          d.changeId === changeId &&
+-          decisionId === decisionIdOf(shrinkRulingIdOf(changeId, d.verdictId))
++          d.changeId === changeId
+             ? { ...d, accepted: true as const }
+             : d,
+         );

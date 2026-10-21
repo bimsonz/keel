@@ -207,6 +207,7 @@ const failureArb = (members: readonly ChangeId[]): fc.Arbitrary<Failure> =>
         "unattributed",
         "textual",
         "halted",
+        "shrink",
         ...members,
       ),
     }),
@@ -231,6 +232,8 @@ const causeOf = (attribution: BatchAttribution): RequeueReason => {
       return "interaction";
     case "unattributed":
       return "bisection";
+    case "shrink":
+      return "shrink";
     default:
       return "co-member-failed";
   }
@@ -305,7 +308,11 @@ describe("a Red batch's members", () => {
       "co-member-failed",
       "infra-failure",
       "interaction",
+      "shrink",
       "textual",
+    ]);
+    expect(exits(redOf([A], { via: "verify", blame: "shrink" })).map((o) => o.reason)).toEqual([
+      "shrink",
     ]);
     expect(exits(redOf([A, B], { via: "bundle", blame: "infra" })).map((o) => o.reason)).toEqual([
       "infra-failure",

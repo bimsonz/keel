@@ -22,6 +22,7 @@ export const CATEGORY: Record<EscalationCategory, string> = {
   "overrule-request": "Overrule request",
   "frozen-trunk": "Trunk frozen",
   "verification-change": "Change to how Keel verifies",
+  "fewer-tests": "Runs fewer tests than trunk",
 };
 
 /** A question already answered, in a line: what a phone shows beneath the open one. */

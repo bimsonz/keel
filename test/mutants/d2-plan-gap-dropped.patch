@@ -2,15 +2,15 @@
 # kills: flow-ruling.agent-namespace
 # why: A plan holding a step KeelVerify cannot run is compiled, so the change parks by design, or lands without it
 diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
-index 8990ea8f..76b245cf 100644
+index cd5a36e4..de1be266 100644
 --- a/packages/core/src/application/verification/precheck.ts
 +++ b/packages/core/src/application/verification/precheck.ts
-@@ -405,7 +405,7 @@ export const decidePrecheck = (
+@@ -408,7 +408,7 @@ export const decidePrecheck = (
    // The gate asks a person for a ruling, and an agent's own namespace has none to ask.
    const rulable = namespaceKind(namespace) !== "agent";
    const missing = plan.success.steps
 -    .filter((s) => !executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable))
 +    .filter((s) => (!executable(s) || (s.id === HUMAN_CLASS_STEP && !rulable)) && false)
      .map((s) => s.id);
-   const [gap, ...gaps] = missing;
-   if (gap !== undefined)
+   const ruled = plan.success.humanClass
+     ? humanClassTouched(flowPolicy, checked.success.touched)

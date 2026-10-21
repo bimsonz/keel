@@ -2,15 +2,15 @@
 # kills: t35.lane-holds
 # why: the lane does not take a resumed change back, so a ruled change is queued by its own account and in no lane's queue
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 1562ba3..2fe5936 100644
+index cf247bce..e131464c 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -294,7 +294,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+@@ -630,7 +630,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
          // Back to the front, with the plan it was queued under: it waited for a person, not for its turn.
-         const { changeId } = decodeResumed(event.payload);
+         const { changeId, decisionId } = decodeResumed(event.payload);
          const queuedHere = (lane.plans ?? []).some((plan) => plan.changeId === changeId);
--        return queuedHere && !holds(tx.store, lane, changeId)
-+        return queuedHere && holds(tx.store, lane, changeId)
-           ? { ...lane, queue: [changeId, ...lane.queue] }
-           : undefined;
-       }
+-        if (!queuedHere || holds(tx.store, lane, changeId)) return undefined;
++        if (!queuedHere || !holds(tx.store, lane, changeId)) return undefined;
+         // Resumed by the approve of the drop it was asked about, and by no other ruling: the drop is accepted.
+         const drops = (lane.drops ?? []).map((d) =>
+           d.changeId === changeId &&

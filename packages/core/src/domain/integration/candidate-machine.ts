@@ -305,11 +305,20 @@ export const decideCandidate = (
         return Result.fail(
           new InvalidBatch({ batchId, reason: "a one-change batch's failure is that change's" }),
         );
+      if (blamed === "shrink" && batch.members.length !== 1)
+        return Result.fail(
+          new InvalidBatch({
+            batchId,
+            reason:
+              "the shrink rule asks a ruling of a batch of one: several that drop tests are bisected",
+          }),
+        );
       if (
         blamed !== "interaction" &&
         blamed !== "infra" &&
         blamed !== "unattributed" &&
         blamed !== "halted" &&
+        blamed !== "shrink" &&
         !batch.members.includes(blamed)
       ) {
         return Result.fail(
@@ -380,7 +389,8 @@ export const decideCandidate = (
 /**
  * Which blame a failure may carry from each state: a refused composition is
  * `textual`, or the sole member of a batch of one; a refused bundle is a change
- * or `infra`; a failed verification is anything but `textual`.
+ * or `infra`; a failed verification is anything but `textual`, and `shrink`
+ * only for a batch of one.
  */
 const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
   switch (batch.state) {
@@ -397,10 +407,12 @@ const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
         attribution !== "textual" &&
         attribution !== "interaction" &&
         attribution !== "unattributed" &&
-        attribution !== "halted"
+        attribution !== "halted" &&
+        attribution !== "shrink"
       );
     case "verifying":
-      return attribution !== "textual";
+      // The shrink rule waits on one member's ruling: a batch of several that drops tests is bisected.
+      return attribution !== "textual" && (attribution !== "shrink" || batch.members.length === 1);
     default:
       return false;
   }

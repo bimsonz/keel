@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "flow-ruling.project-paths"
+# kills: flow-ruling.project-paths
+# why: Precheck's decision drops the paths that hold the gate, so the ruling's question cannot name them
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index cd5a36e4..8563ce10 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -441,7 +441,6 @@ export const decidePrecheck = (
+     predicatePolicy,
+     pack: pack.reason,
+     guardsRefused: guards.refused,
+-    ...(ruled.length === 0 ? {} : { ruledPaths: ruled }),
+   };
+ };
+ 

@@ -2,15 +2,15 @@
 # kills: no-runner.gave-up
 # why: a box the engine gave up on reads as a step with no runner, so a capacity outage is counted against the change
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 6afe70a3..f6fd3020 100644
+index b5051949..e9045433 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -635,7 +635,7 @@ export const SuiteRuntimeCi = (deps: {
+@@ -733,7 +733,7 @@ export const SuiteRuntimeCi = (deps: {
              );
              if (lease !== undefined)
                yield* Effect.tryPromise(() => deps.boxes.release(lease)).pipe(Effect.ignore);
--            if (stdout === undefined) return abstained(step, "unavailable");
-+            if (stdout === undefined) return abstained(step, "no-runner");
-             const judged = yield* tier2.judge(step, stdout, deps.literals);
-             const resultRef = yield* deps.durable(
-               `${step.id}:evidence`,
+-            if (logs === undefined) return abstained(step, "unavailable");
++            if (logs === undefined) return abstained(step, "no-runner");
+             // Nothing reads stderr: a stream of it is cancelled, so its sandbox is not kept for it.
+             const { stderr } = logs;
+             if (stderr !== undefined && typeof stderr !== "string")

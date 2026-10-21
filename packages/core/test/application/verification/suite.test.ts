@@ -162,13 +162,14 @@ describe("the suite runner's report", () => {
 });
 
 describe("judging a suite run", () => {
-  it("passes exit 0 with every test passing", () => {
+  it("[suite.counts] passes exit 0 with every test passing, counting them", () => {
     const j = judge(output(0), report(pass(200)));
     expect(j.report).toMatchObject({
       stepId: step.id,
       outcome: "pass",
       evidenceClass: "proof",
       durationMs: 4321,
+      tests: { total: 200, passed: 200 },
     });
     expect(j.report.tier).toEqual(step.tier);
     expect(j.evidence.totals).toEqual({ total: 200, passed: 200, failed: 0 });
@@ -181,6 +182,7 @@ describe("judging a suite run", () => {
     ];
     const j = judge(output(1), report(tests));
     expect(j.report.outcome).toBe("fail");
+    expect(j.report.tests).toEqual({ total: 4, passed: 3 });
     expect(j.evidence.failing).toEqual([
       { file: "/workspace/test/a.test.ts", test: "sessions expire", message: "expected 401" },
     ]);

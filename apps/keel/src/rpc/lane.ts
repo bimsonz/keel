@@ -1,5 +1,5 @@
 import { CandidateNotFound, ResultFenced, StepReported } from "@keeltown/core/domain/integration";
-import { VerdictOutcome } from "@keeltown/core/domain/verification";
+import { StepCount, VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
   BatchId,
   CandidateId,
@@ -35,6 +35,8 @@ export const RecordVerdictCommand = Schema.Struct({
   retryAt: Schema.optionalKey(InstantSchema),
   /** A bounce because the namespace's verification spend is stopped: no member is blamed. Absent otherwise. */
   halted: Schema.optionalKey(Schema.Literal(true)),
+  /** On a land, the tests each step the shrink rule watches passed, held to trunk's last verdict. Absent otherwise. */
+  tests: Schema.optionalKey(Schema.Array(StepCount)),
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 

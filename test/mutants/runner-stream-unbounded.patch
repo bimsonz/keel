@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "runner.stream-bounded"
+# kills: runner.stream-bounded
+# why: a runner's stdout stream is read whatever its size, so a box printing without end fills the Worker's memory
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index b5051949..cf8599f0 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -350,10 +350,6 @@ export const stdoutText = async (
+     const { done, value } = await reader.read();
+     if (done) break;
+     size += value.byteLength;
+-    if (size > limit) {
+-      await reader.cancel();
+-      return undefined;
+-    }
+     chunks.push(value);
+   }
+   const all = new Uint8Array(size);

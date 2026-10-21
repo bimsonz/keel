@@ -2,15 +2,15 @@
 # kills: capacity.lease
 # why: a Tier 2 step never gives its lease back, so free boxes fall to none until every lease lapses and speculation stops
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 6afe70a3..2f0a4feb 100644
+index b5051949..122164af 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -633,8 +633,6 @@ export const SuiteRuntimeCi = (deps: {
-               Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
+@@ -731,8 +731,6 @@ export const SuiteRuntimeCi = (deps: {
+               Effect.map((r) => r.logs),
                Effect.catch(() => Effect.succeed(undefined)),
              );
 -            if (lease !== undefined)
 -              yield* Effect.tryPromise(() => deps.boxes.release(lease)).pipe(Effect.ignore);
-             if (stdout === undefined) return abstained(step, "unavailable");
-             const judged = yield* tier2.judge(step, stdout, deps.literals);
-             const resultRef = yield* deps.durable(
+             if (logs === undefined) return abstained(step, "unavailable");
+             // Nothing reads stderr: a stream of it is cancelled, so its sandbox is not kept for it.
+             const { stderr } = logs;

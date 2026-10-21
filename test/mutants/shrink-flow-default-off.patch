@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts -t "flow-spec.parses|flow-spec.rulings"
+# kills: flow-spec.parses, flow-spec.rulings
+# why: a flow that says nothing of the shrink rule turns it off, so the rule is off by default
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index ac219f47..8a178f73 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -124,7 +124,7 @@ export const parseFlow = (
+   }
+   const decoded = Schema.decodeUnknownResult(FlowFile)(json);
+   if (Result.isFailure(decoded)) return invalid(`: ${decoded.failure.message}`);
+-  const { flow, steps, predicates, humanClassPaths = [], shrink = "park" } = decoded.success;
++  const { flow, steps, predicates, humanClassPaths = [], shrink = "off" } = decoded.success;
+   const named = Object.keys(Object(Reflect.get(Object(json), "predicates")));
+   const unknown = named.filter((p) => !Predicate.literals.some((known) => known === p));
+   if (unknown.length > 0)

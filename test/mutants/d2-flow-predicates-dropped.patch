@@ -2,15 +2,15 @@
 # kills: flow-spec.predicates, flow-setup.reads-both
 # why: The flow spec's predicates are dropped, so every predicate is advise and a project's block never blocks
 diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
-index 65b09d4..2c1fe6b 100644
+index ac219f47..62bcf48e 100644
 --- a/packages/core/src/application/verification/flow-spec.ts
 +++ b/packages/core/src/application/verification/flow-spec.ts
-@@ -90,7 +90,7 @@ export const parseFlow = (
+@@ -154,7 +154,7 @@ export const parseFlow = (
              flow,
              steps: (steps ?? []).map((s, i) => filled(s, written[i] ?? null)),
            },
 -    predicatePolicy: predicates ?? {},
 +    predicatePolicy: {},
+     humanClassPaths,
+     shrink,
    });
- };
- 

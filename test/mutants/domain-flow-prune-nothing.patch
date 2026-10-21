@@ -2,15 +2,15 @@
 # kills: flow.steps-cited-and-pruned
 # why: Every step runs whatever the change touched
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index a536a2f..9095d1c 100644
+index 466e6d5c..fb43bb02 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -444,7 +444,7 @@ export const compile = (
+@@ -467,7 +467,7 @@ export const compile = (
      ...used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
      ...guards.map((g) => [g.spec.id, { applies: true, because: g.because }] as const),
    ]);
 -  const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
 +  const kept = new Set(used);
-   const touchesFlow = facts.touchedPaths.filter((p) =>
-     policy.humanClassPaths.some((g) => matchesGlob(g, p)),
-   );
+   const touchesFlow = humanClassTouched(policy, facts.touchedPaths);
+   const project = prune(flow, kept);
+   // Guards (Tier 1, seconds) run alongside the project's flow (often Tier 2, minutes), so their proof is recorded whatever the suite does.

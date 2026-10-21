@@ -5221,7 +5221,7 @@
       "post": {
         "operationId": "Operator_giveRuling",
         "summary": "Rule on an escalation",
-        "description": "Answer a question: the person first asked, or a person who maintains its namespace, names one\nof its options; an agent is refused (`users-only`), whatever it maintains. The ruling records a\ndecision and resolves what the question was about: the conflict, or the change to how Keel\nverifies (`verification-change`), which `approve` resumes into the queue and anything else\nsends back. An\noption the question does not offer is a 400 `escalation.option_unknown` whose next actions rule\neach valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.",
+        "description": "Answer a question: the person first asked, or a person who maintains its namespace, names one\nof its options; an agent is refused (`users-only`), whatever it maintains. The ruling records a\ndecision and resolves what the question was about: the conflict, the change to how Keel\nverifies (`verification-change`), or the change that passed with fewer tests than trunk's last\nverdict (`fewer-tests`), either of which `approve` resumes into the queue and anything else\nsends back. An\noption the question does not offer is a 400 `escalation.option_unknown` whose next actions rule\neach valid one; a question already answered or withdrawn is a 409 `escalation.state_refused`.",
         "parameters": [
           {
             "name": "escalationId",
@@ -13594,11 +13594,12 @@
               "interaction",
               "infra",
               "unattributed",
-              "halted"
+              "halted",
+              "shrink"
             ]
           }
         ],
-        "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), nobody yet (`unattributed`), or nobody at all\n(`halted`: the namespace's verification spend is stopped, so every member\nbounces, none of them at fault)."
+        "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), nobody yet (`unattributed`), nobody at all\n(`halted`: the namespace's verification spend is stopped, so every member\nbounces, none of them at fault), or the project's shrink rule (`shrink`: a\nbatch of one passed with fewer tests than trunk's last verdict, and its\nmember waits for a maintainer's ruling on the drop)."
       },
       "BatchDropped": {
         "type": "object",
@@ -14656,7 +14657,8 @@
               "invalidated",
               "co-member-failed",
               "textual",
-              "interaction"
+              "interaction",
+              "shrink"
             ]
           },
           "planHash": {
@@ -17432,7 +17434,8 @@
           "unprovable-conflict",
           "overrule-request",
           "frozen-trunk",
-          "verification-change"
+          "verification-change",
+          "fewer-tests"
         ],
         "description": "What kind of question a person is asked to rule on."
       },

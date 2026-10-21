@@ -2,11 +2,11 @@
 # kills: lane.drops-bounced
 # why: the lane keeps a bounced change in its queue and batches it
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 1562ba3..a7c286d 100644
+index cf247bce..7ecf441f 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -299,8 +299,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
-           : undefined;
+@@ -645,8 +645,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         };
        }
        case "ChangeWithdrawn":
 -      case "ChangeSuperseded":

@@ -235,6 +235,26 @@ describe("unionPlans: the plan a batch runs", () => {
     expect(shared).toBeGreaterThan(0);
   });
 
+  it("[union.counted] a step the shrink rule watches in either member's plan is watched in the union, whichever member it starts from; in neither, in neither", () => {
+    let split = 0;
+    fc.assert(
+      fc.property(batchArb, fc.boolean(), fc.boolean(), (plans, a, b) =>
+        plans.every((p) =>
+          p.steps.every((step) => {
+            const { counted: _counted, ...plain } = step;
+            const as = (on: boolean) => (on ? { ...plain, counted: true as const } : plain);
+            const watched = a || b;
+            if (a !== b) split++;
+            return [mergeStep(as(a), as(b)), mergeStep(as(b), as(a))].every(
+              (merged) => (merged.counted === true) === watched,
+            );
+          }),
+        ),
+      ),
+    );
+    expect(split).toBeGreaterThan(0);
+  });
+
   it("[union.merge-self] a step merged with itself keeps every field it holds, whatever it carries, so the union drops nothing a step gains", () => {
     const runArb = fc.option(
       fc.record({ command: fc.string({ minLength: 1 }), timeoutMs: fc.integer({ min: 1 }) }),

@@ -11,6 +11,7 @@ import {
   coerce,
   type FlowPlan,
   type HeldDecision,
+  StepCount,
   type StepReport,
   type StepResult,
   VerdictOutcome,
@@ -80,8 +81,27 @@ export const SettledVerdict = Schema.Struct({
   retryAt: Schema.optionalKey(InstantSchema),
   /** A bounce because the namespace's verification spend is stopped: no fault of the change's. */
   halted: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * On a land, the tests each step the shrink rule watches (`counted`)
+   * passed: the lane holds them to trunk's last verdict before it lands the
+   * batch, and keeps them as trunk's once it has.
+   */
+  tests: Schema.optionalKey(Schema.Array(StepCount)),
 });
 export type SettledVerdict = typeof SettledVerdict.Type;
+
+/**
+ * What each step the shrink rule watches counted, in plan order: a pass that
+ * counted nothing it could read counts none. A step that did not pass (it
+ * was skipped, or ran only in another world) counts nothing for the rule.
+ */
+export const countedTests = (plan: FlowPlan, results: readonly StepResult[]): StepCount[] =>
+  plan.steps.flatMap((step) => {
+    if (step.counted !== true) return [];
+    const result = results.find((r) => r.stepId === step.id && r.world === undefined);
+    if (result?.outcome !== "pass") return [];
+    return [{ stepId: step.id, ...(result.tests ?? { total: 0, passed: 0 }) }];
+  });
 
 /**
  * Why a verifier could not run a step at all for want of capacity: rate-limited.
@@ -290,6 +310,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
   const failingTests = failures.map((f) => f.name);
   const cited = failures.slice(0, CITED_FAILURES);
   const more = failures.length - cited.length;
+  const tests = decided.success.outcome === "land" ? countedTests(plan, results) : [];
   const settled: SettledVerdict = {
     verdictId: yield* (yield* Ids).next("vrd"),
     outcome: decided.success.outcome,
@@ -308,6 +329,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
     ...(unrunOnly(decided.success.outcome, decided.success.evidence, reports)
       ? { unrun: true }
       : {}),
+    ...(tests.length === 0 ? {} : { tests }),
   };
   return settled;
 });
@@ -334,5 +356,6 @@ export const recordBatchVerdict = Effect.fn("verification/recordBatchVerdict")(f
     ...(input.settled.unrun === true ? { unrun: true } : {}),
     ...(input.settled.retryAt === undefined ? {} : { retryAt: input.settled.retryAt }),
     ...(input.settled.halted === true ? { halted: true } : {}),
+    ...(input.settled.tests === undefined ? {} : { tests: input.settled.tests }),
   });
 });

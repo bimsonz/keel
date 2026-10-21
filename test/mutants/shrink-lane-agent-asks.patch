@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-agent-namespace"
+# kills: lane.shrink-agent-namespace
+# why: in an agent's own namespace a drop in tests parks its change on a question no person can answer, so it waits for ever
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f7904cf9..d81a97d1 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2415,7 +2415,7 @@ const issue = Effect.fn("integration/issue")(function* (
+     ? yield* projectNamespace(before.projectId).pipe(Effect.orDie)
+     : undefined;
+   // An agent's own namespace has no person to ask: the drop goes back to the agent.
+-  const rulable = namespace === undefined || namespaceKind(namespace) !== "agent";
++  const rulable = namespace === undefined || namespaceKind(namespace) !== "user";
+   if (asking && namespace !== undefined && rulable)
+     yield* askShrinkRuling({
+       namespace,

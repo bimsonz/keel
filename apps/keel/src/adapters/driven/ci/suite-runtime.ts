@@ -312,9 +312,58 @@ export const SUITE_CONFIG: SuiteRunnerOptions["config"] = {
 };
 
 /** One Tier 2 runner call through the CI engine. It persists the raw logs as its own step output. */
-export type SuiteRunner = (
-  options: SuiteRunnerOptions,
-) => Promise<{ readonly logs: { readonly stdout: string | ReadableStream<Uint8Array> } }>;
+export type SuiteRunner = (options: SuiteRunnerOptions) => Promise<{
+  readonly logs: {
+    readonly stdout: string | ReadableStream<Uint8Array>;
+    readonly stderr?: string | ReadableStream<Uint8Array>;
+  };
+}>;
+
+/**
+ * The most of a runner's stdout this runtime reads. The engine hands over a
+ * log of more than 300,000 bytes as a stream, which the Workflow persists
+ * with the step that ran it; one past this many bytes is read as truncated,
+ * and its step abstains. It is twice what a step's largest report
+ * (COMMAND_REPORT_LIMIT, gzipped and base64'd) can take.
+ */
+export const RUNNER_STDOUT_LIMIT = 8 * 1024 * 1024;
+
+/** How long this runtime reads a runner's stdout stream for: one that has not ended by then is read as truncated. */
+export const STDOUT_READ_MS = 120_000;
+
+/**
+ * A runner's stdout as text: the string the engine hands over a small log
+ * as, or the stream it hands over a large one as, read to its end; undefined
+ * once it passes `limit` bytes, when the rest is cancelled. Reading a stream
+ * also lets the sandbox that wrote it go.
+ */
+export const stdoutText = async (
+  stdout: string | ReadableStream<Uint8Array>,
+  limit: number = RUNNER_STDOUT_LIMIT,
+): Promise<string | undefined> => {
+  if (typeof stdout === "string") return stdout;
+  const reader = stdout.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- a stream's chunks come one after another
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
+};
 
 /**
  * Keel's count of Tier 2 boxes in use (BoxGate `boxgate:tier2`): a step holds
@@ -669,7 +718,7 @@ export const SuiteRuntimeCi = (deps: {
               Effect.map((answer) => (answer.granted ? answer.leaseId : undefined)),
               Effect.orElseSucceed(() => undefined),
             );
-            const stdout = yield* Effect.tryPromise(() =>
+            const logs = yield* Effect.tryPromise(() =>
               deps.runner({
                 name: step.id,
                 command: tier2.command,
@@ -679,13 +728,22 @@ export const SuiteRuntimeCi = (deps: {
                 sourceControlCredentials: false,
               }),
             ).pipe(
-              // A log over 300 kB arrives as a stream: never a well-formed report, so it reads as malformed.
-              Effect.map((r) => (typeof r.logs.stdout === "string" ? r.logs.stdout : "")),
+              Effect.map((r) => r.logs),
               Effect.catch(() => Effect.succeed(undefined)),
             );
             if (lease !== undefined)
               yield* Effect.tryPromise(() => deps.boxes.release(lease)).pipe(Effect.ignore);
-            if (stdout === undefined) return abstained(step, "unavailable");
+            if (logs === undefined) return abstained(step, "unavailable");
+            // Nothing reads stderr: a stream of it is cancelled, so its sandbox is not kept for it.
+            const { stderr } = logs;
+            if (stderr !== undefined && typeof stderr !== "string")
+              yield* Effect.promise(() => stderr.cancel()).pipe(Effect.ignore);
+            // A log over 300 kB arrives as a stream, read to its end; one past the limit abstains as truncated.
+            const stdout = yield* Effect.tryPromise(() => stdoutText(logs.stdout)).pipe(
+              Effect.timeout(STDOUT_READ_MS),
+              Effect.orElseSucceed(() => undefined),
+            );
+            if (stdout === undefined) return abstained(step, "truncated");
             const judged = yield* tier2.judge(step, stdout, deps.literals);
             const resultRef = yield* deps.durable(
               `${step.id}:evidence`,

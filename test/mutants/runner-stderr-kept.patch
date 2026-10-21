@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts -t "runner.stream-read"
+# kills: runner.stream-read
+# why: a stderr stream nobody reads is left open, so the sandbox that wrote it is kept for it
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index b5051949..b3dbbd5f 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -737,7 +737,7 @@ export const SuiteRuntimeCi = (deps: {
+             // Nothing reads stderr: a stream of it is cancelled, so its sandbox is not kept for it.
+             const { stderr } = logs;
+             if (stderr !== undefined && typeof stderr !== "string")
+-              yield* Effect.promise(() => stderr.cancel()).pipe(Effect.ignore);
++              yield* Effect.void;
+             // A log over 300 kB arrives as a stream, read to its end; one past the limit abstains as truncated.
+             const stdout = yield* Effect.tryPromise(() => stdoutText(logs.stdout)).pipe(
+               Effect.timeout(STDOUT_READ_MS),

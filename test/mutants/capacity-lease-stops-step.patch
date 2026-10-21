@@ -2,14 +2,14 @@
 # kills: capacity.never-stops
 # why: a refused lease or a gate that is away abstains the step, so the counting ledger becomes a gate that parks batches
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 6afe70a3..efa6d477 100644
+index b5051949..d4401b41 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -619,6 +619,7 @@ export const SuiteRuntimeCi = (deps: {
+@@ -718,6 +718,7 @@ export const SuiteRuntimeCi = (deps: {
                Effect.map((answer) => (answer.granted ? answer.leaseId : undefined)),
                Effect.orElseSucceed(() => undefined),
              );
 +            if (lease === undefined) return abstained(step, "unavailable");
-             const stdout = yield* Effect.tryPromise(() =>
+             const logs = yield* Effect.tryPromise(() =>
                deps.runner({
                  name: step.id,

@@ -1,6 +1,6 @@
 import type { ContentHash } from "../../domain/kernel/index.ts";
-import type { InfraFailure, PlanStep } from "../../domain/verification/index.ts";
-import { failingTestsOf, type JunitFailure } from "./junit.ts";
+import type { InfraFailure, PlanStep, StepTests } from "../../domain/verification/index.ts";
+import { failingTestsOf, type JunitFailure, testCountsOf } from "./junit.ts";
 import type { CredentialScan } from "./redact.ts";
 import { MAX_FAILING } from "./suite.ts";
 import {
@@ -91,7 +91,8 @@ export type CommandJudgement = RunnerJudgement<CommandEvidence>;
 
 /**
  * Judges one run of a project's own command by its exit status alone:
- * - `pass` is exit 0;
+ * - `pass` is exit 0, counting the tests the JUnit report it names lists (none
+ *   when that report was not written or does not read as one);
  * - `fail` is an exit from 1 to 127, citing the exit and the end of the output;
  * - everything else abstains: 128 and over (killed by a signal, which is the
  *   box's timeout or its memory, not the project's answer), an infra
@@ -122,26 +123,35 @@ export const judgeCommand = (
   );
 
 /**
- * What a failed command's JUnit report says, when the step names one: the
- * failing tests it lists, and a clause for the why saying what was read.
+ * What the JUnit report a step names says, whatever the command's exit: the
+ * tests it counts, the failing tests it lists, and a clause for the why
+ * saying what was read when it could not be.
  */
 const reportRead = (
   path: string,
   output: { readonly reportUnread?: ReportUnread },
   report: string | undefined,
-): { readonly clause: string; readonly failing?: readonly JunitFailure[] } => {
+): {
+  readonly clause: string;
+  readonly tests?: StepTests;
+  readonly failing?: readonly JunitFailure[];
+} => {
   if (output.reportUnread === "missing")
     return { clause: `; its JUnit report ${path} was not written` };
   if (output.reportUnread === "too-large")
     return {
       clause: `; its JUnit report ${path} is over ${COMMAND_REPORT_LIMIT} bytes, so unread`,
     };
+  const counts = report === undefined ? undefined : testCountsOf(report);
   const failing = report === undefined ? undefined : failingTestsOf(report);
-  if (failing === undefined)
+  if (counts === undefined || failing === undefined)
     return { clause: `; its JUnit report ${path} did not read as JUnit XML` };
-  if (failing.length === 0) return { clause: `; its JUnit report ${path} names no failing test` };
+  const tests = { total: counts.total, passed: counts.passed };
+  if (failing.length === 0)
+    return { clause: `; its JUnit report ${path} names no failing test`, tests };
   return {
     clause: `; its JUnit report names ${failing.length} failing test${failing.length === 1 ? "" : "s"}`,
+    tests,
     failing: failing.slice(0, MAX_FAILING),
   };
 };
@@ -177,16 +187,35 @@ const judgeRun = (
       exit: output.exit,
     });
   const tail = text ?? "";
-  const decide = (outcome: "pass" | "fail", why: string): CommandJudgement => ({
-    report: { ...base, outcome, durationMs: output.durationMs },
+  const decide = (outcome: "pass" | "fail", why: string, tests?: StepTests): CommandJudgement => ({
+    report: {
+      ...base,
+      outcome,
+      durationMs: output.durationMs,
+      ...(tests === undefined ? {} : { tests }),
+    },
     evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
   });
-  if (output.exit === 0) return decide("pass", "the command exited 0");
+  const named = step.run?.report;
+  if (output.exit === 0) {
+    if (named === undefined) return decide("pass", "the command exited 0");
+    // A pass counts the tests its report names; one whose report cannot be read counted none.
+    const read = reportRead(named.junit, output, report);
+    return read.tests === undefined
+      ? decide("pass", `the command exited 0${read.clause}, so no test was counted`, {
+          total: 0,
+          passed: 0,
+        })
+      : decide(
+          "pass",
+          `the command exited 0; its JUnit report counts ${read.tests.total} tests, ${read.tests.passed} passed`,
+          read.tests,
+        );
+  }
   if (output.exit < 128) {
-    const named = step.run?.report;
     if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
     const read = reportRead(named.junit, output, report);
-    const failed = decide("fail", `the command exited ${output.exit}${read.clause}`);
+    const failed = decide("fail", `the command exited ${output.exit}${read.clause}`, read.tests);
     return read.failing === undefined
       ? failed
       : { ...failed, evidence: { ...failed.evidence, failing: read.failing } };

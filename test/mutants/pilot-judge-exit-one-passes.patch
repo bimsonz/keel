@@ -2,15 +2,15 @@
 # kills: command.judge
 # why: Exit 1 passes
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index 03664e8d..c67590ad 100644
+index 04f057ee..b5dab692 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -181,7 +181,7 @@ const judgeRun = (
-     report: { ...base, outcome, durationMs: output.durationMs },
+@@ -197,7 +197,7 @@ const judgeRun = (
      evidence: { stepId: step.id, outcome, why, exit: output.exit, tail },
    });
--  if (output.exit === 0) return decide("pass", "the command exited 0");
-+  if (output.exit <= 1) return decide("pass", "the command exited 0");
-   if (output.exit < 128) {
-     const named = step.run?.report;
-     if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
+   const named = step.run?.report;
+-  if (output.exit === 0) {
++  if (output.exit <= 1) {
+     if (named === undefined) return decide("pass", "the command exited 0");
+     // A pass counts the tests its report names; one whose report cannot be read counted none.
+     const read = reportRead(named.junit, output, report);

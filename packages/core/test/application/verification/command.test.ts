@@ -40,9 +40,9 @@ const xml = (...names: readonly string[]) =>
   `<testsuites><testsuite>${names
     .map((n) => `<testcase classname="test/a.test.ts" name="${n}"><failure/></testcase>`)
     .join("")}<testcase classname="test/a.test.ts" name="passes"/></testsuite></testsuites>`;
-const unread = (reportUnread: "missing" | "too-large"): CommandOutput => ({
+const unread = (reportUnread: "missing" | "too-large", exit = 2): CommandOutput => ({
   _tag: "ran",
-  exit: 2,
+  exit,
   durationMs: 50,
   reportUnread,
 });
@@ -213,12 +213,43 @@ describe("a step command of the project's own, judged by its exit status", () =>
         undefined,
       ]);
     }
-    // The exit decides: a pass never reads the report, and a step that names none never cites one.
+    // The exit decides: a pass cites no failing test, only counts its report, and a step that names none never cites one.
     expect(judge(ran(0), xml("a"))).not.toHaveProperty("failing");
-    expect(judge(ran(0), xml("a")).why).toBe("the command exited 0");
+    expect(judge(ran(0), xml("a")).why).toBe(
+      "the command exited 0; its JUnit report counts 2 tests, 1 passed",
+    );
     expect(judge(ran(1), xml("a"), step)).toMatchObject({ why: "the command exited 1" });
     expect(judge(ran(1), xml("a"), step)).not.toHaveProperty("failing");
     expect(judge(ran(137), xml("a")).outcome).toBe("abstain");
     expect(judge(ran(137), xml("a"))).not.toHaveProperty("failing");
+  });
+
+  it("[command.counts] a pass counts the tests its JUnit report names, and none when the report was not written or does not read; a step naming no report, and an abstain, count nothing", () => {
+    const named: PlanStep = {
+      ...step,
+      run: { command: "pnpm test", timeoutMs: 240_000, report: { junit: "out/junit.xml" } },
+    };
+    const judge = (output: CommandOutput, report: string | undefined, at: PlanStep = named) =>
+      judgeCommand(at, output, { tail: "ok\n", ...(report === undefined ? {} : { report }) });
+    const passing = `<testsuites><testsuite><testcase name="a"/><testcase name="b"/><testcase name="c"><skipped/></testcase></testsuite></testsuites>`;
+    expect(judge(ran(0), passing).report).toMatchObject({
+      outcome: "pass",
+      tests: { total: 3, passed: 2 },
+    });
+    for (const [output, report, why] of [
+      [unread("missing", 0), undefined, "out/junit.xml was not written"],
+      [unread("too-large", 0), undefined, "out/junit.xml is over 4194304 bytes, so unread"],
+      [ran(0), "not xml", "out/junit.xml did not read as JUnit XML"],
+    ] as const) {
+      const got = judge(output, report);
+      expect([got.report.outcome, got.report.tests, got.evidence.why]).toEqual([
+        "pass",
+        { total: 0, passed: 0 },
+        `the command exited 0; its JUnit report ${why}, so no test was counted`,
+      ]);
+    }
+    expect(judge(ran(1), xml("a", "b")).report.tests).toEqual({ total: 3, passed: 1 });
+    expect(judge(ran(0), passing, step).report).not.toHaveProperty("tests");
+    expect(judge(ran(137), passing).report).not.toHaveProperty("tests");
   });
 });

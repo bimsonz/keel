@@ -2,12 +2,12 @@
 # kills: lane.hears-sync
 # why: the lane never hears a sync, so every batch forms on the old head and trunk declines it
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index c15c30ee..8a6400f0 100644
+index cf247bce..9605ac89 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -443,7 +443,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
-               trunkHead: advanced.to,
-             };
+@@ -687,7 +687,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+           trunkHead: advanced.to,
+         };
        }
 -      case "TrunkSynced": {
 +      case "TrunkSyncedNever": {

@@ -2,11 +2,11 @@
 # kills: flow-spec.predicates
 # why: A predicate Keel does not know is ignored, so a misspelt block silently reads as advise
 diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
-index 65b09d4..e5af7dd 100644
+index ac219f47..6b29126e 100644
 --- a/packages/core/src/application/verification/flow-spec.ts
 +++ b/packages/core/src/application/verification/flow-spec.ts
-@@ -71,7 +71,7 @@ export const parseFlow = (
-   const { flow, steps, predicates } = decoded.success;
+@@ -127,7 +127,7 @@ export const parseFlow = (
+   const { flow, steps, predicates, humanClassPaths = [], shrink = "park" } = decoded.success;
    const named = Object.keys(Object(Reflect.get(Object(json), "predicates")));
    const unknown = named.filter((p) => !Predicate.literals.some((known) => known === p));
 -  if (unknown.length > 0)

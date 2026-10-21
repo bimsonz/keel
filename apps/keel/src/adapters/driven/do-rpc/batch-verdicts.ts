@@ -39,6 +39,7 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
               ...(verdict.unrun === true ? { unrun: true } : {}),
               ...(verdict.retryAt === undefined ? {} : { retryAt: verdict.retryAt }),
               ...(verdict.halted === true ? { halted: true } : {}),
+              ...(verdict.tests === undefined ? {} : { tests: verdict.tests }),
             }),
           ),
         ).pipe(

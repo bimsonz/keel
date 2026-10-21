@@ -2,15 +2,15 @@
 # kills: command.judge-report
 # why: A step that names a report still cites only its exit, so the bounce names no test
 diff --git a/packages/core/src/application/verification/command.ts b/packages/core/src/application/verification/command.ts
-index 03664e8d..0a08c782 100644
+index 04f057ee..0dabdb69 100644
 --- a/packages/core/src/application/verification/command.ts
 +++ b/packages/core/src/application/verification/command.ts
-@@ -183,7 +183,7 @@ const judgeRun = (
-   });
-   if (output.exit === 0) return decide("pass", "the command exited 0");
+@@ -213,7 +213,7 @@ const judgeRun = (
+         );
+   }
    if (output.exit < 128) {
--    const named = step.run?.report;
-+    const named = undefined;
-     if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
+-    if (named === undefined) return decide("fail", `the command exited ${output.exit}`);
++    if (named !== null) return decide("fail", `the command exited ${output.exit}`);
      const read = reportRead(named.junit, output, report);
-     const failed = decide("fail", `the command exited ${output.exit}${read.clause}`);
+     const failed = decide("fail", `the command exited ${output.exit}${read.clause}`, read.tests);
+     return read.failing === undefined

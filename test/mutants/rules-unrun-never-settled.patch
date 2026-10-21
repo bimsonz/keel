@@ -2,10 +2,10 @@
 # kills: d21.unrun
 # why: KeelVerify never says a park was for want of capacity, so the lane counts every one
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index c4c1c28a..b24d005d 100644
+index c53debac..0a10da1b 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -295,7 +295,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -326,7 +326,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
        decided.success.outcome === "bounce"
          ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
          : [],
@@ -13,4 +13,4 @@ index c4c1c28a..b24d005d 100644
 +    ...(unrunOnly(decided.success.outcome, [], reports)
        ? { unrun: true }
        : {}),
-   };
+     ...(tests.length === 0 ? {} : { tests }),

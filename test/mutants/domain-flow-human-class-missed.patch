@@ -2,12 +2,12 @@
 # kills: flow.human-class-when-flow-touched
 # why: Editing the flow itself needs no human
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index dabfd31..0c9e8df 100644
+index 466e6d5c..72c583ff 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -57,11 +57,7 @@ import type { PlanStep } from "./plan.ts";
- export const COMPILER_VERSION = "flow-compiler/2";
- 
+@@ -64,11 +64,7 @@ export const COMPILER_VERSION = "flow-compiler/3";
+  * or `.keel/plugins` needs a person's ruling, and the shrink rule parks.
+  */
  export const defaultFlowPolicy: FlowPolicy = {
 -  humanClassPaths: [
 -    Glob.make(".keel/flow*"),
@@ -17,4 +17,4 @@ index dabfd31..0c9e8df 100644
 +  humanClassPaths: [Glob.make(".keel/plugins/**")],
    suiteTier: 2,
    defaultTier: 1,
- };
+   shrink: "park",

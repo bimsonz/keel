@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts -t "verdict.counts"
+# kills: verdict.counts
+# why: KeelVerify's adapter drops the counts on the way to the lane, so the lane holds no batch to trunk's count
+diff --git a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
+index b0cb9cb8..6708a464 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
+@@ -39,7 +39,6 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
+               ...(verdict.unrun === true ? { unrun: true } : {}),
+               ...(verdict.retryAt === undefined ? {} : { retryAt: verdict.retryAt }),
+               ...(verdict.halted === true ? { halted: true } : {}),
+-              ...(verdict.tests === undefined ? {} : { tests: verdict.tests }),
+             }),
+           ),
+         ).pipe(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/identity/requeue-notice.test.ts -t "requeue-notice.every-reason"
+# kills: requeue-notice.every-reason
+# why: a change requeued on the shrink rule is told it failed on Keel's infrastructure
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index dac2bd00..2279b565 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -154,7 +154,7 @@ const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next:
+     next: "Runs alone next",
+   },
+   shrink: {
+-    because: "it passed its checks running fewer tests than trunk's last verdict",
++    because: "its batch failed on Keel's infrastructure",
+     next: "Waits for a maintainer to accept the drop, then runs again; if they do not, it bounces",
+   },
+ };

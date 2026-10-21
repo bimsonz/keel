@@ -17,7 +17,9 @@ const requeue = (reason: RequeueReason): RedExit => ({ _tag: "Requeue", reason }
  * reason never names another cause). A failure nobody could be blamed for
  * waits for bisection, whose CandidateBisected requeues it. A batch failed
  * because its namespace is halted bounces every member: none is at fault,
- * and none can be verified until the namespace is resumed. No member stays
+ * and none can be verified until the namespace is resumed. A batch of one that
+ * dropped tests (`shrink`) requeues its member, which then waits for a
+ * maintainer's ruling on the drop. No member stays
  * Integrating. The Candidate machine makes a batch of one's failure its
  * member's, so no member list is needed.
  */
@@ -33,6 +35,8 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
       return { _tag: "Bisection" };
     case "halted":
       return { _tag: "Bounce" };
+    case "shrink":
+      return requeue("shrink");
     default:
       return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
   }

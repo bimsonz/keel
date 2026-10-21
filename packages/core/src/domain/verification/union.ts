@@ -73,6 +73,8 @@ export const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
     optional: a.optional === true && b.optional === true,
     ...(worlds === undefined ? {} : { worlds }),
     ...(guards === undefined ? {} : { guards }),
+    // A member whose base's shrink rule watches the step holds the whole batch to it.
+    ...(b.counted === true ? { counted: true as const } : {}),
   };
 };
 

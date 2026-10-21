@@ -1,10 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   askAbout,
+  askFlowRuling,
+  askShrinkRuling,
   decisionIdOf,
   EFFECT_STANDS,
   escalationIdOf,
   PREMISE_HOLDS,
+  SHRINK_RULING_APPROVE,
+  shrinkRulingIdOf,
 } from "@keeltown/core/application/coordination";
 import { actionsOf, detailOf } from "@keeltown/core/application/identity";
 import {
@@ -849,4 +853,58 @@ describe("an escalation its raiser withdraws", () => {
     );
     expect(memory.log(namespace, { kind: "escalation", id: never })).toEqual([]);
   });
+});
+
+describe("the questions a change's checks put to a person", () => {
+  it.effect(
+    "[flow-ruling.names-paths] a change to how Keel verifies is asked about by the paths Precheck found, or in general when it names none; one that drops tests by each step's count against trunk's, refused unless a person accepts",
+    () => {
+      const memory = makeEscalationsMemory();
+      return Effect.gen(function* () {
+        const namespace = nextId("org");
+        const project = nextId("prj");
+        const changeId = nextId("chg");
+        const named = yield* askFlowRuling({
+          namespace,
+          project,
+          changeId,
+          revision: 1,
+          instanceId: "p-1",
+          paths: ["package.json", ".keel/flow.json"],
+        });
+        expect(named.escalation.question).toBe(
+          `${changeId} at revision 1 changes how Keel verifies this project: it edits package.json, .keel/flow.json. Verify it and queue it to land?`,
+        );
+        const unnamed = yield* askFlowRuling({
+          namespace,
+          project,
+          changeId,
+          revision: 2,
+          instanceId: "p-2",
+        });
+        expect(unnamed.escalation.question).toContain(
+          "it edits paths whose change needs a person's ruling",
+        );
+        const verdictId = makeId("vrd", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+        const dropped = yield* askShrinkRuling({
+          namespace,
+          project,
+          changeId,
+          verdictId,
+          steps: [
+            { stepId: "keel.test", passed: 90, trunk: 100 },
+            { stepId: "keel.e2e", passed: 4, trunk: 5 },
+          ],
+        });
+        expect(dropped.escalation).toMatchObject({
+          id: shrinkRulingIdOf(changeId, verdictId),
+          category: "fewer-tests",
+          about: { kind: "change", id: changeId },
+          default: "refuse",
+          options: [{ id: SHRINK_RULING_APPROVE }, { id: "refuse" }],
+          question: `${changeId} passed its checks running fewer tests than trunk: keel.test passed 90 tests, 10 fewer than the 100 trunk's last verdict passed; keel.e2e passed 4 tests, 1 fewer than the 5 trunk's last verdict passed. Accept the drop and land it?`,
+        });
+      }).pipe(Effect.provide(memory.layer));
+    },
+  );
 });

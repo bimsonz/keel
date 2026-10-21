@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/red-exit.test.ts -t "red.reason-names-cause|red.only-blamed-bounces"
+# kills: red.reason-names-cause, red.only-blamed-bounces
+# why: a batch failed on the shrink rule bounces its member, so the drop goes back to the agent instead of to a maintainer
+diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
+index e4bef622..f72f4907 100644
+--- a/packages/core/src/domain/integration/red-exit.ts
++++ b/packages/core/src/domain/integration/red-exit.ts
+@@ -36,7 +36,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
+     case "halted":
+       return { _tag: "Bounce" };
+     case "shrink":
+-      return requeue("shrink");
++      return { _tag: "Bounce" };
+     default:
+       return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
+   }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-bisect"
+# kills: lane.shrink-bisect
+# why: a batch of several that drops tests asks about each member before it is bisected, so changes that dropped nothing wait for a person
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index f7904cf9..900bc9e5 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -2410,7 +2410,7 @@ const issue = Effect.fn("integration/issue")(function* (
+       ? shrunkSteps(before, batch.members, verdict.tests ?? [])
+       : [];
+   const asking =
+-    shrank !== undefined && sole !== undefined && others.length === 0 && before !== undefined;
++    shrank !== undefined && sole !== undefined && before !== undefined;
+   const namespace = asking
+     ? yield* projectNamespace(before.projectId).pipe(Effect.orDie)
+     : undefined;

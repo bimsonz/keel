@@ -11,7 +11,6 @@ import type {
 import {
   coerce,
   compile,
-  defaultFlowPolicy,
   type FlowPlan,
   type FlowWorld,
   type PlanStep,
@@ -20,7 +19,7 @@ import {
 } from "../../domain/verification/index.ts";
 import { FlowSpecSource, PlanStore, ProbeLedger, type RepoRef } from "../ports/index.ts";
 import { type DepsAnswer, depsStop } from "./deps.ts";
-import { flowSetup } from "./flow-spec.ts";
+import { flowPolicyOf, flowSetup } from "./flow-spec.ts";
 import { TIER2_STEP_IDS } from "./packs.ts";
 import { type ProbeParties, worldChecks } from "./probe-conflict.ts";
 
@@ -194,7 +193,7 @@ export const trunkCheckPlan = (namespace: NamespaceId, staging: RepoRef, commit:
         admittedGuards: [],
       },
       pack.defaults,
-      defaultFlowPolicy,
+      flowPolicyOf(setup.success),
     );
     if (Result.isFailure(plan))
       return {

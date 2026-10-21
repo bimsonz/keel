@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.shrink-trunk"
+# kills: lane.shrink-trunk
+# why: any trunk advance makes the green batch's counts trunk's, though trunk took another candidate
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index cf247bce..bd347b53 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -674,7 +674,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         // Trunk took the batch in flight: what its verdict counted is trunk's last verdict now.
+         const counted =
+           lane.active?.landing !== undefined &&
+-          advanced.landings.some((landing) => landing.candidateId === lane.active?.candidateId)
++          advanced.landings.length >= 0
+             ? lane.active.landing
+             : undefined;
+         const after = withoutDrops(

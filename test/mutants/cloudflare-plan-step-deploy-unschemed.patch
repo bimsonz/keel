@@ -2,15 +2,15 @@
 # kills: plan-codec.deploy
 # why: the plan store's schema leaves a step's deploy spec out, so a stored plan that deploys a Worker cannot be read back and its change never verifies
 diff --git a/packages/core/src/domain/verification/plan.ts b/packages/core/src/domain/verification/plan.ts
-index 947df903..b132f982 100644
+index cb029732..04cb6238 100644
 --- a/packages/core/src/domain/verification/plan.ts
 +++ b/packages/core/src/domain/verification/plan.ts
-@@ -79,8 +79,6 @@ export const PlanStep = Schema.Struct({
+@@ -81,8 +81,6 @@ export const PlanStep = Schema.Struct({
    ),
    /** Set when the project's flow gives the step a command of its own: the verifier runs it and judges its exit. */
    run: Schema.optional(StepRun),
 -  /** Set on a step that builds, previews or smokes the project's Worker: the base's deploy spec, so the plan's hash covers it. */
 -  deploy: Schema.optional(DeploySpec),
- });
- export type PlanStep = typeof PlanStep.Type;
- 
+   /**
+    * Set when the project's shrink rule watches the step (`.keel/flow`'s
+    * `shrink`, on unless the project turns it off): its pass counts the tests

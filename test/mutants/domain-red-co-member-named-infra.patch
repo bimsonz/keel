@@ -2,12 +2,12 @@
 # kills: red.reason-names-cause
 # why: a co-member's failure is requeued as infra, so three batch-mates' failures bounce an innocent change
 diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
-index bb620f38..1c79ca32 100644
+index e4bef622..c3554c48 100644
 --- a/packages/core/src/domain/integration/red-exit.ts
 +++ b/packages/core/src/domain/integration/red-exit.ts
-@@ -34,7 +34,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
-     case "halted":
-       return { _tag: "Bounce" };
+@@ -38,7 +38,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
+     case "shrink":
+       return requeue("shrink");
      default:
 -      return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
 +      return attribution === member ? { _tag: "Bounce" } : requeue("infra-failure");

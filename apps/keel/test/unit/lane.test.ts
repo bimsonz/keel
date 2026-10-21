@@ -34,6 +34,7 @@ import {
   VERIFY_BUDGET_MS,
   verificationDue,
 } from "@keeltown/core/application/integration";
+import { decisionIdOf, shrinkRulingIdOf } from "@keeltown/core/application/coordination";
 import type { Change } from "@keeltown/core/domain/coordination";
 import type { Agent } from "@keeltown/core/domain/identity";
 import { unionPlans, type VerdictOutcome } from "@keeltown/core/domain/verification";
@@ -49,6 +50,7 @@ import {
   Glob,
   Instant,
   makeId,
+  type NamespaceId,
 } from "@keeltown/core/kernel";
 import {
   type BatchVerdict,
@@ -59,6 +61,7 @@ import {
   Changes,
   CodeHost,
   EntityStore,
+  Escalations,
   EventOutbox,
   PlanStore,
   StagingWriter,
@@ -70,6 +73,7 @@ import {
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
   makeCodeHostMemory,
+  makeEscalationsMemory,
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLanesMemory,
@@ -133,6 +137,8 @@ interface WorldOptions {
   readonly stagingHung?: boolean;
   /** The project's largest batch: 1 unless given, so a case batches only when it says so. */
   readonly maxBatchSize?: number;
+  /** The namespace the project is placed in: the sample org unless given. */
+  readonly namespace?: NamespaceId;
 }
 
 /** The Lane's ports in memory, staging's main shared by the code host and the StagingWriter. */
@@ -252,6 +258,8 @@ function world(options: WorldOptions = {}) {
   });
   const directory = makeAgentDirectoryMemory();
   const composer = composing.layer;
+  // The project's maintainers, as the shrink rule puts a drop in tests to them.
+  const escalations = makeEscalationsMemory(clock);
   const layer = Layer.mergeAll(
     outbox.layer,
     clock.layer,
@@ -282,10 +290,11 @@ function world(options: WorldOptions = {}) {
           )
         : staging.layer,
     projects.layer,
-    makePlacedProject(PROJECT).layer,
+    makePlacedProject(PROJECT, options.namespace).layer,
     directory.layer,
     changesLayer,
     plans.layer,
+    escalations.layer,
   );
   const seeded = Effect.gen(function* () {
     (yield* EventOutbox).subscribe("projector", "*");
@@ -314,6 +323,8 @@ function world(options: WorldOptions = {}) {
     seeded,
     /** Every compose the lane asked for, as it asked. */
     composed: composing.requests,
+    /** The questions the lane put to the project's maintainers. */
+    escalations,
   };
 }
 type World = ReturnType<typeof world>;
@@ -3015,6 +3026,339 @@ describe("the Lane's speculation", () => {
         expect(
           (yield* payloads("BatchFailed")).map((p) => [p["batchId"], p["attribution"]]),
         ).toEqual([[next.batchId, change(2)]]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+});
+
+const TEST = "keel.test";
+/** A verdict that counted `passed` of `total` tests on the one step the rule watches. */
+const counted = (
+  at: {
+    readonly batchId: BatchId;
+    readonly candidateId: CandidateId;
+    readonly instanceId: string;
+  },
+  passed: number,
+  total = passed,
+): BatchVerdict => ({
+  ...verdict(at.batchId, at.candidateId, at.instanceId, "land"),
+  tests: [{ stepId: TEST, total, passed }],
+});
+/** Trunk took the batch in flight: its advance names the batch's own candidate. */
+const took = (from: string, to: string, members: readonly ChangeId[], candidateId: CandidateId) =>
+  deliver(
+    envelope(
+      { kind: "trunk", id: PROJECT },
+      {
+        _tag: "TrunkAdvanced",
+        projectId: PROJECT,
+        from,
+        to,
+        groupId: `grp-${to}`,
+        landings: members.map((changeId) => ({
+          changeId,
+          commitSha: to,
+          candidateId,
+          proofId: `proof-${changeId}`,
+        })),
+      },
+    ),
+  );
+const trunkTests = Effect.map(EntityStore, (store) => laneOf(store, LANE)?.tests);
+const drops = Effect.map(EntityStore, (store) => laneOf(store, LANE)?.drops ?? []);
+/** The member as its own object puts it back after a shrink: requeued, parked on the question, and resumed by `decisionId`. */
+const parkedAndResumed = (id: ChangeId, batchId: BatchId, decisionId: string) =>
+  Effect.gen(function* () {
+    yield* deliver(
+      envelope(changeRef(id), {
+        _tag: "ChangeRequeued",
+        changeId: id,
+        batchId,
+        reason: "shrink",
+        planHash: PLAN.planHash,
+      }),
+    );
+    yield* parked(id, "awaiting-ruling");
+    yield* deliver(envelope(changeRef(id), { _tag: "ChangeResumed", changeId: id, decisionId }));
+  });
+/** A first change landed with `passed` tests: trunk's last verdict, as the rule reads it. */
+const trunkAt = (w: World, passed: number) =>
+  Effect.gen(function* () {
+    const base = yield* w.seeded;
+    yield* queue(w, change(1));
+    const first = yield* toVerifying(w);
+    yield* recordVerdict(LANE, counted(first, passed));
+    const taken = sha("e");
+    yield* took(base, taken, [change(1)], first.candidateId);
+    yield* stepped(LANE);
+    return taken;
+  });
+
+describe("the shrink rule", () => {
+  it.effect(
+    "[lane.shrink-trunk] trunk's last verdict is what the batch trunk took counted, once trunk takes it: a green batch trunk has not taken, or an advance of another candidate, sets nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(LANE, counted(first, 100, 104));
+        expect(yield* trunkTests).toBeUndefined();
+        yield* advance(base, sha("d"), [change(9)]);
+        expect(yield* trunkTests).toBeUndefined();
+        yield* took(sha("d"), sha("e"), [change(1)], first.candidateId);
+        expect(yield* trunkTests).toEqual([{ stepId: TEST, total: 104, passed: 100 }]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-park] a batch of one passing fewer tests than trunk's last verdict is not landed: it parks, blamed on the rule, saying how many fewer, and its member's drop is put to the project's maintainers; as many tests as trunk lands",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        yield* queue(w, change(2));
+        const second = yield* toVerifying(w);
+        const shrank = counted(second, 90);
+        yield* recordVerdict(LANE, shrank);
+        const issued = (yield* payloads("VerdictIssued")).at(-1);
+        expect(issued?.["outcome"]).toBe("park");
+        expect(issued?.["evidence"]).toContain(
+          "shrink rule: keel.test passed 90 tests, 10 fewer than the 100 trunk's last verdict passed",
+        );
+        expect((yield* payloads("BatchFailed")).at(-1)).toMatchObject({
+          batchId: second.batchId,
+          attribution: "shrink",
+        });
+        expect(yield* drops).toEqual([
+          {
+            changeId: change(2),
+            verdictId: shrank.verdictId,
+            steps: [{ stepId: TEST, fewer: 10 }],
+          },
+        ]);
+        const asked = yield* Escalations.use((port) =>
+          port.get(shrinkRulingIdOf(change(2), shrank.verdictId)),
+        );
+        expect(asked.escalation).toMatchObject({
+          category: "fewer-tests",
+          about: { kind: "change", id: change(2) },
+        });
+        expect(asked.escalation.question).toContain("keel.test passed 90 tests, 10 fewer");
+        // The control: as many as trunk's last verdict lands.
+        yield* queue(w, change(3));
+        const third = yield* toVerifying(w);
+        yield* recordVerdict(LANE, counted(third, 100));
+        expect((yield* payloads("VerdictIssued")).at(-1)?.["outcome"]).toBe("land");
+        expect((yield* payloads("BatchVerified")).at(-1)).toMatchObject({ batchId: third.batchId });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-accepted] the approve of the drop it was asked about lets the change's batch pass that many fewer, and no more; a resume by any other ruling accepts nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        yield* queue(w, change(2));
+        const second = yield* toVerifying(w);
+        const shrank = counted(second, 90);
+        yield* recordVerdict(LANE, shrank);
+        yield* stepped(LANE);
+        // A resume by another question's ruling: the drop stays unaccepted, and the same drop parks again.
+        yield* parkedAndResumed(
+          change(2),
+          second.batchId,
+          makeId("dec", "01J9KKKKKKKKKKKKKKKKKKKKKK"),
+        );
+        expect((yield* drops).map((d) => d.accepted)).toEqual([undefined]);
+        const again = yield* toVerifying(w);
+        const askedAgain = counted(again, 90);
+        yield* recordVerdict(LANE, askedAgain);
+        expect((yield* payloads("BatchFailed")).at(-1)).toMatchObject({ attribution: "shrink" });
+        yield* stepped(LANE);
+        // The approve of that question: the drop is accepted, and a batch dropping no more lands.
+        yield* parkedAndResumed(
+          change(2),
+          again.batchId,
+          decisionIdOf(shrinkRulingIdOf(change(2), askedAgain.verdictId)),
+        );
+        expect((yield* drops).map((d) => d.accepted)).toEqual([true]);
+        const ruled = yield* toVerifying(w);
+        const further = counted(ruled, 85);
+        yield* recordVerdict(LANE, further);
+        const more = (yield* payloads("VerdictIssued")).at(-1);
+        expect(more?.["outcome"]).toBe("park");
+        expect(more?.["evidence"]).toContain(
+          "shrink rule: keel.test passed 85 tests, 15 fewer than the 100 trunk's last verdict passed, more than the 10 a maintainer accepted",
+        );
+        const asked = (yield* drops)[0];
+        expect(asked).toMatchObject({ steps: [{ stepId: TEST, fewer: 15 }] });
+        expect(asked?.accepted).toBeUndefined();
+        yield* stepped(LANE);
+        yield* parkedAndResumed(
+          change(2),
+          ruled.batchId,
+          decisionIdOf(shrinkRulingIdOf(change(2), further.verdictId)),
+        );
+        const accepted = yield* toVerifying(w);
+        yield* recordVerdict(LANE, counted(accepted, 85));
+        expect((yield* payloads("VerdictIssued")).at(-1)?.["outcome"]).toBe("land");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-agent-namespace] in an agent's own namespace, where no person can rule, a batch of one passing fewer tests bounces its change, saying so, and asks nobody",
+    () => {
+      const w = world({ namespace: makeId("agt", "01J9NNNNNNNNNNNNNNNNNNNNNN") });
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        yield* queue(w, change(2));
+        const second = yield* toVerifying(w);
+        const shrank = counted(second, 90);
+        yield* recordVerdict(LANE, shrank);
+        const issued = (yield* payloads("VerdictIssued")).at(-1);
+        expect(issued?.["outcome"]).toBe("bounce");
+        expect(JSON.stringify(issued?.["nextActions"])).toContain(
+          "no person can accept a drop in tests in an agent's own namespace",
+        );
+        expect((yield* payloads("BatchFailed")).at(-1)).toMatchObject({
+          batchId: second.batchId,
+          attribution: change(2),
+        });
+        expect(yield* drops).toEqual([]);
+        const unasked = yield* Effect.flip(
+          Escalations.use((port) => port.get(shrinkRulingIdOf(change(2), shrank.verdictId))),
+        );
+        expect(unasked._tag).toBe("EscalationNotFound");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-bisect] a batch of several passing fewer tests than trunk is bisected, asking nobody, so the question is asked of the change that dropped them",
+    () => {
+      const w = world({ maxBatchSize: 2 });
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        yield* queue(w, change(2));
+        yield* queue(w, change(3));
+        const pair = yield* toVerifying(w);
+        expect(batchOf(yield* EntityStore, pair.batchId)?.members).toEqual([change(2), change(3)]);
+        const shrank = counted(pair, 95);
+        yield* recordVerdict(LANE, shrank);
+        expect((yield* payloads("BatchFailed")).at(-1)).toMatchObject({
+          batchId: pair.batchId,
+          attribution: "unattributed",
+        });
+        expect((yield* payloads("CandidateBisected")).at(-1)).toMatchObject({
+          batchId: pair.batchId,
+        });
+        expect(yield* drops).toEqual([]);
+        for (const member of [change(2), change(3)]) {
+          const unasked = yield* Effect.flip(
+            Escalations.use((port) => port.get(shrinkRulingIdOf(member, shrank.verdictId))),
+          );
+          expect(unasked._tag).toBe("EscalationNotFound");
+        }
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-unheld] a step trunk has no count for, and a verdict counting none, are held to nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        yield* queue(w, change(2));
+        const second = yield* toVerifying(w);
+        yield* recordVerdict(LANE, {
+          ...verdict(second.batchId, second.candidateId, second.instanceId, "land"),
+          tests: [{ stepId: "other.suite", total: 1, passed: 1 }],
+        });
+        expect((yield* payloads("VerdictIssued")).at(-1)?.["outcome"]).toBe("land");
+        yield* took(sha("e"), sha("f"), [change(2)], second.candidateId);
+        expect(yield* trunkTests).toEqual([
+          { stepId: TEST, total: 100, passed: 100 },
+          { stepId: "other.suite", total: 1, passed: 1 },
+        ]);
+        yield* stepped(LANE);
+        yield* queue(w, change(3));
+        const third = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(third.batchId, third.candidateId, third.instanceId, "land"),
+        );
+        expect((yield* payloads("VerdictIssued")).at(-1)?.["outcome"]).toBe("land");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.shrink-forgotten] a drop asked about is forgotten once its change is submitted again, ends, or lands",
+    () => {
+      const w = world();
+      /** The change's batch of one passes with 90: the lane asks about the drop, and answers its verdict. */
+      const shrinks = (id: ChangeId) =>
+        Effect.gen(function* () {
+          yield* queue(w, id);
+          const at = yield* toVerifying(w);
+          const shrank = counted(at, 90);
+          yield* recordVerdict(LANE, shrank);
+          yield* stepped(LANE);
+          return { at, accept: decisionIdOf(shrinkRulingIdOf(id, shrank.verdictId)) };
+        });
+      const askedOf = Effect.map(drops, (all) => all.map((d) => [d.changeId, d.accepted]));
+      return Effect.gen(function* () {
+        yield* trunkAt(w, 100);
+        // Parked on the question, then submitted again: the new submission is judged afresh.
+        const second = yield* shrinks(change(2));
+        yield* deliver(
+          envelope(changeRef(change(2)), {
+            _tag: "ChangeRequeued",
+            changeId: change(2),
+            batchId: second.at.batchId,
+            reason: "shrink",
+            planHash: PLAN.planHash,
+          }),
+        );
+        yield* parked(change(2), "awaiting-ruling");
+        expect(yield* askedOf).toEqual([[change(2), undefined]]);
+        yield* queue(w, change(2));
+        expect(yield* drops).toEqual([]);
+        const resubmitted = yield* toVerifying(w);
+        yield* recordVerdict(LANE, counted(resubmitted, 100));
+        yield* took(sha("e"), sha("f"), [change(2)], resubmitted.candidateId);
+        yield* stepped(LANE);
+        // Accepted, then sent back: it ends here.
+        const third = yield* shrinks(change(3));
+        yield* parkedAndResumed(change(3), third.at.batchId, third.accept);
+        expect(yield* askedOf).toEqual([[change(3), true]]);
+        yield* deliver(
+          envelope(changeRef(change(3)), {
+            _tag: "ChangeBounced",
+            changeId: change(3),
+            decisionId: makeId("dec", "01J9KKKKKKKKKKKKKKKKKKKKKK"),
+            reasons: ["sent back"],
+            nextActions: [],
+          }),
+        );
+        expect(yield* drops).toEqual([]);
+        // Accepted, then landed: trunk's last verdict is its count now, and the drop is spent.
+        yield* stepped(LANE);
+        const fourth = yield* shrinks(change(4));
+        yield* parkedAndResumed(change(4), fourth.at.batchId, fourth.accept);
+        const landing = yield* toVerifying(w);
+        yield* recordVerdict(LANE, counted(landing, 90));
+        yield* took(sha("f"), sha("a"), [change(4)], landing.candidateId);
+        expect(yield* drops).toEqual([]);
+        expect(yield* trunkTests).toEqual([{ stepId: TEST, total: 90, passed: 90 }]);
       }).pipe(Effect.provide(w.layer));
     },
   );

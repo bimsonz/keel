@@ -2,11 +2,11 @@
 # kills: lane.verdict-next-actions
 # why: The lane drops KeelVerify's remedy, so a red change bounces with a generic next action instead of what to fix
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 5de5f424..90d3399c 100644
+index cf247bce..c5c3b232 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -2175,7 +2175,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
-     };
+@@ -2314,7 +2314,7 @@ const issuedFor = (verdict: Verdict, batch: Batch, lane: Lane, at: number): Issu
+   }
    // KeelVerify's own remedy (what to fix in the failing tests) when it gave one.
    const verifiersRemedy =
 -    verdict.nextActions === undefined || verdict.nextActions.length === 0

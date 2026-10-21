@@ -224,6 +224,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
               changeId: submission.changeId,
               revision: submission.revision,
               instanceId: submission.instanceId,
+              paths: decision.ruledPaths,
             }).pipe(Effect.orDie, Effect.as("asked")),
           ),
         );

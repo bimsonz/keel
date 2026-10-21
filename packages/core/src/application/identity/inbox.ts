@@ -153,6 +153,10 @@ const REQUEUED: Record<RequeueReason, { readonly because: string; readonly next:
     because: "its batch's changes passed apart but failed together",
     next: "Runs alone next",
   },
+  shrink: {
+    because: "it passed its checks running fewer tests than trunk's last verdict",
+    next: "Waits for a maintainer to accept the drop, then runs again; if they do not, it bounces",
+  },
 };
 
 /** More than the notice's title says, chosen for the event when it is delivered. */

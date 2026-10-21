@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t "flow-ruling.names-paths"
+# kills: flow-ruling.names-paths
+# why: a flow ruling's question never names the paths Precheck found, so a maintainer cannot tell a package.json edit from a flow edit
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index c0810770..51267959 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -94,7 +94,7 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
+   const edits =
+     asked.paths === undefined || asked.paths.length === 0
+       ? "it edits paths whose change needs a person's ruling"
+-      : `it edits ${asked.paths.join(", ")}`;
++      : "it edits paths whose change needs a person's ruling";
+   return yield* (yield* HumanGate).raise({
+     namespace: asked.namespace,
+     escalationId: flowRulingIdOf(changeId, asked.instanceId),

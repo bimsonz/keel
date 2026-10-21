@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failingTestsOf } from "../../../src/application/verification/index.ts";
+import { failingTestsOf, testCountsOf } from "../../../src/application/verification/index.ts";
 
 /** vitest's `--reporter=junit`: the file in `classname`, the describe chain in `name`, a failure per error. */
 const VITEST = `<?xml version="1.0" encoding="UTF-8" ?>
@@ -105,5 +105,20 @@ describe("reading a JUnit XML report", () => {
       `<testsuite></testcase></testsuite>`,
     ])
       expect({ text, read: failingTestsOf(text) }).toEqual({ text, read: undefined });
+  });
+
+  it("[junit.counts] a report's tests are counted, a failure as failed even when skipped too, a skip as neither passed nor failed, and markup in CDATA or a comment never", () => {
+    expect(testCountsOf(VITEST)).toEqual({ total: 3, passed: 1, failed: 1, skipped: 1 });
+    expect(testCountsOf(PYTEST)).toEqual({ total: 3, passed: 1, failed: 2, skipped: 0 });
+    expect(testCountsOf(GO)).toEqual({ total: 2, passed: 1, failed: 1, skipped: 0 });
+    expect(testCountsOf(NEXTEST)).toEqual({ total: 2, passed: 1, failed: 1, skipped: 0 });
+    expect(
+      testCountsOf(
+        `<testsuite><testcase name="a"><skipped/><failure/></testcase><testcase name="b"/><testcase name="c"><skipped></skipped></testcase></testsuite>`,
+      ),
+    ).toEqual({ total: 3, passed: 1, failed: 1, skipped: 1 });
+    expect(testCountsOf(`<testsuites/>`)).toEqual({ total: 0, passed: 0, failed: 0, skipped: 0 });
+    for (const text of ["", "not xml", `<testsuite><testcase name="a"></testsuite>`])
+      expect({ text, read: testCountsOf(text) }).toEqual({ text, read: undefined });
   });
 });

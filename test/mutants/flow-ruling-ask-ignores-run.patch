@@ -2,11 +2,11 @@
 # kills: flow-ruling.real, flow-ruling.resubmit
 # why: the question is raised under the revision, not the run the change waits from, so a maintainer's ruling answers nothing
 diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
-index 67b0c8c7..337312f3 100644
+index c0810770..afae2ad9 100644
 --- a/packages/core/src/application/coordination/escalations.ts
 +++ b/packages/core/src/application/coordination/escalations.ts
-@@ -88,7 +88,7 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
-   const { changeId, revision } = asked;
+@@ -97,7 +97,7 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
+       : `it edits ${asked.paths.join(", ")}`;
    return yield* (yield* HumanGate).raise({
      namespace: asked.namespace,
 -    escalationId: flowRulingIdOf(changeId, asked.instanceId),

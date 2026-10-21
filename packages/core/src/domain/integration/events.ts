@@ -25,9 +25,15 @@ import { FlowWorld, InfraFailure, StepKind, StepOutcome } from "../verification/
  * nobody at all (`halted`: the namespace's verification spend is stopped, so
  * every member bounces with what its owner does, none of them at fault).
  */
+/**
+ * Who a failed batch is on: a member, its text, the members' interaction,
+ * the infrastructure, nobody yet (it is bisected), a halted namespace, or
+ * the shrink rule: the batch of one passed with fewer tests than trunk's last
+ * verdict, and its member waits for a maintainer's ruling.
+ */
 export const BatchAttribution = Schema.Union([
   ChangeId,
-  Schema.Literals(["textual", "interaction", "infra", "unattributed", "halted"]),
+  Schema.Literals(["textual", "interaction", "infra", "unattributed", "halted", "shrink"]),
 ]);
 export type BatchAttribution = typeof BatchAttribution.Type;
 
