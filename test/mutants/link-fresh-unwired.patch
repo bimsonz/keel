@@ -2,11 +2,12 @@
 # kills: link.touch
 # why: the doorway takes every caller for freshly signed in, so the four moves that want a passkey sign-in are made on any session
 diff --git a/apps/keel/src/composition/doorway.ts b/apps/keel/src/composition/doorway.ts
+index 75d782c9..d9ece847 100644
 --- a/apps/keel/src/composition/doorway.ts
 +++ b/apps/keel/src/composition/doorway.ts
-@@ -17,16 +17,7 @@ import type { Doorway } from "../adapters/driving/http/handlers.ts";
- export function doorwayOf(host: string, now: () => Date = () => new Date()): Doorway {
+@@ -23,16 +23,7 @@ export function doorwayOf(
    return {
+     registerApp,
      origin: `https://${host}`,
 -    fresh: (caller, also) => {
 -      if (caller.signedIn === undefined) return false;

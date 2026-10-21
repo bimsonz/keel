@@ -2,15 +2,15 @@
 # kills: gate.signed-in
 # why: the user a session names is admitted without the session's sign-in, so the handlers are told nothing of it
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index be3dab27..0797d970 100644
+index 87f6dd15..06c721af 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -162,7 +162,7 @@ export const principalOf: (
+@@ -201,7 +201,7 @@ export const principalOf: (
      case "Session": {
        const user = yield* Users.use((users) => users.principal(credential.userId));
        if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
 -      return { principal: user.value, signedIn: credential.signedIn };
 +      return { principal: user.value };
      }
-     case "Token": {
-       const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+     case "App": {
+       const { userId } = credential.claims;

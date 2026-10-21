@@ -2,14 +2,20 @@
 # kills: door.from-spec
 # why: a step that sends a body names none of its fields, so an agent is told where to post and not what
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index af1e9706..cae07d01 100644
+index b5445f92..073c7ca2 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -240,7 +240,7 @@ function operationStep(
+@@ -242,13 +242,7 @@ function operationStep(
      ...(query.length === 0 ? {} : { query }),
      ...(media === undefined
        ? {}
--      : { body: fieldsOf(document, at(media[1], "schema"), asked.depth) }),
+-      : {
+-          body: fieldsOf(
+-            document,
+-            asked.sends === undefined ? at(media[1], "schema") : model(document, asked.sends),
+-            asked.depth,
+-          ),
+-        }),
 +      : { body: [] }),
      answer: {
        status: worked.map(([status]) => Number(status)),

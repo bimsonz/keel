@@ -2,15 +2,15 @@
 # kills: ba.first-passkey-routes
 # why: an account with no passkey changes its address or unlinks a provider with any fresh sign-in
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 2fbff68b..b2bb07bb 100644
+index ad43ec18..bd247709 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -274,7 +274,7 @@ export function authOptions(config: AuthConfig) {
+@@ -313,7 +313,7 @@ export function authOptions(config: AuthConfig) {
      const now = new Date();
      if (isFresh(signedIn, now)) return;
      const none = !(await holdsPasskey(db, carried.user.id));
 -    const first = none && ADDS_PASSKEY.has(ctx.path);
 +    const first = none;
      if (first && mayAddFirstPasskey(signedIn, now)) return;
-     const what = ctx.path === DELETE_PATH ? "deleting your account" : "changing how you sign in";
-     throw APIError.from("FORBIDDEN", {
+     const what =
+       ctx.path === DELETE_PATH

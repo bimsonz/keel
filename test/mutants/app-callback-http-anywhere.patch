@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.callbacks"
+# kills: app.callbacks
+# why: an app's code may be sent over http to any machine, where anyone on the way reads it
+diff --git a/apps/keel/src/adapters/driven/better-auth/apps.ts b/apps/keel/src/adapters/driven/better-auth/apps.ts
+index 73409ef0..764e4521 100644
+--- a/apps/keel/src/adapters/driven/better-auth/apps.ts
++++ b/apps/keel/src/adapters/driven/better-auth/apps.ts
+@@ -41,7 +41,7 @@ export function appRedirectAllowed(uri: string): boolean {
+   const url = URL.parse(uri);
+   if (url === null || url.hash !== "" || url.username !== "" || url.password !== "") return false;
+   if (url.protocol === "https:") return !LOOPBACK.has(url.hostname);
+-  return url.protocol === "http:" && LOOPBACK.has(url.hostname);
++  return url.protocol === "http:";
+ }
+ 
+ /** A native app listens on this machine (RFC 8252); one whose callbacks are all https elsewhere is a web app. */

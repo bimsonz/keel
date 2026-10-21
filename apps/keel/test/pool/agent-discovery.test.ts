@@ -71,7 +71,8 @@ describe("what an arriving agent reads to find its way in", () => {
         token_endpoint: TOKEN_ENDPOINT,
         jwks_uri: `${ISSUER}/jwks`,
         registration_endpoint: `${BASE}/v1/oauth/register`,
-        grant_types_supported: ["client_credentials"],
+        authorization_endpoint: `${ISSUER}/oauth2/authorize`,
+        grant_types_supported: ["client_credentials", "authorization_code", "refresh_token"],
       });
       expect(body["token_endpoint_auth_methods_supported"]).toContain("private_key_jwt");
       expect(body["dpop_signing_alg_values_supported"]).toEqual(
@@ -80,16 +81,18 @@ describe("what an arriving agent reads to find its way in", () => {
     }
   });
 
-  it("[wellknown.takes] the authorization server's document says what Keel takes and nothing more: these fields and no other, one way for a client to name itself, and the two algorithms a key signs with", async () => {
+  it("[wellknown.takes] the authorization server's document says what Keel takes and nothing more: these fields and no other, an agent's way to name itself and an app's, the code an app asks for and how it proves it, and the two algorithms a key signs with", async () => {
     for (const path of AUTHORIZATION_SERVER)
       expect(await document(path)).toEqual({
         issuer: ISSUER,
+        authorization_endpoint: `${ISSUER}/oauth2/authorize`,
         token_endpoint: TOKEN_ENDPOINT,
         jwks_uri: `${ISSUER}/jwks`,
-        scopes_supported: ["agent:work", "agent:read"],
-        response_types_supported: [],
-        grant_types_supported: ["client_credentials"],
-        token_endpoint_auth_methods_supported: ["private_key_jwt"],
+        scopes_supported: ["agent:work", "agent:read", "person", "offline_access"],
+        response_types_supported: ["code"],
+        grant_types_supported: ["client_credentials", "authorization_code", "refresh_token"],
+        code_challenge_methods_supported: ["S256"],
+        token_endpoint_auth_methods_supported: ["private_key_jwt", "none"],
         token_endpoint_auth_signing_alg_values_supported: ["EdDSA", "ES256"],
         dpop_signing_alg_values_supported: ["EdDSA", "ES256"],
         registration_endpoint: `${BASE}/v1/oauth/register`,
@@ -97,7 +100,7 @@ describe("what an arriving agent reads to find its way in", () => {
       });
   });
 
-  it("[wellknown.refuses] the ways of naming a client that the document leaves out are refused by the endpoint it names: a secret in the form, a secret in a Basic header and no authentication at all get no token, where a request the agent's key signed gets one", async () => {
+  it("[wellknown.refuses] the ways of naming a client that the document leaves out are refused by the endpoint it names, and an app's is no agent's: a secret in the form, a secret in a Basic header and no authentication at all get an agent no token, where a request the agent's key signed gets one", async () => {
     const account = await newKey();
     const agent = await seedKeyAgent(account);
     const secret = "a-secret-no-agent-was-ever-given";

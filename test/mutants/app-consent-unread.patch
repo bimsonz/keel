@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.withdrawn"
+# kills: app.withdrawn
+# why: an app's token is taken whether or not its person still allows the app, so revoking it stops nothing until the token runs out
+diff --git a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+index d084283d..29c05076 100644
+--- a/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
++++ b/apps/keel/src/adapters/driven/better-auth/access-tokens.ts
+@@ -186,7 +186,7 @@ async function appClaims(
+   } catch (fault) {
+     return unchecked("the person's consent", fault);
+   }
+-  return allowed ? { userId: claims.sub, clientId: claims.azp } : APP_REFUSED;
++  return { userId: claims.sub, clientId: claims.azp };
+ }
+ 
+ /**

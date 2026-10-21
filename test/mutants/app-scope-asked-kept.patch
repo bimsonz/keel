@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.sign-in"
+# kills: app.sign-in
+# why: an app is granted the scopes it asked for, an agent's among them, so the provider refuses it or grants more than acting as the person
+diff --git a/apps/keel/src/adapters/driven/better-auth/apps.ts b/apps/keel/src/adapters/driven/better-auth/apps.ts
+index 73409ef0..1aebbce4 100644
+--- a/apps/keel/src/adapters/driven/better-auth/apps.ts
++++ b/apps/keel/src/adapters/driven/better-auth/apps.ts
+@@ -177,7 +177,7 @@ export function appAuthorization(
+       "invalid_target",
+       `An app signs a person in for ${mcp}, Keel's MCP server, and for nothing else.`,
+     );
+-  return { ...query, scope: APP_SCOPES.join(" "), resource: mcp };
++  return { ...query, resource: query["resource"] ?? mcp };
+ }
+ 
+ /**

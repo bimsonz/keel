@@ -311,9 +311,16 @@ export function registeredOk({ agent, created }: SignedUp): Auth_registerClientR
   };
 }
 
-/** A sign-up refused for its key or its proof, in registration's own shape (RFC 7591 §3.2.2). */
+/** An app Keel registered as a public client, as registration answers it (RFC 7591 §3.2.1). */
+export type RegisteredApp = Extract<Auth_registerClientResult["body"], { readonly kind: "app" }>;
+
+export function appRegisteredOk(app: RegisteredApp): Auth_registerClientResult {
+  return { status: 201, body: app };
+}
+
+/** A registration refused for its key, its proof or its callbacks, in registration's own shape (RFC 7591 §3.2.2). */
 export function registrationRefused(
-  refused: "invalid_client_metadata" | "invalid_dpop_proof",
+  refused: "invalid_client_metadata" | "invalid_redirect_uri" | "invalid_dpop_proof",
   detail: string,
 ): Auth_registerClientResult {
   return {

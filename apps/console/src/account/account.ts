@@ -11,6 +11,7 @@ import {
   organizationClient,
   usernameClient,
 } from "better-auth/client/plugins";
+import type { AllowedApp } from "./apps.ts";
 import { NOTHING, type Standing, standingOf } from "./closing.ts";
 import { type Role, ac, roleOf, roles } from "./roles.ts";
 
@@ -469,6 +470,53 @@ export function createAccount(options: AccountOptions) {
 
     async denyDevice(userCode: string): Promise<void> {
       taken(await client.device.deny({ userCode }));
+    },
+
+    // Apps a person signs in through (apps.ts): an MCP client acting as them at Keel's MCP server.
+
+    /** The name an app registered with, or its id where it gave none. */
+    async appName(clientId: string): Promise<string> {
+      const answer = await client.$fetch<{ client_name?: string }>("/oauth2/public-client", {
+        method: "GET",
+        query: { client_id: clientId },
+      });
+      const name = taken(answer).client_name;
+      return typeof name === "string" && name !== "" ? name : clientId;
+    },
+
+    /** The person's answer to an app's request: Keel's address to send them on to, the app's own. */
+    async answerApp(query: string, accept: boolean): Promise<string> {
+      const answer = await client.$fetch<{ url?: string; redirect_uri?: string }>(
+        "/oauth2/consent",
+        { method: "POST", body: { accept, oauth_query: query } },
+      );
+      const said = taken(answer);
+      const to = said.url ?? said.redirect_uri;
+      if (typeof to !== "string") throw new Refused("", "Keel answered and named nowhere to go");
+      return to;
+    },
+
+    /** The apps the person allowed, the newest first, each with the name it registered with. */
+    async apps(): Promise<AllowedApp[]> {
+      const answer = await client.$fetch<
+        readonly { id: string; clientId: string; createdAt: string | Date }[]
+      >("/oauth2/get-consents", { method: "GET" });
+      const consents = taken(answer).toSorted(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      return Promise.all(
+        consents.map(async (consent) => ({
+          id: consent.id,
+          clientId: consent.clientId,
+          name: await this.appName(consent.clientId).catch(() => consent.clientId),
+          allowedAt: new Date(consent.createdAt).toISOString(),
+        })),
+      );
+    },
+
+    /** Withdraws an app's consent: Keel refuses its token at once, and ends its refreshes. */
+    async revokeApp(id: string): Promise<void> {
+      taken(await client.$fetch("/oauth2/delete-consent", { method: "POST", body: { id } }));
     },
 
     // Orgs. Every call names the org it is about, as the address does: Better Auth also keeps an "active

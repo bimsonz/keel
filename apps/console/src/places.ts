@@ -3,6 +3,7 @@
 // person's projects, an agent's, or an org's home. Every other one is at a first segment Keel reserves, in
 // its own list, so none can be taken for a handle.
 
+import { appRequestAgain, isAppRequest } from "./account/apps.ts";
 import { RESERVED_SEGMENTS } from "./contract/keel/index.ts";
 
 export type OrgTab = "home" | "members" | "credentials" | "settings";
@@ -14,6 +15,8 @@ export type Place =
   | { at: "settings" }
   /** Where `keeltown login` sends a person, with the code their terminal is showing. */
   | { at: "device"; userCode: string }
+  /** Where Keel's sign-in sends a person to allow an app to act as them, the app's request signed into the address. */
+  | { at: "consent" }
   | { at: "new-org" }
   /**
    * Making a project. `owner` is the namespace the link here named, where it named one; `start` is how the link
@@ -114,6 +117,8 @@ export function placeOf(pathname: string, search = ""): Place | null {
       return { at: "sponsor" };
     case "device":
       return { at: "device", userCode: new URLSearchParams(search).get("user_code") ?? "" };
+    case "consent":
+      return { at: "consent" };
     default:
       return null;
   }
@@ -156,6 +161,8 @@ export function titleOfPlace(place: Place): string {
         return "Settings";
       case "device":
         return "Device activation";
+      case "consent":
+        return "Authorize an app";
       case "new-org":
         return "New org";
       case "new-project":
@@ -190,11 +197,13 @@ export function hrefOf(place: Place, next?: string): string {
 }
 
 /**
- * Where to go once signed in: the page that sent the reader to sign in, if it was one of this console's.
+ * Where to go once signed in: the page that sent the reader to sign in, if it was one of this console's, or, where
+ * Keel's sign-in sent them here for an app, the app's request again at Keel's own authorization endpoint.
  * Anything else an address asks for is not followed: a link must not be able to send a person who has just
  * signed in to another site.
  */
 export function nextOf(search: string): string {
+  if (isAppRequest(search)) return appRequestAgain(search);
   const asked = new URLSearchParams(search).get("next") ?? "";
   if (!asked.startsWith("/")) return "/";
   // Read as an address on a site of no name: one that is still on that site is a path here.

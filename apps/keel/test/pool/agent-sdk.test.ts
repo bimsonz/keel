@@ -5,7 +5,7 @@ import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
 import { decodeJwt } from "jose";
 import { describe, expect, it } from "vitest";
-import { verifyAgentToken } from "../../src/adapters/driven/better-auth/access-tokens.ts";
+import { verifyAccessToken } from "../../src/adapters/driven/better-auth/access-tokens.ts";
 import { makeAuth } from "../../src/adapters/driven/better-auth/auth.ts";
 import { freshAddress } from "./agent-keys.ts";
 import { BASE, drainOutbox } from "./helpers.ts";
@@ -34,8 +34,8 @@ function keel() {
 }
 
 /** The check the gate makes of an agent's token, as `agent-access-tokens.test.ts` makes it. */
-const admitted = (presented: Parameters<typeof verifyAgentToken>[3]) =>
-  verifyAgentToken(
+const admitted = (presented: Parameters<typeof verifyAccessToken>[3]) =>
+  verifyAccessToken(
     makeAuth({
       db: env.DB,
       secret: env.BETTER_AUTH_SECRET,
@@ -44,7 +44,7 @@ const admitted = (presented: Parameters<typeof verifyAgentToken>[3]) =>
       endSponsorships: async () => {},
     }),
     BASE,
-    BASE,
+    { resource: BASE },
     presented,
   );
 

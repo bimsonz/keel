@@ -104,7 +104,9 @@ import {
 import type { AgentClaims, AgentToken, Caller } from "./caller.ts";
 import { specRoute } from "./spec-routes.ts";
 import {
+  appRegisteredOk,
   latticesOk,
+  type RegisteredApp,
   registeredOk,
   registrationRefused,
   tokenError,
@@ -528,6 +530,21 @@ export interface Doorway {
         readonly detail: string;
       }
   >;
+  /**
+   * Registration of an app a person will sign in through, by the sign-in
+   * adapter: a public client for the code grant and the scopes `person
+   * offline_access`, or why its callbacks are refused.
+   */
+  readonly registerApp: (request: {
+    readonly redirect_uris: readonly string[];
+    readonly client_name?: string | undefined;
+  }) => Promise<
+    | RegisteredApp
+    | {
+        readonly refused: "invalid_redirect_uri" | "invalid_client_metadata";
+        readonly detail: string;
+      }
+  >;
 }
 
 /** Where an agent signs up, as the spec has it: the path its proof must name. */
@@ -623,15 +640,26 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
     authorizeHandlers(
       {
         Auth_registerClient: async (caller: Caller, input: Input<"Auth_registerClient">) => {
+          const { body } = input;
+          // An app sends its callbacks and no key: a public client a person signs in through.
+          if ("redirect_uris" in body) {
+            const app = await doorway.registerApp({
+              redirect_uris: body.redirect_uris,
+              client_name: body.client_name,
+            });
+            return "refused" in app
+              ? registrationRefused(app.refused, app.detail)
+              : appRegisteredOk(app);
+          }
           const proven = await doorway.provenKey({
-            jwk: input.jwks.keys[0],
+            jwk: body.jwks.keys[0],
             proof: input.dpop,
             url: `${doorway.origin}${REGISTER_PATH}`,
           });
           if ("refused" in proven) return registrationRefused(proven.refused, proven.detail);
           return run(
             caller,
-            signUpAgent(proven, input.client_name).pipe(
+            signUpAgent(proven, body.client_name).pipe(
               Effect.map(registeredOk),
               // The id is another key's account (a collision in 128 bits of a thumbprint), or its handle is held.
               Effect.catchTag("SignUpRefused", () =>

@@ -2,12 +2,12 @@
 # kills: names.reserved, ns.reserved
 # why: sponsor is a handle anyone can take, so a person or an org named sponsor holds the address of the page where a person approves sponsoring an agent
 diff --git a/packages/contracts/src/reserved.ts b/packages/contracts/src/reserved.ts
-index d25c80d..e8de7b5 100644
+index d3f528e2..97b7749b 100644
 --- a/packages/contracts/src/reserved.ts
 +++ b/packages/contracts/src/reserved.ts
-@@ -18,7 +18,6 @@ export const RESERVED_SEGMENTS = [
-   "logout",
+@@ -19,7 +19,6 @@ export const RESERVED_SEGMENTS = [
    "device",
+   "consent",
    "invite",
 -  "sponsor",
    "settings",

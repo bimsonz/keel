@@ -25,13 +25,14 @@ import { CodeHostReadCache, makeMemoryTier } from "../adapters/driven/artifacts/
 import { RepoServerArtifacts } from "../adapters/driven/artifacts/repo-server.ts";
 import {
   resourceChallenge,
-  verifyAgentToken,
+  verifyAccessToken,
 } from "../adapters/driven/better-auth/access-tokens.ts";
 import {
   type AgentAccess,
   agentResources,
   TOKEN_PATH,
 } from "../adapters/driven/better-auth/agents.ts";
+import { appAllowed, registerApp } from "../adapters/driven/better-auth/apps.ts";
 import {
   authorizationServerDocument,
   protectedResourceDocument,
@@ -222,6 +223,7 @@ function gateDeps(
   runtime: IsolateRuntime,
   host: string,
   auth: () => ReturnType<typeof makeAuth>,
+  db: D1Database,
 ): GateDeps {
   const origin = `https://${host}`;
   return {
@@ -242,8 +244,18 @@ function gateDeps(
         },
       };
     },
-    agentToken: (presented, door) =>
-      verifyAgentToken(auth(), origin, agentResources(origin)[door], presented),
+    accessToken: (presented, door) =>
+      verifyAccessToken(
+        auth(),
+        origin,
+        door === "mcp"
+          ? {
+              resource: agentResources(origin).mcp,
+              apps: { allowed: (userId, clientId) => appAllowed(db, userId, clientId) },
+            }
+          : { resource: agentResources(origin).api },
+        presented,
+      ),
     challenge: (door, refusal) => resourceChallenge(agentResources(origin)[door], refusal),
     admit: (credential: Credential) =>
       runtime.runPromise(
@@ -423,11 +435,6 @@ export function makeIsolate(
     (userId) => runtime.runPromise(endSponsorships(Schema.decodeSync(UserId)(userId))),
   );
   const origin = `https://${env.KEEL_HOST}`;
-  const handlers = makeHandlers(
-    makeRunner(runtime, isD1Unavailable),
-    signInMethods(authConfig),
-    doorwayOf(env.KEEL_HOST),
-  );
   /**
    * Better Auth starts its initialisation (D1 included) when it is made and
    * shares that promise, and its adapter's schema check, with every later
@@ -440,7 +447,12 @@ export function makeIsolate(
     authOverrides.made?.();
     return makeAuth(authConfig);
   };
-  const deps = gateDeps(runtime, env.KEEL_HOST, auth);
+  const handlers = makeHandlers(
+    makeRunner(runtime, isD1Unavailable),
+    signInMethods(authConfig),
+    doorwayOf(env.KEEL_HOST, (request) => registerApp(() => auth().api, request)),
+  );
+  const deps = gateDeps(runtime, env.KEEL_HOST, auth, env.DB);
   // One limiter, two counts under their own keys: tokens issued to an agent, and failed exchanges from an address.
   const tokenLimits: TokenLimits = {
     issued: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success,

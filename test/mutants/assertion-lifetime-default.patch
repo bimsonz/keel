@@ -2,14 +2,14 @@
 # kills: token.assertion
 # why: a signed token request may say it is good for the provider's default five minutes, so one that leaks unused is good five times as long
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index da8663a1..b14fedf6 100644
+index b5800300..b209cd80 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -262,7 +262,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
-     // The provider links a resource to a stored client row, and an agent has none: every agent may ask for either.
-     enforcePerClientResources: false,
+@@ -276,7 +276,6 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
      m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
+     accessTokenExpiresIn: PERSON_TOKEN_SECONDS,
+     refreshTokenExpiresIn: PERSON_REFRESH_SECONDS,
 -    assertionMaxLifetime: ASSERTION_SECONDS,
      // A token is bound only to a key whose proofs Keel's own doors take: the library's list is wider.
      dpop: { signingAlgorithms: [...KEY_ALGORITHMS] },
-     allowDynamicClientRegistration: false,
+     // Keel's registration route calls the provider's for an app, with no session: the app is a public client.

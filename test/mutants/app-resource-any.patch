@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.callbacks"
+# kills: app.callbacks
+# why: an app may ask for a token for Keel's API, which no app's token is for
+diff --git a/apps/keel/src/adapters/driven/better-auth/apps.ts b/apps/keel/src/adapters/driven/better-auth/apps.ts
+index 73409ef0..9f0dca6a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/apps.ts
++++ b/apps/keel/src/adapters/driven/better-auth/apps.ts
+@@ -172,12 +172,7 @@ export function appAuthorization(
+   mcp: string,
+ ): Record<string, unknown> {
+   const resource: unknown = query["resource"];
+-  if (resource !== undefined && resource !== mcp)
+-    throw refuse(
+-      "invalid_target",
+-      `An app signs a person in for ${mcp}, Keel's MCP server, and for nothing else.`,
+-    );
+-  return { ...query, scope: APP_SCOPES.join(" "), resource: mcp };
++  return { ...query, scope: APP_SCOPES.join(" "), resource: resource ?? mcp };
+ }
+ 
+ /**

@@ -2,13 +2,13 @@
 # kills: gate.agent-token
 # why: a session or a token of the secret exchange is taken under the DPoP scheme, which promises a key binding neither has
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 22076ce2..9b074cc3 100644
+index 94f04890..6130d774 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -242,8 +242,7 @@ export async function gate(
-           deps.challenge(door, answer),
+@@ -253,8 +253,7 @@ export async function gate(
          );
-       credential = { _tag: "Claims", claims: answer };
+       credential =
+         "userId" in answer ? { _tag: "App", claims: answer } : { _tag: "Claims", claims: answer };
 -    } else if (scheme !== "Bearer") return refused({ refused: "invalid" });
 -    else if (JWT.test(token)) credential = { _tag: "Token", token };
 +    } else if (JWT.test(token)) credential = { _tag: "Token", token };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.withdrawn"
+# kills: app.withdrawn
+# why: withdrawing an app's consent leaves its refresh token good, so it is given new tokens after it was revoked
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index ad43ec18..23451000 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -497,8 +497,6 @@ export function authOptions(config: AuthConfig) {
+         if (ctx.path === "/device/approve") await passkeyToApproval(ctx);
+         // What the app was given for this person ends with the consent the provider deletes after.
+         const withdrawn: unknown = ctx.body?.id;
+-        if (ctx.path === WITHDRAW_PATH && session !== null && typeof withdrawn === "string")
+-          await forgetAppTokens(db, withdrawn, session.user.id);
+         return beforeOrg(ctx);
+       }),
+       after: createAuthMiddleware(async (ctx) => {

@@ -6984,8 +6984,8 @@
     "/oauth/register": {
       "post": {
         "operationId": "Auth_registerClient",
-        "summary": "Sign an agent up with its public key",
-        "description": "Sign an agent up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523). The answer is 201 for a new account. The same key\nagain answers the same account, 200.",
+        "summary": "Register an agent or an app",
+        "description": "Register a client (RFC 7591): an agent signing up with its key, or an app\na person will sign in through.\n\nAn agent signs up with its public key: no person, no browser, no secret.\nSend the key and a DPoP proof (RFC 9449) made by that same key for this\nrequest, so nobody registers a key they do not hold. The answer's\n`client_id` is the agent; it then asks the token endpoint named in\n`/.well-known/oauth-authorization-server` for a token with a request signed\nby the key (RFC 7523). The answer is 201 for a new account. The same key\nagain answers the same account, 200.\n\nAn app sends its `redirect_uris` and no key: it is registered as a public\nclient, 201, and a person signs in through it at the authorization endpoint\nthe server's metadata names. It needs no proof.",
         "parameters": [
           {
             "name": "dpop",
@@ -7013,7 +7013,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ClientRegistration"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ClientRegistration"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AppRegistration"
+                    }
+                  ]
                 }
               }
             }
@@ -7095,7 +7102,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClientRegistrationRequest"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClientRegistrationRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AppRegistrationRequest"
+                  }
+                ]
               }
             }
           }
@@ -13523,6 +13537,136 @@
           "not": {}
         },
         "description": "A change with the same intent as `changeId` landed. A notice for `changeId`'s agent, committed on the project."
+      },
+      "AppRegistration": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "client_id_issued_at",
+          "redirect_uris",
+          "token_endpoint_auth_method",
+          "grant_types",
+          "response_types",
+          "client_name",
+          "scope",
+          "kind"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The app's id, which it names on every authorization and token request."
+          },
+          "client_id_issued_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the app was registered, in seconds since the epoch."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "none"
+            ]
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "refresh_token"
+              ]
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "description": "What a person who signs in through it grants: `person offline_access`, the person's own standing and a refresh token."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app"
+            ],
+            "description": "The kind of client this is: an app a person signs in through, never an account of its own."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "AppRegistrationRequest": {
+        "type": "object",
+        "required": [
+          "redirect_uris"
+        ],
+        "properties": {
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "minItems": 1,
+            "maxItems": 5,
+            "description": "Where the person's browser is sent back with the code: `http` to this\nmachine (`localhost`, `127.0.0.1` or `[::1]`, any port), or `https`."
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "enum": [
+              "none"
+            ],
+            "description": "An app holds no secret: it proves the code is its own with PKCE."
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "authorization_code",
+                "refresh_token"
+              ]
+            }
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          "client_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The name a person reads on Keel's consent page, beside where the code is sent."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Asked for and not granted beyond `person offline_access`: an app acts as the person who signs in, and as nothing else."
+          }
+        },
+        "additionalProperties": {},
+        "description": "An app's registration (RFC 7591), such as an MCP client: a public client,\nholding no secret, that a person then signs in through with the\nauthorization code grant and PKCE (RFC 7636). Its token acts as that person\nat Keel's MCP server and nowhere else, carrying the one scope `person`. A\nfield Keel does not take is ignored (RFC 7591 §2)."
       },
       "ApproveSponsorRequest": {
         "type": "object",
@@ -25160,6 +25304,7 @@
             "type": "string",
             "enum": [
               "invalid_client_metadata",
+              "invalid_redirect_uri",
               "invalid_dpop_proof"
             ]
           },

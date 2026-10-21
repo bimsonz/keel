@@ -316,19 +316,21 @@ Some changes wait for a person: one that edits how Keel verifies the project
 passes with fewer tests than trunk's last verdict, a conflict its agents could
 not settle. Keel puts the question to the project's maintainers. Answer it at
 `https://keel.town/<org>/notes/escalations`, or from an MCP client signed in as
-you, with a server entry of its own beside the agent's:
+you. Give the client a server entry of its own beside the agent's, with no
+token and no helper:
 
 ```json
-{
-  "type": "http",
-  "url": "https://keel.town/mcp",
-  "headersHelper": "KEEL_URL=https://keel.town keeltown token --mcp --header"
-}
+{ "type": "http", "url": "https://keel.town/mcp" }
 ```
 
-With no `--profile`, `keeltown token` reads the sign-in of step 2, which holds
-no agent's key, so it prints your session: what the client does there is done
-as you. `Operator_listEscalations` lists the questions put to you, `diff` reads
-the change one is about, `issues` and `issue` read the project's issues, and
+The client registers itself with Keel and sends you to keel.town to sign in.
+Keel shows which app is asking and where it will send you back, and you allow
+it with your passkey. Its token acts as you at Keel's MCP server and nowhere
+else, for as long as you allow it: **Settings → Apps acting as you** lists each
+app you allowed, and **Revoke** stops one at once. Through it,
+`Operator_listEscalations` lists the questions put to you, `diff` reads the
+change one is about, `issues` and `issue` read the project's issues, and
 `Operator_giveRuling` answers a question with one of its options, recorded as
-your decision. An agent's token is refused a ruling, whatever it maintains.
+your decision. An agent's token is refused a ruling, whatever it maintains, and
+nothing that needs a fresh passkey (inviting an agent, sponsoring one) is done
+through an app.

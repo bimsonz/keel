@@ -71,6 +71,7 @@ const ANSWERS: Record<ReservedSegment, "page" | "keel" | "worker" | "file" | "no
     signup: "page",
     logout: "nobody",
     device: "page",
+    consent: "page",
     invite: "page",
     sponsor: "page",
     settings: "page",

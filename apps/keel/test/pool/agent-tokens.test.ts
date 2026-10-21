@@ -306,9 +306,7 @@ describe("the one-time ids a token request leaves behind", () => {
 /** Every route the provider and the jwt plugin define that Keel does not serve. */
 const CLOSED = [
   "/token",
-  "/oauth2/authorize",
   "/oauth2/register",
-  "/oauth2/consent",
   "/oauth2/continue",
   "/oauth2/userinfo",
   "/oauth2/introspect",
@@ -318,22 +316,41 @@ const CLOSED = [
   "/oauth2/create-client",
   "/oauth2/get-client",
   "/oauth2/get-clients",
-  "/oauth2/public-client",
   "/oauth2/public-client-prelogin",
   "/oauth2/update-client",
   "/oauth2/delete-client",
   "/oauth2/client/rotate-secret",
   "/oauth2/get-consent",
-  "/oauth2/get-consents",
   "/oauth2/update-consent",
-  "/oauth2/delete-consent",
   "/admin/oauth2/create-client",
   "/admin/oauth2/update-client",
   "/admin/oauth2/resources",
 ] as const;
 
+/** The routes of a person's sign-in through an app, which Keel serves (apps.ts), by the method each takes. */
+const APP_ROUTES = [
+  ["GET", "/oauth2/authorize"],
+  ["POST", "/oauth2/consent"],
+  ["GET", "/oauth2/public-client"],
+  ["GET", "/oauth2/get-consents"],
+  ["POST", "/oauth2/delete-consent"],
+] as const;
+
 describe("the provider's routes at /v1/auth", () => {
-  it("[oauth.surface] Keel serves the token endpoint and the published key, and no other route of the provider's", async () => {
+  it("[oauth.surface] Keel serves the token endpoint, the published key and a person's sign-in through an app, and no other route of the provider's", async () => {
+    for (const [method, path] of APP_ROUTES) {
+      const response = await worker(`${BASE}/v1/auth${path}`, {
+        method,
+        redirect: "manual",
+        headers: {
+          "cf-connecting-ip": freshAddress(),
+          ...(method === "POST" ? { "content-type": "application/json", origin: BASE } : {}),
+        },
+        ...(method === "POST" ? { body: "{}" } : {}),
+      });
+      expect([method, path, response.status === 404]).toEqual([method, path, false]);
+      await response.body?.cancel();
+    }
     const answers: [string, string, number][] = [];
     for (const path of CLOSED)
       for (const method of ["GET", "POST"] as const) {

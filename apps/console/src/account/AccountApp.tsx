@@ -56,6 +56,8 @@ import {
   UserIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
+import { Apps } from "./Apps.tsx";
+import { Consent } from "./Consent.tsx";
 import { Sessions } from "./Sessions.tsx";
 import { Sponsor } from "./Sponsor.tsx";
 import { Sponsored } from "./Sponsored.tsx";
@@ -592,6 +594,9 @@ function Settings({
         <div id="sessions" className="scroll-mt-4">
           <Sessions account={account} onSignedOut={() => go("/")} />
         </div>
+        <div id="apps" className="scroll-mt-4">
+          <Apps account={account} />
+        </div>
         <div id="agents" className="scroll-mt-4">
           <Sponsored account={account} sponsorship={sponsorship} who={who} />
         </div>
@@ -973,6 +978,8 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
     page = (
       <Device account={account} who={reader.who} userCode={place.userCode} onSignedIn={signedIn} />
     );
+  else if (reader.is === "user" && place.at === "consent")
+    page = <Consent account={account} who={reader.who} onSignedIn={signedIn} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
   else if (reader.is === "user" && place.at === "new-project")
     // Whose the project may be is the reader's own account and their orgs: the form waits for Keel's list.

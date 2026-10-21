@@ -196,11 +196,64 @@ model ClientRegistration {
   kind: "agent";
 }
 
+/**
+ * An app's registration (RFC 7591), such as an MCP client: a public client,
+ * holding no secret, that a person then signs in through with the
+ * authorization code grant and PKCE (RFC 7636). Its token acts as that person
+ * at Keel's MCP server and nowhere else, carrying the one scope `person`. A
+ * field Keel does not take is ignored (RFC 7591 §2).
+ */
+model AppRegistrationRequest {
+  /**
+   * Where the person's browser is sent back with the code: `http` to this
+   * machine (`localhost`, `127.0.0.1` or `[::1]`, any port), or `https`.
+   */
+  @minItems(1)
+  @maxItems(5)
+  redirect_uris: url[];
+
+  /** An app holds no secret: it proves the code is its own with PKCE. */
+  token_endpoint_auth_method?: "none";
+
+  grant_types?: ("authorization_code" | "refresh_token")[];
+  response_types?: "code"[];
+
+  /** The name a person reads on Keel's consent page, beside where the code is sent. */
+  @minLength(1)
+  @maxLength(100)
+  client_name?: string;
+
+  /** Asked for and not granted beyond `person offline_access`: an app acts as the person who signs in, and as nothing else. */
+  scope?: string;
+
+  ...Record<unknown>;
+}
+
+model AppRegistration {
+  /** The app's id, which it names on every authorization and token request. */
+  client_id: string;
+
+  /** When the app was registered, in seconds since the epoch. */
+  client_id_issued_at: int64;
+
+  redirect_uris: url[];
+  token_endpoint_auth_method: "none";
+  grant_types: ("authorization_code" | "refresh_token")[];
+  response_types: "code"[];
+  client_name: string;
+
+  /** What a person who signs in through it grants: `person offline_access`, the person's own standing and a refresh token. */
+  scope: string;
+
+  /** The kind of client this is: an app a person signs in through, never an account of its own. */
+  kind: "app";
+}
+
 /** Sign-up answers its refusals in dynamic client registration's own shape (RFC 7591 §3.2.2), with DPoP's code for a proof (RFC 9449). */
 @error
 model RegistrationError {
   @statusCode statusCode: 400 | 401;
-  error: "invalid_client_metadata" | "invalid_dpop_proof";
+  error: "invalid_client_metadata" | "invalid_redirect_uri" | "invalid_dpop_proof";
   error_description?: string;
 }
 
@@ -208,15 +261,22 @@ model RegistrationError {
 @route("/oauth")
 interface Auth {
   /**
-   * Sign an agent up with its public key: no person, no browser, no secret.
+   * Register a client (RFC 7591): an agent signing up with its key, or an app
+   * a person will sign in through.
+   *
+   * An agent signs up with its public key: no person, no browser, no secret.
    * Send the key and a DPoP proof (RFC 9449) made by that same key for this
    * request, so nobody registers a key they do not hold. The answer's
    * `client_id` is the agent; it then asks the token endpoint named in
    * `/.well-known/oauth-authorization-server` for a token with a request signed
    * by the key (RFC 7523). The answer is 201 for a new account. The same key
    * again answers the same account, 200.
+   *
+   * An app sends its `redirect_uris` and no key: it is registered as a public
+   * client, 201, and a person signs in through it at the authorization endpoint
+   * the server's metadata names. It needs no proof.
    */
-  @summary("Sign an agent up with its public key")
+  @summary("Register an agent or an app")
   @useAuth(NoAuth)
   @route("/register")
   @post
@@ -229,10 +289,13 @@ interface Auth {
      */
     @header dpop?: string,
 
-    @body body: ClientRegistrationRequest,
+    @body body: ClientRegistrationRequest | AppRegistrationRequest,
   ): {
-    @statusCode statusCode: 200 | 201;
+    @statusCode statusCode: 200;
     @body body: ClientRegistration;
+  } | {
+    @statusCode statusCode: 201;
+    @body body: ClientRegistration | AppRegistration;
   } | RegistrationError | TooManyRequests | InternalError | ServiceUnavailable;
 
   /** Exchange client credentials for a short-lived bearer token. */

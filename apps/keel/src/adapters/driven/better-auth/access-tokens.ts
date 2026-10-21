@@ -1,11 +1,12 @@
 import { createResourceServerChallenge } from "@better-auth/oauth-provider";
 import type {
+  AppClaims,
   PresentedToken,
   TokenRefusal,
   TokenUnchecked,
 } from "@keeltown/core/application/identity";
 import { type AgentClaims, Handle, Scope } from "@keeltown/core/domain/identity";
-import { AgentId, ProjectId, RunId, RunLabel } from "@keeltown/core/kernel";
+import { AgentId, ProjectId, RunId, RunLabel, UserId } from "@keeltown/core/kernel";
 import { APIError } from "better-auth/api";
 import {
   createDpopReplayStore,
@@ -14,10 +15,36 @@ import {
   verifyJwsAccessToken,
 } from "better-auth/oauth2";
 import { Schema } from "effect";
+import { PERSON_SCOPE } from "./apps.ts";
 import { AUTH_BASE_PATH, type KeelAuth } from "./auth.ts";
 import { KEY_ALGORITHMS } from "./key-proofs.ts";
 
-export type { PresentedToken, TokenRefusal, TokenUnchecked };
+export type { AppClaims, PresentedToken, TokenRefusal, TokenUnchecked };
+
+/** The claims of a person's token an app holds: the person, the app it was given to, and its scopes. */
+const PersonClaims = Schema.Struct({
+  sub: UserId,
+  azp: Schema.NonEmptyString,
+  scope: Schema.String,
+});
+const asPersonClaims = Schema.decodeUnknownOption(PersonClaims);
+
+/**
+ * The door a token is presented at: the resource it must be for, and, at the
+ * one door an app's token acts at, whether the person still allows the app.
+ * At a door with no `apps`, a person's token is refused.
+ */
+export interface TokenDoor {
+  readonly resource: string;
+  readonly apps?: { readonly allowed: (userId: UserId, clientId: string) => Promise<boolean> };
+}
+
+/** An app's token at a door it does not act at, or whose person no longer allows it. */
+const APP_REFUSED: TokenRefusal = {
+  refused: "invalid_token",
+  detail:
+    "This token is an app's, acting as a person at Keel's MCP server alone, and only while that person allows the app: sign in through the app again.",
+};
 
 /** How old a request's proof may be. */
 const PROOF_SECONDS = 60;
@@ -61,9 +88,12 @@ function unchecked(reading: string, fault: unknown): TokenUnchecked {
 }
 
 /**
- * Who an agent's token says is calling, once Better Auth's own checks pass: the
- * token's signature, issuer, audience and expiry, then its binding (RFC 9449
- * §7.1). The audience is `resource`, the door the request came in by: a token
+ * Who a token Keel issued says is calling, once Better Auth's own checks pass:
+ * the token's signature, issuer, audience and expiry, then its binding (RFC 9449
+ * §7.1). An agent's token names the agent; a person's token names the person
+ * and the app that holds it, and is taken only at a door with `apps` (Keel's
+ * MCP server), with the scope `person`, and while the person's consent to the
+ * app stands, read on every request. The audience is the door's resource: a token
  * issued for another of Keel's resources is refused here. A token bound to a
  * key needs the DPoP scheme and a proof made by that key for this request,
  * used once; a token bound to no key needs neither and is refused with either:
@@ -77,12 +107,13 @@ function unchecked(reading: string, fault: unknown): TokenUnchecked {
  * fault of a proof in its own binding error, so any other throw out of the
  * binding check is the store's.
  */
-export async function verifyAgentToken(
+export async function verifyAccessToken(
   auth: KeelAuth,
   origin: string,
-  resource: string,
+  door: TokenDoor,
   presented: PresentedToken,
-): Promise<AgentClaims | TokenRefusal | TokenUnchecked> {
+): Promise<AgentClaims | AppClaims | TokenRefusal | TokenUnchecked> {
+  const { resource } = door;
   let payload: Awaited<ReturnType<typeof verifyJwsAccessToken>>;
   let keysUnread: { readonly fault: unknown } | undefined;
   try {
@@ -123,6 +154,8 @@ export async function verifyAgentToken(
         "A token bound to a key needs `Authorization: DPoP <token>` and a DPoP proof made by that key for this method and URL, naming the token, used once.",
     };
   }
+  const person = asPersonClaims(payload);
+  if (person._tag === "Some") return appClaims(door, person.value);
   const claims = asClaims(payload);
   if (claims._tag === "None") return NOT_A_TOKEN;
   const scopes = asScopes(claims.value.scope.split(" ").filter(Boolean));
@@ -138,6 +171,22 @@ export async function verifyAgentToken(
     ...(run === undefined ? {} : { run: { id: run, ...(label === undefined ? {} : { label }) } }),
     bound: cnf !== undefined,
   };
+}
+
+/** A person's token, as the door takes it: at the app door, for `person`, while the person allows the app. */
+async function appClaims(
+  door: TokenDoor,
+  claims: typeof PersonClaims.Type,
+): Promise<AppClaims | TokenRefusal | TokenUnchecked> {
+  if (door.apps === undefined || !claims.scope.split(" ").includes(PERSON_SCOPE))
+    return APP_REFUSED;
+  let allowed: boolean;
+  try {
+    allowed = await door.apps.allowed(claims.sub, claims.azp);
+  } catch (fault) {
+    return unchecked("the person's consent", fault);
+  }
+  return allowed ? { userId: claims.sub, clientId: claims.azp } : APP_REFUSED;
 }
 
 /**

@@ -63,26 +63,41 @@ export interface TokenUnchecked {
 }
 
 /**
+ * A person's token that an app they allowed holds, as the doorway verified it:
+ * the person it acts as, and the app (its client id) that holds it.
+ */
+export interface AppClaims {
+  readonly userId: UserId;
+  readonly clientId: string;
+}
+
+/**
  * What a request presents, as the doorway reads it: a token of the secret
  * exchange, still to be verified; the claims of an agent's own token, which
  * the doorway has verified (its signature, audience, expiry and key binding);
- * a user's session; or nothing.
+ * the claims of a person's token an app holds, verified the same way and
+ * against the person's standing consent to the app; a user's session; or
+ * nothing.
  */
 export type Credential =
   | { readonly _tag: "Token"; readonly token: string }
   | { readonly _tag: "Claims"; readonly claims: AgentClaims }
+  | { readonly _tag: "App"; readonly claims: AppClaims }
   | { readonly _tag: "Session"; readonly userId: UserId; readonly signedIn: SignedIn }
   | { readonly _tag: "None" };
 
 /**
  * Who the gate admitted: for an agent the claims of the token it verified
  * (which name a project, unless it is a new agent's first), for a user how its
- * session was signed in.
+ * session was signed in, and for a user an app acts as, the app. An app's
+ * caller has no sign-in of its own, so nothing that asks for a fresh one is
+ * done through it.
  */
 export interface Admitted {
   readonly principal: Principal;
   readonly token?: AgentClaims;
   readonly signedIn?: SignedIn;
+  readonly app?: AppClaims;
 }
 
 /**
@@ -147,7 +162,8 @@ export type GateRefusal =
  * org, and it stands there as the public: it still reads who it is and may ask
  * for a sponsor. A token whose `org` is not its agent's current one (minted
  * before the agent was placed) is stale, and the agent exchanges its credential
- * again. A user is admitted with how and when its session was signed in.
+ * again. A user is admitted with how and when its session was signed in, and
+ * a user an app acts as with the app, and no sign-in of their own.
  *
  * An agent that signed itself up presents its own token, which names one
  * project or none. It stands in that project's namespace, read from the
@@ -186,6 +202,12 @@ export const principalOf: (
       const user = yield* Users.use((users) => users.principal(credential.userId));
       if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
       return { principal: user.value, signedIn: credential.signedIn };
+    }
+    case "App": {
+      const { userId } = credential.claims;
+      const user = yield* Users.use((users) => users.principal(userId));
+      if (Option.isNone(user)) return yield* new UserNotKnown({ userId });
+      return { principal: user.value, app: credential.claims };
     }
     case "Token": {
       const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));

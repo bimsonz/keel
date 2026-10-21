@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/app-sign-in.test.ts -t "app.fresh"
+# kills: app.fresh
+# why: an app is allowed on any session, however old, so a borrowed laptop's sign-in hands an app the person's standing
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index ad43ec18..8856b734 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -117,7 +117,6 @@ const SIGN_IN =
+  * gives it a way in of its own. Each needs a fresh sign-in (fresh.ts).
+  */
+ const CHANGES_SIGN_IN = new Set([
+-  CONSENT_PATH,
+   "/passkey/generate-register-options",
+   "/passkey/verify-registration",
+   "/passkey/delete-passkey",

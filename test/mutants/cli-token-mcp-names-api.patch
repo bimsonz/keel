@@ -2,10 +2,10 @@
 # kills: cli.token-mcp
 # why: `token --mcp` names Keel's origin as the door, which is the API's name, so the token it prints is the API's
 diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
-index 39c7a78e..be7ddae0 100644
+index 6fe1dc07..0595ee20 100644
 --- a/packages/cli/src/run.ts
 +++ b/packages/cli/src/run.ts
-@@ -514,7 +514,7 @@ async function keyCommand(
+@@ -427,7 +427,7 @@ async function keyCommand(
      bound: false,
      ...target(values, io.env),
      // Each of Keel's doors takes only a token asked for by its own name.
@@ -13,4 +13,4 @@ index 39c7a78e..be7ddae0 100644
 +    ...(values.mcp === true ? { resource: `${baseUrl.replace(/\/+$/, "")}` } : {}),
      ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
    }).token();
-   io.stdout(bearer(values, token));
+   io.stdout(values.header === true ? JSON.stringify({ Authorization: `Bearer ${token}` }) : token);

@@ -185,6 +185,8 @@ interface Asked {
   /** How deep the request body's fields are spelled out; the document has the rest. */
   readonly depth: number;
   readonly keep: readonly string[];
+  /** The model the walk sends, where the operation takes a choice of bodies: an agent's, at sign-up. */
+  readonly sends?: string;
 }
 
 function operationStep(
@@ -240,7 +242,13 @@ function operationStep(
     ...(query.length === 0 ? {} : { query }),
     ...(media === undefined
       ? {}
-      : { body: fieldsOf(document, at(media[1], "schema"), asked.depth) }),
+      : {
+          body: fieldsOf(
+            document,
+            asked.sends === undefined ? at(media[1], "schema") : model(document, asked.sends),
+            asked.depth,
+          ),
+        }),
     answer: {
       status: worked.map(([status]) => Number(status)),
       keep: asked.keep.map((name) => kept(document, answered, name, operationId)),
@@ -257,7 +265,13 @@ function operationStep(
  */
 export const WALK = [
   { id: "key", title: "Make a key", model: "RegistrationJwk" },
-  { id: "sign-up", operationId: "Auth_registerClient", depth: 3, keep: ["client_id", "handle"] },
+  {
+    id: "sign-up",
+    operationId: "Auth_registerClient",
+    depth: 3,
+    keep: ["client_id", "handle"],
+    sends: "ClientRegistrationRequest",
+  },
   { id: "token", title: "Ask for a token", model: "AgentTokenRequest" },
   {
     id: "whoami",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/apps.test.ts -t "console.app-asking"
+# kills: console.app-asking
+# why: the consent page offers to allow a request Keel did not sign, which Keel then refuses after the person's passkey
+diff --git a/apps/console/src/account/apps.ts b/apps/console/src/account/apps.ts
+index a493af83..eb52208d 100644
+--- a/apps/console/src/account/apps.ts
++++ b/apps/console/src/account/apps.ts
+@@ -36,7 +36,7 @@ export function appAskingOf(search: string): AppAsking | null {
+   const query = new URLSearchParams(search);
+   const clientId = query.get("client_id");
+   const redirect = URL.parse(query.get("redirect_uri") ?? "");
+-  if (clientId === null || clientId === "" || redirect === null || !query.has("sig")) return null;
++  if (clientId === null || clientId === "" || redirect === null) return null;
+   return {
+     clientId,
+     returnsTo: redirect.origin,

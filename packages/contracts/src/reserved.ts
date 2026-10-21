@@ -17,6 +17,7 @@ export const RESERVED_SEGMENTS = [
   "signup",
   "logout",
   "device",
+  "consent",
   "invite",
   "sponsor",
   "settings",

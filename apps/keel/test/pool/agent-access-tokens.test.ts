@@ -5,7 +5,7 @@ import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
 import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
-import { verifyAgentToken } from "../../src/adapters/driven/better-auth/access-tokens.ts";
+import { verifyAccessToken } from "../../src/adapters/driven/better-auth/access-tokens.ts";
 import { makeAuth } from "../../src/adapters/driven/better-auth/auth.ts";
 import {
   granted,
@@ -22,8 +22,8 @@ const WHOAMI = `${BASE}/v1/agents/me`;
 const MCP = `${BASE}/mcp`;
 
 /** The check the gate makes of an agent's token, over a Better Auth made for the call as the gate makes one. */
-const verify = (presented: Parameters<typeof verifyAgentToken>[3], resource: string = BASE) =>
-  verifyAgentToken(
+const verify = (presented: Parameters<typeof verifyAccessToken>[3], resource: string = BASE) =>
+  verifyAccessToken(
     makeAuth({
       db: env.DB,
       secret: env.BETTER_AUTH_SECRET,
@@ -32,7 +32,7 @@ const verify = (presented: Parameters<typeof verifyAgentToken>[3], resource: str
       endSponsorships: async () => {},
     }),
     BASE,
-    resource,
+    { resource },
     presented,
   );
 
@@ -217,7 +217,8 @@ describe("an agent's token at the gate", () => {
         door === "mcp" ? MCP : BASE,
       );
       if ("refused" in answer) return answer.refused;
-      return "unchecked" in answer ? "unchecked" : answer.agentId;
+      if ("unchecked" in answer) return "unchecked";
+      return "agentId" in answer ? answer.agentId : answer.userId;
     };
     expect([await at(forApi, "api"), await at(forApi, "mcp")]).toEqual([
       forApi.agent.id,

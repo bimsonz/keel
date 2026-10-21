@@ -2,15 +2,15 @@
 # kills: d1.away-directory, d1.away-quota
 # why: the runner is handed no check, so no handler's defect is ever read as the database being away
 diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index 13a63d5c..0e2490a5 100644
+index 3527a7e4..269e638e 100644
 --- a/apps/keel/src/composition/isolate.ts
 +++ b/apps/keel/src/composition/isolate.ts
-@@ -326,7 +326,7 @@ export function makeIsolate(
-   );
-   const origin = `https://${env.KEEL_HOST}`;
+@@ -448,7 +448,7 @@ export function makeIsolate(
+     return makeAuth(authConfig);
+   };
    const handlers = makeHandlers(
 -    makeRunner(runtime, isD1Unavailable),
 +    makeRunner(runtime),
      signInMethods(authConfig),
-     doorwayOf(env.KEEL_HOST),
+     doorwayOf(env.KEEL_HOST, (request) => registerApp(() => auth().api, request)),
    );

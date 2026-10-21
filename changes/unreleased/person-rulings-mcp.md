@@ -1,4 +1,8 @@
 ### Added
 
 - **A person rules over MCP.** `Operator_listEscalations` and `Operator_giveRuling` are MCP tools. Signed in as themselves, a person lists the questions Keel puts to them, reads the change one is about with `diff`, and rules, the decision recorded as theirs; an agent's token is still refused a ruling (`users-only`). A person's connection is told it acts as a person, and an agent's is told as before.
-- **`keeltown token` for a person.** With no agent's key on the profile, `token` prints the session of the person signed in, so `keeltown token --mcp --header` is the headers helper of an MCP client that acts as them. A profile that holds an agent's key still prints the agent's token.
+- **A person signs in through an app at Keel's MCP server.** An MCP client registers at `/v1/oauth/register` with its `redirect_uris` and no key (RFC 7591), as a public client: https to another machine, or http to this one. The person signs in on Keel's own pages, sees the app's name and where it sends them back, and allows it on a passkey from the last ten minutes; the app trades the code with PKCE (S256) for a token of a quarter hour and a refresh token. The token carries `person offline_access`, is taken at the MCP server alone (Keel's API refuses it), and only while the person's consent stands, read on every request: **Settings → Apps acting as you** lists each app, and **Revoke** ends it and its tokens at once. Whatever scopes an app asks for, it is granted these and no other.
+
+### Changed
+
+- The authorization server's document names the authorization endpoint, the `code` response type, `S256`, the grants `authorization_code` and `refresh_token`, the scopes `person` and `offline_access`, and `none` (an app's way of naming itself) beside an agent's; the MCP resource's document lists the app's scopes. `/v1/oauth/register` answers an app's registration with `kind: "app"`, and an agent's as before.

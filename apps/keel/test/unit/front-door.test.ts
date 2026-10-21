@@ -83,9 +83,13 @@ describe("the front door is read from the published document", () => {
         entry.id,
         [...(media === undefined ? [] : ["content-type"]), ...sent],
       ]);
+      // Where the operation takes a choice of bodies, the walk sends the one it names.
+      const sends = "sends" in entry ? entry.sends : undefined;
+      const body =
+        sends === undefined ? at(media?.[1], "schema") : { $ref: `#/components/schemas/${sends}` };
       expect([entry.id, names(step.body)]).toEqual([
         entry.id,
-        media === undefined ? [] : Object.keys(record(named(at(media[1], "schema"))["properties"])),
+        media === undefined ? [] : Object.keys(record(named(body)["properties"])),
       ]);
       const worked = Object.keys(record(operation["responses"])).filter((status) =>
         status.startsWith("2"),

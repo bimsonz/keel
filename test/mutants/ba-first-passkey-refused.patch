@@ -2,14 +2,14 @@
 # kills: ba.first-passkey
 # why: an account with no passkey is held to the passkey rule, so one that signed up by a code or GitHub can never add one
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 2fbff68b..8e9d091b 100644
+index ad43ec18..46937b54 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -275,7 +275,6 @@ export function authOptions(config: AuthConfig) {
+@@ -314,7 +314,6 @@ export function authOptions(config: AuthConfig) {
      if (isFresh(signedIn, now)) return;
      const none = !(await holdsPasskey(db, carried.user.id));
      const first = none && ADDS_PASSKEY.has(ctx.path);
 -    if (first && mayAddFirstPasskey(signedIn, now)) return;
-     const what = ctx.path === DELETE_PATH ? "deleting your account" : "changing how you sign in";
-     throw APIError.from("FORBIDDEN", {
-       code: "FRESH_SIGN_IN_REQUIRED",
+     const what =
+       ctx.path === DELETE_PATH
+         ? "deleting your account"

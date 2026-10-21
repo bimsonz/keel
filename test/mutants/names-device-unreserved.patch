@@ -2,7 +2,7 @@
 # kills: names.reserved
 # why: device is a handle anyone can take, so keel.town/device stops being the device-login page
 diff --git a/packages/contracts/src/reserved.ts b/packages/contracts/src/reserved.ts
-index d25c80d..16db36a 100644
+index d3f528e2..39d7cfea 100644
 --- a/packages/contracts/src/reserved.ts
 +++ b/packages/contracts/src/reserved.ts
 @@ -16,7 +16,6 @@ export const RESERVED_SEGMENTS = [
@@ -10,6 +10,6 @@ index d25c80d..16db36a 100644
    "signup",
    "logout",
 -  "device",
+   "consent",
    "invite",
    "sponsor",
-   "settings",

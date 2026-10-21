@@ -16,11 +16,12 @@ import { APIError } from "better-auth/api";
 import { deriveDpopJkt } from "better-auth/oauth2";
 import { Result, Schema } from "effect";
 import { decodeProtectedHeader } from "jose";
+import { APP_SCOPES, PERSON_REFRESH_SECONDS, PERSON_TOKEN_SECONDS } from "./apps.ts";
 import { KEY_ALGORITHMS } from "./key-proofs.ts";
 
 /**
  * Keel as an authorization server for agents, on Better Auth's
- * OAuth provider. The provider checks an agent's signed token request (RFC
+ * OAuth provider, which serves the apps a person signs in through too (apps.ts). The provider checks an agent's signed token request (RFC
  * 7523), binds the token to the key that asks for it (DPoP, RFC 9449), signs
  * it and publishes the key. What is Keel's own is here: who an agent is, which
  * the provider asks of the agent directory each time and never keeps.
@@ -39,15 +40,16 @@ export const TOKEN_PATH = "/oauth2/token";
 
 /**
  * The provider's and the jwt plugin's routes Keel does not serve. An agent
- * needs the token endpoint and the published key; a person does not sign in
- * through the provider yet, so every route of that flow, every client-management
- * route and the route that turns a session into a token are closed.
+ * needs the token endpoint and the published key. A person signing in through
+ * an app needs the authorization endpoint, consent, the app's public name for
+ * the consent page, and their own list of the apps they allowed, to withdraw
+ * one. Registration is Keel's own route, for agents and apps alike, so the
+ * provider's is closed, as are every other client- and consent-management route
+ * and the route that turns a session into a token.
  */
 export const CLOSED_PATHS = [
   "/token",
-  "/oauth2/authorize",
   "/oauth2/register",
-  "/oauth2/consent",
   "/oauth2/continue",
   "/oauth2/userinfo",
   "/oauth2/introspect",
@@ -57,15 +59,12 @@ export const CLOSED_PATHS = [
   "/oauth2/create-client",
   "/oauth2/get-client",
   "/oauth2/get-clients",
-  "/oauth2/public-client",
   "/oauth2/public-client-prelogin",
   "/oauth2/update-client",
   "/oauth2/delete-client",
   "/oauth2/client/rotate-secret",
   "/oauth2/get-consent",
-  "/oauth2/get-consents",
   "/oauth2/update-consent",
-  "/oauth2/delete-consent",
 ] as const;
 
 /** The name the provider records as where a client came from. */
@@ -241,8 +240,11 @@ export interface AgentTokensConfig {
 }
 
 /**
- * The provider, serving agents only: the client-credentials grant, and no
- * registration of its own.
+ * The provider: the client-credentials grant for agents, and the code grant
+ * with PKCE and refreshes for the apps a person signs in through, which Keel's
+ * own registration route registers as public clients holding the scopes
+ * `person offline_access` and no other (apps.ts). An agent's token lasts five
+ * minutes and an app's a quarter hour.
  *
  * It is handed to Better Auth as a plain plugin. Its own type does not assign
  * under `exactOptionalPropertyTypes` (its `/oauth2/authorize` route declares
@@ -263,19 +265,25 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
   };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- see above: the plugin is one, its declared type is what does not assign
   return oauthProvider({
-    // No person signs in through the provider yet: these are where it would send one.
+    // Keel's own pages, where a person signs in and allows an app.
     loginPage: `${config.origin}/login`,
     consentPage: `${config.origin}/consent`,
-    grantTypes: ["client_credentials"],
-    scopes: [...AGENT_SCOPES],
+    grantTypes: ["client_credentials", "authorization_code", "refresh_token"],
+    scopes: [...AGENT_SCOPES, ...APP_SCOPES],
     resources: Object.values(agentResources(config.origin)),
     // The provider links a resource to a stored client row, and an agent has none: every agent may ask for either.
     enforcePerClientResources: false,
     m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
+    accessTokenExpiresIn: PERSON_TOKEN_SECONDS,
+    refreshTokenExpiresIn: PERSON_REFRESH_SECONDS,
     assertionMaxLifetime: ASSERTION_SECONDS,
     // A token is bound only to a key whose proofs Keel's own doors take: the library's list is wider.
     dpop: { signingAlgorithms: [...KEY_ALGORITHMS] },
-    allowDynamicClientRegistration: false,
+    // Keel's registration route calls the provider's for an app, with no session: the app is a public client.
+    allowDynamicClientRegistration: true,
+    allowUnauthenticatedClientRegistration: true,
+    clientRegistrationDefaultScopes: [...APP_SCOPES],
+    clientRegistrationAllowedScopes: [],
     extensions: [
       {
         clientDiscovery: agentDiscovery(agents),

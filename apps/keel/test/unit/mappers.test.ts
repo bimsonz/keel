@@ -68,6 +68,8 @@ import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 const NO_SIGN_UPS = {
   provenKey: async () =>
     ({ refused: "invalid_dpop_proof", detail: "no key is proved in this test" }) as const,
+  registerApp: async () =>
+    ({ refused: "invalid_redirect_uri", detail: "no app registers in this test" }) as const,
 };
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");

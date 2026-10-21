@@ -10,11 +10,13 @@ import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
 import {
   type AgentAccess,
+  agentResources,
   agentTokens,
   CLOSED_PATHS,
   forgetSpentIds,
   TOKEN_PATH,
 } from "./agents.ts";
+import { appAuthorization, appTokenRequest, forgetAppTokens, isAppGrant } from "./apps.ts";
 import { forget, onlyOwner, ownedProjects, ownsProjects, soleOwnerOf } from "./closing.ts";
 import {
   approvalPasskeyAt,
@@ -74,6 +76,11 @@ export const DISABLED_PATHS = [
 /** Where a person deletes their own account: Better Auth's route, with Keel's refusals before it (closing.ts). */
 const DELETE_PATH = "/delete-user";
 
+/** Where a person allows an app to act as them, and where they withdraw that (apps.ts). */
+const AUTHORIZE_PATH = "/oauth2/authorize";
+const CONSENT_PATH = "/oauth2/consent";
+const WITHDRAW_PATH = "/oauth2/delete-consent";
+
 /**
  * Better Auth matches `disabledPaths` against the path a request asks for, so
  * a route declared with a parameter (`/reset-password/:token`) is still served
@@ -105,10 +112,12 @@ const SIGN_IN =
 /**
  * Better Auth's routes that change how an account signs in, as it names them:
  * both steps of adding a passkey, removing one, linking or unlinking a
- * provider, and changing the address, by link or by code; and the one that
- * ends it, deleting the account. Each needs a fresh sign-in (fresh.ts).
+ * provider, and changing the address, by link or by code; the one that ends
+ * it, deleting the account; and allowing an app to act as the person, which
+ * gives it a way in of its own. Each needs a fresh sign-in (fresh.ts).
  */
 const CHANGES_SIGN_IN = new Set([
+  CONSENT_PATH,
   "/passkey/generate-register-options",
   "/passkey/verify-registration",
   "/passkey/delete-passkey",
@@ -267,6 +276,7 @@ const lostRace = () => refuse("NAME_TAKEN", `That handle was taken a moment ago:
 
 export function authOptions(config: AuthConfig) {
   const origin = `https://${config.host}`;
+  const { mcp } = agentResources(origin);
   const { db } = config;
 
   /**
@@ -305,7 +315,12 @@ export function authOptions(config: AuthConfig) {
     const none = !(await holdsPasskey(db, carried.user.id));
     const first = none && ADDS_PASSKEY.has(ctx.path);
     if (first && mayAddFirstPasskey(signedIn, now)) return;
-    const what = ctx.path === DELETE_PATH ? "deleting your account" : "changing how you sign in";
+    const what =
+      ctx.path === DELETE_PATH
+        ? "deleting your account"
+        : ctx.path === CONSENT_PATH
+          ? "allowing an app to act as you"
+          : "changing how you sign in";
     throw APIError.from("FORBIDDEN", {
       code: "FRESH_SIGN_IN_REQUIRED",
       message: first
@@ -429,10 +444,22 @@ export function authOptions(config: AuthConfig) {
       before: createAuthMiddleware(async (ctx) => {
         // A token request that names no resource is for Keel's own API. Left unnamed, the
         // provider issues an opaque token it stores against a client row, and an agent has none.
+        // An app's grant is for Keel's MCP server alone, named or not (apps.ts).
+        if (ctx.path === TOKEN_PATH && isAppGrant(ctx.body))
+          return { context: { ...ctx, body: appTokenRequest(Object(ctx.body), mcp) } };
         if (ctx.path === TOKEN_PATH)
           return ctx.body?.resource === undefined
             ? { context: { ...ctx, body: { ...ctx.body, resource: origin } } }
             : undefined;
+        // An app is granted `person offline_access` for the MCP server, whatever it asked, by link or by form.
+        if (ctx.path === AUTHORIZE_PATH)
+          return {
+            context: {
+              ...ctx,
+              query: appAuthorization(Object(ctx.query), mcp),
+              ...(ctx.method === "POST" ? { body: appAuthorization(Object(ctx.body), mcp) } : {}),
+            },
+          };
         if (DISABLED.has(ctx.path))
           throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
         if (ctx.path === "/device/token") return passkeyOfRedeemed(ctx);
@@ -468,6 +495,10 @@ export function authOptions(config: AuthConfig) {
         if (ctx.path === "/organization/create" && typeof slug === "string")
           await claimable(db, slug);
         if (ctx.path === "/device/approve") await passkeyToApproval(ctx);
+        // What the app was given for this person ends with the consent the provider deletes after.
+        const withdrawn: unknown = ctx.body?.id;
+        if (ctx.path === WITHDRAW_PATH && session !== null && typeof withdrawn === "string")
+          await forgetAppTokens(db, withdrawn, session.user.id);
         return beforeOrg(ctx);
       }),
       after: createAuthMiddleware(async (ctx) => {

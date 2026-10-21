@@ -2,11 +2,11 @@
 # kills: ba.fresh-routes
 # why: removing a passkey needs no fresh sign-in, so a session of any age takes away the account owner's way in
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 12627ae..5146a37 100644
+index ad43ec18..297a6b0e 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -60,7 +60,6 @@ const SIGN_IN =
- const CHANGES_SIGN_IN = new Set([
+@@ -120,7 +120,6 @@ const CHANGES_SIGN_IN = new Set([
+   CONSENT_PATH,
    "/passkey/generate-register-options",
    "/passkey/verify-registration",
 -  "/passkey/delete-passkey",

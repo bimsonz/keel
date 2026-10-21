@@ -2,14 +2,14 @@
 # kills: oauth.surface
 # why: the provider's own client registration answers again, a second and unproved way to make a client beside Keel's sign-up
 diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
-index 5a71018f..a5e5e6fd 100644
+index b5800300..bcd1ed94 100644
 --- a/apps/keel/src/adapters/driven/better-auth/agents.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
-@@ -43,7 +43,6 @@ export const TOKEN_PATH = "/oauth2/token";
+@@ -49,7 +49,6 @@ export const TOKEN_PATH = "/oauth2/token";
+  */
  export const CLOSED_PATHS = [
    "/token",
-   "/oauth2/authorize",
 -  "/oauth2/register",
-   "/oauth2/consent",
    "/oauth2/continue",
    "/oauth2/userinfo",
+   "/oauth2/introspect",

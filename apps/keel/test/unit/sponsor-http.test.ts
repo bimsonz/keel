@@ -73,6 +73,9 @@ const MAY = makeId("usr", ulid());
 const NOW = Date.parse("2026-10-13T09:00:00Z");
 const MINUTE = 60_000;
 
+/** No app registers in these tests: a sponsorship is a person's and an agent's. */
+const noApps = () => Promise.reject(new Error("no app registers here"));
+
 const signedIn = (by: string | null, minutesAgo: number): SignedIn => ({
   by,
   at: NOW - minutesAgo * MINUTE,
@@ -162,7 +165,7 @@ function world() {
   const handlers = makeHandlers(
     makeRunner(runtime),
     { emailCode: false, github: false },
-    doorwayOf("keel.test", () => new Date(NOW)),
+    doorwayOf("keel.test", noApps, () => new Date(NOW)),
   );
   let enrolments = 0;
   /** Each a millisecond after the last, so "oldest first" is the order they were enrolled in. */

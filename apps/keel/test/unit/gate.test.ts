@@ -69,7 +69,7 @@ function recordingGate() {
           sessions[headers.get("cookie") ?? ""] ??
           null,
       ),
-    agentToken: (presented, door) => {
+    accessToken: (presented, door) => {
       presentedAt.push({ ...presented, door });
       return Promise.resolve(
         presented.token === ACCESS_TOKEN

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/apps.test.ts -t "console.app-resume"
+# kills: console.app-resume
+# why: a person who signs in for an app is sent home, and the app is left waiting for a code that never comes
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 6af12548..a7801dd4 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -203,7 +203,6 @@ export function hrefOf(place: Place, next?: string): string {
+  * signed in to another site.
+  */
+ export function nextOf(search: string): string {
+-  if (isAppRequest(search)) return appRequestAgain(search);
+   const asked = new URLSearchParams(search).get("next") ?? "";
+   if (!asked.startsWith("/")) return "/";
+   // Read as an address on a site of no name: one that is still on that site is a path here.

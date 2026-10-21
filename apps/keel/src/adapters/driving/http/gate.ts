@@ -1,5 +1,6 @@
 import type {
   Admitted,
+  AppClaims,
   Credential,
   PresentedToken,
   SignedIn,
@@ -50,13 +51,15 @@ export interface GateDeps {
    */
   readonly sessionUser: (headers: Headers) => Promise<SessionUser | null>;
   /**
-   * The claims of an agent's own token presented at `door`, once the identity adapter's checks
-   * pass: its signature, issuer, expiry, that it is for this door, and its key binding.
+   * The claims of a token Keel issued, presented at `door`, once the identity adapter's checks
+   * pass: its signature, issuer, expiry, that it is for this door, and its key binding. An
+   * agent's own token names the agent; a person's token an app holds names the person and the
+   * app, and is taken only at the MCP door, while the person allows the app.
    */
-  readonly agentToken: (
+  readonly accessToken: (
     presented: PresentedToken,
     door: Door,
-  ) => Promise<AgentClaims | TokenRefusal | TokenUnchecked>;
+  ) => Promise<AgentClaims | AppClaims | TokenRefusal | TokenUnchecked>;
   /**
    * The `WWW-Authenticate` value of a 401 at `door`: where the door's metadata is, so a client
    * finds the server that issues its tokens, or for a refused proof what a proof must be.
@@ -185,7 +188,9 @@ function refusal(answer: GateRefusal, requestId: string): Response {
  * An agent that signed itself up presents its own token (`at+jwt`), as a plain
  * bearer or, bound to a key, under the `DPoP` scheme with a proof made by that
  * key for this request (RFC 9449). The identity adapter checks it for the door
- * the request came in by, and the core gate is handed its claims. Every 401
+ * the request came in by, and the core gate is handed its claims. An app a
+ * person allowed presents that person's token the same way, at the MCP door
+ * alone, and the core gate admits the person, with the app beside them. Every 401
  * names the door's metadata in `WWW-Authenticate`: the gate's own, and the one
  * the policy answers a request with no credential, which carries the
  * challenge the gate hands on (`Gated.challenge`). A token the adapter could
@@ -220,7 +225,7 @@ export async function gate(
     if (presented === null) return refused({ refused: "invalid" });
     const { scheme, token } = presented;
     if (JWT.test(token) && typeOf(token) === ACCESS_TOKEN) {
-      const answer = await deps.agentToken(
+      const answer = await deps.accessToken(
         {
           token,
           scheme,
@@ -246,7 +251,8 @@ export async function gate(
           }),
           deps.challenge(door, answer),
         );
-      credential = { _tag: "Claims", claims: answer };
+      credential =
+        "userId" in answer ? { _tag: "App", claims: answer } : { _tag: "Claims", claims: answer };
     } else if (scheme !== "Bearer") return refused({ refused: "invalid" });
     else if (JWT.test(token)) credential = { _tag: "Token", token };
     else {

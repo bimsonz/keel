@@ -13,6 +13,7 @@ const SITE_PATHS = [
   "signup",
   "logout",
   "device",
+  "consent",
   "invite",
   "sponsor",
   "settings",
