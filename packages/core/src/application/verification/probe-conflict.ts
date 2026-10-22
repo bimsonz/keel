@@ -19,6 +19,21 @@ import type { MatrixCell } from "./run-matrix.ts";
 /** How long the Probe Workflow waits, in all, for a party to submit: then DraftFailed `no-submission`. */
 export const PROBE_SUBMISSION_WAIT_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * How long the Probe Workflow waits, in all, for a proposal's commit to be
+ * approved: a maintainer's pace, not its proposer's; then DraftFailed
+ * `no-submission`. Once approved, a submission it still owes is waited for
+ * PROBE_SUBMISSION_WAIT_MS from then.
+ */
+export const PROBE_APPROVAL_WAIT_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * The longest one wait of the Probe Workflow lasts: Workflows documents a
+ * day as `waitForEvent`'s default timeout and no longer bound, so a longer
+ * wait is several, the party read again between.
+ */
+export const PROBE_WAIT_SLICE_MS = 24 * 60 * 60 * 1000;
+
 /** The two sides of a conflict a probe is drafted for: A holds the premise, B makes the effect against it. */
 export interface ProbeParties {
   readonly A: ChangeId;
@@ -53,6 +68,8 @@ export type PartySubmission =
   | { readonly _tag: "Submitted"; readonly head: CommitSha; readonly base: CommitSha }
   | { readonly _tag: "Landed"; readonly landing: CommitSha }
   | { readonly _tag: "Unsubmitted" }
+  /** A proposal whose commit waits for a maintainer's approval: no world until it is approved. */
+  | { readonly _tag: "AwaitingApproval" }
   | { readonly _tag: "Gone"; readonly state: ChangeState };
 
 /** The fields of a Change a party's world is read from: `landedCommit` is its commit on trunk, once it landed. */
@@ -64,9 +81,9 @@ export type PartyChange = Pick<Change, "state" | "commitSha" | "baseSha" | "land
  * commit it last submitted, and only a submission sets it. With none yet, or
  * in a state only a rebase leaves (which moves its base before it submits
  * again), the Probe waits for its next ChangeSubmitted; a change with no
- * `baseSha` (only one submitted before submissions carried it) waits too,
- * and so does a proposal until its commit is approved; the wait's deadline
- * ends it. A workspace branch's moving head is never
+ * `baseSha` (only one submitted before submissions carried it) waits too;
+ * the wait's deadline ends it. A proposal waits until its commit is approved
+ * (AwaitingApproval), on a maintainer's deadline rather than its proposer's. A workspace branch's moving head is never
  * read: a probe's evidence cites a fixed commit.
  *
  * The one rule for both sides of the wait: the Change DO's `awaitSubmission`
@@ -86,7 +103,7 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
   // A proposal is no world until a maintainer approves the commit it carries: before that Keel drafts,
   // builds and runs nothing of it, and the Probe waits for the approval as for a submission.
   if (change.proposal !== undefined && change.proposal.approved !== change.commitSha)
-    return { _tag: "Unsubmitted" };
+    return { _tag: "AwaitingApproval" };
   return { _tag: "Submitted", head: change.commitSha, base: change.baseSha };
 };
 

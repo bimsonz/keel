@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.agent-question-withdrawn
+# why: a withdrawn change leaves its unruled question on how Keel verifies it open, asking maintainers about a change that is gone
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0c2a20c2..d14adb8f 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2077,7 +2077,6 @@ const abandonCall: (
+           },
+         ],
+       );
+-      if (Result.isSuccess(withdrawn)) takeBackFlowQuestions(tx.store, "was withdrawn");
+       return Result.map(withdrawn, asTransition);
+     },
+   );

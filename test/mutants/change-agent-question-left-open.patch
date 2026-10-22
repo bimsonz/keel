@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.agent-question-withdrawn
+# why: an agent's change submitted again leaves the last pass's unruled question on how Keel verifies it open in the maintainers' questions for ever
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0c2a20c2..45009e2f 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2012,7 +2012,6 @@ const submitCall: (
+         command.leaseId,
+       );
+       // A new pass asks its own questions: the last pass's, still unruled, are taken back.
+-      if (Result.isSuccess(submitted)) takeBackFlowQuestions(tx.store, "was submitted again");
+       return Result.map(submitted, asTransition);
+     },
+   );

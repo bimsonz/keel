@@ -408,7 +408,7 @@ function replay(steps: readonly Step[]): {
         baseSha: CommitSha.make("b".repeat(40)),
       },
       submit: { _tag: "Submit", leaseId, commitSha: SHA, inWorkspace: true },
-      precheck: { _tag: "StartPrecheck", instanceId: "precheck" },
+      precheck: { _tag: "StartPrecheck", instanceId: "precheck", commitSha: SHA },
       compile: {
         _tag: "CompilePlan",
         drift: [],

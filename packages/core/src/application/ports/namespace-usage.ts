@@ -55,7 +55,8 @@ export class NamespaceUsage extends Context.Service<
      * is the domain's `admitQuota` on the namespace's count in the current window,
      * under the namespace's settings as they stand (its own limit before the
      * instance's; a halted namespace's spend kinds refused). A refusal counts
-     * nothing.
+     * nothing; a refusal of a daily kind is its key's answer only until the
+     * reset it names, after which the key is decided again.
      */
     readonly admit: (
       namespace: NamespaceId,

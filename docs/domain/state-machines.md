@@ -62,11 +62,13 @@ stateDiagram-v2
   Working --> Withdrawn: ChangeWithdrawn
   Working --> Superseded: ChangeSuperseded
   Submitted --> Deriving: PrecheckStarted
+  Submitted --> Working: ProposalUpdated
   Submitted --> Withdrawn: ChangeWithdrawn
   Submitted --> Superseded: ChangeSuperseded
   Deriving --> Drifted: ChangeDrifted
   Deriving --> Verifying: PlanCompiled
   Deriving --> Bounced: ChangeBounced
+  Deriving --> Working: ProposalUpdated
   Deriving --> Withdrawn: ChangeWithdrawn
   Deriving --> Superseded: ChangeSuperseded
   Drifted --> Working: IntentRevised

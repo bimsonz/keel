@@ -1,15 +1,21 @@
 import type { ProjectId } from "@keeltown/core/kernel";
 import { ProposalLedger } from "@keeltown/core/ports";
 import { Layer, Schema } from "effect";
-import { ProjectCodecs, ReserveProposalCommand } from "../../../rpc/index.ts";
+import {
+  ProjectCodecs,
+  ReleaseProposalCommand,
+  ReserveProposalCommand,
+} from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
 
 /** The Project DO's method `ProposalLedger` calls (`project:<id>`), answering an Exit envelope. */
 export interface ProjectProposalsStub {
   reserveProposal(command: typeof ReserveProposalCommand.Encoded): Promise<unknown>;
+  releaseProposal(command: typeof ReleaseProposalCommand.Encoded): Promise<unknown>;
 }
 
 const encodeReserve = Schema.encodeSync(ReserveProposalCommand);
+const encodeRelease = Schema.encodeSync(ReleaseProposalCommand);
 
 /** `ProposalLedger` over each project's own object, addressed by the project's id. */
 export function ProposalLedgerRpc(
@@ -21,6 +27,10 @@ export function ProposalLedgerRpc(
       reserve: (projectId, reservation) =>
         callObject(ProjectCodecs.reserveProposal, () =>
           project(projectId).reserveProposal(encodeReserve(reservation)),
+        ),
+      release: (projectId, release) =>
+        callObject(ProjectCodecs.releaseProposal, () =>
+          project(projectId).releaseProposal(encodeRelease(release)),
         ),
     }),
   );

@@ -46,11 +46,15 @@ export function ProbeChangesRpc(
           const answer = yield* callObject(ChangeCodecs.awaitSubmission, () =>
             stub.awaitSubmission(Schema.encodeSync(AwaitSubmissionCommand)({ subscriber })),
           );
-          if ("waiting" in answer) return { _tag: "Waiting" } satisfies PartyAnswer;
+          if ("waiting" in answer)
+            return {
+              _tag: "Waiting",
+              ...(answer.forApproval === true ? { forApproval: true } : {}),
+            } satisfies PartyAnswer;
           const submission = submissionStateOf(answer.change);
           if (submission._tag === "Gone")
             return { _tag: "Gone", state: submission.state } satisfies PartyAnswer;
-          if (submission._tag === "Unsubmitted")
+          if (submission._tag === "Unsubmitted" || submission._tag === "AwaitingApproval")
             return yield* Effect.die(
               new Error(
                 `${changeId} is ${answer.change.state} with no current submission, but awaitSubmission answered it without a wait`,

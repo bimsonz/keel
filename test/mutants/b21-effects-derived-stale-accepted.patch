@@ -2,19 +2,15 @@
 # kills: b21.effects-derived
 # why: a derivation of a revision the change has left is recorded against its current one
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index dbee8ba..656ff64 100644
+index 275ece27..5163e24e 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1174,7 +1174,11 @@ const precheckCommand = (
-       },
-       (tx) => {
+@@ -2427,7 +2427,7 @@ const precheckCommand = (
          const stored = storedChange(tx.store, changeId);
--        if (stored !== undefined && stored.intent.revision !== step.revision)
-+        if (
-+          stored !== undefined &&
-+          stored.intent.revision !== step.revision &&
-+          method !== "effectsDerived"
-+        )
+         if (
+           stored !== undefined &&
+-          (stored.intent.revision !== step.revision ||
++          ((stored.intent.revision !== step.revision && method !== "effectsDerived") ||
+             (method !== "precheckStarted" && stored.precheckInstance !== step.instanceId))
+         )
            return Result.fail(refused(stored, method));
-         return Result.map(
-           transition(

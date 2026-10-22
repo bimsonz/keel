@@ -166,7 +166,7 @@ async function take(c: ChangeUnderTest, step: Step, i: number, sha: string): Pro
     case "submit-elsewhere":
       return void (await submit(c, lease, "c".repeat(40), `k${i}`));
     case "precheck-started":
-      return void (await c.stub.precheckStarted({ revision, instanceId: `p${i}` }));
+      return void (await c.stub.precheckStarted({ revision, instanceId: `p${i}`, commitSha: sha }));
     case "plan-compiled":
       return void (await c.stub.planCompiled({
         revision,
@@ -382,7 +382,11 @@ describe("the lease's deadline", () => {
     ok(
       decodeExit(
         ChangeCodecs.precheckStarted,
-        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+        await c.stub.precheckStarted({
+          revision: 1,
+          instanceId: "p-1",
+          commitSha: await c.carried(),
+        }),
       ),
     );
     c.clock.advance(1);
@@ -425,7 +429,11 @@ describe("a Precheck refusal over RPC", () => {
     ok(
       decodeExit(
         ChangeCodecs.precheckStarted,
-        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+        await c.stub.precheckStarted({
+          revision: 1,
+          instanceId: "p-1",
+          commitSha: await c.carried(),
+        }),
       ),
     );
     const refused = ok(
@@ -451,7 +459,11 @@ describe("a compiled change and its lane", () => {
     ok(
       decodeExit(
         ChangeCodecs.precheckStarted,
-        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+        await c.stub.precheckStarted({
+          revision: 1,
+          instanceId: "p-1",
+          commitSha: await c.carried(),
+        }),
       ),
     );
     const compiled = ok(
@@ -494,7 +506,11 @@ async function queue(c: ChangeUnderTest) {
   ok(
     decodeExit(
       ChangeCodecs.precheckStarted,
-      await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      await c.stub.precheckStarted({
+        revision: 1,
+        instanceId: "p-1",
+        commitSha: await c.carried(),
+      }),
     ),
   );
   ok(

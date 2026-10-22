@@ -6,6 +6,7 @@ import {
   hearProposal,
   MAX_OPEN_PROPOSALS,
   RESERVATION_TTL_MS,
+  releaseProposal,
   reserveProposal,
 } from "@keeltown/core/application/coordination";
 import {
@@ -121,8 +122,74 @@ describe("a project's proposal ledger", () => {
         for (const n of [1, 2, 3, 4, 5]) yield* reserving(ANN, `new${n}`);
         expect(yield* Effect.flip(reserving(ANN, "old1"))).toMatchObject({ _tag: "ProposalLimit" });
         l.clock.advance(RESERVATION_TTL_MS + 1);
-        // Once a place is free again, the retry is answered the id it was first given.
-        expect(yield* reserving(ANN, "old1")).toBe(lapsed[0]);
+        // Once a place is free again the retry takes it: as a new reservation, the lapsed one forgotten.
+        const retried = yield* reserving(ANN, "old1");
+        expect(lapsed).not.toContain(retried);
+        expect(yield* reserving(ANN, "old1")).toBe(retried);
+      }).pipe(Effect.provide(l.layer));
+    },
+  );
+  it.effect(
+    "[proposal-ledger.pruned] a reservation whose proposal never arrived is forgotten once its place lapses: the proposer's next reservation takes its rows away, another proposer's stay, and a retry of its key is a new reservation, under the cap",
+    () => {
+      const l = ledger();
+      return Effect.gen(function* () {
+        const lapsed = yield* reserving(ANN, "k1");
+        const bobs = yield* reserving(BOB, "k1");
+        l.clock.advance(RESERVATION_TTL_MS + 1);
+        yield* reserving(ANN, "k2");
+        const store = yield* EntityStore;
+        const ids = (table: string) => store.list(table).map((row) => row.id);
+
+        expect(ids("proposal-open").filter((id) => id.endsWith(lapsed))).toEqual([]);
+        expect(ids("proposal-proposer")).not.toContain(lapsed);
+        expect(ids("proposal-reserved")).not.toContain(`${ANN}/k1`);
+        expect(ids("proposal-proposer")).toContain(bobs);
+        expect(ids("proposal-reserved")).toContain(`${BOB}/k1`);
+        expect(yield* reserving(ANN, "k1")).not.toBe(lapsed);
+      }).pipe(Effect.provide(l.layer));
+    },
+  );
+  it.effect(
+    "[proposal-ledger.pruned-legacy] a lapsed reservation made before its place kept its key is forgotten whole too: its retry, with five places held, is refused at the cap",
+    () => {
+      const l = ledger();
+      return Effect.gen(function* () {
+        const old = yield* reserving(ANN, "old");
+        // As the ledger wrote a place before it kept the reservation's key on it.
+        const store = yield* EntityStore;
+        const place = `${ANN}/${old}`;
+        const { key: _key, ...unkeyed } = Object(store.get("proposal-open", place));
+        store.put("proposal-open", place, unkeyed);
+        l.clock.advance(RESERVATION_TTL_MS + 1);
+        for (const n of [1, 2, 3, 4, 5]) yield* reserving(ANN, `new${n}`);
+
+        expect(store.list("proposal-reserved").map((row) => row.id)).not.toContain(`${ANN}/old`);
+        expect(yield* Effect.flip(reserving(ANN, "old"))).toMatchObject({ _tag: "ProposalLimit" });
+      }).pipe(Effect.provide(l.layer));
+    },
+  );
+
+  it.effect(
+    "[proposal-ledger.release] a place given back is free at once and its key reserves anew; a proposal that arrived keeps its place, and a key that reserved nothing gives back nothing",
+    () => {
+      const l = ledger();
+      return Effect.gen(function* () {
+        const ids: ChangeId[] = [];
+        for (const n of [1, 2, 3, 4, 5]) ids.push(yield* reserving(ANN, `k${n}`));
+        const [arrived] = ids;
+        if (arrived === undefined) throw new Error("no first place");
+        yield* proposed(arrived);
+        yield* releaseProposal({ proposer: ANN, idempotencyKey: "k1" });
+        yield* releaseProposal({ proposer: ANN, idempotencyKey: "never" });
+        yield* releaseProposal({ proposer: BOB, idempotencyKey: "k2" });
+        expect(yield* Effect.flip(reserving(ANN, "k6"))).toMatchObject({ _tag: "ProposalLimit" });
+        expect(yield* reserving(ANN, "k1")).toBe(arrived);
+
+        yield* releaseProposal({ proposer: ANN, idempotencyKey: "k2" });
+        const sixth = yield* reserving(ANN, "k6");
+        expect(ids).not.toContain(sixth);
+        expect(yield* Effect.flip(reserving(ANN, "k2"))).toMatchObject({ _tag: "ProposalLimit" });
       }).pipe(Effect.provide(l.layer));
     },
   );

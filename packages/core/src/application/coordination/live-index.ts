@@ -12,6 +12,7 @@ import {
   Intent,
   IntentDeclared,
   IntentRevised,
+  ProposalUpdated,
   type LiveChange,
   nearKeysOf,
   nearLookupsOf,
@@ -236,7 +237,8 @@ export function liveGoalOf(store: Store, changeId: ChangeId): string | undefined
 /**
  * Folds one event of a change into its project's index, inside the
  * transaction that receives it, and answers the notices it gives. A revision
- * folds through the domain's `reviseIntent`; a derivation replaces the row's
+ * folds through the domain's `reviseIntent`; a proposal moved to another
+ * commit takes that commit's footprint; a derivation replaces the row's
  * effects when it is later on the change's log than the one they came from
  * (two Precheck passes can share a revision); an end removes the row. Each
  * row's key rows move with it. Each issued preflight settles who has been
@@ -279,6 +281,14 @@ export function hearLiveChange(
       if (live === undefined) return [];
       const revised = Schema.decodeUnknownSync(IntentRevised)(event.payload);
       putLive(store, changeId, live, { ...live, intent: reviseIntent(live.intent, revised) });
+      return [];
+    }
+    case "ProposalUpdated": {
+      // A proposal moved to another commit is near by that commit's footprint from now on.
+      if (live === undefined) return [];
+      const { footprint } = Schema.decodeUnknownSync(ProposalUpdated)(event.payload);
+      if (footprint !== undefined)
+        putLive(store, changeId, live, { ...live, intent: { ...live.intent, footprint } });
       return [];
     }
     case "EffectsDerived": {

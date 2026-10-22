@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { appAskingOf, appRequestAgain, isAppRequest } from "../../../src/account/apps.ts";
+import {
+  appAskingOf,
+  appRequestAgain,
+  consentLede,
+  consentTitle,
+  isAppRequest,
+} from "../../../src/account/apps.ts";
 import { nextOf, placeOf, sentFrom } from "../../../src/places.ts";
 
 /** An app's request as Keel's sign-in sends it to the login and consent pages: signed, with its signing fields. */
@@ -49,5 +55,17 @@ describe("an app a person signs in through", () => {
     expect(
       sentFrom({ at: "consent" }, { is: "visitor" }, { pathname: "/consent", search: SIGNED }),
     ).toBe(`/login?next=${encodeURIComponent(`/consent${SIGNED}`)}`);
+  });
+  it("[consent.name-is-its-own] the consent page says the app's name is the name it gave itself, and says first, plainly, where it sends the person back to", () => {
+    expect(consentTitle("Acme Notes")).toBe(
+      "Allow an app that calls itself “Acme Notes” to act as you?",
+    );
+    expect(consentTitle(null)).toBe("Allow this app to act as you?");
+    const lede = consentLede({ returnsTo: "http://localhost:33418" }, "ann");
+    expect(lede).toMatch(/^It will send you back to localhost:33418\. /);
+    expect(lede).toContain("signed in as ann at Keel's MCP server");
+    expect(consentLede({ returnsTo: "https://notes.example" }, "ann")).toMatch(
+      /^It will send you back to notes\.example\. /,
+    );
   });
 });

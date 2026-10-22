@@ -206,6 +206,43 @@ export function describeNamespaceUsageContract(adapter: string, make: () => Name
     );
 
     it.live(
+      "[usage.contract.refusal-until-reset] a daily kind's refusal is its key's answer until the reset it names, then the key is decided again and counted once; a running total's refusal stays",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const namespace = yield* harness.namespace();
+          const minutes = DEFAULT_QUOTAS["container-minutes"];
+          const bytes = DEFAULT_QUOTAS["repo-bytes"];
+          const [late, full] = [key(), key()];
+          yield* admit(namespace, "container-minutes", minutes);
+          yield* admit(namespace, "repo-bytes", bytes);
+          const midnight = (Math.floor((yield* harness.now) / DAY_MS) + 1) * DAY_MS;
+          const refused = { reason: "limit", retryAt: midnight };
+          expect(yield* Effect.flip(admit(namespace, "container-minutes", 1, late))).toMatchObject(
+            refused,
+          );
+          expect(yield* Effect.flip(admit(namespace, "repo-bytes", 1, full))).toMatchObject({
+            reason: "limit",
+          });
+          yield* record(namespace, "repo-bytes", -bytes);
+          yield* harness.advance(midnight - 1 - (yield* harness.now));
+          expect(yield* Effect.flip(admit(namespace, "container-minutes", 1, late))).toMatchObject(
+            refused,
+          );
+          yield* harness.advance(1);
+          const admitted = { limit: minutes, remaining: minutes - 1 };
+          expect(yield* admit(namespace, "container-minutes", 1, late)).toEqual(admitted);
+          expect(yield* admit(namespace, "container-minutes", 1, late)).toEqual(admitted);
+          // A running total names no reset: its refusal is the key's answer, though there is room now.
+          expect(yield* Effect.flip(admit(namespace, "repo-bytes", 1, full))).toMatchObject({
+            reason: "limit",
+            used: bytes,
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
       "[usage.contract.settings] a namespace's settings start empty, read back as configured, are replaced whole, and are no other namespace's",
       () => {
         const harness = make();

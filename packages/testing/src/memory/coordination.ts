@@ -12,6 +12,7 @@ import {
   AGENT_OWNED,
   type Change,
   ChangeInOtherProject,
+  ChangeHeldByOther,
   ChangeNotFound,
   type ChangeState,
   ChangeStateRefused,
@@ -412,15 +413,24 @@ export function makeChangesMemory(
    * then a change in a state outside `states` or holding no workspace.
    */
   /** The change, if `principal` is its own agent in its project: any other caller reads it as not found. */
-  const ownChange = (principal: AgentToken, changeId: ChangeId) =>
+  /**
+   * The change, for the agent that holds it under `leaseId`: one of another
+   * project, or none, is ChangeNotFound; one another agent of its project
+   * holds is ChangeHeldByOther, naming the holder; one no agent holds (a
+   * proposal) carries no lease of the caller's, LeaseStale: as the Change DO
+   * answers.
+   */
+  const ownChange = (principal: AgentToken, changeId: ChangeId, leaseId: LeaseId) =>
     Effect.gen(function* () {
       const change = changes.get(changeId);
       if (
         change === undefined ||
-        change.agentId !== principal.agentId ||
         (workspaces.has(changeId) && projects.get(changeId) !== principal.projectId)
       )
         return yield* new ChangeNotFound({ changeId });
+      if (change.agentId !== undefined && change.agentId !== principal.agentId)
+        return yield* new ChangeHeldByOther({ changeId, holder: change.agentId, nextActions: [] });
+      if (change.lease === undefined) return yield* new LeaseStale({ changeId, leaseId });
       return change;
     });
   const mayUseWorkspace = (
@@ -432,7 +442,7 @@ export function makeChangesMemory(
   ) =>
     Effect.gen(function* () {
       const now = Instant(yield* EffectClock.currentTimeMillis);
-      const change = yield* ownChange(principal, changeId);
+      const change = yield* ownChange(principal, changeId, leaseId);
       const workspaceId = workspaces.get(changeId);
       const refused = new ChangeStateRefused({ changeId, state: change.state, command });
       if (TERMINAL.has(change.state)) return yield* refused;
@@ -542,13 +552,11 @@ export function makeChangesMemory(
             };
             return { change: stored, preflight, workspace };
           }),
-        submit: (_principal, input) =>
+        submit: (principal, input) =>
           Effect.gen(function* () {
             const replayed = submits.get(`${input.changeId} ${input.idempotencyKey}`);
             if (replayed !== undefined) return replayed;
-            const change = changes.get(input.changeId);
-            if (change === undefined)
-              return yield* new ChangeNotFound({ changeId: input.changeId });
+            const change = yield* ownChange(principal, input.changeId, input.lease);
             if (leaseOf(change).id !== input.lease || leaseOf(change).state !== "active") {
               return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
             }
@@ -697,7 +705,7 @@ export function makeChangesMemory(
               { agentId, projectId, run, handle, ...call },
               (_field, value: unknown) => (value instanceof Uint8Array ? [...value] : value),
             );
-            const own = yield* ownChange(principal, input.changeId);
+            const own = yield* ownChange(principal, input.changeId, input.lease);
             const made = madeCommits.get(key);
             if (made !== undefined) {
               if (made.fingerprint !== fingerprint)

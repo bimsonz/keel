@@ -23,6 +23,10 @@ export const QUOTA_KINDS = [
   "container-minutes",
   "model-calls",
   "concurrent-containers",
+  "proposals",
+  "proposal-moves",
+  "issues",
+  "issue-comments",
 ] as const;
 
 /** A namespace's id: a person's, an agent's or an org's (core's `NamespaceId`). */

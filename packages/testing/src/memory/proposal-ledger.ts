@@ -1,4 +1,8 @@
-import { hearProposal, reserveProposal } from "@keeltown/core/application/coordination";
+import {
+  hearProposal,
+  releaseProposal,
+  reserveProposal,
+} from "@keeltown/core/application/coordination";
 import type { EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { ProposalLedger } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
@@ -33,6 +37,8 @@ export function makeProposalLedgerMemory() {
           reserveProposal(projectId, reservation).pipe(
             Effect.provide(Layer.mergeAll(storeOf(projectId).layer, ids.layer, clock.layer)),
           ),
+        release: (projectId, release) =>
+          releaseProposal(release).pipe(Effect.provide(storeOf(projectId).layer)),
       }),
     ),
   };

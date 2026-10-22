@@ -2,20 +2,18 @@
 # kills: b21.await-one-transaction, b21.await-plan-one-transaction
 # why: the read and the subscribe are separate transactions, so a submission or a plan committed between them is missed
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0cea15a..4b8af12 100644
+index 483de428..0b3aec36 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -562,9 +562,12 @@ const awaitChange = (
+@@ -984,7 +984,10 @@ const awaitChange = (
        const projectId = heldWorkspace(store, changeId)?.projectId;
        if (projectId === undefined) return { _tag: "unprojected" } as const;
        if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
 -      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
-       return { _tag: "waiting" } as const;
-     });
 +    if (found._tag === "waiting")
 +      store.transaction(() =>
 +        outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true }),
 +      );
+       return { _tag: "waiting", waiting: waitingOn(change) } as const;
+     });
      if (found._tag === "missing") return yield* notFound(changeId);
-     if (found._tag === "unprojected")
-       return yield* Effect.die(`${changeId} has no project recorded`);

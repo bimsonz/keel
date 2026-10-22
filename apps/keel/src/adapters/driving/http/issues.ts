@@ -1,7 +1,8 @@
-import type { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { admitAccountRate, giveBackAccountRate } from "@keeltown/core/application/identity";
+import type { IdempotencyConflict, QuotaExceeded } from "@keeltown/core/domain/identity";
 import type { Issue, IssueComment, IssueNotFound } from "@keeltown/core/domain/issues";
 import { AgentId, agentActor, type CommandActor, UserId, userActor } from "@keeltown/core/kernel";
-import { AgentDirectory, Issues, Users } from "@keeltown/core/ports";
+import { AgentDirectory, Clock, Issues, Users } from "@keeltown/core/ports";
 import { Effect, Option, Schema } from "effect";
 import type {
   CloseIssueResult,
@@ -14,6 +15,7 @@ import type {
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { projectIn } from "./decisions.ts";
+import { accountOfCaller, isAccountRate, rateLimited } from "./account-rate.ts";
 import { problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 
@@ -135,6 +137,15 @@ const moveError = (caller: Caller, error: IssueNotFound | IdempotencyConflict) =
     ? issueNotFound(caller, error)
     : idempotencyConflict(caller, error);
 
+/** A daily limit of the caller's account, reached: 429 until the count starts again. */
+const limited = (caller: Caller, error: QuotaExceeded) =>
+  isAccountRate(error)
+    ? Effect.map(
+        Effect.flatMap(Clock, (clock) => clock.now),
+        (now) => rateLimited(caller, error, now),
+      )
+    : Effect.die(new Error(`an issue's write met the ${error.kind} quota`));
+
 /** The project of the issue the call was decided on, as `authorizeHandlers` resolved it. */
 function issueProject(caller: Caller) {
   const resource = caller.resource;
@@ -197,46 +208,69 @@ export function issueHandlers(run: Runner) {
           Effect.catchTag("IssueNotFound", (error) => Effect.succeed(issueNotFound(caller, error))),
         ),
       ),
-    openIssue: (caller: Caller, input: Input<"openIssue">) =>
-      run(
+    openIssue: (caller: Caller, input: Input<"openIssue">) => {
+      const { projectId } = projectIn(caller);
+      // Counted against the caller's account for the day, once for the key.
+      const counted = `issue:${projectId}:${input["idempotency-key"]}`;
+      return run(
         caller,
-        Issues.use((issues) =>
-          issues.open({
-            projectId: projectIn(caller).projectId,
-            title: input.title,
-            body: input.body ?? "",
-            author: actorOf(caller),
-            idempotencyKey: input["idempotency-key"],
-          }),
-        ).pipe(
+        admitAccountRate(accountOfCaller(caller), "issues", counted).pipe(
+          Effect.andThen(
+            Issues.use((issues) =>
+              issues.open({
+                projectId,
+                title: input.title,
+                body: input.body ?? "",
+                author: actorOf(caller),
+                idempotencyKey: input["idempotency-key"],
+              }),
+            ),
+          ),
           Effect.flatMap(shown),
           Effect.map((body): OpenIssueResult => ({ status: 201, body })),
           Effect.catchTag("IdempotencyConflict", (error) =>
             Effect.succeed(idempotencyConflict(caller, error)),
           ),
+          Effect.catchTag("QuotaExceeded", (error) => limited(caller, error)),
         ),
-      ),
-    commentOnIssue: (caller: Caller, input: Input<"commentOnIssue">) =>
-      run(
+      );
+    },
+    commentOnIssue: (caller: Caller, input: Input<"commentOnIssue">) => {
+      const { projectId } = projectIn(caller);
+      const account = accountOfCaller(caller);
+      // Counted against the caller's account for the day, once for the key; a comment refused counts nothing.
+      const counted = `comment:${projectId}:${input.number}:${input["idempotency-key"]}`;
+      return run(
         caller,
-        Issues.use((issues) =>
-          issues.comment({
-            projectId: projectIn(caller).projectId,
-            number: input.number,
-            body: input.body,
-            author: actorOf(caller),
-            idempotencyKey: input["idempotency-key"],
-          }),
-        ).pipe(
+        admitAccountRate(account, "issue-comments", counted).pipe(
+          Effect.andThen(
+            Issues.use((issues) =>
+              issues.comment({
+                projectId,
+                number: input.number,
+                body: input.body,
+                author: actorOf(caller),
+                idempotencyKey: input["idempotency-key"],
+              }),
+            ).pipe(
+              Effect.tapError((error) =>
+                error._tag === "IssueNotFound"
+                  ? giveBackAccountRate(account, "issue-comments", counted)
+                  : Effect.void,
+              ),
+            ),
+          ),
           Effect.flatMap((comment) =>
             Effect.map(handlesOf([comment.author]), (handles): CommentOnIssueResult => ({
               status: 201,
               body: commentView(comment, handles),
             })),
           ),
+          Effect.catchTag("QuotaExceeded", (error) => limited(caller, error)),
           Effect.catch((error) => Effect.succeed(moveError(caller, error))),
         ),
-      ),
+      );
+    },
     closeIssue: (caller: Caller, input: Input<"closeIssue">) =>
       run(
         caller,

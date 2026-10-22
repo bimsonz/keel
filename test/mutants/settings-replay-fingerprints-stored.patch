@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts
+# kills: settings.replay-after-move
+# why: a PUT is fingerprinted with what it filled from the store, so its own replay after another PUT is refused as a conflict
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 2fc631ff..c8105f84 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -153,7 +153,12 @@ export const changeSettings: (
+ > = Effect.fn("integration/changeSettings")(function* (command: ChangeSettings) {
+   const { projectId, by, actor, run, requestId } = command;
+   // The request as it was sent: what it leaves out is filled from what is stored, which may move.
+-  const fingerprint = contentHashOf(asJson(command.settings));
++  const fingerprint = contentHashOf(
++    asJson({
++      ...command.settings,
++      proposals: command.settings.proposals ?? held(yield* EntityStore, projectId).proposals,
++    }),
++  );
+   const next = (store: Store): ProjectSettings => {
+     const stored = held(store, projectId);
+     return {

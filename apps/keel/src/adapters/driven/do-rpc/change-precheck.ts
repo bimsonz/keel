@@ -6,6 +6,7 @@ import {
   EffectsDerivedCommand,
   type ExitCodec,
   PlanCompiledCommand,
+  PrecheckDerivingCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
 } from "../../../rpc/index.ts";
@@ -32,9 +33,19 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
             Schema.encodeSync(PrecheckStartedCommand)({
               revision: step.revision,
               instanceId: step.instanceId,
+              commitSha: step.commitSha,
             }),
           ),
         ).pipe(Effect.asVoid),
+      deriving: (changeId, step) =>
+        call(ChangeCodecs.precheckDeriving, () =>
+          change(changeId).precheckDeriving(
+            Schema.encodeSync(PrecheckDerivingCommand)({
+              revision: step.revision,
+              instanceId: step.instanceId,
+            }),
+          ),
+        ),
       derived: (changeId, derived) =>
         call(ChangeCodecs.effectsDerived, () =>
           change(changeId).effectsDerived(
@@ -59,6 +70,10 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
             }),
           ),
         ).pipe(Effect.map((answer) => answer.verdictId)),
+      asks: (changeId, escalationId) =>
+        call(ChangeCodecs.flowQuestionAsked, () =>
+          change(changeId).flowQuestionAsked(escalationId),
+        ),
       compiled: (changeId, plan) =>
         call(ChangeCodecs.planCompiled, () =>
           change(changeId).planCompiled(

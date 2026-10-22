@@ -2,15 +2,15 @@
 # kills: b21.proven-blocks
 # why: a plan compiled under block with a proof standing still asks to queue, which the machine refuses as blocked
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 203b3b42..e9647775 100644
+index d4fcca5d..fb28ccc6 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2520,7 +2520,7 @@ export const planCompiled: (
+@@ -2608,7 +2608,7 @@ export const planCompiled: (
        (store) => {
          const blockers = blockersOf(store, plan.predicatePolicy);
          const bounce = conflictBounce(blockers.openProvenConflicts);
 -        if (bounce !== undefined) return [compile, bounce];
 +        void bounce;
-         // A proposal waits for the approval of its commit before anything is verified. A question on how
-         // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
-         if (storedChange(store, changeId)?.proposal !== undefined) {
+         // Every question on how Keel verifies it is recorded as asked, so the change can take it back.
+         if (plan.needsRuling === true)
+           store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});

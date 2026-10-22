@@ -118,21 +118,21 @@ model ProjectSettings {
   maxBatchSize: int32;
 
   /**
-   * Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;
-   * Keel always answers it. With `off` the lane skips verification and marks what lands
+   * Whether the project's lane verifies each batch before it lands: `required` until a PUT sets it. Absent in a PUT
+   * keeps what is stored; Keel always answers it. With `off` the lane skips verification and marks what lands
    * unverified. Every change is audited by ProjectSettingsChanged.
    */
   verification?: "required" | "off";
 
   /**
-   * Who may read the project. `public` lets anonymous readers see it through the repo read API; absent in a
-   * PUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged.
+   * Who may read the project. `public` lets anonymous readers see it through the repo read API; `private` until a
+   * PUT sets it. Absent in a PUT keeps what is stored, and Keel always answers it. Every change is audited by ProjectSettingsChanged.
    */
   visibility?: "private" | "public";
 
   /**
-   * Whether a fork of the project may propose changes back to it. Absent in a PUT means `open`, and Keel always
-   * answers it; a private project takes no proposals, whatever it says. Every change is audited by
+   * Whether a fork of the project may propose changes back to it: `open` until a PUT sets it. Absent in a PUT keeps
+   * what is stored, and Keel always answers it; a private project takes no proposals, whatever it says. Every change is audited by
    * ProjectSettingsChanged.
    */
   proposals?: "open" | "closed";
@@ -257,6 +257,11 @@ interface Operator {
   @post
   syncUpstream(@path projectId: ProjectId): UpstreamSync | NotFound | Conflict | StandardErrors;
 
+  /**
+   * Replace a project's settings. A field the body leaves out keeps what is stored (`verification`, `visibility`,
+   * `proposals`), so a client that does not know a field never changes it; send it to change it. A replay under its
+   * request id answers the settings as they stand; the same request id with another body is 409.
+   */
   @summary("Replace a project's settings")
   @useAuth(SessionAuth)
   @route("/projects/{projectId}/settings")

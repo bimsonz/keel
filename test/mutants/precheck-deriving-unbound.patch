@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/effects-derived.test.ts
+# kills: b21.deriving-bound
+# why: a pass of another run derives, so a stream of moves has every superseded pass parse the code
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index f453e88e..c77e7a72 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2625,8 +2625,7 @@ export const precheckDeriving: (
+   if (change === undefined) yield* notFound(changeId);
+   else if (
+     change.state !== "deriving" ||
+-    change.intent.revision !== step.revision ||
+-    change.precheckInstance !== step.instanceId
++    change.intent.revision !== step.revision
+   )
+     yield* refused(change, "DeriveEffects");
+ });

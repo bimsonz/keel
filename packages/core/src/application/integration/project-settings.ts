@@ -129,12 +129,14 @@ export const settingsOf: (
 
 /**
  * Replaces the project's settings as whoever governs it, a person or an agent
- * in a namespace of its own (an absent `verification` is `required`, an absent
- * `visibility` `private`, absent `proposals` `open`). One ProjectSettingsChanged audits every field the
- * PUT changes, from and to, under the actor and the run the command names; an
- * unchanged PUT commits nothing, so a retry
- * is a no-op by content. The cause is `settings:<requestId>`: a replay of the
- * request answers the settings as they stand, and the same request id with
+ * in a namespace of its own. An optional field the PUT leaves out
+ * (`verification`, `visibility`, `proposals`) keeps what is stored, so a
+ * client that does not know a field never changes it. One
+ * ProjectSettingsChanged audits every field the PUT changes, from and to,
+ * under the actor and the run the command names; an unchanged PUT commits
+ * nothing, so a retry is a no-op by content. The cause is
+ * `settings:<requestId>`: a replay of the request, as it was sent, answers the
+ * settings as they stand, whatever moved since, and the same request id with
  * other settings is IdempotencyConflict.
  *
  * A change of visibility is written to the project's place before answering,
@@ -150,14 +152,18 @@ export const changeSettings: (
   Clock | EntityStore | EventOutbox | ProjectNamespaces
 > = Effect.fn("integration/changeSettings")(function* (command: ChangeSettings) {
   const { projectId, by, actor, run, requestId } = command;
-  const next: ProjectSettings = {
-    protectedPaths: command.settings.protectedPaths,
-    maxBatchSize: command.settings.maxBatchSize,
-    verification: command.settings.verification ?? "required",
-    visibility: command.settings.visibility ?? "private",
-    proposals: command.settings.proposals ?? "open",
+  // The request as it was sent: what it leaves out is filled from what is stored, which may move.
+  const fingerprint = contentHashOf(asJson(command.settings));
+  const next = (store: Store): ProjectSettings => {
+    const stored = held(store, projectId);
+    return {
+      protectedPaths: command.settings.protectedPaths,
+      maxBatchSize: command.settings.maxBatchSize,
+      verification: command.settings.verification ?? stored.verification,
+      visibility: command.settings.visibility ?? stored.visibility,
+      proposals: command.settings.proposals ?? stored.proposals,
+    };
   };
-  const fingerprint = contentHashOf(asJson(next));
   const conflict = new IdempotencyConflict({ idempotencyKey: requestId });
   const entity: EntityRef = { kind: "project", id: projectId };
   const committed = yield* commit(
@@ -177,12 +183,13 @@ export const changeSettings: (
           ? Result.succeed({ value: held(tx.store, projectId), drafts: [] })
           : Result.fail(conflict);
       tx.store.put(SETTINGS_REQUEST, requestId, { fingerprint });
-      const changes = changesBetween(held(tx.store, projectId), next);
-      if (changes.length === 0) return Result.succeed({ value: next, drafts: [] });
-      tx.store.put(PROJECT_SETTINGS, projectId, asStored(encodeSettings(next)));
+      const replaced = next(tx.store);
+      const changes = changesBetween(held(tx.store, projectId), replaced);
+      if (changes.length === 0) return Result.succeed({ value: replaced, drafts: [] });
+      tx.store.put(PROJECT_SETTINGS, projectId, asStored(encodeSettings(replaced)));
       const changed = ProjectSettingsChanged.make({ projectId, changes, by });
       return Result.succeed({
-        value: next,
+        value: replaced,
         drafts: [{ payload: payloadOf(encodeChanged(changed)) }],
       });
     },

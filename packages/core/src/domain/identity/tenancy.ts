@@ -124,6 +124,8 @@ export interface AgentPrincipal {
   readonly standing: AgentStanding;
   /** Whether a person sponsors the agent: one nobody sponsors opens no issue on a project it does not stand on. */
   readonly sponsored?: boolean;
+  /** The person who sponsors it, whose account what it opens counts against. */
+  readonly sponsor?: UserId;
 }
 
 export interface AnonymousPrincipal {
@@ -243,12 +245,15 @@ export interface ProposalResource {
 
 /**
  * A proposed change, as an action on the proposal itself is decided: its
- * project, and who proposed it. No `proposer`: the change is no proposal.
+ * project, who proposed it, and the fork it comes from. No `proposer`: the
+ * change is no proposal.
  */
 export interface ProposalChangeResource {
   readonly _tag: "ProposalChange";
   readonly project: ProjectResource | MissingResource;
   readonly proposer?: CommandActor;
+  /** The fork its proposer must still stand on to move it. */
+  readonly fork?: ProjectResource | MissingResource;
 }
 
 export type Resource =

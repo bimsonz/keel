@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.wait-sliced
+# why: a probe waits a month in one waitForEvent, longer than Workflows documents a wait may be
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 2a95feb5..fd7d4449 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -572,7 +572,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+           yield* steps.waitFor(
+             `change ${side}${round} ${n}`,
+             partyEventType(changeId),
+-            Math.min(until - now, PROBE_WAIT_SLICE_MS),
++            until - now,
+           );
+         }
+       });

@@ -1,3 +1,7 @@
+### Changed (breaking)
+
+- **`Change.agentId` is optional.** A proposal from a fork is a change no agent holds, so `Change.agentId` (and a change summary's `agentId`) is absent on one. In `@keeltown/contracts` and the SDK (`@keeltown/sdk`), whose types come from it, the field is now `agentId?: string`: TypeScript that reads it must handle `undefined` before it compiles again. Nothing changes on the wire for an agent's change.
+
 ### Added
 
 - **Proposals from forks.** A commit of a fork is proposed back to the project it was forked from: `POST /v1/projects/{projectId}/proposals` (`propose`), listed by `GET /v1/projects/{projectId}/proposals` (`proposals`), moved to another commit by its proposer (`POST /v1/changes/{changeId}/proposal/commits`, `updateProposal`), approved at the commit read (`…/proposal/approval`, `approveProposal`), asked for changes (`…/proposal/changes-requested`, `requestProposalChanges`) and closed (`…/proposal/close`, `closeProposal`). Each is an MCP tool. A proposal is a change of the project that no agent holds: `Change.agentId` is absent on one, which has `origin: proposal` and `proposal {fork, commit, proposer, approved?}`. It is checked under the project's own checks at its trunk head and waits, unverified, for a maintainer's approval of the commit it carries; a new commit clears the approval. Its events: `ChangeProposed`, `ProposalUpdated`, `ProposalApproved`, `ProposalChangesRequested`, and `ChangeParked {reason: awaiting-approval}`.

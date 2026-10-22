@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/gate.test.ts
+# kills: gate.sponsor-named
+# why: an agent admitted by its own key names no sponsor, so each agent a person sponsors gets a day's allowance of its own
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 4c9559a8..8c2d11cb 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -297,7 +297,6 @@ export const principalOf: (
+           paused: agent.state === "suspended",
+           standing,
+           sponsored: agent.sponsor !== undefined,
+-          ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+         },
+         token: claims,
+       };

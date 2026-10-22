@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proposals.test.ts
+# kills: proposal.giveback-on-land
+# why: the Change object never arms the give-back, so a landed proposal's copies stay counted against its fork
+diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
+index 1d1762db..873ef7ed 100644
+--- a/apps/keel/src/adapters/driving/do/change.ts
++++ b/apps/keel/src/adapters/driving/do/change.ts
+@@ -426,7 +426,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+     await this.armLease();
+     const owed = await this.runtime.runPromise(copiesOwed(this.changeId));
+     const armed = armedAlarms(this.ctx.storage).some((alarm) => alarm.reason === GIVE_BACK);
+-    if (owed && !armed)
++    if (owed && !armed && false)
+       await scheduleAlarm(this.ctx.storage, {
+         kind: "deadline",
+         reason: GIVE_BACK,

@@ -2,14 +2,14 @@
 # kills: b21.await-submission, b21.await-plan
 # why: a waiting Workflow instance is never told when the change submits or its plan compiles
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0cea15a..53f8da1 100644
+index 483de428..d5728530 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -562,7 +562,6 @@ const awaitChange = (
+@@ -984,7 +984,6 @@ const awaitChange = (
        const projectId = heldWorkspace(store, changeId)?.projectId;
        if (projectId === undefined) return { _tag: "unprojected" } as const;
        if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
 -      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
-       return { _tag: "waiting" } as const;
+       return { _tag: "waiting", waiting: waitingOn(change) } as const;
      });
      if (found._tag === "missing") return yield* notFound(changeId);

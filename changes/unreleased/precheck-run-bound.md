@@ -1,0 +1,3 @@
+### Fixed
+
+- **A Precheck pass is bound to its own run.** A change bounced while Precheck derives it and submitted again keeps its revision, so the earlier pass could still compile its plan onto the new submission. Precheck's start now names the commit its run was started for (`precheckStarted {revision, instanceId, commitSha}` on the Change object) and is refused once the change carries another; past its start, a pass's derivation, refusal and plan are refused unless it is the change's current pass. A proposal may again move to another commit while Precheck reads the last: the old pass moves nothing.

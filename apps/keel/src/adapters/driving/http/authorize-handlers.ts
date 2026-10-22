@@ -221,7 +221,10 @@ const proposalOf = (projectId: unknown, fork: unknown) =>
     } satisfies ProposalResource;
   });
 
-/** A proposed change, by the change itself: its project, and who proposed it when it is a proposal. */
+/**
+ * A proposed change, by the change itself: its project, and when it is a
+ * proposal, who proposed it and the fork it comes from, as the policy sees it.
+ */
 const proposalChange = (id: unknown) =>
   Option.match(decodeChangeId(id), {
     onNone: () =>
@@ -229,13 +232,18 @@ const proposalChange = (id: unknown) =>
     onSome: (changeId) =>
       Changes.use((changes) => changes.get(changeId)).pipe(
         Effect.flatMap((read) =>
-          Effect.map(projectResource(read.projectId), (project): ProposalChangeResource => ({
-            _tag: "ProposalChange",
-            project,
-            ...(read.change.proposal === undefined
-              ? {}
-              : { proposer: read.change.proposal.proposer }),
-          })),
+          Effect.gen(function* () {
+            const project = yield* projectResource(read.projectId);
+            const { proposal } = read.change;
+            if (proposal === undefined)
+              return { _tag: "ProposalChange", project } satisfies ProposalChangeResource;
+            return {
+              _tag: "ProposalChange",
+              project,
+              proposer: proposal.proposer,
+              fork: yield* projectResource(proposal.fork),
+            } satisfies ProposalChangeResource;
+          }),
         ),
         Effect.catchTag("ChangeNotFound", () =>
           Effect.succeed<ProposalChangeResource>({ _tag: "ProposalChange", project: MISSING }),

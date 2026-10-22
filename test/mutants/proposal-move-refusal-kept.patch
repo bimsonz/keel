@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: rate.final-refusal-given-back
+# why: a move refused for its commit spends one of the day's moves though nothing moved and no retry can
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 370c35e4..2b342e11 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -213,7 +213,7 @@ export const updateFromFork = Effect.fn("integration/updateFromFork")(function*
+     })
+     .pipe(
+       Effect.tapError((error) =>
+-        refusedForItsCommit(error) ||
++        false ||
+         error._tag === "ChangeNotFound" ||
+         error._tag === "NotAProposal" ||
+         (error._tag === "ChangeStateRefused" && TERMINAL.has(error.state))

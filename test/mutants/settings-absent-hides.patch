@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts
+# kills: settings.absent-keeps, b12.settings-visibility
+# why: a settings PUT that leaves visibility out makes a public project private
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 2fc631ff..2e002fc7 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -160,7 +160,7 @@ export const changeSettings: (
+       protectedPaths: command.settings.protectedPaths,
+       maxBatchSize: command.settings.maxBatchSize,
+       verification: command.settings.verification ?? stored.verification,
+-      visibility: command.settings.visibility ?? stored.visibility,
++      visibility: command.settings.visibility ?? "private",
+       proposals: command.settings.proposals ?? stored.proposals,
+     };
+   };

@@ -74,7 +74,7 @@ import {
   type Instant,
   type Json,
   type LeaseId,
-  type NamespaceId,
+  NamespaceId,
   NextAction,
   ProjectId,
   sha256HexOfBytes,
@@ -289,34 +289,56 @@ export const CHANGE_BATCH_VERDICT = "change-batch-verdict";
 /** Where the Change DO marks each shrink ruling it parked on, by escalation id: only those resume or bounce it. */
 const CHANGE_SHRINK_RULING = "change-shrink-ruling";
 /**
- * Where it keeps the question on how Keel verifies a proposal, by escalation
- * id, asked of the Precheck run whose plan held the gate: the proposal waits
- * for its approval first, and a ruling heard meanwhile is kept here (`heard`)
- * until the approval asks whether it still has to wait for one.
+ * Where it keeps each question on how Keel verifies it, by escalation id,
+ * asked of the Precheck run whose plan held the gate, and what became of it
+ * (`heard`): the ruling's option once one is heard, or withdrawn once the
+ * change took it back. A proposal waits for its approval first, and a ruling
+ * heard meanwhile is kept here until the approval asks whether it still has
+ * to wait for one.
  */
 const CHANGE_FLOW_ASKED = "change-flow-asked";
-const FlowAsked = Schema.Struct({ heard: Schema.optional(Schema.String) });
+const FlowAsked = Schema.Struct({
+  heard: Schema.optional(Schema.String),
+  /** Why the change took it back, until its namespace has heard so. */
+  unsent: Schema.optional(Schema.String),
+});
 const decodeFlowAsked = Schema.decodeUnknownSync(FlowAsked);
 /** What a question taken back is recorded as having heard: nothing is left to rule on. */
 const FLOW_WITHDRAWN = "withdrawn";
 
 /**
- * Takes back each question on how Keel verifies the proposal that nobody has
- * ruled on, in its project's namespace: it moved to another commit, or it
- * closed, so nothing is left to rule on. Each is recorded as withdrawn, so it
- * is taken back once.
+ * Takes back each question on how Keel verifies the change that nobody has
+ * ruled on, in the transaction that moves it on from the pass that asked
+ * (another commit, a submission again, a revision) or ends it: each is
+ * recorded as withdrawn, with why, until its namespace hears it
+ * (`sendTakenBack`). A replay of that move commits nothing, so it takes back
+ * nothing a later pass asked.
  */
-const withdrawFlowQuestions = (changeId: ChangeId, projectId: ProjectId, reason: string) =>
+const takeBackFlowQuestions = (store: Store, reason: string): void => {
+  for (const { id, value } of store.list(CHANGE_FLOW_ASKED))
+    if (decodeFlowAsked(value).heard === undefined)
+      store.put(CHANGE_FLOW_ASKED, id, { heard: FLOW_WITHDRAWN, unsent: reason });
+};
+
+/**
+ * Withdraws in the project's namespace each question the change took back
+ * that its namespace has not heard yet, then records it heard: a replay of
+ * the move sends what its first call left unsent, and nothing more. A
+ * question not yet raised when it is taken back is withdrawn by its raiser,
+ * who asks first whether the change still asks it (`flowQuestionAsked`).
+ */
+const sendTakenBack = (changeId: ChangeId, projectId: ProjectId) =>
   Effect.gen(function* () {
     const store = yield* EntityStore;
-    const open = store
-      .list(CHANGE_FLOW_ASKED)
-      .filter(({ value }) => decodeFlowAsked(value).heard === undefined);
-    if (open.length === 0) return;
+    const unsent = store.list(CHANGE_FLOW_ASKED).flatMap(({ id, value }) => {
+      const reason = decodeFlowAsked(value).unsent;
+      return reason === undefined ? [] : [{ id, reason }];
+    });
+    if (unsent.length === 0) return;
     const place = yield* (yield* ProjectNamespaces).byId(projectId);
     if (Option.isNone(place)) return;
     const gate = yield* HumanGate;
-    for (const { id } of open) {
+    for (const { id, reason } of unsent) {
       yield* gate.withdraw({
         namespace: place.value.namespace,
         escalationId: Schema.decodeUnknownSync(EscalationId)(id),
@@ -325,6 +347,23 @@ const withdrawFlowQuestions = (changeId: ChangeId, projectId: ProjectId, reason:
       store.put(CHANGE_FLOW_ASKED, id, { heard: FLOW_WITHDRAWN });
     }
   });
+
+/**
+ * Whether the change still asks a question on how Keel verifies it: false once
+ * it took it back. One it never recorded asking (a pass compiled before it
+ * recorded its questions) is still asked.
+ */
+export const flowQuestionAsked: (
+  changeId: ChangeId,
+  escalationId: EscalationId,
+) => Effect.Effect<boolean, ChangeNotFound, EntityStore> = Effect.fn(
+  "coordination/flowQuestionAsked",
+)(function* (changeId: ChangeId, escalationId: EscalationId) {
+  const store = yield* EntityStore;
+  if (storedChange(store, changeId) === undefined) return yield* notFound(changeId);
+  const asked = store.get(CHANGE_FLOW_ASKED, escalationId);
+  return asked === undefined || decodeFlowAsked(asked).heard !== FLOW_WITHDRAWN;
+});
 
 export interface DeclareChange {
   /** The id the agent's AgentSession reserved for `idempotencyKey`. */
@@ -519,6 +558,11 @@ export interface AdoptedChange {
 export interface PrecheckStep {
   readonly revision: number;
   readonly instanceId: string;
+}
+
+/** Precheck's first step: the commit its run was started for, which must still be the one the change carries. */
+export interface PrecheckStart extends PrecheckStep {
+  readonly commitSha: CommitSha;
 }
 
 /** Precheck refused the submission: why, and what the agent can do about it (never empty). */
@@ -925,9 +969,14 @@ export const AWAIT_PLAN_HEARS = [
   "ChangeSuperseded",
 ] as const;
 
+/** What a waiter on a submission waits through: none yet, or a proposal's approval. */
+const WAITS_FOR_SUBMISSION: ReadonlySet<string> = new Set(["Unsubmitted", "AwaitingApproval"]);
+
 /** A wait's answer when there is nothing to read yet: the subscriber will be told. */
 export interface Awaiting {
   readonly waiting: true;
+  /** It is a proposal waiting for a maintainer's approval of its commit, not for its proposer. */
+  readonly forApproval?: true;
 }
 
 /**
@@ -941,6 +990,8 @@ const awaitChange = (
   subscriber: Subscriber,
   answered: (change: Change) => boolean,
   hears: readonly string[],
+  /** What the wait says of the change it waits on. */
+  waitingOn: (change: Change) => Awaiting = () => ({ waiting: true }),
 ): Effect.Effect<ChangeRead | Awaiting, ChangeNotFound, EntityStore | EventOutbox> =>
   Effect.gen(function* () {
     const store = yield* EntityStore;
@@ -952,20 +1003,21 @@ const awaitChange = (
       if (projectId === undefined) return { _tag: "unprojected" } as const;
       if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
       outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
-      return { _tag: "waiting" } as const;
+      return { _tag: "waiting", waiting: waitingOn(change) } as const;
     });
     if (found._tag === "missing") return yield* notFound(changeId);
     if (found._tag === "unprojected")
       return yield* Effect.die(`${changeId} has no project recorded`);
-    return found._tag === "read" ? found.read : ({ waiting: true } as const);
+    return found._tag === "read" ? found.read : found.waiting;
   });
 
 /**
- * The change with its project when `submissionStateOf` reads anything but
- * Unsubmitted from it: a current submission, its landing, or its end.
- * Otherwise `waiting`, with `subscriber` told once of its next
- * ChangeSubmitted, ProposalApproved, ChangeWithdrawn or ChangeSuperseded. The Probe reads the
- * answer with the same rule, so it never waits unsubscribed.
+ * The change with its project when `submissionStateOf` reads a current
+ * submission, its landing, or its end from it. Otherwise `waiting`, with
+ * `subscriber` told once of its next ChangeSubmitted, ProposalApproved,
+ * ChangeWithdrawn or ChangeSuperseded, and `forApproval` when it is a proposal
+ * waiting for a maintainer's approval. The Probe reads the answer with the
+ * same rule, so it never waits unsubscribed.
  */
 export const awaitSubmission: (
   changeId: ChangeId,
@@ -976,8 +1028,12 @@ export const awaitSubmission: (
   awaitChange(
     changeId,
     subscriber,
-    (change) => submissionStateOf(change)._tag !== "Unsubmitted",
+    (change) => !WAITS_FOR_SUBMISSION.has(submissionStateOf(change)._tag),
     AWAIT_SUBMISSION_HEARS,
+    (change) =>
+      submissionStateOf(change)._tag === "AwaitingApproval"
+        ? { waiting: true, forApproval: true }
+        : { waiting: true },
   ),
 );
 
@@ -1186,10 +1242,15 @@ const PROPOSAL_FOOTPRINT_MAX = 300;
 
 /**
  * The events its project's object hears of a proposal: what its live-change
- * index hears of any change, and the proposal itself, which its ledger counts
- * among its proposer's open proposals.
+ * index hears of any change, the proposal itself, which its ledger counts
+ * among its proposer's open proposals, and each move to another commit, whose
+ * footprint the index keeps from then on.
  */
-export const PROPOSAL_INDEX_HEARS = [...LIVE_INDEX_HEARS, "ChangeProposed"] as const;
+export const PROPOSAL_INDEX_HEARS = [
+  ...LIVE_INDEX_HEARS,
+  "ChangeProposed",
+  "ProposalUpdated",
+] as const;
 
 /**
  * A proposal of a fork's commit, as its Change DO is asked to make it by the
@@ -1267,21 +1328,80 @@ const footprintOf = (touched: readonly TreeChange[]): readonly FootprintEntry[] 
   }));
 
 /**
+ * What the proposal copied in, by `<change>/<commit>`: the bytes admitted
+ * against its fork's namespace, given back once the proposal ends and its
+ * workspace is collected.
+ */
+const CHANGE_COPIED = "change-copied";
+const Copied = Schema.Struct({ namespace: NamespaceId, bytes: Schema.Number });
+const decodeCopied = Schema.decodeUnknownSync(Copied);
+/** Where the change marks that it gave back what it copied: once. */
+const CHANGE_GIVEN_BACK = "change-given-back";
+
+/**
  * Admits the pack a proposal's commit is copied in against its fork's
  * namespace's repo bytes, once per change and commit: a copy retried is the
- * same admission.
+ * same admission. What it admitted is kept at once, the first record of a
+ * commit standing, whatever then becomes of the copy or of the commit that
+ * follows it (a push refused midway, a move a close got to first): the
+ * proposal gives it all back when it ends.
  */
 const admitCopy =
   (
     usage: NamespaceUsage["Service"],
+    store: Store,
     namespace: NamespaceId,
     changeId: ChangeId,
     proposed: CommitSha,
   ) =>
   (bytes: number) =>
-    usage
-      .admit(namespace, REPO_BYTES, bytes, `proposal:${changeId}:${proposed}`)
-      .pipe(Effect.asVoid);
+    usage.admit(namespace, REPO_BYTES, bytes, `proposal:${changeId}:${proposed}`).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          const kept = `${changeId}/${proposed}`;
+          if (bytes > 0 && store.get(CHANGE_COPIED, kept) === undefined)
+            store.put(CHANGE_COPIED, kept, { namespace, bytes });
+        }),
+      ),
+      Effect.asVoid,
+    );
+
+/** Whether the change ended holding copies it has not yet given back. */
+export const copiesOwed: (changeId: ChangeId) => Effect.Effect<boolean, never, EntityStore> =
+  Effect.fn("coordination/copiesOwed")(function* (changeId: ChangeId) {
+    const store = yield* EntityStore;
+    const change = storedChange(store, changeId);
+    return (
+      change !== undefined &&
+      TERMINAL.has(change.state) &&
+      store.get(CHANGE_GIVEN_BACK, changeId) === undefined &&
+      store.list(CHANGE_COPIED, `${changeId}/`).length > 0
+    );
+  });
+
+/**
+ * Gives back, once the proposal has ended, what its copies counted against
+ * each namespace: one record per namespace under
+ * `proposal-giveback:<change>`, then the change marks it given. Nothing while
+ * it is open, and nothing a second time.
+ */
+export const giveBackCopies: (
+  changeId: ChangeId,
+) => Effect.Effect<void, never, EntityStore | NamespaceUsage> = Effect.fn(
+  "coordination/giveBackCopies",
+)(function* (changeId: ChangeId) {
+  if (!(yield* copiesOwed(changeId))) return;
+  const store = yield* EntityStore;
+  const owed = new Map<NamespaceId, number>();
+  for (const { value } of store.list(CHANGE_COPIED, `${changeId}/`)) {
+    const { namespace, bytes } = decodeCopied(value);
+    owed.set(namespace, (owed.get(namespace) ?? 0) + bytes);
+  }
+  const usage = yield* NamespaceUsage;
+  for (const [namespace, bytes] of owed)
+    yield* usage.record(namespace, REPO_BYTES, -bytes, `proposal-giveback:${changeId}`);
+  store.put(CHANGE_GIVEN_BACK, changeId, true);
+});
 
 /**
  * Proposes a fork's commit to this project: takes a workspace, copies the
@@ -1331,7 +1451,13 @@ export const propose: (
         grant.repo,
         command.commit,
         [command.base, grant.baseSha],
-        admitCopy(yield* NamespaceUsage, command.namespace, changeId, command.commit),
+        admitCopy(
+          yield* NamespaceUsage,
+          yield* EntityStore,
+          command.namespace,
+          changeId,
+          command.commit,
+        ),
       )
       .pipe(Effect.catchTag("RepoNotFound", Effect.die));
     const touched = yield* (yield* CodeHost)
@@ -1448,6 +1574,7 @@ export const updateProposal: (
   | NamespaceUsage
   | HumanGate
   | ProjectNamespaces
+  | CodeHost
 > = Effect.fn("coordination/updateProposal")(function* (
   changeId: ChangeId,
   command: UpdateProposal,
@@ -1488,9 +1615,13 @@ export const updateProposal: (
       held.repo,
       command.commit,
       [change.baseSha ?? held.grantedSha, held.grantedSha],
-      admitCopy(yield* NamespaceUsage, command.namespace, changeId, command.commit),
+      admitCopy(yield* NamespaceUsage, store, command.namespace, changeId, command.commit),
     )
     .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+  // Its footprint from now on: each path the new commit touches against the base it is judged from.
+  const touched = yield* (yield* CodeHost)
+    .diffTrees(held.repo, command.base, command.commit)
+    .pipe(Effect.orDie);
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
@@ -1499,18 +1630,20 @@ export const updateProposal: (
       actor: command.proposer,
       project: held.projectId,
     },
-    (tx) =>
-      Result.map(
-        transition(
-          tx,
-          changeId,
-          ["ChangeNotFound", "ChangeStateRefused", "NotAProposal"],
-          [moving],
-        ),
-        asTransition,
-      ),
+    (tx) => {
+      // A proposal opened before its project's index heard moves hears them from its first.
+      tx.outbox.subscribe(`project:${held.projectId}`, PROPOSAL_INDEX_HEARS, changeRef(changeId));
+      const moved = transition(
+        tx,
+        changeId,
+        ["ChangeNotFound", "ChangeStateRefused", "NotAProposal"],
+        [{ ...moving, footprint: footprintOf(touched) }],
+      );
+      if (Result.isSuccess(moved)) takeBackFlowQuestions(tx.store, "moved to another commit");
+      return Result.map(moved, asTransition);
+    },
   );
-  yield* withdrawFlowQuestions(changeId, held.projectId, "moved to another commit");
+  yield* sendTakenBack(changeId, held.projectId);
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
 
@@ -1528,6 +1661,7 @@ const onProposal = (
   },
   method: string,
   commands: (store: Store) => readonly ChangeCommand[],
+  takesBack?: string,
 ) =>
   Effect.gen(function* () {
     const committed = yield* commit(
@@ -1538,14 +1672,17 @@ const onProposal = (
         actor: command.by,
         ...inProject(yield* EntityStore, changeId),
       },
-      (tx) =>
-        heldWorkspace(tx.store, changeId)?.projectId === command.projectId
-          ? Result.map(
-              transition(tx, changeId, PROPOSAL_REFUSALS, commands(tx.store)),
-              asTransition,
-            )
-          : Result.fail(notFound(changeId)),
+      (tx) => {
+        if (heldWorkspace(tx.store, changeId)?.projectId !== command.projectId)
+          return Result.fail(notFound(changeId));
+        const moved = transition(tx, changeId, PROPOSAL_REFUSALS, commands(tx.store));
+        // What ends it takes back its open questions in the same commit.
+        if (takesBack !== undefined && Result.isSuccess(moved))
+          takeBackFlowQuestions(tx.store, takesBack);
+        return Result.map(moved, asTransition);
+      },
     );
+    if (takesBack !== undefined) yield* sendTakenBack(changeId, command.projectId);
     return yield* settled(changeId, command.idempotencyKey, committed);
   });
 
@@ -1581,13 +1718,19 @@ export const requestProposalChanges = (changeId: ChangeId, command: RequestPropo
 
 /** Closes a proposal: ChangeWithdrawn, by its proposer or by whoever may approve it, and its open questions taken back. */
 export const closeProposal = (changeId: ChangeId, command: CloseProposal) =>
-  onProposal(changeId, command, "closeProposal", () => [
-    {
-      _tag: "Withdraw",
-      authority: { _tag: "Proposal", by: actorParts(command.by).id },
-      ...(command.reason === undefined ? {} : { reason: command.reason }),
-    },
-  ]).pipe(Effect.tap(() => withdrawFlowQuestions(changeId, command.projectId, "was closed")));
+  onProposal(
+    changeId,
+    command,
+    "closeProposal",
+    () => [
+      {
+        _tag: "Withdraw",
+        authority: { _tag: "Proposal", by: actorParts(command.by).id },
+        ...(command.reason === undefined ? {} : { reason: command.reason }),
+      },
+    ],
+    "was closed",
+  );
 
 /** Revises the intent under the lease, at the revision the caller last read. */
 const reviseCall: (
@@ -1601,7 +1744,7 @@ const reviseCall: (
   | RevisionMismatch
   | ChangeStateRefused
   | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | LiveChanges | Decisions
+  Clock | EntityStore | EventOutbox | LiveChanges | Decisions | HumanGate | ProjectNamespaces
 > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
   const store = yield* EntityStore;
   const notHeld = holdingRefusal(store, changeId, command);
@@ -1653,12 +1796,14 @@ const reviseCall: (
       );
       if (Result.isFailure(revised)) return Result.fail(revised.failure);
       if (after !== undefined) subscribeSubjects(tx, changeId, after);
+      takeBackFlowQuestions(tx.store, "was revised");
       return Result.succeed(
         withSurfaced(asTransition(revised.success), surfaced(tx, changeId, preflight)),
       );
     },
   );
   const change = yield* settled(changeId, command.idempotencyKey, committed);
+  if (projectId !== undefined) yield* sendTakenBack(changeId, projectId);
   return { change, preflight: issuedPreflight(committed.events) };
 });
 
@@ -1830,7 +1975,7 @@ const submitCall: (
   | ChangeStateRefused
   | CommitNotInWorkspace
   | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox | CodeHost
+  Clock | EntityStore | EventOutbox | CodeHost | HumanGate | ProjectNamespaces
 > = Effect.fn("coordination/submit")(function* (changeId: ChangeId, command: SubmitChange) {
   const notHeld = holdingRefusal(yield* EntityStore, changeId, command);
   if (notHeld !== undefined) return yield* notHeld;
@@ -1848,26 +1993,29 @@ const submitCall: (
       ...byAgent(command.agentId, command.run),
       ...(held === undefined ? {} : { project: held.projectId }),
     },
-    (tx) =>
-      Result.map(
-        transition(
-          tx,
-          changeId,
-          ["ChangeNotFound", "LeaseStale", "ChangeStateRefused", "CommitNotInWorkspace"],
-          [
-            {
-              _tag: "Submit",
-              leaseId: command.leaseId,
-              commitSha: command.commitSha,
-              inWorkspace,
-            },
-          ],
-          command.leaseId,
-        ),
-        asTransition,
-      ),
+    (tx) => {
+      const submitted = transition(
+        tx,
+        changeId,
+        ["ChangeNotFound", "LeaseStale", "ChangeStateRefused", "CommitNotInWorkspace"],
+        [
+          {
+            _tag: "Submit",
+            leaseId: command.leaseId,
+            commitSha: command.commitSha,
+            inWorkspace,
+          },
+        ],
+        command.leaseId,
+      );
+      // A new pass asks its own questions: the last pass's, still unruled, are taken back.
+      if (Result.isSuccess(submitted)) takeBackFlowQuestions(tx.store, "was submitted again");
+      return Result.map(submitted, asTransition);
+    },
   );
-  return yield* settled(changeId, command.idempotencyKey, committed);
+  const change = yield* settled(changeId, command.idempotencyKey, committed);
+  if (held !== undefined) yield* sendTakenBack(changeId, held.projectId);
+  return change;
 });
 
 export const submit = renewingOnRefusal(submitCall, (command) => command.leaseId);
@@ -1891,7 +2039,7 @@ const abandonCall: (
 ) => Effect.Effect<
   Change,
   ChangeNotFound | ChangeHeldByOther | LeaseStale | ChangeStateRefused | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox
+  Clock | EntityStore | EventOutbox | HumanGate | ProjectNamespaces
 > = Effect.fn("coordination/abandon")(function* (changeId: ChangeId, command: AbandonChange) {
   const { authority } = command;
   if (authority._tag === "Lease") {
@@ -1914,24 +2062,26 @@ const abandonCall: (
         heldWorkspace(tx.store, changeId)?.projectId !== authority.projectId
       )
         return Result.fail(new ChangeNotFound({ changeId }));
-      return Result.map(
-        transition(
-          tx,
-          changeId,
-          ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
-          [
-            {
-              _tag: "Withdraw",
-              authority,
-              ...(command.reason === undefined ? {} : { reason: command.reason }),
-            },
-          ],
-        ),
-        asTransition,
+      const withdrawn = transition(
+        tx,
+        changeId,
+        ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
+        [
+          {
+            _tag: "Withdraw",
+            authority,
+            ...(command.reason === undefined ? {} : { reason: command.reason }),
+          },
+        ],
       );
+      if (Result.isSuccess(withdrawn)) takeBackFlowQuestions(tx.store, "was withdrawn");
+      return Result.map(withdrawn, asTransition);
     },
   );
-  return yield* settled(changeId, command.idempotencyKey, committed);
+  const change = yield* settled(changeId, command.idempotencyKey, committed);
+  const projectId = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+  if (projectId !== undefined) yield* sendTakenBack(changeId, projectId);
+  return change;
 });
 
 export const abandon = renewingOnRefusal(abandonCall, ({ authority }) =>
@@ -2387,7 +2537,9 @@ export const lapseLease: (
 /**
  * One of Precheck's commands: idempotent by `instanceId` (the cause is
  * `<instanceId>:<method>`), and refused when Precheck checked a revision other
- * than the change's current one. `commands` may read the change's store
+ * than the change's current one, or, past its start, when its run is not the
+ * change's current pass: a resubmission keeps the revision, so only the run
+ * tells one pass from the next. `commands` may read the change's store
  * inside the transaction (its blockers). `before` commits ahead of the
  * change's own events in the same transaction (a refusal's verdict);
  * `alongside` runs once the commands are decided, before the events are
@@ -2418,7 +2570,11 @@ const precheckCommand = (
       },
       (tx) => {
         const stored = storedChange(tx.store, changeId);
-        if (stored !== undefined && stored.intent.revision !== step.revision)
+        if (
+          stored !== undefined &&
+          (stored.intent.revision !== step.revision ||
+            (method !== "precheckStarted" && stored.precheckInstance !== step.instanceId))
+        )
           return Result.fail(refused(stored, method));
         return Result.map(
           transition(
@@ -2441,17 +2597,39 @@ const precheckCommand = (
     return { events: committed.events, change: yield* current(changeId, committed) };
   });
 
-/** Precheck has started on the submission: commits PrecheckStarted. */
+/** Precheck has started on the submission it was started for: commits PrecheckStarted, while the change still carries that commit. */
 export const precheckStarted: (
   changeId: ChangeId,
-  step: PrecheckStep,
+  step: PrecheckStart,
 ) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
-  Effect.fn("coordination/precheckStarted")(function* (changeId: ChangeId, step: PrecheckStep) {
+  Effect.fn("coordination/precheckStarted")(function* (changeId: ChangeId, step: PrecheckStart) {
     const started = yield* precheckCommand(changeId, "precheckStarted", step, [
-      { _tag: "StartPrecheck", instanceId: step.instanceId },
+      { _tag: "StartPrecheck", instanceId: step.instanceId, commitSha: step.commitSha },
     ]);
     return started.change;
   });
+
+/**
+ * Whether a Precheck pass may still derive: ChangeStateRefused unless the
+ * change is deriving in this run, at this revision. It commits nothing:
+ * `derive` asks before it reads any code, so a pass the change has moved on
+ * from (another commit, a submission again, a revision) parses none.
+ */
+export const precheckDeriving: (
+  changeId: ChangeId,
+  step: PrecheckStep,
+) => Effect.Effect<void, ChangeNotFound | ChangeStateRefused, EntityStore> = Effect.fn(
+  "coordination/precheckDeriving",
+)(function* (changeId: ChangeId, step: PrecheckStep) {
+  const change = storedChange(yield* EntityStore, changeId);
+  if (change === undefined) yield* notFound(changeId);
+  else if (
+    change.state !== "deriving" ||
+    change.intent.revision !== step.revision ||
+    change.precheckInstance !== step.instanceId
+  )
+    yield* refused(change, "DeriveEffects");
+});
 
 /**
  * Precheck derived the submission's effects from its code: commits
@@ -2569,13 +2747,13 @@ export const planCompiled: (
         const blockers = blockersOf(store, plan.predicatePolicy);
         const bounce = conflictBounce(blockers.openProvenConflicts);
         if (bounce !== undefined) return [compile, bounce];
+        // Every question on how Keel verifies it is recorded as asked, so the change can take it back.
+        if (plan.needsRuling === true)
+          store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
         // A proposal waits for the approval of its commit before anything is verified. A question on how
         // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
-        if (storedChange(store, changeId)?.proposal !== undefined) {
-          if (plan.needsRuling === true)
-            store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
+        if (storedChange(store, changeId)?.proposal !== undefined)
           return [compile, { _tag: "Queue", laneId, blockers }, { _tag: "AwaitApproval" }];
-        }
         // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
         // conflict already with a person holds the change too: either the moment it is queued.
         const asked =
@@ -2859,6 +3037,10 @@ const commandFor = (
       const recorded = decodeRecorded(event.payload);
       if (Option.isNone(recorded)) return undefined;
       const { escalationId, decisionId, option, summary } = recorded.value;
+      // A ruling on a question on how Keel verifies it answers it: nothing is left to take back.
+      const asked = store.get(CHANGE_FLOW_ASKED, escalationId);
+      if (asked !== undefined && decodeFlowAsked(asked).heard === undefined)
+        store.put(CHANGE_FLOW_ASKED, escalationId, { heard: option });
       // A proposal still waiting for its approval hears the ruling on how Keel verifies it first: an
       // approve is kept for the approval, which then queues it, and anything else sends it back.
       if (
@@ -2867,10 +3049,8 @@ const commandFor = (
         escalationId === flowRulingIdOf(change.id, change.precheckInstance) &&
         store.get(CHANGE_FLOW_ASKED, escalationId) !== undefined
       ) {
-        if (option === FLOW_RULING_APPROVE) {
-          store.put(CHANGE_FLOW_ASKED, escalationId, { heard: option });
-          return {};
-        }
+        // An approve is kept, heard, for the approval.
+        if (option === FLOW_RULING_APPROVE) return {};
         return {
           command: {
             _tag: "Bounce",

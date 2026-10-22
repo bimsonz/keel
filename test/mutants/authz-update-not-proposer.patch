@@ -2,15 +2,14 @@
 # kills: authz.proposals
 # why: anyone who can read a proposal moves it to another commit, not only its proposer
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e40376fe..7876abea 100644
+index cc146b62..4017d1be 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -1039,7 +1039,7 @@ const onProposalChange = (
+@@ -1057,7 +1057,6 @@ const onProposalChange = (
    const theirs = proposed.proposer !== undefined && proposed.proposer === actorOf(principal);
    switch (need) {
-     case "proposer":
--      return theirs ? granted() : refused("proposer-only");
-+      return granted();
-     case "proposerOrApprove":
-       return theirs ? granted() : approver(principal, proposed.project);
-     case "approve":
+     case "proposer": {
+-      if (!theirs) return refused("proposer-only");
+       const stands =
+         proposed.fork === undefined ? refused("left-fork") : standsOnFork(principal, proposed.fork);
+       if (Result.isSuccess(stands)) return stands;

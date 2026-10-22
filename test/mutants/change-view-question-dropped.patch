@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts
+# kills: change-view.park-reason
+# why: a change waiting for a ruling never names the question it waits on
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c32936a2..b8f5f4bf 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -365,7 +365,7 @@ function changeView(change: Change, tell: Teller) {
+       ? {}
+       : {
+           parkReason: change.parkReason,
+-          ...(change.escalationId === undefined ? {} : { escalationId: change.escalationId }),
++          ...(change.escalationId === undefined ? {} : {}),
+         }),
+     revision: change.intent.revision,
+     goal: change.intent.goal,

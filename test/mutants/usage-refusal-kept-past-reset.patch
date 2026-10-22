@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts apps/keel/test/unit/proposals-http.test.ts
+# kills: usage.contract.refusal-until-reset, rate.retry-after-reset
+# why: a call refused at its daily limit and sent again under its key the next day is refused for a week, its Retry-After saying one second
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index c3fa495f..c762ca36 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -129,7 +129,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+       const keyed = decodeKeyed(first);
+       // A refusal that named when the count starts again answers until then, and is decided again after.
+       const { exceeded } = keyed;
+-      if (exceeded !== undefined && (exceeded.retryAt === undefined || now < exceeded.retryAt))
++      if (exceeded !== undefined && exceeded !== undefined)
+         return Result.fail(exceeded);
+       if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
+     }

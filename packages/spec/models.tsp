@@ -131,6 +131,13 @@ model Change {
   proposal?: ChangeProposal;
 
   state: ChangeState;
+
+  /** Why it is parked, while it is: a proposal for its approval, a change for a person's ruling, or for an adopter. */
+  parkReason?: ParkReason;
+
+  /** The question a change parked `awaiting-ruling` waits on, while it waits. */
+  escalationId?: EscalationId;
+
   revision: int32;
   goal: string;
   footprint: MFP.FootprintEntry[];

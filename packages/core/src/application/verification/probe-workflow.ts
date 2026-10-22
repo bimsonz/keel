@@ -47,7 +47,9 @@ import {
   draftWorlds,
   guardOf,
   type PartyWorld,
+  PROBE_APPROVAL_WAIT_MS,
   PROBE_SUBMISSION_WAIT_MS,
+  PROBE_WAIT_SLICE_MS,
   type ProbeParties,
   type ProbeWorldPlan,
   partiesOf,
@@ -526,11 +528,23 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
     const parties = read.success;
 
     const started = yield* steps.step("started", clock.now);
-    const deadline = started + PROBE_SUBMISSION_WAIT_MS;
+    /** When the wait for a submission ends: a day from the start, or from a proposal's approval. */
+    let deadline = started + PROBE_SUBMISSION_WAIT_MS;
+    /** When the wait for a proposal's approval ends: a maintainer's pace, from the start. */
+    const approvalDeadline = started + PROBE_APPROVAL_WAIT_MS;
 
-    /** A party's world, waiting for its submission while it has none; `round` names this read's steps apart. */
+    /**
+     * A party's world, waiting for its submission while it has none, or for
+     * its approval while it is a proposal a maintainer has not yet approved;
+     * `round` names this read's steps apart. The first read that finds it
+     * approved starts the wait for a submission again from then. Each wait is
+     * a day at most: one that ends unheard reads the party again, and its
+     * deadline decides.
+     */
     const party = (side: "A" | "B", changeId: ChangeId, round: string) =>
       Effect.gen(function* () {
+        /** Whether the last read found it waiting for its approval. */
+        let awaitingApproval = false;
         for (let n = 1; ; n++) {
           const name = `party ${side}${round} ${n}`;
           const got = yield* steps.step(
@@ -548,14 +562,18 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
             return { _tag: "World", world: answered } satisfies PartyEnd;
           if (answered._tag === "Gone")
             return { _tag: "Gone", state: answered.state } satisfies PartyEnd;
+          const forApproval = answered.forApproval === true;
           const now = yield* steps.step(`clock ${side}${round} ${n}`, clock.now);
-          if (now >= deadline) return { _tag: "Timeout" } satisfies PartyEnd;
-          const heard = yield* steps.waitFor(
+          if (awaitingApproval && !forApproval)
+            deadline = Math.max(deadline, now + PROBE_SUBMISSION_WAIT_MS);
+          awaitingApproval = forApproval;
+          const until = forApproval ? approvalDeadline : deadline;
+          if (now >= until) return { _tag: "Timeout" } satisfies PartyEnd;
+          yield* steps.waitFor(
             `change ${side}${round} ${n}`,
             partyEventType(changeId),
-            deadline - now,
+            Math.min(until - now, PROBE_WAIT_SLICE_MS),
           );
-          if (!heard) return { _tag: "Timeout" } satisfies PartyEnd;
         }
       });
 

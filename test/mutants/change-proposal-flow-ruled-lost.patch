@@ -2,15 +2,15 @@
 # kills: change.proposal-approve-asks
 # why: the question on how Keel verifies a proposal is not kept, so its approval queues it with nobody having ruled
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 203b3b42..285325fe 100644
+index d4fcca5d..586f25b2 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2524,8 +2524,6 @@ export const planCompiled: (
+@@ -2610,8 +2610,6 @@ export const planCompiled: (
+         const bounce = conflictBounce(blockers.openProvenConflicts);
+         if (bounce !== undefined) return [compile, bounce];
+         // Every question on how Keel verifies it is recorded as asked, so the change can take it back.
+-        if (plan.needsRuling === true)
+-          store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
          // A proposal waits for the approval of its commit before anything is verified. A question on how
          // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
-         if (storedChange(store, changeId)?.proposal !== undefined) {
--          if (plan.needsRuling === true)
--            store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
-           return [compile, { _tag: "Queue", laneId, blockers }, { _tag: "AwaitApproval" }];
-         }
-         // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
+         if (storedChange(store, changeId)?.proposal !== undefined)

@@ -1650,7 +1650,7 @@ describe("authorize", () => {
     ): ProposalChangeResource => ({
       _tag: "ProposalChange",
       project: at,
-      ...(proposer === undefined ? {} : { proposer }),
+      ...(proposer === undefined ? {} : { proposer, fork: privateFork }),
     });
     const maintainer = user({
       userId: USERS[2] ?? makeId("usr", ulid(3)),
@@ -1701,6 +1701,35 @@ describe("authorize", () => {
     ).toBe("404");
     expect(outcome(authorize(ANON, "approveProposal", proposed(theirs)))).toBe("401");
     expect(outcome(authorize(ANON, "proposals", upstream))).toBe("ok:public");
+  });
+
+  it("[authz.proposer-left-fork] its proposer moves a proposal only while they still stand on its fork: a person who left the fork's org, or an agent no longer working in it, is refused left-fork, and an agent nobody sponsors any more sponsor-required; either may still close it", () => {
+    const upstream = project(PRJ_1, "public");
+    const fork = project(PRJ_3, "private");
+    const stranger = user({ memberships: [{ org: ORG_2, role: "member" }] });
+    const left = user({ userId: stranger.userId, memberships: [] });
+    const sponsored = agentOn(PRJ_3, { sponsored: true });
+    const unsponsored = { ...sponsored, sponsored: false };
+    const elsewhere = agentOn(PRJ_4, { sponsored: true, agentId: sponsored.agentId });
+    const proposed = (proposer: CommandActor): ProposalChangeResource => ({
+      _tag: "ProposalChange",
+      project: upstream,
+      proposer,
+      fork,
+    });
+    const theirs = proposed(userActor(stranger.userId));
+    const agents = proposed(agentActor(sponsored.agentId));
+    expect(outcome(authorize(stranger, "updateProposal", theirs))).toBe("ok:");
+    expect(outcome(authorize(left, "updateProposal", theirs))).toBe("403:left-fork");
+    expect(outcome(authorize(sponsored, "updateProposal", agents))).toBe("ok:");
+    expect(outcome(authorize(elsewhere, "updateProposal", agents))).toBe("403:left-fork");
+    expect(outcome(authorize(unsponsored, "updateProposal", agents))).toBe("403:sponsor-required");
+    expect(outcome(authorize(stranger, "updateProposal", { ...theirs, fork: MISSING }))).toBe(
+      "403:left-fork",
+    );
+    // Closing what they proposed asks no standing: it only takes it away.
+    expect(outcome(authorize(left, "closeProposal", theirs))).toBe("ok:");
+    expect(outcome(authorize(unsponsored, "closeProposal", agents))).toBe("ok:");
   });
 
   it("[authz.suspended] a suspended user or org is refused, and an org's insiders are told why", () => {

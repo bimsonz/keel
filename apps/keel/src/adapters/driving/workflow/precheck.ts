@@ -160,14 +160,12 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
         const keeping = touched.then((diff) =>
           diff._tag === "Unreadable"
             ? undefined
-            : step
-                .do("derive", () =>
-                  settle(
-                    runtime,
-                    deriveSubmission(namespace, workspace, submission, on.base, diff.paths),
-                  ),
-                )
-                .then(settledValue),
+            : step.do("derive", () =>
+                settle(
+                  runtime,
+                  deriveSubmission(namespace, workspace, submission, on.base, diff.paths),
+                ),
+              ),
         );
         const steps = [
           touched,
@@ -183,13 +181,15 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
         const read = { ancestry: on, touched: diff, policy, flow, guards };
         if (kept === undefined)
           return { _tag: "Done", value: { ...read, subjects: workspace.subjects } };
+        // The change moved on before this pass derived: it read no code.
+        if (kept._tag === "Stale") return kept;
         const derived = await step.do("derived", () =>
-          settle(runtime, commitDerivation(namespace, submission, kept.derivationRef)),
+          settle(runtime, commitDerivation(namespace, submission, kept.value.derivationRef)),
         );
         if (derived._tag === "Stale") return derived;
         return {
           _tag: "Done",
-          value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
+          value: { ...read, subjects: planSubjects(workspace.subjects, kept.value.subjects) },
         };
       };
       const found: Settled<PrecheckFindings> =

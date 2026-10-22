@@ -291,7 +291,12 @@ describe("KeelWorldCheck", () => {
     expect(await hearing(c, "PlanCompiled")).toContain(`workflow:KeelWorldCheck/${id}`);
     expect(await recorded(s)).toEqual([]);
     // Precheck answers: the Change DO's own outbox tells the instance, through the fan-out.
-    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ ...PASS, commitSha: await c.carried() }),
+      ),
+    );
     ok(
       decodeExit(
         ChangeCodecs.planCompiled,
@@ -311,7 +316,12 @@ describe("KeelWorldCheck", () => {
     const s = await suspected({ A: c.changeId });
     await drafted(s.projectId, s.conflictId);
     const planHash = await stored();
-    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ ...PASS, commitSha: await c.carried() }),
+      ),
+    );
     ok(
       decodeExit(
         ChangeCodecs.planCompiled,
@@ -347,7 +357,12 @@ describe("KeelWorldCheck", () => {
     await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
     await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
     await instance.waitForStepResult({ name: `clock suite:${s.A} 1` });
-    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ ...PASS, commitSha: await c.carried() }),
+      ),
+    );
     ok(
       decodeExit(
         ChangeCodecs.precheckRefused,

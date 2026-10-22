@@ -2,15 +2,15 @@
 # kills: b21.await-submission
 # why: a change withdrawn before it submitted leaves its Probe waiting for an event that never comes
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0cea15a..819143d 100644
+index 483de428..0cb88305 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -587,7 +587,7 @@ export const awaitSubmission: (
+@@ -1010,7 +1010,7 @@ export const awaitSubmission: (
    awaitChange(
      changeId,
      subscriber,
--    (change) => submissionStateOf(change)._tag !== "Unsubmitted",
+-    (change) => !WAITS_FOR_SUBMISSION.has(submissionStateOf(change)._tag),
 +    (change) => submissionStateOf(change)._tag === "Submitted",
      AWAIT_SUBMISSION_HEARS,
-   ),
- );
+     (change) =>
+       submissionStateOf(change)._tag === "AwaitingApproval"

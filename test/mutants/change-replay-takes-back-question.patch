@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.replay-keeps-question
+# why: a submission or revision sent again under its key takes back the question the pass after it asked, and the change waits for good on a question nobody can answer
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0c2a20c2..f15d97bc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -331,7 +331,8 @@ const sendTakenBack = (changeId: ChangeId, projectId: ProjectId) =>
+   Effect.gen(function* () {
+     const store = yield* EntityStore;
+     const unsent = store.list(CHANGE_FLOW_ASKED).flatMap(({ id, value }) => {
+-      const reason = decodeFlowAsked(value).unsent;
++      const asked = decodeFlowAsked(value);
++      const reason = asked.unsent ?? (asked.heard === undefined ? "again" : undefined);
+       return reason === undefined ? [] : [{ id, reason }];
+     });
+     if (unsent.length === 0) return;

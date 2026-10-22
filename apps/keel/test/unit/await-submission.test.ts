@@ -122,7 +122,7 @@ describe("[b21.await-proposal] a Probe waits for a proposal's approval", () => {
           );
         store.put(CHANGE, changeId, proposed());
         const waiting = yield* awaitSubmission(changeId, "workflow:Probe/unapproved");
-        expect(waiting).toEqual({ waiting: true });
+        expect(waiting).toEqual({ waiting: true, forApproval: true });
         expect(
           outbox.subscribers("ProposalApproved", {
             entity: { kind: "change", id: changeId },
@@ -138,7 +138,7 @@ describe("[b21.await-proposal] a Probe waits for a proposal's approval", () => {
 
 describe("[b21.await-agrees] the Change DO and the Probe read a submission by one rule", () => {
   it.effect(
-    "[b21.await-agrees] in every state, with or without a commit, a base and a landing, it waits and subscribes exactly when the Probe would read Unsubmitted",
+    "[b21.await-agrees] in every state, with or without a commit, a base and a landing, it waits and subscribes exactly when the Probe would read no submission (Unsubmitted, or AwaitingApproval for a proposal), and says when it waits for an approval",
     () =>
       Effect.gen(function* () {
         yield* declared;
@@ -163,11 +163,13 @@ describe("[b21.await-agrees] the Change DO and the Probe read a submission by on
                     affected: [],
                   })
                   .includes(subscriber);
-                const unsubmitted = submissionStateOf(change)._tag === "Unsubmitted";
+                const read = submissionStateOf(change)._tag;
+                const unsubmitted = read === "Unsubmitted" || read === "AwaitingApproval";
                 expect({ state, commitSha, baseSha, landedCommit, hears, ...answer }).toMatchObject(
                   unsubmitted ? { waiting: true, hears: true } : { change, hears: false },
                 );
                 expect("waiting" in answer).toBe(unsubmitted);
+                expect("forApproval" in answer).toBe(read === "AwaitingApproval");
               }
         expect(n).toBe(ChangeState.literals.length * 8);
       }).pipe(Effect.provide(layers)),

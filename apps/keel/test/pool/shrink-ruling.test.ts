@@ -62,7 +62,11 @@ async function queue(c: ChangeUnderTest) {
   ok(
     decodeExit(
       ChangeCodecs.precheckStarted,
-      await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      await c.stub.precheckStarted({
+        revision: 1,
+        instanceId: "p-1",
+        commitSha: await c.carried(),
+      }),
     ),
   );
   ok(

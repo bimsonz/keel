@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.agent-question-withdrawn
+# why: an agent's question is never recorded as asked, so nothing ever takes it back
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index d4fcca5d..ab989ede 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2610,7 +2610,7 @@ export const planCompiled: (
+         const bounce = conflictBounce(blockers.openProvenConflicts);
+         if (bounce !== undefined) return [compile, bounce];
+         // Every question on how Keel verifies it is recorded as asked, so the change can take it back.
+-        if (plan.needsRuling === true)
++        if (plan.needsRuling === true && storedChange(store, changeId)?.proposal !== undefined)
+           store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
+         // A proposal waits for the approval of its commit before anything is verified. A question on how
+         // Keel verifies it is asked of this run all the same: it waits on that once it is approved.

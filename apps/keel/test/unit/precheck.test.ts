@@ -276,9 +276,14 @@ function precheckWorld(
    * derivation: `derive` and `derived` are taken in precheck-derive.test.ts.
    * Nothing is derived here, so the plan's subjects are the workspace's.
    */
-  const run = (submission: PrecheckSubmission, namespace: NamespaceId = sampleNamespace) =>
+  const run = (
+    submission: PrecheckSubmission,
+    namespace: NamespaceId = sampleNamespace,
+    /** The start's answer as the Workflow's history replays it, its start not taken again. */
+    started?: PrecheckWorkspace,
+  ) =>
     Effect.gen(function* () {
-      const workspace = yield* startPrecheck(submission);
+      const workspace = started ?? (yield* startPrecheck(submission));
       const ancestry = yield* checkAncestry(workspace, submission);
       const findings: PrecheckFindings =
         ancestry._tag === "Descends"
@@ -396,6 +401,35 @@ describe("Precheck", () => {
       ]);
     });
   });
+
+  it.effect(
+    "[precheck.start-replayed] a pass whose start ran on the code before a deploy, its answer replayed from the Workflow's history, goes on under the new steps: they bind the run that start recorded and read the workspace it answered, so it may derive and it compiles; once the change has moved on, the same replay is stale",
+    () => {
+      const world = precheckWorld();
+      const moved = precheckWorld();
+      return Effect.gen(function* () {
+        // The start as the code before the deploy took it: the change was seeded with no commit to check.
+        const submission = yield* world.submitted([withFile("src/a.ts")]);
+        const cached = yield* startPrecheck(submission).pipe(Effect.provide(world.layer));
+        const deriving = Effect.flatMap(ChangePrecheck, (precheck) =>
+          precheck.deriving(submission.changeId, submission),
+        );
+        yield* deriving.pipe(Effect.provide(world.layer));
+        const decision = yield* world.run(submission, sampleNamespace, cached);
+        expect(decision._tag).toBe("Compile");
+        expect(world.changes.stateOf(changeId)).toBe("queued");
+
+        const before = yield* moved.submitted([withFile("src/a.ts")]);
+        const replayed = yield* startPrecheck(before).pipe(Effect.provide(moved.layer));
+        // Submitted again since: the run that start recorded is no longer the change's.
+        moved.changes.submit(changeId, 1, replayed);
+        const stale = yield* Effect.flip(deriving.pipe(Effect.provide(moved.layer)));
+        const compiled = yield* Effect.flip(moved.run(before, sampleNamespace, replayed));
+        expect([stale._tag, compiled._tag]).toEqual(["ChangeStateRefused", "ChangeStateRefused"]);
+        expect(moved.changes.stateOf(changeId)).toBe("submitted");
+      });
+    },
+  );
 
   it.effect(
     "[d12.protected-refused] refuses a protected path, read from the project's settings",

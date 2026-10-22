@@ -3,6 +3,7 @@ import {
   type ChangeId,
   CommitSha,
   ContentHash,
+  type EscalationId,
   makeId,
   type NamespaceId,
   type VerdictId,
@@ -356,6 +357,10 @@ interface PrecheckedChange {
   readonly replies: Map<string, VerdictId | undefined>;
   /** Whether the current Precheck pass has recorded its derivation: one a pass. */
   derived: boolean;
+  /** The current pass's run: only its steps move the change once it has started. */
+  pass?: string;
+  /** The commit it carries, when seeded with one: a run started for another is refused. */
+  readonly commitSha?: CommitSha | undefined;
 }
 
 /**
@@ -364,12 +369,15 @@ interface PrecheckedChange {
  * pass on `derived`, then bounced on `refused`, or on `compiled` verifying
  * and, with no step before the queue, queued in the same commit, or parked
  * there for a maintainer's ruling when the plan holds the human-class gate),
- * idempotent by instance, and ChangeStateRefused for a stale revision or a
- * step the state does not allow.
+ * idempotent by instance, and ChangeStateRefused for a stale revision, a
+ * start for a commit the change no longer carries, a step of a run that is not
+ * the current pass, or a step the state does not allow.
  * `submit` seeds a change; `calls` lists the writes that took effect.
  */
 export function makeChangePrecheckMemory() {
   const changes = new Map<ChangeId, PrecheckedChange>();
+  /** The questions each change took back, by `<changeId> <escalationId>`. */
+  const takenBack = new Set<string>();
   let verdicts = 0;
   const calls: { changeId: ChangeId; method: string; call: PrecheckCall }[] = [];
   const known = (changeId: ChangeId) => {
@@ -392,31 +400,48 @@ export function makeChangePrecheckMemory() {
     Effect.flatMap(known(changeId), (change) => {
       const key = `${call.instanceId}:${method}`;
       if (change.replies.has(key)) return Effect.succeed(change.replies.get(key));
-      if (call.revision !== change.revision || change.state !== from)
+      const otherRun = method !== "precheckStarted" && change.pass !== call.instanceId;
+      if (call.revision !== change.revision || change.state !== from || otherRun)
         return Effect.fail(refusedBy(changeId, change, method));
       const answer = reply();
       change.replies.set(key, answer);
       change.state = to;
       // A pass starts with no derivation, and records at most one.
-      if (method === "precheckStarted") change.derived = false;
+      if (method === "precheckStarted") {
+        change.derived = false;
+        change.pass = call.instanceId;
+      }
       if (method === "effectsDerived") change.derived = true;
       calls.push({ changeId, method, call });
       return Effect.succeed(answer);
     });
   return {
     calls,
-    /** Seeds `changeId` as submitted at `revision`, holding `workspace` (none: it holds none yet). */
-    submit: (changeId: ChangeId, revision: number, workspace?: PrecheckWorkspace) => {
+    /**
+     * Seeds `changeId` as submitted at `revision`, holding `workspace` (none: it
+     * holds none yet), and carrying `commitSha` when one is given.
+     */
+    submit: (
+      changeId: ChangeId,
+      revision: number,
+      workspace?: PrecheckWorkspace,
+      commitSha?: CommitSha,
+    ) => {
       changes.set(changeId, {
         revision,
         state: "submitted",
         workspace,
         replies: new Map(),
         derived: false,
+        commitSha,
       });
     },
     /** The change's state, for a test to read. */
     stateOf: (changeId: ChangeId) => changes.get(changeId)?.state,
+    /** The change took back the question `escalationId`: it moved on from the pass that asked it. */
+    takeBack: (changeId: ChangeId, escalationId: EscalationId) => {
+      takenBack.add(`${changeId} ${escalationId}`);
+    },
     layer: Layer.succeed(
       ChangePrecheck,
       ChangePrecheck.of({
@@ -427,8 +452,20 @@ export function makeChangePrecheckMemory() {
               : Effect.succeed(change.workspace),
           ),
         started: (changeId, call) =>
-          write(changeId, "precheckStarted", call, "submitted", "deriving", () => undefined).pipe(
-            Effect.asVoid,
+          Effect.flatMap(known(changeId), (change) =>
+            change.commitSha !== undefined &&
+            call.commitSha !== change.commitSha &&
+            !change.replies.has(`${call.instanceId}:precheckStarted`)
+              ? Effect.fail(refusedBy(changeId, change, "StartPrecheck"))
+              : write(changeId, "precheckStarted", call, "submitted", "deriving", () => undefined),
+          ).pipe(Effect.asVoid),
+        deriving: (changeId, call) =>
+          Effect.flatMap(known(changeId), (change) =>
+            change.state !== "deriving" ||
+            call.revision !== change.revision ||
+            change.pass !== call.instanceId
+              ? Effect.fail(refusedBy(changeId, change, "DeriveEffects"))
+              : Effect.void,
           ),
         derived: (changeId, derived) =>
           Effect.flatMap(known(changeId), (change) =>
@@ -446,6 +483,8 @@ export function makeChangePrecheckMemory() {
                 : Effect.succeed(verdictId),
             ),
           ),
+        asks: (changeId, escalationId) =>
+          Effect.succeed(!takenBack.has(`${changeId} ${escalationId}`)),
         compiled: (changeId, plan) =>
           write(
             changeId,

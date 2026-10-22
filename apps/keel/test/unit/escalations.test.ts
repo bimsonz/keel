@@ -6,6 +6,7 @@ import {
   decisionIdOf,
   EFFECT_STANDS,
   escalationIdOf,
+  flowRulingIdOf,
   PREMISE_HOLDS,
   SHRINK_RULING_APPROVE,
   shrinkRulingIdOf,
@@ -40,11 +41,12 @@ import {
   BUNDLE,
   conflictOn,
   DISCRIMINATING,
+  makeChangePrecheckMemory,
   makeEntityStoreMemory,
   makeEscalationsMemory,
   makeProbeLedgerMemory,
 } from "@keeltown/testing";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
 import * as fc from "fast-check";
 
 // prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
@@ -904,7 +906,29 @@ describe("the questions a change's checks put to a person", () => {
           options: [{ id: SHRINK_RULING_APPROVE }, { id: "refuse" }],
           question: `${changeId} passed its checks running fewer tests than trunk: keel.test passed 90 tests, 10 fewer than the 100 trunk's last verdict passed; keel.e2e passed 4 tests, 1 fewer than the 5 trunk's last verdict passed. Accept the drop and land it?`,
         });
-      }).pipe(Effect.provide(memory.layer));
+      }).pipe(Effect.provide(Layer.merge(memory.layer, makeChangePrecheckMemory().layer)));
+    },
+  );
+
+  it.effect(
+    "[flow-ruling.stale-pass-withdrawn] a question the change took back before it was put (it moved on from the pass that asked it meanwhile) is withdrawn as soon as it is raised; one the change still asks stays open",
+    () => {
+      const memory = makeEscalationsMemory();
+      const changes = makeChangePrecheckMemory();
+      return Effect.gen(function* () {
+        const namespace = nextId("org");
+        const project = nextId("prj");
+        const changeId = nextId("chg");
+        const stale = flowRulingIdOf(changeId, "p-1");
+        const current = flowRulingIdOf(changeId, "p-2");
+        changes.takeBack(changeId, stale);
+        yield* askFlowRuling({ namespace, project, changeId, revision: 1, instanceId: "p-1" });
+        yield* askFlowRuling({ namespace, project, changeId, revision: 1, instanceId: "p-2" });
+        const logged = (id: string) =>
+          memory.log(namespace, { kind: "escalation", id }).map((event) => event.type);
+        expect(logged(stale)).toEqual(["EscalationRaised", "EscalationWithdrawn"]);
+        expect(logged(current)).toEqual(["EscalationRaised"]);
+      }).pipe(Effect.provide(Layer.merge(memory.layer, changes.layer)));
     },
   );
 });

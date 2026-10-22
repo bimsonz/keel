@@ -2,17 +2,18 @@
 # kills: b21.await-agrees
 # why: the Change DO answers a commit with no base, which the Probe reads as Unsubmitted: it waits on a subscription nobody holds
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 0cea15a..7fa168b 100644
+index 483de428..372f7cfe 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -587,7 +587,9 @@ export const awaitSubmission: (
+@@ -1010,7 +1010,10 @@ export const awaitSubmission: (
    awaitChange(
      changeId,
      subscriber,
--    (change) => submissionStateOf(change)._tag !== "Unsubmitted",
+-    (change) => !WAITS_FOR_SUBMISSION.has(submissionStateOf(change)._tag),
 +    (change) =>
-+      submissionStateOf({ ...change, baseSha: change.baseSha ?? change.commitSha })._tag !==
-+      "Unsubmitted",
++      !WAITS_FOR_SUBMISSION.has(
++        submissionStateOf({ ...change, baseSha: change.baseSha ?? change.commitSha })._tag,
++      ),
      AWAIT_SUBMISSION_HEARS,
-   ),
- );
+     (change) =>
+       submissionStateOf(change)._tag === "AwaitingApproval"

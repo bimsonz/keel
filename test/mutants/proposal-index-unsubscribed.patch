@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.update-footprint-old-subscription
+# why: a proposal opened before its project's index heard moves is never heard moving, so nearby finds it by its first commit's paths
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 6f1fb26c..077cb1c6 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1632,7 +1632,6 @@ export const updateProposal: (
+     },
+     (tx) => {
+       // A proposal opened before its project's index heard moves hears them from its first.
+-      tx.outbox.subscribe(`project:${held.projectId}`, PROPOSAL_INDEX_HEARS, changeRef(changeId));
+       const moved = transition(
+         tx,
+         changeId,

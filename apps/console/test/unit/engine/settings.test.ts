@@ -4,6 +4,8 @@ import {
   branchOf,
   maintains,
   mayPublish,
+  proposalsBy,
+  proposalsSaid,
   readBy,
   syncedSaid,
 } from "../../../src/engine/settings.ts";
@@ -37,6 +39,25 @@ describe("a project's settings, as a page offers them", () => {
     expect(readBy(readBy(held, "public"), "private")).toEqual(held);
     // What was read is not written on.
     expect(held.visibility).toBe("private");
+  });
+
+  it("[console.settings-proposals] closes and opens a public project's proposals and changes nothing else; a private project takes none, whatever its settings say", () => {
+    const held: ProjectSettings = {
+      protectedPaths: ["infra/**"],
+      maxBatchSize: 8,
+      verification: "required",
+      visibility: "public",
+      proposals: "open",
+    };
+    expect(proposalsBy(held, "closed")).toEqual({ ...held, proposals: "closed" });
+    expect(proposalsBy(proposalsBy(held, "closed"), "open")).toEqual(held);
+    expect(held.proposals).toBe("open");
+    expect(proposalsSaid(held)).toBe("open");
+    expect(proposalsSaid({ ...held, proposals: "closed" })).toBe("closed");
+    // Settings stored before proposals were kept read as open.
+    const { proposals: _none, ...older } = held;
+    expect(proposalsSaid(older)).toBe("open");
+    expect(proposalsSaid({ ...held, visibility: "private" })).toBe("none");
   });
 
   it("[settings.sync-said] says a sync as a code host does: the branch by its short name, and level or moved", () => {

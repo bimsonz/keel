@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.issues-daily
+# why: an account opens issues without end
+diff --git a/apps/keel/src/adapters/driving/http/issues.ts b/apps/keel/src/adapters/driving/http/issues.ts
+index 12ce859d..97cc42a4 100644
+--- a/apps/keel/src/adapters/driving/http/issues.ts
++++ b/apps/keel/src/adapters/driving/http/issues.ts
+@@ -214,7 +214,7 @@ export function issueHandlers(run: Runner) {
+       const counted = `issue:${projectId}:${input["idempotency-key"]}`;
+       return run(
+         caller,
+-        admitAccountRate(accountOfCaller(caller), "issues", counted).pipe(
++        Effect.void.pipe(
+           Effect.andThen(
+             Issues.use((issues) =>
+               issues.open({

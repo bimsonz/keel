@@ -400,6 +400,23 @@ describe("the request gate", () => {
       }).pipe(Effect.provide(layers())),
   );
 
+  it.effect(
+    "[gate.sponsor-named] an agent's principal names the person who sponsors it, admitted by its token and by its own key alike, so what it opens counts against them; one nobody sponsors names nobody",
+    () =>
+      Effect.gen(function* () {
+        const byToken = yield* Effect.flatMap(tokenAt(2), principalOf).pipe(
+          Effect.provide(layers()),
+        );
+        const byKey = yield* principalOf(claims()).pipe(
+          Effect.provide(keyedLayers({ sponsor: ANN })),
+        );
+        const loose = yield* principalOf(claims()).pipe(Effect.provide(keyedLayers()));
+        expect(byToken.principal).toMatchObject({ sponsored: true, sponsor: ANN });
+        expect(byKey.principal).toMatchObject({ sponsored: true, sponsor: ANN });
+        expect(loose.principal).not.toHaveProperty("sponsor");
+      }),
+  );
+
   it.effect("[gate.sponsorless] an agent in no org is refused by name, sponsored or not", () =>
     Effect.gen(function* () {
       const placeless = TokenIssuer.use((issuer) =>

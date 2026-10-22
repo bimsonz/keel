@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.giveback-on-close
+# why: an ended proposal never gives back what it copied in, so the fork's namespace pays for workspaces long collected
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 561b18d2..07799f38 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1373,8 +1373,7 @@ export const giveBackCopies: (
+     owed.set(namespace, (owed.get(namespace) ?? 0) + bytes);
+   }
+   const usage = yield* NamespaceUsage;
+-  for (const [namespace, bytes] of owed)
+-    yield* usage.record(namespace, REPO_BYTES, -bytes, `proposal-giveback:${changeId}`);
++  for (const [namespace, bytes] of owed) yield* Effect.void.pipe(Effect.as([namespace, bytes, usage]));
+   store.put(CHANGE_GIVEN_BACK, changeId, true);
+ });
+ 

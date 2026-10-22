@@ -8,13 +8,15 @@ import type { Subscriber } from "./event-outbox.ts";
  * A party to a conflict as the Probe Workflow reads it: the world it stands
  * for (its current submission, or the commit it landed as over that commit's
  * first parent); Waiting, when it has no current submission yet and the
- * subscriber will hear its next ChangeSubmitted, ChangeWithdrawn or
- * ChangeSuperseded; or Gone, withdrawn or superseded (a landed change whose
- * landing commit is unknown reads as Gone too).
+ * subscriber will hear its next ChangeSubmitted, ProposalApproved,
+ * ChangeWithdrawn or ChangeSuperseded (`forApproval`: it is a proposal whose
+ * commit waits for a maintainer's approval, not for its proposer); or Gone,
+ * withdrawn or superseded (a landed change whose landing commit is unknown
+ * reads as Gone too).
  */
 export type PartyAnswer =
   | PartyWorld
-  | { readonly _tag: "Waiting" }
+  | { readonly _tag: "Waiting"; readonly forApproval?: true }
   | { readonly _tag: "Gone"; readonly state: ChangeState };
 
 /**

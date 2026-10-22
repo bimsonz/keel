@@ -68,6 +68,8 @@ export const ProposalUpdated = Schema.TaggedStruct("ProposalUpdated", {
   changeId: ChangeId,
   commit: CommitSha,
   note: Schema.optional(Schema.String.check(Schema.isMaxLength(65_536))),
+  /** Each path the new commit touches against the proposal's base: its footprint from now on. Absent on older events. */
+  footprint: Schema.optional(Schema.Array(FootprintEntry)),
 });
 /** Someone holding `maintain` approved the proposal at this commit and no other: it goes back to where it waited. */
 export const ProposalApproved = Schema.TaggedStruct("ProposalApproved", {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: rate.final-refusal-given-back
+# why: a proposal refused for its pack size spends one of the day's ten though it was never made
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 370c35e4..a9a50a81 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -157,7 +157,7 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+     })
+     .pipe(
+       Effect.tapError((error) =>
+-        refusedForItsCommit(error)
++        false
+           ? giveBackAccountRate(input.account, "proposals", counted)
+           : Effect.void,
+       ),

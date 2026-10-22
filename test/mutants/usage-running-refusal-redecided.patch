@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: usage.contract.refusal-until-reset, usage.contract.idempotent
+# why: a running total's refusal is decided again under its key, so the key no longer answers as it first did
+diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
+index c3fa495f..998d4135 100644
+--- a/packages/core/src/application/identity/namespace-usage.ts
++++ b/packages/core/src/application/identity/namespace-usage.ts
+@@ -129,7 +129,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+       const keyed = decodeKeyed(first);
+       // A refusal that named when the count starts again answers until then, and is decided again after.
+       const { exceeded } = keyed;
+-      if (exceeded !== undefined && (exceeded.retryAt === undefined || now < exceeded.retryAt))
++      if (exceeded !== undefined && (exceeded.retryAt !== undefined && now < exceeded.retryAt))
+         return Result.fail(exceeded);
+       if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
+     }

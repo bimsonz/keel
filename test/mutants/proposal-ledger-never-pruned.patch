@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-ledger.test.ts
+# kills: proposal-ledger.pruned, proposals.lapsed-retry-counted
+# why: a reservation whose proposal never arrived is kept for ever, and its key's retry is answered its old id with no place counted, past the cap
+diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
+index 4bd30333..818c6d40 100644
+--- a/packages/core/src/application/coordination/proposal-ledger.ts
++++ b/packages/core/src/application/coordination/proposal-ledger.ts
+@@ -104,7 +104,6 @@ export const reserveProposal = Effect.fn("coordination/reserveProposal")(functio
+   const minted = yield* (yield* Ids).next("chg");
+   const key = `${reservation.proposer}/${reservation.idempotencyKey}`;
+   const answer = store.transaction((): ChangeId | ProposalLimit | IdempotencyConflict => {
+-    pruneLapsed(store, reservation.proposer, now);
+     const held = store.get(RESERVED, key);
+     if (held !== undefined) {
+       const reserved = decodeReserved(held);

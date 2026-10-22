@@ -6,7 +6,7 @@ import { Button } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import { hrefOf } from "../places.ts";
 import { type Account, type Who, nameOf } from "./account.ts";
-import { appAskingOf } from "./apps.ts";
+import { appAskingOf, consentLede, consentTitle } from "./apps.ts";
 import { approveWithPasskey } from "./device.ts";
 import { Card, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 
@@ -79,20 +79,17 @@ export function Consent({
       go(to);
     });
 
-  const app = name ?? "This app";
   return (
-    <Card
-      title={`Allow ${app} to act as you?`}
-      lede={`It will be signed in as ${nameOf(allower)} at Keel's MCP server, and sends you back to ${asking.returnsTo}.`}
-    >
+    <Card title={consentTitle(name)} lede={consentLede(asking, nameOf(allower))}>
       <p className="text-sm text-kumo-default">
-        Through it, {app} reads what you can read on Keel, lists the questions Keel puts to you, and
-        answers one when you tell it to, recorded as your ruling. It cannot invite or sponsor
+        Through it, the app reads what you can read on Keel, lists the questions Keel puts to you,
+        and answers one when you tell it to, recorded as your ruling. It cannot invite or sponsor
         agents, change how you sign in, or use Keel's API. It keeps working until you revoke it in{" "}
         <a className="a-link" href={hrefOf({ at: "settings" })}>
           your settings
         </a>
-        . Allow it only if you started this from {app} yourself.
+        . The name is the one the app gave itself: allow it only if you started this yourself, from
+        the app you expect.
       </p>
       {changed !== null && (
         <output className="text-sm text-kumo-default">

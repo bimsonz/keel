@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: proposals.rate-limited-frees-place
+# why: a proposal refused for its account's day keeps its place for fifteen minutes, so the proposer is told they hold five open when it is the day that refuses them
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 370c35e4..d91389cd 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -134,14 +134,7 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+     fingerprint: input.fingerprint,
+   });
+   const counted = `propose:${input.upstream}:${changeId}`;
+-  yield* admitAccountRate(input.account, "proposals", counted).pipe(
+-    Effect.tapError(() =>
+-      ledger.release(input.upstream, {
+-        proposer: input.proposer,
+-        idempotencyKey: input.idempotencyKey,
+-      }),
+-    ),
+-  );
++  yield* admitAccountRate(input.account, "proposals", counted);
+   const proposed: Change = yield* (yield* Changes)
+     .propose(changeId, {
+       changeId,

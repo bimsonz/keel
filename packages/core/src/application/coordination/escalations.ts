@@ -36,6 +36,7 @@ import { commit, type Transaction, type Transition } from "../ports/commit.ts";
 import type { EventDraft } from "../ports/event-outbox.ts";
 import type { Stored } from "../ports/entity-store.ts";
 import {
+  ChangePrecheck,
   type ConflictView,
   EntityStore,
   type EscalationAsk,
@@ -78,7 +79,10 @@ export const FLOW_RULING_APPROVE = "approve";
  * the ruling's decision and is resumed into the queue by an approve or sent
  * back by anything else. With no sponsor and no agent named, the
  * maintainers are asked at once, and only a person among them may rule.
- * Raising it again answers it as it stands and asks nobody twice.
+ * Raising it again answers it as it stands and asks nobody twice. Once it is
+ * raised the change is asked whether it still asks it: one it took back
+ * meanwhile, having moved on from the run that asked, is withdrawn at once,
+ * since its own taking back found nothing raised yet to withdraw.
  */
 export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (asked: {
   readonly namespace: NamespaceId;
@@ -91,13 +95,15 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
   readonly paths?: readonly string[] | undefined;
 }) {
   const { changeId, revision } = asked;
+  const escalationId = flowRulingIdOf(changeId, asked.instanceId);
   const edits =
     asked.paths === undefined || asked.paths.length === 0
       ? "it edits paths whose change needs a person's ruling"
       : `it edits ${asked.paths.join(", ")}`;
-  return yield* (yield* HumanGate).raise({
+  const gate = yield* HumanGate;
+  const raised = yield* gate.raise({
     namespace: asked.namespace,
-    escalationId: flowRulingIdOf(changeId, asked.instanceId),
+    escalationId,
     project: asked.project,
     raisedBy: `change:${changeId}`,
     ask: {
@@ -128,6 +134,13 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
       default: "refuse",
     },
   });
+  if (!(yield* (yield* ChangePrecheck).asks(changeId, escalationId)))
+    yield* gate.withdraw({
+      namespace: asked.namespace,
+      escalationId,
+      reason: `${changeId} moved on from the Precheck run that asked it`,
+    });
+  return raised;
 });
 
 /**

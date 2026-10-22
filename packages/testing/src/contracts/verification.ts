@@ -942,10 +942,11 @@ export const freshId = <P extends "bat" | "cnd" | "chg" | "prj">(prefix: P) =>
 
 export interface ChangePrecheckHarness {
   readonly layer: Layer.Layer<ChangePrecheck>;
-  /** A change just submitted: its id, its revision, and the workspace it holds. */
+  /** A change just submitted: its id, its revision, the commit it carries, and the workspace it holds. */
   readonly submitted: () => Effect.Effect<{
     readonly changeId: ReturnType<typeof freshId<"chg">>;
     readonly revision: number;
+    readonly commitSha: CommitSha;
     readonly workspace: PrecheckWorkspace;
   }>;
 }
@@ -1000,7 +1001,9 @@ export function describeChangePrecheckContract(
         const call = { revision: 1, instanceId: `precheck-${random(6)}` };
         const tags = [
           yield* Effect.flip(changes.workspace(unknown)),
-          yield* Effect.flip(changes.started(unknown, call)),
+          yield* Effect.flip(
+            changes.started(unknown, { ...call, commitSha: CommitSha.make("c".repeat(40)) }),
+          ),
           yield* Effect.flip(changes.derived(unknown, { ...call, ...DERIVATION })),
           yield* Effect.flip(changes.refused(unknown, { ...call, ...REFUSAL })),
           yield* Effect.flip(changes.compiled(unknown, { ...call, ...PLAN })),
@@ -1021,14 +1024,14 @@ export function describeChangePrecheckContract(
         const h = harness();
         return Effect.gen(function* () {
           const changes = yield* ChangePrecheck;
-          const { changeId, revision } = yield* h.submitted();
+          const { changeId, revision, commitSha } = yield* h.submitted();
           const instanceId = `precheck-${random(6)}`;
           const stale = yield* Effect.flip(
-            changes.started(changeId, { revision: revision + 1, instanceId }),
+            changes.started(changeId, { revision: revision + 1, instanceId, commitSha }),
           );
           expect(stale._tag).toBe("ChangeStateRefused");
           // Still submitted: the current revision starts.
-          yield* changes.started(changeId, { revision, instanceId });
+          yield* changes.started(changeId, { revision, instanceId, commitSha });
         }).pipe(Effect.provide(h.layer));
       },
     );
@@ -1039,13 +1042,13 @@ export function describeChangePrecheckContract(
         const h = harness();
         return Effect.gen(function* () {
           const changes = yield* ChangePrecheck;
-          const { changeId, revision } = yield* h.submitted();
+          const { changeId, revision, commitSha } = yield* h.submitted();
           const call = { revision, instanceId: `precheck-${random(6)}` };
-          yield* changes.started(changeId, call);
-          yield* changes.started(changeId, call);
+          yield* changes.started(changeId, { ...call, commitSha });
+          yield* changes.started(changeId, { ...call, commitSha });
           yield* changes.compiled(changeId, { ...call, ...PLAN });
           yield* changes.compiled(changeId, { ...call, ...PLAN });
-          const other = { revision, instanceId: `precheck-${random(6)}` };
+          const other = { revision, instanceId: `precheck-${random(6)}`, commitSha };
           expect((yield* Effect.flip(changes.started(changeId, other)))._tag).toBe(
             "ChangeStateRefused",
           );
@@ -1059,9 +1062,9 @@ export function describeChangePrecheckContract(
         const h = harness();
         return Effect.gen(function* () {
           const changes = yield* ChangePrecheck;
-          const { changeId, revision } = yield* h.submitted();
+          const { changeId, revision, commitSha } = yield* h.submitted();
           const call = { revision, instanceId: `precheck-${random(6)}` };
-          yield* changes.started(changeId, call);
+          yield* changes.started(changeId, { ...call, commitSha });
           yield* changes.derived(changeId, { ...call, ...DERIVATION });
           yield* changes.derived(changeId, { ...call, ...DERIVATION });
           const second = { revision, instanceId: `precheck-${random(6)}` };
@@ -1079,7 +1082,7 @@ export function describeChangePrecheckContract(
         const h = harness();
         return Effect.gen(function* () {
           const changes = yield* ChangePrecheck;
-          const { changeId, revision } = yield* h.submitted();
+          const { changeId, revision, commitSha } = yield* h.submitted();
           const call = { revision, instanceId: `precheck-${random(6)}` };
           const tagOf = (derived: PrecheckCall) =>
             Effect.map(
@@ -1087,7 +1090,7 @@ export function describeChangePrecheckContract(
               (refusal) => refusal._tag,
             );
           const early = yield* tagOf({ revision, instanceId: `precheck-${random(6)}` });
-          yield* changes.started(changeId, call);
+          yield* changes.started(changeId, { ...call, commitSha });
           const stale = yield* tagOf({ revision: revision + 1, instanceId: call.instanceId });
           // The stale call moved nothing: the current revision still derives.
           yield* changes.derived(changeId, { ...call, ...DERIVATION });
@@ -1112,15 +1115,47 @@ export function describeChangePrecheckContract(
         const h = harness();
         return Effect.gen(function* () {
           const changes = yield* ChangePrecheck;
-          const { changeId, revision } = yield* h.submitted();
+          const { changeId, revision, commitSha } = yield* h.submitted();
           const call = { revision, instanceId: `precheck-${random(6)}` };
-          yield* changes.started(changeId, call);
+          yield* changes.started(changeId, { ...call, commitSha });
           const verdictId = yield* changes.refused(changeId, { ...call, ...REFUSAL });
           expect(verdictId).toMatch(/^vrd_/);
           expect(yield* changes.refused(changeId, { ...call, ...REFUSAL })).toBe(verdictId);
           expect((yield* Effect.flip(changes.compiled(changeId, { ...call, ...PLAN })))._tag).toBe(
             "ChangeStateRefused",
           );
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+
+    it.effect(
+      "[precheck.contract.run-bound] a run starts only for the commit the change carries, and past its start only the current pass's run moves it: another run's derivation, refusal and plan are refused",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision, commitSha } = yield* h.submitted();
+          const moved = CommitSha.make("e".repeat(40));
+          const call = { revision, instanceId: `precheck-${random(6)}` };
+          const elsewhere = yield* Effect.flip(
+            changes.started(changeId, { ...call, commitSha: moved }),
+          );
+          yield* changes.started(changeId, { ...call, commitSha });
+          const other = { revision, instanceId: `precheck-${random(6)}` };
+          const tags = [
+            elsewhere,
+            yield* Effect.flip(changes.derived(changeId, { ...other, ...DERIVATION })),
+            yield* Effect.flip(changes.refused(changeId, { ...other, ...REFUSAL })),
+            yield* Effect.flip(changes.compiled(changeId, { ...other, ...PLAN })),
+          ].map((e) => e._tag);
+          expect(tags).toEqual([
+            "ChangeStateRefused",
+            "ChangeStateRefused",
+            "ChangeStateRefused",
+            "ChangeStateRefused",
+          ]);
+          // None of them moved it: the current pass still compiles.
+          yield* changes.compiled(changeId, { ...call, ...PLAN });
         }).pipe(Effect.provide(h.layer));
       },
     );

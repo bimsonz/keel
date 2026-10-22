@@ -16,10 +16,11 @@ import {
 } from "@keeltown/core/application/coordination";
 import { type EscalationId, makeId } from "@keeltown/core/kernel";
 import { Escalations, PROJECTOR } from "@keeltown/core/ports";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
+import { ChangePrecheckRpc } from "../../src/adapters/driven/do-rpc/change-precheck.ts";
 import { HumanGateRpc } from "../../src/adapters/driven/do-rpc/human-gate.ts";
 import { PERSON_INSTRUCTIONS } from "../../src/adapters/driving/mcp/server.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
@@ -65,7 +66,11 @@ async function deriving(c: ChangeUnderTest) {
   ok(
     decodeExit(
       ChangeCodecs.precheckStarted,
-      await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      await c.stub.precheckStarted({
+        revision: 1,
+        instanceId: "p-1",
+        commitSha: await c.carried(),
+      }),
     ),
   );
 }
@@ -98,7 +103,10 @@ async function compiledForRuling(c: ChangeUnderTest, instanceId = "p-1") {
       instanceId,
     }).pipe(
       Effect.provide(
-        HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+        Layer.merge(
+          HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+          ChangePrecheckRpc(env.CHANGE),
+        ),
       ),
       Effect.orDie,
     ),
@@ -222,7 +230,11 @@ describe("a change to how Keel verifies, on the real Change and namespace object
     ok(
       decodeExit(
         ChangeCodecs.precheckStarted,
-        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+        await c.stub.precheckStarted({
+          revision: 1,
+          instanceId: "p-1",
+          commitSha: await c.carried(),
+        }),
       ),
     );
     await vi.waitFor(async () => expect(await prechecks.get()).toHaveLength(1), WAIT);
@@ -336,7 +348,7 @@ describe("a change to how Keel verifies, on the real Change and namespace object
       ok(
         decodeExit(
           ChangeCodecs.precheckStarted,
-          await c.stub.precheckStarted({ revision: 1, instanceId }),
+          await c.stub.precheckStarted({ revision: 1, instanceId, commitSha: await c.carried() }),
         ),
       );
     };

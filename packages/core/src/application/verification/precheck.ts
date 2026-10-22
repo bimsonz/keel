@@ -105,7 +105,10 @@ export const startPrecheck = Effect.fn("verification/startPrecheck")(function* (
   submission: PrecheckSubmission,
 ) {
   const changes = yield* ChangePrecheck;
-  yield* changes.started(submission.changeId, call(submission));
+  yield* changes.started(submission.changeId, {
+    ...call(submission),
+    commitSha: submission.commitSha,
+  });
   return yield* changes.workspace(submission.changeId);
 });
 

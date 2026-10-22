@@ -6,7 +6,7 @@
 // new commit takes the approval away and the lane lets it go; each refusal is
 // told by its own code with nothing reserved; and a fork synced over the
 // doorway proposes only what it adds since.
-import { runInDurableObject } from "cloudflare:test";
+import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { MAX_OPEN_PROPOSALS } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
@@ -29,6 +29,7 @@ import {
   ProposalLedger,
   Trunks,
   WorkspacePool,
+  WorkspaceRebaser,
 } from "@keeltown/core/ports";
 import {
   heldLease,
@@ -40,6 +41,7 @@ import {
   makeWorkspaceRebaserMemory,
   makeWorkspaceWriterMemory,
 } from "@keeltown/testing";
+import { PushRejected } from "@keeltown/core/domain/integration";
 import { decodeCommit } from "@keeltown/gitcore";
 import { Effect, Layer, Schema } from "effect";
 import { ulid } from "ulid";
@@ -185,15 +187,19 @@ type ChangeStub = ReturnType<typeof changeStub>;
 
 /** Precheck's pass over the change's submitted commit, started and its plan compiled by hand. */
 async function prechecked(stub: ChangeStub, instanceId: string) {
-  const { revision } = (await read(stub)).intent;
+  const { intent, commitSha } = await read(stub);
+  if (commitSha === undefined) throw new Error("a proposal carries its commit from the start");
   ok(
-    decodeExit(ChangeCodecs.precheckStarted, await stub.precheckStarted({ revision, instanceId })),
+    decodeExit(
+      ChangeCodecs.precheckStarted,
+      await stub.precheckStarted({ revision: intent.revision, instanceId, commitSha }),
+    ),
   );
   ok(
     decodeExit(
       ChangeCodecs.planCompiled,
       await stub.planCompiled({
-        revision,
+        revision: intent.revision,
         instanceId,
         planHash: PLAN_HASH,
         steps: 1,
@@ -350,6 +356,8 @@ async function proposalObject(
   w: Projects,
   body: { readonly fork: ProjectId; readonly commit: CommitSha; readonly goal: string },
   key: string,
+  /** How the object's rebaser pushes, around the memory one's: the memory one unless given. */
+  rebasing: (inner: WorkspaceRebaser["Service"]) => WorkspaceRebaser["Service"] = (inner) => inner,
 ) {
   const changeId = await reserve(w.upstream, w.proposer, key, contentHashOf(body));
   const stub = changeStub(changeId);
@@ -376,15 +384,29 @@ async function proposalObject(
     ),
   ).pipe(Layer.provide(pool.layer));
   const admitted: NamespaceId[] = [];
+  /** Each repo-bytes amount the object counted, admitted or given back, by namespace. */
+  const counted: {
+    readonly namespace: NamespaceId;
+    readonly amount: number;
+    readonly key: string;
+  }[] = [];
   const usage = Layer.effect(
     NamespaceUsage,
     Effect.map(NamespaceUsage, (inner) =>
       NamespaceUsage.of({
         ...inner,
-        admit: (namespace, ...counted) =>
+        admit: (namespace, kind, amount, countedAs) =>
           Effect.andThen(
-            Effect.sync(() => admitted.push(namespace)),
-            inner.admit(namespace, ...counted),
+            Effect.sync(() => {
+              admitted.push(namespace);
+              counted.push({ namespace, amount, key: countedAs });
+            }),
+            inner.admit(namespace, kind, amount, countedAs),
+          ),
+        record: (namespace, kind, amount, countedAs) =>
+          Effect.andThen(
+            Effect.sync(() => void counted.push({ namespace, amount, key: countedAs })),
+            inner.record(namespace, kind, amount, countedAs),
           ),
       }),
     ),
@@ -394,7 +416,9 @@ async function proposalObject(
       ownRepo,
       w.code.layer,
       makeTrunksMemory().layer,
-      makeWorkspaceRebaserMemory(w.code).layer,
+      Layer.effect(WorkspaceRebaser, Effect.map(WorkspaceRebaser, rebasing)).pipe(
+        Layer.provide(makeWorkspaceRebaserMemory(w.code).layer),
+      ),
       makeWorkspaceWriterMemory(w.code).layer,
       usage,
       liveChangesLayer(objectEnv),
@@ -403,7 +427,7 @@ async function proposalObject(
       ProjectNamespacesD1(objectEnv.DB),
     ),
   );
-  return { changeId, stub, admitted };
+  return { changeId, stub, admitted, counted, pool };
 }
 
 /** Proposes the fork's `commit` over the doorway as the projects' agent, its object made first. */
@@ -443,14 +467,18 @@ describe("proposals from a fork, on the real objects", () => {
   });
 
   it(
-    "[proposal.real] a sponsored agent proposes its fork's landing over the doorway: it parks for approval with no batch formed; a maintainer's approval over MCP queues it on the real Lane, which composes it as its proposer's, and it lands through the real Trunk",
+    "[proposal.real] a sponsored agent proposes its fork's landing over the doorway: it parks for approval with no batch formed; a maintainer's approval over MCP queues it on the real Lane, which composes it as its proposer's, and it lands through the real Trunk; [proposal.giveback-on-land] landed, it gives its fork's namespace back what it copied in",
     async () => {
       const w = await projects();
       const lanes = await realObjects(w);
       const work = await landed(lanes.fork, w.fork, { ...README, "src/fork-one.ts": "one\n" });
       expect(await headOf(w.fork)).toBe(work);
 
-      const { changeId, stub, admitted } = await proposed(w, work, "Add the first fork file");
+      const { changeId, stub, admitted, counted } = await proposed(
+        w,
+        work,
+        "Add the first fork file",
+      );
       // What it copied in is the fork's to count, never the project's it is proposed to.
       expect(admitted).toEqual([POOL_ORG]);
       expect(await read(stub)).toMatchObject({
@@ -484,12 +512,19 @@ describe("proposals from a fork, on the real objects", () => {
         },
       });
       expect(member?.agent).toBeUndefined();
+      // [proposal.giveback-on-land] Landed, it gives back to the fork's namespace what it copied in.
+      await runDurableObjectAlarm(stub);
+      const copied = counted.reduce((sum, c) => sum + (c.amount > 0 ? c.amount : 0), 0);
+      expect(copied).toBeGreaterThan(0);
+      expect(counted.filter((c) => c.amount < 0)).toEqual([
+        { namespace: POOL_ORG, amount: -copied, key: `proposal-giveback:${changeId}` },
+      ]);
     },
     LONG,
   );
 
   it(
-    "[proposal.new-commit] a new commit after the approval takes the approval away: the lane lets it go, and it waits for approval again",
+    "[proposal.new-commit] a new commit after the approval takes the approval away: the lane lets it go, and it waits for approval again; [proposal.moved-footprint] its footprint is the new commit's",
     async () => {
       let release: (() => void) | undefined;
       const held = new Promise<void>((resolve) => {
@@ -540,12 +575,61 @@ describe("proposals from a fork, on the real objects", () => {
       const now = await read(stub);
       expect(now.commitSha).toBe(second);
       expect(now.proposal?.approved).toBeUndefined();
+      expect(now.intent.footprint.map((entry) => entry.path).toSorted()).toEqual([
+        "src/fork-one.ts",
+        "src/fork-two.ts",
+      ]);
       expect(lanes.up.composer.requests.flatMap((r) => r.members.map((m) => m.changeId))).toEqual([
         ahead.changeId,
       ]);
 
       release?.();
       await verified(lanes.up, ahead.stub, { ...README, "src/ahead.ts": "ahead\n" });
+    },
+    LONG,
+  );
+
+  it(
+    "[proposal.propose-serial] a retry of a propose under its key that races the first waits for it and answers the change it made, never pushing: the workspace the first commits with is never given back",
+    async () => {
+      const w = await projects();
+      const lanes = await realObjects(w);
+      const work = await landed(lanes.fork, w.fork, { ...README, "src/fork-one.ts": "one\n" });
+      const key = `propose-${ulid()}`;
+      const body = { fork: w.fork, commit: work, goal: "Add the fork's file" };
+      let release: (() => void) | undefined;
+      const latch = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let pushes = 0;
+      const object = await proposalObject(w, body, key, (inner) => ({
+        ...inner,
+        // The first push waits on the latch; one that races it is refused, as Artifacts refuses a stale push.
+        pushProposal: (...args) =>
+          ++pushes === 1
+            ? Effect.andThen(
+                Effect.promise(() => latch),
+                inner.pushProposal(...args),
+              )
+            : Effect.fail(new PushRejected({ reason: "stale" })),
+      }));
+      const token = await tokenFor(w.proposer);
+      const path = `/projects/${w.upstream}/proposals`;
+      const first = call(w.via, token, "POST", path, body, key);
+      await vi.waitFor(() => expect(pushes).toBe(1), WAIT);
+      const second = call(w.via, token, "POST", path, body, key);
+      // Long enough for a racing retry to reach its push.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      release?.();
+      const answers = await Promise.all([first, second]);
+
+      expect(answers.map((a) => [a.status, a.body["id"]])).toEqual([
+        [201, object.changeId],
+        [201, object.changeId],
+      ]);
+      expect(pushes).toBe(1);
+      expect([...object.pool.released.keys()]).toEqual([]);
+      expect(await read(object.stub)).toMatchObject({ state: "submitted", commitSha: work });
     },
     LONG,
   );

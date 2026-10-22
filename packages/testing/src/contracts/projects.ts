@@ -168,41 +168,51 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       },
     );
 
-    it.live("replaces the settings a PUT names, an absent verification meaning required", () => {
-      const harness = make();
-      return Effect.gen(function* () {
-        const projects = yield* Projects;
-        const by = creator();
-        const project = yield* projects.create(by, creating(harness.source));
-        const off = { protectedPaths: [Glob.make("infra/**")], maxBatchSize: 1 } as const;
-        const turnedOff = yield* projects.putSettings(
-          by,
-          project.id,
-          { ...off, verification: "off" },
-          "req-1",
-        );
-        const readOff = yield* projects.settings(project.id);
-        const turnedOn = yield* projects.putSettings(by, project.id, off, "req-2");
+    it.live(
+      "replaces the settings a PUT names, an absent verification keeping what is stored",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* Projects;
+          const by = creator();
+          const project = yield* projects.create(by, creating(harness.source));
+          const off = { protectedPaths: [Glob.make("infra/**")], maxBatchSize: 1 } as const;
+          const turnedOff = yield* projects.putSettings(
+            by,
+            project.id,
+            { ...off, verification: "off" },
+            "req-1",
+          );
+          const readOff = yield* projects.settings(project.id);
+          const keptOff = yield* projects.putSettings(by, project.id, off, "req-2");
+          const turnedOn = yield* projects.putSettings(
+            by,
+            project.id,
+            { ...off, verification: "required" },
+            "req-3",
+          );
 
-        expect(turnedOff).toEqual({
-          ...off,
-          verification: "off",
-          visibility: "private",
-          proposals: "open",
-        });
-        expect(readOff).toEqual(turnedOff);
-        expect(turnedOn).toEqual({
-          ...off,
-          verification: "required",
-          visibility: "private",
-          proposals: "open",
-        });
-        expect(yield* projects.settings(project.id)).toEqual(turnedOn);
-      }).pipe(Effect.provide(harness.layer));
-    });
+          expect(turnedOff).toEqual({
+            ...off,
+            verification: "off",
+            visibility: "private",
+            proposals: "open",
+          });
+          expect(readOff).toEqual(turnedOff);
+          expect(keptOff).toEqual(turnedOff);
+          expect(turnedOn).toEqual({
+            ...off,
+            verification: "required",
+            visibility: "private",
+            proposals: "open",
+          });
+          expect(yield* projects.settings(project.id)).toEqual(turnedOn);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
 
     it.live(
-      "[b12.settings-visibility] keeps the visibility a PUT names, an absent one meaning private",
+      "[b12.settings-visibility] keeps the visibility a PUT names, an absent one keeping what is stored",
       () => {
         const harness = make();
         return Effect.gen(function* () {
@@ -217,10 +227,17 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
             "req-1",
           );
           const readPublic = yield* projects.settings(project.id);
-          const hidden = yield* projects.putSettings(by, project.id, put, "req-2");
+          const kept = yield* projects.putSettings(by, project.id, put, "req-2");
+          const hidden = yield* projects.putSettings(
+            by,
+            project.id,
+            { ...put, visibility: "private" },
+            "req-3",
+          );
 
           expect(published.visibility).toBe("public");
           expect(readPublic.visibility).toBe("public");
+          expect(kept.visibility).toBe("public");
           expect(hidden.visibility).toBe("private");
           expect((yield* projects.settings(project.id)).visibility).toBe("private");
         }).pipe(Effect.provide(harness.layer));

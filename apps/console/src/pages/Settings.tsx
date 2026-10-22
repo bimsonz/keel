@@ -18,7 +18,16 @@ import { Box, DangerZone, FormDialog, Rows, Setting, Tag } from "../account/rows
 import type { ProjectSettings, ProjectView, UpstreamSync } from "../contract/keel/index.ts";
 import { usePlayer, useSelected } from "../engine/react.tsx";
 import type { Visibility } from "../engine/projects.ts";
-import { branchOf, maintains, mayPublish, owns, readBy, syncedSaid } from "../engine/settings.ts";
+import {
+  branchOf,
+  maintains,
+  mayPublish,
+  owns,
+  proposalsBy,
+  proposalsSaid,
+  readBy,
+  syncedSaid,
+} from "../engine/settings.ts";
 import type { SettingsSection } from "../route.ts";
 import { Link } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
@@ -154,18 +163,21 @@ function General({
   project,
   held,
   change,
+  changeProposals,
   busy,
   refused,
 }: {
   project: ProjectView;
   held: ProjectSettings;
   change: (to: Visibility) => Promise<boolean>;
+  changeProposals: (to: "open" | "closed") => Promise<boolean>;
   busy: boolean;
   refused: Said | null;
 }) {
   const { source } = usePlayer();
   const [publishing, setPublishing] = useState(false);
   const visibility: Visibility = held.visibility ?? project.visibility;
+  const proposals = proposalsSaid({ ...held, visibility });
   const batch = held.maxBatchSize;
   return (
     <>
@@ -177,6 +189,27 @@ function General({
             name="Visibility"
             value={<Tag>{visibility === "public" ? "Public" : "Private"}</Tag>}
           />
+          <Setting
+            name="Proposals from forks"
+            value={
+              proposals === "none"
+                ? "None: a private project takes none"
+                : proposals === "open"
+                  ? "Open"
+                  : "Closed"
+            }
+          >
+            {maintains(project) && proposals !== "none" && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void changeProposals(proposals === "open" ? "closed" : "open")}
+              >
+                {proposals === "open" ? "Close proposals" : "Open proposals"}
+              </Button>
+            )}
+          </Setting>
         </Rows>
       </Box>
       <Box title="Trunk">
@@ -327,6 +360,14 @@ export function SettingsPage({
     });
     return done;
   };
+  const changeProposals = async (to: "open" | "closed"): Promise<boolean> => {
+    let done = false;
+    await ask(async () => {
+      setHeld(await putSettings(proposalsBy(held, to)));
+      done = true;
+    });
+    return done;
+  };
 
   return (
     <Column>
@@ -335,7 +376,14 @@ export function SettingsPage({
         <Sidebar open={open} />
         <div className="flex min-w-0 flex-1 flex-col gap-5">
           {open === undefined && (
-            <General project={project} held={held} change={change} busy={busy} refused={refused} />
+            <General
+              project={project}
+              held={held}
+              change={change}
+              changeProposals={changeProposals}
+              busy={busy}
+              refused={refused}
+            />
           )}
           {open === "access" && (
             <>

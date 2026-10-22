@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.moves-http
+# why: a move past the day's limit is answered as some other refusal, not 429 with when to come back
+diff --git a/apps/keel/src/adapters/driving/http/proposals.ts b/apps/keel/src/adapters/driving/http/proposals.ts
+index be958df2..db93cc32 100644
+--- a/apps/keel/src/adapters/driving/http/proposals.ts
++++ b/apps/keel/src/adapters/driving/http/proposals.ts
+@@ -350,7 +350,7 @@ export function proposalHandlers(run: Runner) {
+             onSuccess: (change) =>
+               Effect.succeed<UpdateProposalResult>({ status: 200, body: changeBody(change) }),
+             onFailure: (error) =>
+-              error._tag === "QuotaExceeded" && isAccountRate(error)
++              false
+                 ? Effect.map(
+                     Effect.flatMap(Clock, (clock) => clock.now),
+                     (now): UpdateProposalResult => rateLimited(caller, error, now),

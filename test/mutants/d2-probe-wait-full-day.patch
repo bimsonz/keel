@@ -2,15 +2,15 @@
 # kills: probe.deadline
 # why: Each wait for a party is a whole day, so the 24 hours in all is exceeded by whatever time passed before it
 diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
-index 6d7658d..a15b5f7 100644
+index 2a95feb5..cdd3bef3 100644
 --- a/packages/core/src/application/verification/probe-workflow.ts
 +++ b/packages/core/src/application/verification/probe-workflow.ts
-@@ -399,7 +399,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
-           const heard = yield* steps.waitFor(
+@@ -572,7 +572,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+           yield* steps.waitFor(
              `change ${side}${round} ${n}`,
              partyEventType(changeId),
--            deadline - now,
+-            Math.min(until - now, PROBE_WAIT_SLICE_MS),
 +            PROBE_SUBMISSION_WAIT_MS,
            );
-           if (!heard) return { _tag: "Timeout" } satisfies PartyEnd;
          }
+       });

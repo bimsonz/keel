@@ -29,6 +29,26 @@ export function readBy(settings: ProjectSettings, visibility: Visibility): Proje
   return { ...settings, visibility };
 }
 
+/** Whether forks may propose to the project, as a page says it. */
+export type ProposalsSaid = "open" | "closed" | "none";
+
+/** The settings Keel holds, whole, with whether forks may propose changed and nothing else. */
+export function proposalsBy(
+  settings: ProjectSettings,
+  proposals: "open" | "closed",
+): ProjectSettings {
+  return { ...settings, proposals };
+}
+
+/**
+ * Whether forks may propose to the project: as its settings say for a public one (open until a PUT closes
+ * them, and for settings kept before there was the setting); a private project takes none, whatever they say.
+ */
+export function proposalsSaid(settings: ProjectSettings): ProposalsSaid {
+  if (settings.visibility !== "public") return "none";
+  return settings.proposals ?? "open";
+}
+
 /** A ref as a code host names its branch: `refs/heads/main` is `main`. */
 export function branchOf(ref: string): string {
   return ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;

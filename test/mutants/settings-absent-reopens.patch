@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts
+# kills: settings.absent-keeps, proposals.setting
+# why: a settings PUT that leaves proposals out reopens them, so any client that does not send the field undoes a maintainer's closing
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 2fc631ff..80219564 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -161,7 +161,7 @@ export const changeSettings: (
+       maxBatchSize: command.settings.maxBatchSize,
+       verification: command.settings.verification ?? stored.verification,
+       visibility: command.settings.visibility ?? stored.visibility,
+-      proposals: command.settings.proposals ?? stored.proposals,
++      proposals: command.settings.proposals ?? "open",
+     };
+   };
+   const conflict = new IdempotencyConflict({ idempotencyKey: requestId });

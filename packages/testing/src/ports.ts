@@ -366,8 +366,9 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           subjects: [Schema.decodeUnknownSync(SubjectKey)("authz.sessions")],
           intent: { revision: 1, goal: "cache the sessions", footprint: [], premises: [] },
         };
-        memory.submit(changeId, 1, workspace);
-        return { changeId, revision: 1, workspace };
+        const commitSha = CommitSha.make("c".repeat(40));
+        memory.submit(changeId, 1, workspace, commitSha);
+        return { changeId, revision: 1, commitSha, workspace };
       }),
   };
 }

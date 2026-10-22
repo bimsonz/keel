@@ -11,6 +11,9 @@ export default defineConfig({
         test: {
           name: "unit",
           environment: "node",
+          // Tests that spawn git, and properties that play hundreds of runs, take a second alone and pass
+          // vitest's 5 s default inside the whole suite on a loaded machine: the arch tests' limit, for all.
+          testTimeout: 60_000,
           include: [
             "packages/*/src/**/*.test.ts",
             "packages/*/test/**/*.test.ts",

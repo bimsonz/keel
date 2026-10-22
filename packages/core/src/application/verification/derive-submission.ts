@@ -212,7 +212,9 @@ const recorded = (reading: Reading): RecordedReading =>
     : { parser: reading.parser, skipped: reading.skipped };
 
 /**
- * The `derive` step. Reads the project's live anchors here, inside the step,
+ * The `derive` step. First asks whether the pass may still derive: one the
+ * change has moved on from is ChangeStateRefused, which the Workflow settles as
+ * stale, having read nothing. Reads the project's live anchors here, inside the step,
  * so the anchors and the readings belong to one moment; parses the base and
  * the submitted commit from the same seeds, and the base once more over every
  * file the head reached that the base was never asked about, so both readings
@@ -240,6 +242,11 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
   base: CommitSha,
   touched: readonly string[],
 ) {
+  // A pass the change has moved on from reads no code: it is stale before it parses.
+  yield* (yield* ChangePrecheck).deriving(submission.changeId, {
+    revision: submission.revision,
+    instanceId: submission.instanceId,
+  });
   const anchors = yield* (yield* Projects).liveAnchors(workspace.projectId);
   const seeds = derivationSeeds(touched, workspace.subjects, anchors);
   const source = yield* SyntaxSource;

@@ -12,6 +12,7 @@ import type {
   ChangeId,
   CommitSha,
   ContentHash,
+  EscalationId,
   NextAction,
   ProjectId,
   VerdictId,
@@ -50,6 +51,11 @@ export interface PrecheckWorkspace {
 export interface PrecheckCall {
   readonly revision: number;
   readonly instanceId: string;
+}
+
+/** Precheck's start: the commit its run was started for. */
+export interface PrecheckStart extends PrecheckCall {
+  readonly commitSha: CommitSha;
 }
 
 /** Precheck refused the submission: why, and what the agent can do about it. */
@@ -95,8 +101,14 @@ export class ChangePrecheck extends Context.Service<
   {
     /** The workspace the change holds. ChangeStateRefused before it holds one. */
     readonly workspace: (changeId: ChangeId) => Effect.Effect<PrecheckWorkspace, Refusal>;
-    /** Commits PrecheckStarted. */
-    readonly started: (changeId: ChangeId, call: PrecheckCall) => Effect.Effect<void, Refusal>;
+    /** Commits PrecheckStarted, while the change still carries the commit the run was started for. */
+    readonly started: (changeId: ChangeId, call: PrecheckStart) => Effect.Effect<void, Refusal>;
+    /**
+     * Whether the pass may still derive, committing nothing: ChangeStateRefused
+     * unless the change is deriving in this run, at this revision. Asked before
+     * any code is read, so a pass the change moved on from parses none.
+     */
+    readonly deriving: (changeId: ChangeId, call: PrecheckCall) => Effect.Effect<void, Refusal>;
     /** Commits a ruling-class VerdictIssued (bounce) and ChangeBounced naming it; answers that verdict. */
     readonly refused: (
       changeId: ChangeId,
@@ -113,5 +125,14 @@ export class ChangePrecheck extends Context.Service<
     ) => Effect.Effect<void, Refusal>;
     /** Commits PlanCompiled and queues the change, or bounces it citing a conflict proven against it that blocks under the plan's policy. */
     readonly compiled: (changeId: ChangeId, plan: PrecheckCompiled) => Effect.Effect<void, Refusal>;
+    /**
+     * Whether the change still asks a question its pass compiled a plan for:
+     * false once it took the question back, having moved on from that pass. A
+     * question it never recorded asking is still asked.
+     */
+    readonly asks: (
+      changeId: ChangeId,
+      escalationId: EscalationId,
+    ) => Effect.Effect<boolean, ChangeNotFound>;
   }
 >()("keel/ChangePrecheck") {}

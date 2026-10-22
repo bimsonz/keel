@@ -133,14 +133,15 @@ export function makeProjectsMemory(
             (): Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict> => {
               const current = settings.get(projectId);
               if (current === undefined) return Effect.fail(new ProjectNotFound({ projectId }));
+              // What the PUT leaves out keeps what is stored; the request, as sent, is its fingerprint.
               const replaced: ProjectSettings = {
                 protectedPaths: put.protectedPaths,
                 maxBatchSize: put.maxBatchSize,
-                verification: put.verification ?? "required",
-                visibility: put.visibility ?? "private",
-                proposals: put.proposals ?? "open",
+                verification: put.verification ?? current.verification,
+                visibility: put.visibility ?? current.visibility,
+                proposals: put.proposals ?? current.proposals,
               };
-              const fingerprint = JSON.stringify(replaced);
+              const fingerprint = JSON.stringify(put);
               const key = `${projectId}\u0000${requestId}`;
               const seen = requests.get(key);
               if (seen !== undefined)

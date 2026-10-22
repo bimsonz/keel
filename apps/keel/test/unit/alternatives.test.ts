@@ -32,6 +32,8 @@ import {
   sampleProjectId,
   ulidOf,
   heldLease,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
@@ -92,6 +94,8 @@ function world() {
       makeCodeHostMemory().layer,
       index.layer,
       makeDecisionsMemory().layer,
+      makeEscalationsMemory().gate,
+      makeProjectNamespacesMemory().layer,
     );
   const objects = new Map<
     ChangeId,

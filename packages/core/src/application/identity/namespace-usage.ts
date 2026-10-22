@@ -106,7 +106,8 @@ const putUsed = (
 
 /**
  * `NamespaceUsage.admit` over this object's own store: the key's first answer if it
- * has one; otherwise the domain's decision on the namespace's count now under the
+ * has one (a refusal of a daily kind only until the reset it named); otherwise the
+ * domain's decision on the namespace's count now under the
  * namespace's settings, the amount counted when it is admitted, and the answer kept
  * under the key, all in one transaction, so no other admission interleaves.
  * The namespace's own limit comes before the instance's for it, and that before the
@@ -126,7 +127,10 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
     const first = store.get(KEY, id);
     if (first !== undefined) {
       const keyed = decodeKeyed(first);
-      if (keyed.exceeded !== undefined) return Result.fail(keyed.exceeded);
+      // A refusal that named when the count starts again answers until then, and is decided again after.
+      const { exceeded } = keyed;
+      if (exceeded !== undefined && (exceeded.retryAt === undefined || now < exceeded.retryAt))
+        return Result.fail(exceeded);
       if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
     }
     const used = usedAt(store, namespace, kind, now);

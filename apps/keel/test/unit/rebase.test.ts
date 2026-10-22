@@ -35,6 +35,8 @@ import {
   makeWorkspaceRebaserMemory,
   sampleProjectId,
   heldLease,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import {
@@ -81,6 +83,8 @@ function world() {
       rebaser.layer,
       makeLiveChangesMemory().layer,
       makeDecisionsMemory().layer,
+      makeEscalationsMemory().gate,
+      makeProjectNamespacesMemory().layer,
     );
   return { clock, code, rebaser, seeded, layerFor };
 }
@@ -262,6 +266,7 @@ describe("rebase", () => {
             Schema.decodeUnknownSync(PrecheckStartedCommand)({
               revision: 1,
               instanceId: "precheck-1",
+              commitSha: work,
             }),
           );
           yield* precheckRefused(

@@ -10,11 +10,15 @@ import {
   closeProposal,
   declare,
   effectsDerived,
+  flowQuestionAsked,
   getChange,
   HeldWorkspace,
+  copiesOwed,
+  giveBackCopies,
   lapseLease,
   nearby,
   planCompiled,
+  precheckDeriving,
   precheckRefused,
   precheckStarted,
   propose,
@@ -33,7 +37,7 @@ import {
 } from "@keeltown/core/application/coordination";
 import { tellPreview } from "@keeltown/core/application/delivery";
 import { isAgentOwned, lapsesAt } from "@keeltown/core/domain/coordination";
-import { ChangeId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
+import { ChangeId, EscalationId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Exit, Option, Schema } from "effect";
 import {
@@ -55,6 +59,7 @@ import {
   NearbyCommand,
   type ExitCodec,
   PlanCompiledCommand,
+  PrecheckDerivingCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
   ProposeCommand,
@@ -83,31 +88,43 @@ const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
 /** A lease's deadline is its own alarm row, so adoption withdraws the old one and arms the new. */
 const LEASE_DEADLINE = /^lease (\S+) lapses$/;
 const leaseDeadline = (leaseId: string) => `lease ${leaseId} lapses`;
+/** The deadline on which an ended proposal gives back what it copied in: due at once, run until it has. */
+const GIVE_BACK = "proposal copies given back";
 
 /**
  * The Change DO (`change:<ULID>`): a change and its lease, decided by the
  * domain's Change machine through the coordination use-cases. Every method
- * answers with an Exit envelope, and every answer leaves the lease's deadline
- * armed exactly while the lease is active.
+ * answers with an Exit envelope, and every answer (a delivery's too, which
+ * can land it) leaves the lease's deadline armed exactly while the lease is
+ * active, and the give-back of an ended proposal's copies armed until it has
+ * given them back.
  */
 export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRpc {
+  /**
+   * The proposal's copies, one at a time: a propose or an update copies a
+   * commit in across awaits the object's input gate lets other calls through,
+   * so a retry under the same key would otherwise copy over the first, and give
+   * back the workspace the first commits with when its own copy is refused.
+   */
+  private copying: Promise<unknown> = Promise.resolve();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, changeServices(env));
     // A crash between a commit and arming its deadline leaves the alarm unset; the next instance re-arms it from the state.
-    void ctx.blockConcurrencyWhile(() => this.armLease());
+    void ctx.blockConcurrencyWhile(() => this.armDeadlines());
   }
 
   private get changeId(): ChangeId {
     return changeIdOf(this.ctx.id.name);
   }
 
-  /** Answers, then arms the lease's deadline for whatever the call left. */
+  /** Answers, then arms the deadlines for whatever the call left. */
   protected override async answer<A, E>(
     codec: ExitCodec<A, E>,
     program: Effect.Effect<A, E, DurableObjectServices | ChangeServices>,
   ) {
     const answered = await super.answer(codec, program);
-    await this.armLease();
+    await this.armDeadlines();
     return answered;
   }
 
@@ -220,7 +237,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     const program = decoded(ProposeCommand, command).pipe(
       Effect.flatMap((proposing) => propose(changeId, { ...proposing, changeId })),
     );
-    return this.answer(ChangeCodecs.propose, program);
+    return this.oneCopyAtATime(() => this.answer(ChangeCodecs.propose, program));
   }
 
   async updateProposal(command: typeof UpdateProposalCommand.Encoded) {
@@ -228,7 +245,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     const program = decoded(UpdateProposalCommand, command).pipe(
       Effect.flatMap((moving) => updateProposal(changeId, moving)),
     );
-    return this.answer(ChangeCodecs.updateProposal, program);
+    return this.oneCopyAtATime(() => this.answer(ChangeCodecs.updateProposal, program));
+  }
+
+  /** Runs `call` once every copy before it has answered, whatever it answered. */
+  private oneCopyAtATime<A>(call: () => Promise<A>): Promise<A> {
+    const turn = this.copying.then(call, call);
+    this.copying = turn.catch(() => undefined);
+    return turn;
   }
 
   async approveProposal(command: typeof ApproveProposalCommand.Encoded) {
@@ -280,12 +304,28 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     return this.answer(ChangeCodecs.workspace, changeWorkspace(this.changeId));
   }
 
+  async flowQuestionAsked(escalationId: string) {
+    const changeId = this.changeId;
+    const program = decoded(EscalationId, escalationId).pipe(
+      Effect.flatMap((id) => flowQuestionAsked(changeId, id)),
+    );
+    return this.answer(ChangeCodecs.flowQuestionAsked, program);
+  }
+
   async precheckStarted(command: typeof PrecheckStartedCommand.Encoded) {
     const changeId = this.changeId;
     const program = decoded(PrecheckStartedCommand, command).pipe(
       Effect.flatMap((step) => precheckStarted(changeId, step)),
     );
     return this.answer(ChangeCodecs.precheckStarted, program);
+  }
+
+  async precheckDeriving(command: typeof PrecheckDerivingCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(PrecheckDerivingCommand, command).pipe(
+      Effect.flatMap((step) => precheckDeriving(changeId, step)),
+    );
+    return this.answer(ChangeCodecs.precheckDeriving, program);
   }
 
   async effectsDerived(command: typeof EffectsDerivedCommand.Encoded) {
@@ -367,8 +407,16 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     return undefined;
   }
 
-  /** The lease's deadline: makes the lapse visible, then re-arms only while the lease is still active. */
+  /**
+   * The lease's deadline makes the lapse visible, then re-arms only while the
+   * lease is still active. The give-back gives an ended proposal's copies
+   * back to its fork's namespace; one that fails throws, and runs again.
+   */
   protected override async onDeadline(request: StartedAlarm): Promise<void> {
+    if (request.reason === GIVE_BACK) {
+      await this.runtime.runPromise(giveBackCopies(this.changeId));
+      return;
+    }
     const leaseId = LEASE_DEADLINE.exec(request.reason)?.[1];
     if (leaseId === undefined) return super.onDeadline(request);
     const exit = await this.runtime.runPromiseExit(
@@ -380,7 +428,20 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     );
     if (Exit.isFailure(exit))
       console.warn("lease deadline refused", JSON.stringify({ reason: request.reason }));
+    await this.armDeadlines();
+  }
+
+  /** The lease's deadline as `armLease` arms it, and the give-back while an ended proposal owes it. */
+  private async armDeadlines(): Promise<void> {
     await this.armLease();
+    const owed = await this.runtime.runPromise(copiesOwed(this.changeId));
+    const armed = armedAlarms(this.ctx.storage).some((alarm) => alarm.reason === GIVE_BACK);
+    if (owed && !armed)
+      await scheduleAlarm(this.ctx.storage, {
+        kind: "deadline",
+        reason: GIVE_BACK,
+        at: Date.now(),
+      });
   }
 
   /**

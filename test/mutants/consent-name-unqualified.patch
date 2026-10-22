@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/apps.test.ts
+# kills: consent.name-is-its-own
+# why: the consent page names an app by the name it gave itself as if Keel vouched for it, so an app can pass itself off as another
+diff --git a/apps/console/src/account/apps.ts b/apps/console/src/account/apps.ts
+index 1760f30f..0fee0875 100644
+--- a/apps/console/src/account/apps.ts
++++ b/apps/console/src/account/apps.ts
+@@ -51,7 +51,7 @@ export function appAskingOf(search: string): AppAsking | null {
+ export function consentTitle(name: string | null): string {
+   return name === null
+     ? "Allow this app to act as you?"
+-    : `Allow an app that calls itself “${name}” to act as you?`;
++    : `Allow ${name} to act as you?`;
+ }
+ 
+ /**

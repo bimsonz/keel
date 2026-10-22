@@ -38,6 +38,10 @@ const limitsArb: fc.Arbitrary<Quotas> = fc.record({
   "container-minutes": limitArb,
   "model-calls": limitArb,
   "concurrent-containers": limitArb,
+  proposals: limitArb,
+  "proposal-moves": limitArb,
+  issues: limitArb,
+  "issue-comments": limitArb,
 });
 /** An org's overrides: some kinds, each its own limit. */
 const overridesArb = fc

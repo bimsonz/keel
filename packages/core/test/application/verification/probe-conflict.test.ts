@@ -130,7 +130,7 @@ describe("probe-conflict", () => {
     );
   });
 
-  it("[probe-conflict.proposal-unapproved] a proposal is no party's world until a maintainer approves the commit it carries: before that the Probe waits, and Keel drafts, builds and runs nothing of it", () => {
+  it("[probe-conflict.proposal-unapproved] a proposal is no party's world until a maintainer approves the commit it carries: before that the Probe waits for its approval, and Keel drafts, builds and runs nothing of it", () => {
     const proposal = { fork: makeId("prj", ulid(9)), proposer: userActor(makeId("usr", ulid(8))) };
     fc.assert(
       fc.property(
@@ -146,7 +146,7 @@ describe("probe-conflict", () => {
             }),
           ).toEqual(
             asAgents._tag === "Submitted" && approved !== sha(1)
-              ? { _tag: "Unsubmitted" }
+              ? { _tag: "AwaitingApproval" }
               : asAgents,
           );
         },

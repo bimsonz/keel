@@ -68,7 +68,8 @@ interface Proposals {
    * Refused: a project not forked from this one (409 `proposal.not_a_fork`), a commit not on the fork's trunk (409
    * `proposal.commit_not_on_fork`), a commit with nothing upstream lacks (409 `proposal.empty`), a sixth open proposal
    * of yours here (409 `proposal.limit`), no workspace free (503 `workspace.pool_exhausted`, retry after the time it
-   * names). A retry with the same Idempotency-Key answers the same change.
+   * names), past your account's proposals for the day (10 by default; an agent's count is its sponsor's: 429
+   * `rate.limited` until the next UTC midnight). A retry with the same Idempotency-Key answers the same change.
    */
   @summary("Propose a commit of a fork")
   @tag("mcp")
@@ -99,9 +100,13 @@ interface Proposals {
 
   /**
    * Move your open proposal to another commit of the fork's trunk: Keel copies it, checks it again, and it waits for
-   * approval again, whatever was approved before. Its proposer alone may (403 reason `proposer-only`). Refused while it
+   * approval again, whatever was approved before. Its proposer alone may (403 reason `proposer-only`), and only while they
+   * still stand on the fork as proposing asks (403 reason `left-fork`; an agent nobody sponsors any more,
+   * `sponsor-required`). Refused while it
    * is being integrated, or once it has ended (409 `change.state_refused`); a change that is no proposal is 409
-   * `change.not_a_proposal`; a commit not on the fork's trunk 409 `proposal.commit_not_on_fork`.
+   * `change.not_a_proposal`; a commit not on the fork's trunk 409 `proposal.commit_not_on_fork`; past your account's
+   * moves for the day (50 by default; an agent's count is its sponsor's) 429 `rate.limited` until the next UTC
+   * midnight. A retry with the same Idempotency-Key counts once.
    */
   @summary("Propose another commit")
   @tag("mcp")

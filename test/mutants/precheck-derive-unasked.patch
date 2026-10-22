@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.superseded
+# why: a superseded Precheck pass parses the base and the head before it finds out, so moves can load the parser without bound
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index a85e3256..5e2e3a30 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -243,10 +243,6 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+   touched: readonly string[],
+ ) {
+   // A pass the change has moved on from reads no code: it is stale before it parses.
+-  yield* (yield* ChangePrecheck).deriving(submission.changeId, {
+-    revision: submission.revision,
+-    instanceId: submission.instanceId,
+-  });
+   const anchors = yield* (yield* Projects).liveAnchors(workspace.projectId);
+   const seeds = derivationSeeds(touched, workspace.subjects, anchors);
+   const source = yield* SyntaxSource;

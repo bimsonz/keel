@@ -256,7 +256,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
     );
 
     it.live(
-      "reads a refresh by another agent, or by the change's agent in another project, as ChangeNotFound",
+      "refuses a refresh by another agent of the change's project as ChangeHeldByOther, naming its holder, and reads one by the change's agent in another project as ChangeNotFound",
       () => {
         const harness = make();
         return Effect.gen(function* () {
@@ -276,7 +276,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             yield* Effect.flip(changes.refreshWorkspace(elsewhere, input)),
           ];
           expect(errors).toMatchObject([
-            { _tag: "ChangeNotFound", changeId: result.change.id },
+            { _tag: "ChangeHeldByOther", changeId: result.change.id, holder: who.agentId },
             { _tag: "ChangeNotFound", changeId: result.change.id },
           ]);
         }).pipe(Effect.provide(harness.layer));
@@ -379,7 +379,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
     );
 
     it.live(
-      "[b11.adopt] adopts a lapsed change: a new lease for the adopter, a fresh workspace token, the old lease fenced",
+      "[b11.adopt] adopts a lapsed change: a new lease for the adopter, a fresh workspace token, the old holder fenced as another agent the adopter now holds it from",
       () => {
         const harness = make();
         return Effect.gen(function* () {
@@ -398,7 +398,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           expect(adopted.workspace?.workspaceId).toBe(result.workspace.workspaceId);
           expect(adopted.workspace?.token).not.toBe("");
           const fenced = yield* Effect.flip(changes.submit(who, submit()));
-          expect(fenced._tag).toBe("LeaseStale");
+          expect(fenced).toMatchObject({ _tag: "ChangeHeldByOther", holder: adopter.agentId });
         }).pipe(Effect.provide(harness.layer));
       },
     );

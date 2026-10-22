@@ -42,7 +42,7 @@ import { SYNTAX_WASM } from "../../src/adapters/driven/syntax/wasm.ts";
 import { PrecheckParams } from "../../src/adapters/driving/workflow/precheck.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { drainAfter, drainOutbox, POOL_ORG } from "./helpers.ts";
+import { drainAfter, drainOutbox, passDerives, POOL_ORG } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 const WAIT = { timeout: 15_000, interval: 50 };
@@ -280,6 +280,7 @@ const derivedFrom = (
           ),
           SyntaxSourceTreeSitter(SYNTAX_WASM).pipe(Layer.provide(c.code.layer)),
           EvidenceStoreR2(env.ARCHIVE),
+          passDerives,
         ),
       ),
     ),

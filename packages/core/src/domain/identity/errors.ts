@@ -146,7 +146,10 @@ export class NotVisible extends Schema.TaggedError<NotVisible>()("NotVisible", {
  * - `org-project`: an agent is invited to one project only in a person's own
  *   namespace; an org takes it into the whole of the org;
  * - `sponsor-required`: an agent nobody sponsors opens no issue, and writes no
- *   comment, on a project it does not stand on.
+ *   comment, on a project it does not stand on;
+ * - `proposals-closed`: the project takes no proposals from forks;
+ * - `proposer-only`: only its proposer moves a proposal to another commit;
+ * - `left-fork`: its proposer no longer stands on the fork it comes from.
  */
 export const RefusalReason = Schema.Literals([
   "user-suspended",
@@ -166,6 +169,7 @@ export const RefusalReason = Schema.Literals([
   "sponsor-required",
   "proposals-closed",
   "proposer-only",
+  "left-fork",
 ]);
 export type RefusalReason = typeof RefusalReason.Type;
 

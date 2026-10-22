@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts apps/keel/test/unit/proposal-ledger.test.ts
+# kills: proposals.contract.release, proposal-ledger.release
+# why: a place given back stays held, so a proposal the day refused blocks one of the proposer's five
+diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
+index de16828d..35ecc267 100644
+--- a/packages/core/src/application/coordination/proposal-ledger.ts
++++ b/packages/core/src/application/coordination/proposal-ledger.ts
+@@ -149,7 +149,6 @@ export const releaseProposal = Effect.fn("coordination/releaseProposal")(functio
+     if (place !== undefined && decodeOpen(place).proposed) return;
+     store.remove(OPEN, openKey(release.proposer, changeId));
+     store.remove(PROPOSER, changeId);
+-    store.remove(RESERVED, key);
+   });
+ });
+ 

@@ -44,6 +44,26 @@ export function appAskingOf(search: string): AppAsking | null {
   };
 }
 
+/**
+ * The consent page's question. An app registers itself under any name it
+ * likes, so the page says the name is the app's own, not one Keel vouches for.
+ */
+export function consentTitle(name: string | null): string {
+  return name === null
+    ? "Allow this app to act as you?"
+    : `Allow an app that calls itself “${name}” to act as you?`;
+}
+
+/**
+ * What the consent page says first: where the app sends the person back to,
+ * by its host, plainly, since that is what gives away an app that is not the
+ * one it calls itself; then who it acts as, and where.
+ */
+export function consentLede(asking: Pick<AppAsking, "returnsTo">, as: string): string {
+  const host = URL.parse(asking.returnsTo)?.host ?? asking.returnsTo;
+  return `It will send you back to ${host}. If you did not start this from there, deny it. Allowed, it is signed in as ${as} at Keel's MCP server.`;
+}
+
 /** An app the person allowed, as their settings list it. */
 export interface AllowedApp {
   /** The consent's id: what revoking it names. */

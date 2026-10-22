@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.proposer-left-fork
+# why: a proposer who has left the fork, or an agent no longer working in it or sponsored, still moves its proposal to commits they no longer answer for
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index cc146b62..4f6332eb 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -1058,6 +1058,7 @@ const onProposalChange = (
+   switch (need) {
+     case "proposer": {
+       if (!theirs) return refused("proposer-only");
++      if (theirs) return granted();
+       const stands =
+         proposed.fork === undefined ? refused("left-fork") : standsOnFork(principal, proposed.fork);
+       if (Result.isSuccess(stands)) return stands;

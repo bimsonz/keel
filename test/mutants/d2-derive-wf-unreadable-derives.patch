@@ -2,15 +2,15 @@
 # kills: d21.pool.derive-unreadable
 # why: A commit whose diff could not be read is sent to derive with no paths, whose step fails and retries, so the agent waits on a Workflow that errors instead of a refusal it can act on
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index c0a16003..bbe9c35b 100644
+index 28b5c54a..ff3269a2 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -145,7 +145,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+@@ -158,7 +158,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
          const touched = step.do("diff", () => settle(runtime, reads.touched)).then(settledValue);
          // A diff that could not be read is refused by decide: with no paths, nothing derives.
          const keeping = touched.then((diff) =>
 -          diff._tag === "Unreadable"
 +          false
              ? undefined
-             : step
-                 .do("derive", () =>
+             : step.do("derive", () =>
+                 settle(

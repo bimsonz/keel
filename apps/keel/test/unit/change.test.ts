@@ -40,6 +40,9 @@ import {
 import {
   Clock,
   CodeHost,
+  HumanGate,
+  type ProjectNamespaces,
+  type WithdrawRequest,
   type Decisions,
   EntityStore,
   EventOutbox,
@@ -52,7 +55,9 @@ import {
   makeIdsMemory,
   makeLiveChangesMemory,
   makeDecisionsMemory,
+  makeEscalationsMemory,
   makeManualClock,
+  makeProjectNamespacesMemory,
   makeWorkspacePoolMemory,
   sampleProjectId,
   heldLease,
@@ -77,13 +82,34 @@ const agentId = "agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
 const adopterId = "agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1";
 const BASE = CommitSha.make("b".repeat(40));
 
-/** One Change DO's state, in memory, on a clock the test moves, with a pool and a code host. */
+/** The namespace the change's project is placed in: its questions are put to it, and taken back there. */
+const PLACE = makeId("org", "01JZ8PT2C4E6G8J0M2N4Q6VP00");
+
+/**
+ * One Change DO's state, in memory, on a clock the test moves, with a pool, a
+ * code host, and the questions it takes back from its project's namespace.
+ */
 function changeObject(options: { readonly capacity?: number } = {}) {
   const clock = makeManualClock();
   const pool = makeWorkspacePoolMemory({ baseSha: BASE, ...options });
   const code = makeCodeHostMemory();
   const live = makeLiveChangesMemory();
+  const withdrawn: WithdrawRequest[] = [];
+  const places = makeProjectNamespacesMemory();
+  places.places.set(sampleProjectId, {
+    projectId: sampleProjectId,
+    namespace: PLACE,
+    name: "sample",
+  });
   const layer = Layer.mergeAll(
+    Layer.succeed(
+      HumanGate,
+      HumanGate.of({
+        raise: () => Effect.die(new Error("a change's object raises no question here")),
+        withdraw: (request) => Effect.sync(() => void withdrawn.push(request)),
+      }),
+    ),
+    places.layer,
     makeEventOutboxMemory().layer,
     makeIdsMemory().layer,
     clock.layer,
@@ -92,7 +118,7 @@ function changeObject(options: { readonly capacity?: number } = {}) {
     live.layer,
     makeDecisionsMemory().layer,
   );
-  return { clock, pool, live, layer };
+  return { clock, pool, live, layer, withdrawn };
 }
 
 const declaring = (overrides: Record<string, unknown> = {}) =>
@@ -120,6 +146,12 @@ const revising = (leaseId: string, ifMatchRevision: number, key: string, by: str
     idempotencyKey: key,
   });
 
+const abandoning = (leaseId: string, key: string) =>
+  Schema.decodeUnknownSync(AbandonCommand)({
+    authority: { _tag: "Lease", leaseId, agentId, projectId: sampleProjectId },
+    idempotencyKey: key,
+  });
+
 const submitting = (leaseId: string, commitSha: string, key: string, by: string = agentId) =>
   Schema.decodeUnknownSync(SubmitCommand)({
     agentId: by,
@@ -136,8 +168,8 @@ const pushToWorkspace = Effect.gen(function* () {
   return yield* (yield* CodeHostFixture).commit(held.repo, "refs/heads/main", { "a.txt": "a" });
 });
 
-const starting = (revision: number, instanceId: string) =>
-  Schema.decodeUnknownSync(PrecheckStartedCommand)({ revision, instanceId });
+const starting = (revision: number, instanceId: string, commitSha: string) =>
+  Schema.decodeUnknownSync(PrecheckStartedCommand)({ revision, instanceId, commitSha });
 
 const compiling = (revision: number, instanceId: string) =>
   Schema.decodeUnknownSync(PlanCompiledCommand)({
@@ -440,7 +472,7 @@ describe("leases", () => {
         const lease = heldLease(declared.change).id;
         const sha = yield* pushToWorkspace;
         yield* submit(changeId, submitting(lease, sha, "submit-1"));
-        yield* precheckStarted(changeId, starting(1, "p-1"));
+        yield* precheckStarted(changeId, starting(1, "p-1", sha));
         clock.advance(LEASE_TTL_MS);
         const held = yield* lapseLease(changeId, lease, "due");
         clock.advance(1);
@@ -553,10 +585,7 @@ describe("Precheck's commands", () => {
       const declared = yield* declare(declaring());
       const sha = yield* pushToWorkspace;
       yield* submit(changeId, submitting(heldLease(declared.change).id, sha, "submit-1"));
-      const started = Schema.decodeUnknownSync(PrecheckStartedCommand)({
-        revision: 1,
-        instanceId: "precheck-1",
-      });
+      const started = starting(1, "precheck-1", sha);
       const first = yield* precheckStarted(changeId, started);
       const replayed = yield* precheckStarted(changeId, started);
       const stale = yield* Effect.exit(planCompiled(changeId, compiling(2, "precheck-1")));
@@ -577,7 +606,7 @@ const deriving = (instanceId: string) =>
     const declared = yield* declare(declaring());
     const sha = yield* pushToWorkspace;
     yield* submit(changeId, submitting(heldLease(declared.change).id, sha, "submit-1"));
-    yield* precheckStarted(changeId, starting(1, instanceId));
+    yield* precheckStarted(changeId, starting(1, instanceId, sha));
     return { lease: heldLease(declared.change).id, sha };
   });
 
@@ -1156,7 +1185,7 @@ describe("a change to how Keel verifies", () => {
         const refused = flowRulingIdOf(changeId, "precheck-1");
         yield* receive(ruledOn(refused, "refuse"));
         yield* submit(changeId, submitting(lease, sha, "submit-2"));
-        yield* precheckStarted(changeId, starting(1, "precheck-2"));
+        yield* precheckStarted(changeId, starting(1, "precheck-2", sha));
         const parked = yield* planCompiled(changeId, compilingGated(1, "precheck-2"));
         const asked = flowRulingIdOf(changeId, "precheck-2");
         const before = (yield* EventOutbox).log(changeRef).length;
@@ -1190,7 +1219,7 @@ describe("a change to how Keel verifies", () => {
         yield* receive(failed(batchId, changeId));
         const bounced = yield* getChange(changeId);
         yield* submit(changeId, submitting(lease, sha, "submit-2"));
-        yield* precheckStarted(changeId, starting(1, "precheck-2"));
+        yield* precheckStarted(changeId, starting(1, "precheck-2", sha));
         const parked = yield* planCompiled(changeId, compilingGated(1, "precheck-2"));
 
         expect(bounced.state).toBe("bounced");
@@ -1200,6 +1229,80 @@ describe("a change to how Keel verifies", () => {
           escalationId: flowRulingIdOf(changeId, "precheck-2"),
         });
       }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+describe("a question on how Keel verifies an agent's change", () => {
+  it.effect(
+    "[change.agent-question-withdrawn] a question no ruling answered is taken back once the change moves on from the pass that asked it: sent back by a ruling on a conflict and submitted again, or withdrawn; one a maintainer ruled on is left as it is",
+    () => {
+      const asked = flowRulingIdOf(changeId, "precheck-1");
+      const resubmitted = changeObject();
+      const abandoned = changeObject();
+      const ruled = changeObject();
+      return Effect.gen(function* () {
+        yield* Effect.gen(function* () {
+          const { lease, sha } = yield* deriving("precheck-1");
+          yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+          yield* receive(resolved(CONFLICT, DECISION, [changeId]));
+          expect((yield* getChange(changeId)).state).toBe("bounced");
+          expect(resubmitted.withdrawn).toEqual([]);
+          yield* submit(changeId, submitting(lease, sha, "submit-2"));
+        }).pipe(Effect.provide(resubmitted.layer));
+        yield* Effect.gen(function* () {
+          const { lease } = yield* deriving("precheck-1");
+          yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+          yield* abandon(changeId, abandoning(lease, "abandon-1"));
+        }).pipe(Effect.provide(abandoned.layer));
+        yield* Effect.gen(function* () {
+          const { lease, sha } = yield* deriving("precheck-1");
+          yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+          yield* receive(ruledOn(asked, "refuse"));
+          yield* submit(changeId, submitting(lease, sha, "submit-2"));
+        }).pipe(Effect.provide(ruled.layer));
+
+        for (const { withdrawn } of [resubmitted, abandoned])
+          expect(withdrawn.map((w) => [w.namespace, w.escalationId])).toEqual([[PLACE, asked]]);
+        expect(ruled.withdrawn).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[change.replay-keeps-question] a revision takes back the last pass's question; a submission or revision sent again under its key, once the next pass has asked its own, takes back nothing more",
+    () => {
+      const first = flowRulingIdOf(changeId, "precheck-1");
+      const next = flowRulingIdOf(changeId, "precheck-2");
+      const resubmitted = changeObject();
+      const revised = changeObject();
+      return Effect.gen(function* () {
+        yield* Effect.gen(function* () {
+          const { lease, sha } = yield* deriving("precheck-1");
+          yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+          yield* receive(resolved(CONFLICT, DECISION, [changeId]));
+          yield* submit(changeId, submitting(lease, sha, "submit-2"));
+          yield* precheckStarted(changeId, starting(1, "precheck-2", sha));
+          yield* planCompiled(changeId, compilingGated(1, "precheck-2"));
+          yield* submit(changeId, submitting(lease, sha, "submit-2"));
+          expect(yield* getChange(changeId)).toMatchObject({ state: "parked", escalationId: next });
+        }).pipe(Effect.provide(resubmitted.layer));
+        yield* Effect.gen(function* () {
+          const { lease, sha } = yield* deriving("precheck-1");
+          yield* planCompiled(changeId, compilingGated(1, "precheck-1"));
+          yield* receive(resolved(CONFLICT, DECISION, [changeId]));
+          yield* revise(changeId, revising(lease, 1, "revise-1"));
+          expect(revised.withdrawn.map((w) => w.escalationId)).toEqual([first]);
+          yield* submit(changeId, submitting(lease, sha, "submit-2"));
+          yield* precheckStarted(changeId, starting(2, "precheck-2", sha));
+          yield* planCompiled(changeId, compilingGated(2, "precheck-2"));
+          yield* revise(changeId, revising(lease, 1, "revise-1"));
+          expect(yield* getChange(changeId)).toMatchObject({ state: "parked", escalationId: next });
+        }).pipe(Effect.provide(revised.layer));
+
+        for (const { withdrawn } of [resubmitted, revised])
+          expect(withdrawn.map((w) => w.escalationId)).toEqual([first]);
+      });
     },
   );
 });
@@ -1309,9 +1412,9 @@ describe("a Precheck refusal", () => {
         yield* precheckRefused(changeId, refusing(1, "precheck-1"));
         yield* revise(changeId, revising(lease, 1, "revise-1"));
         yield* submit(changeId, submitting(lease, sha, "submit-2"));
-        const second = yield* precheckStarted(changeId, starting(2, "precheck-2"));
+        const second = yield* precheckStarted(changeId, starting(2, "precheck-2", sha));
         const firstReplayed = yield* Effect.exit(
-          precheckStarted(changeId, starting(1, "precheck-1")),
+          precheckStarted(changeId, starting(1, "precheck-1", sha)),
         );
 
         expect(second.state).toBe("deriving");
@@ -1342,7 +1445,7 @@ describe("the remedy a status read carries", () => {
         const lease = heldLease(declared.change).id;
         const sha = yield* pushToWorkspace;
         yield* submit(changeId, submitting(lease, sha, "submit-1"));
-        yield* precheckStarted(changeId, starting(1, "p-1"));
+        yield* precheckStarted(changeId, starting(1, "p-1", sha));
         yield* precheckRefused(changeId, refusing(1, "p-1"));
         const bounced = yield* submissionStatus(changeId);
         clock.advance(LEASE_TTL_MS);
@@ -1445,6 +1548,83 @@ const REVISE_OR_WITHDRAW = [
   expect.objectContaining({ operationId: "abandon" }),
 ];
 const typesOf = Effect.map(EventOutbox, (outbox) => outbox.log(changeRef).map((e) => e.type));
+
+/** A freshness conflict of the change's opened, naming its predicate, so the plan's policy for it applies. */
+const suspectedOnFreshness = (conflictId: string, { holder, author }: Sides) =>
+  arriving(
+    { kind: "conflict", id: conflictId },
+    {
+      _tag: "ConflictSuspected",
+      conflictId,
+      kind: "semantic",
+      predicate: "freshness",
+      parties: [holder, author],
+      premise: { holder, proposition: RELIED },
+      effect: { changeId: author, proposition: RELIED },
+    },
+  );
+const proven = (conflictId: string) =>
+  arriving(
+    { kind: "conflict", id: conflictId },
+    {
+      _tag: "ConflictProven",
+      conflictId,
+      evidence: { _tag: "probe", probeId: "prb_00000000000000000000000000" },
+    },
+  );
+
+/** Pushes another commit to the change's workspace, holding `content` in a.txt. */
+const pushAgain = (content: string) =>
+  Effect.gen(function* () {
+    const held = yield* changeWorkspace(changeId);
+    return yield* (yield* CodeHostFixture).commit(held.repo, "refs/heads/main", {
+      "a.txt": content,
+    });
+  });
+
+describe("a Precheck pass, bound to its run", () => {
+  it.effect(
+    "[precheck.run-bound] a pass's steps move the change only while it is the change's current pass: bounced while one pass derives and submitted again on the same revision, the next pass compiles and the first one's compile is refused",
+    () => {
+      const { layer } = changeObject();
+      const sides = { holder: changeId, author: otherChange };
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        const lease = heldLease(declared.change).id;
+        const first = yield* pushToWorkspace;
+        yield* submit(changeId, submitting(lease, first, "submit-1"));
+        yield* precheckStarted(changeId, starting(1, "precheck-1", first));
+        // The first pass's plan blocks on a proven freshness conflict.
+        yield* planCompiled(changeId, {
+          ...compiling(1, "precheck-1"),
+          predicatePolicy: { freshness: "block" },
+        });
+        yield* receive(suspectedOnFreshness(CONFLICT, sides));
+        yield* receive(proven(CONFLICT));
+        const second = yield* pushAgain("second");
+        yield* submit(changeId, submitting(lease, second, "submit-2"));
+        yield* precheckStarted(changeId, starting(1, "precheck-A", second));
+        // Pass A derives under the last plan's policy: another conflict proven now bounces the change.
+        yield* receive(suspectedOnFreshness(OTHER_CONFLICT, sides));
+        yield* receive(proven(OTHER_CONFLICT));
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+        const third = yield* pushAgain("third");
+        yield* submit(changeId, submitting(lease, third, "submit-3"));
+        yield* precheckStarted(changeId, starting(1, "precheck-B", third));
+
+        const stale = yield* Effect.exit(planCompiled(changeId, compiling(1, "precheck-A")));
+        const current = yield* planCompiled(changeId, compiling(1, "precheck-B"));
+
+        expect(failureTag(stale)).toContain("ChangeStateRefused");
+        expect(current).toMatchObject({ state: "queued", commitSha: third });
+        expect(
+          (yield* typesOf).filter((type) => type === "PlanCompiled"),
+          "one plan for the first pass and one for B, none for A",
+        ).toHaveLength(2);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
 
 describe("a conflict of the change put to a person", () => {
   it.effect(
@@ -1992,12 +2172,20 @@ describe("a rely racing a revise", () => {
         makeCodeHostMemory().layer,
         live,
         makeDecisionsMemory().layer,
+        makeEscalationsMemory().gate,
+        makeProjectNamespacesMemory().layer,
       );
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
         const leaseId = heldLease(declared.change).id;
         const services = yield* Effect.context<
-          Clock | EntityStore | EventOutbox | LiveChanges | Decisions
+          | Clock
+          | EntityStore
+          | EventOutbox
+          | LiveChanges
+          | Decisions
+          | HumanGate
+          | ProjectNamespaces
         >();
         meanwhile.run = () =>
           Effect.runSync(

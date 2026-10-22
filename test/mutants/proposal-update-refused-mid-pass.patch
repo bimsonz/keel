@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: machine.proposal-update-mid-pass
+# why: a proposer cannot move a proposal while Precheck reads it, and waits on a pass that judges a commit they have replaced
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 7c11109d..33bda6cc 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -662,8 +662,6 @@ export const decideChange = (
+       // nothing once the proposal carries another.
+       const first = at("working");
+       const again = at(
+-        "submitted",
+-        "deriving",
+         "drifted",
+         "verifying",
+         "queued",

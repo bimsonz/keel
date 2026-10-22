@@ -26,6 +26,7 @@ import {
   makeId,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -293,7 +294,9 @@ describe("a Red batch's members", () => {
 
   it("[red.reason-names-cause] every requeued member's reason is its failure's cause, never another's", () => {
     const seen = new Set<RequeueReason>();
-    fc.assert(
+    // A lone member blamed on the shrink rule is about one draw in eighty: counted over a fixed set of draws
+    // too, so whether every reason is reached is the generator's fact, not the run's seed's.
+    assertReaching(
       fc.property(redArb, (red) => {
         if (red === undefined || red.attribution === undefined) return true;
         const cause = causeOf(red.attribution);

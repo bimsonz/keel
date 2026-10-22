@@ -1027,7 +1027,8 @@ export class KeelClient {
 
   /**
    * Operator: replaces a project's settings. A PUT of what is already there
-   * commits nothing, so a retry is safe; an absent `verification` means `required`.
+   * commits nothing, so a retry is safe; an optional field left out
+   * (`verification`, `visibility`, `proposals`) keeps what is stored.
    */
   putSettings(
     projectId: string,

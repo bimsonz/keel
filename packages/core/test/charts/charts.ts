@@ -15,7 +15,7 @@ const ends = { ChangeWithdrawn: c("withdrawn"), ChangeSuperseded: c("superseded"
 /** Adoption of a lapsed lease, where the change waits on its agent: under the platform a lease does not lapse. */
 const waits = (state: string) => ({ ChangeAdopted: c(state) });
 const lapses = { ChangeParked: c("parked.leaseLapsed") };
-/** A proposal moved to another commit: back to work to be submitted, from anywhere but a batch or a Precheck pass. */
+/** A proposal moved to another commit: back to work to be submitted, from anywhere but a batch. */
 const reproposed = { ProposalUpdated: c("working") };
 /** Past its plan and not yet batched, a change parks for a person's ruling, or a proposal for its approval. */
 const waitsForAPerson = {
@@ -41,12 +41,13 @@ export const changeChart: Chart = {
         ...ends,
       },
     },
-    submitted: { on: { PrecheckStarted: c("deriving"), ...ends } },
+    submitted: { on: { PrecheckStarted: c("deriving"), ...reproposed, ...ends } },
     deriving: {
       on: {
         ChangeDrifted: c("drifted"),
         PlanCompiled: c("verifying"),
         ChangeBounced: c("bounced"),
+        ...reproposed,
         ...ends,
       },
     },

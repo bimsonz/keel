@@ -4215,7 +4215,7 @@
       "post": {
         "operationId": "updateProposal",
         "summary": "Propose another commit",
-        "description": "Move your open proposal to another commit of the fork's trunk: Keel copies it, checks it again, and it waits for\napproval again, whatever was approved before. Its proposer alone may (403 reason `proposer-only`). Refused while it\nis being integrated, or once it has ended (409 `change.state_refused`); a change that is no proposal is 409\n`change.not_a_proposal`; a commit not on the fork's trunk 409 `proposal.commit_not_on_fork`.",
+        "description": "Move your open proposal to another commit of the fork's trunk: Keel copies it, checks it again, and it waits for\napproval again, whatever was approved before. Its proposer alone may (403 reason `proposer-only`), and only while they\nstill stand on the fork as proposing asks (403 reason `left-fork`; an agent nobody sponsors any more,\n`sponsor-required`). Refused while it\nis being integrated, or once it has ended (409 `change.state_refused`); a change that is no proposal is 409\n`change.not_a_proposal`; a commit not on the fork's trunk 409 `proposal.commit_not_on_fork`; past your account's\nmoves for the day (50 by default; an agent's count is its sponsor's) 429 `rate.limited` until the next UTC\nmidnight. A retry with the same Idempotency-Key counts once.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ChangePath"
@@ -10256,7 +10256,7 @@
       "post": {
         "operationId": "propose",
         "summary": "Propose a commit of a fork",
-        "description": "Propose a commit of your fork's trunk back to the project it was forked from: it becomes a change here, `#n` and\nall, that waits for approval (parked, `awaiting-approval`) once Precheck has read it. Keel copies the fork's\ncommits itself, so you need no token for this project. Who may: a person who is a member of the fork's namespace,\nor an agent working in the fork that a person sponsors (403 `auth.forbidden`, reason `sponsor-required`, with\n`askSponsor` as the way on). The project must be public and take proposals (403 reason `proposals-closed`).\nRefused: a project not forked from this one (409 `proposal.not_a_fork`), a commit not on the fork's trunk (409\n`proposal.commit_not_on_fork`), a commit with nothing upstream lacks (409 `proposal.empty`), a sixth open proposal\nof yours here (409 `proposal.limit`), no workspace free (503 `workspace.pool_exhausted`, retry after the time it\nnames). A retry with the same Idempotency-Key answers the same change.",
+        "description": "Propose a commit of your fork's trunk back to the project it was forked from: it becomes a change here, `#n` and\nall, that waits for approval (parked, `awaiting-approval`) once Precheck has read it. Keel copies the fork's\ncommits itself, so you need no token for this project. Who may: a person who is a member of the fork's namespace,\nor an agent working in the fork that a person sponsors (403 `auth.forbidden`, reason `sponsor-required`, with\n`askSponsor` as the way on). The project must be public and take proposals (403 reason `proposals-closed`).\nRefused: a project not forked from this one (409 `proposal.not_a_fork`), a commit not on the fork's trunk (409\n`proposal.commit_not_on_fork`), a commit with nothing upstream lacks (409 `proposal.empty`), a sixth open proposal\nof yours here (409 `proposal.limit`), no workspace free (503 `workspace.pool_exhausted`, retry after the time it\nnames), past your account's proposals for the day (10 by default; an agent's count is its sponsor's: 429\n`rate.limited` until the next UTC midnight). A retry with the same Idempotency-Key answers the same change.",
         "parameters": [
           {
             "name": "projectId",
@@ -11432,6 +11432,7 @@
       "put": {
         "operationId": "Operator_putSettings",
         "summary": "Replace a project's settings",
+        "description": "Replace a project's settings. A field the body leaves out keeps what is stored (`verification`, `visibility`,\n`proposals`), so a client that does not know a field never changes it; send it to change it. A replay under its\nrequest id answers the settings as they stand; the same request id with another body is 409.",
         "parameters": [
           {
             "name": "projectId",
@@ -15143,6 +15144,22 @@
           },
           "state": {
             "$ref": "#/components/schemas/ChangeState"
+          },
+          "parkReason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ParkReason"
+              }
+            ],
+            "description": "Why it is parked, while it is: a proposal for its approval, a change for a person's ruling, or for an adopter."
+          },
+          "escalationId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EscalationId"
+              }
+            ],
+            "description": "The question a change parked `awaiting-ruling` waits on, while it waits."
           },
           "revision": {
             "type": "integer",
@@ -25865,7 +25882,7 @@
               "required",
               "off"
             ],
-            "description": "Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;\nKeel always answers it. With `off` the lane skips verification and marks what lands\nunverified. Every change is audited by ProjectSettingsChanged."
+            "description": "Whether the project's lane verifies each batch before it lands: `required` until a PUT sets it. Absent in a PUT\nkeeps what is stored; Keel always answers it. With `off` the lane skips verification and marks what lands\nunverified. Every change is audited by ProjectSettingsChanged."
           },
           "visibility": {
             "type": "string",
@@ -25873,7 +25890,7 @@
               "private",
               "public"
             ],
-            "description": "Who may read the project. `public` lets anonymous readers see it through the repo read API; absent in a\nPUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged."
+            "description": "Who may read the project. `public` lets anonymous readers see it through the repo read API; `private` until a\nPUT sets it. Absent in a PUT keeps what is stored, and Keel always answers it. Every change is audited by ProjectSettingsChanged."
           },
           "proposals": {
             "type": "string",
@@ -25881,7 +25898,7 @@
               "open",
               "closed"
             ],
-            "description": "Whether a fork of the project may propose changes back to it. Absent in a PUT means `open`, and Keel always\nanswers it; a private project takes no proposals, whatever it says. Every change is audited by\nProjectSettingsChanged."
+            "description": "Whether a fork of the project may propose changes back to it: `open` until a PUT sets it. Absent in a PUT keeps\nwhat is stored, and Keel always answers it; a private project takes no proposals, whatever it says. Every change is audited by\nProjectSettingsChanged."
           }
         },
         "additionalProperties": {
@@ -26313,6 +26330,13 @@
             "type": "string",
             "maxLength": 65536,
             "description": "What the proposer said of the new commit."
+          },
+          "footprint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.FootprintEntry"
+            },
+            "description": "Each path the new commit touches against the proposal's base: its footprint from now on. Absent on older events."
           }
         },
         "additionalProperties": {

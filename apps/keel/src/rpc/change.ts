@@ -374,8 +374,17 @@ export type ChangeWorkspace = typeof ChangeWorkspace.Type;
 export const PrecheckStartedCommand = Schema.Struct({
   revision: Schema.Int,
   instanceId: Schema.NonEmptyString,
+  /** The commit the run was started for: refused once the change carries another. */
+  commitSha: CommitSha,
 });
 export type PrecheckStartedCommand = typeof PrecheckStartedCommand.Type;
+
+/** Precheck asks, before it reads any code, whether its pass may still derive. */
+export const PrecheckDerivingCommand = Schema.Struct({
+  revision: Schema.Int,
+  instanceId: Schema.NonEmptyString,
+});
+export type PrecheckDerivingCommand = typeof PrecheckDerivingCommand.Type;
 
 /**
  * Precheck refused the submission. Commits, in one transaction, VerdictIssued
@@ -462,7 +471,11 @@ const Mutation = Schema.Union([
 /** A wait's answer: the change with its project, or `waiting` with the subscriber recorded. */
 const AwaitedChange = Schema.Union([
   Schema.Struct({ change: Change, projectId: ProjectId }),
-  Schema.Struct({ waiting: Schema.Literal(true) }),
+  Schema.Struct({
+    waiting: Schema.Literal(true),
+    /** A proposal waiting for a maintainer's approval of its commit. */
+    forApproval: Schema.optional(Schema.Literal(true)),
+  }),
 ]);
 
 export const ChangeCodecs = {
@@ -603,12 +616,14 @@ export const ChangeCodecs = {
   submission: exitCodec(SubmissionStatus, ChangeNotFound),
   workspace: exitCodec(ChangeWorkspace, PrecheckRefusal),
   precheckStarted: exitCodec(Change, PrecheckRefusal),
+  precheckDeriving: exitCodec(Schema.Void, PrecheckRefusal),
   effectsDerived: exitCodec(Change, PrecheckRefusal),
   precheckRefused: exitCodec(
     Schema.Struct({ change: Change, verdictId: VerdictId }),
     PrecheckRefusal,
   ),
   planCompiled: exitCodec(Change, Schema.Union([ChangeNotFound, ChangeStateRefused])),
+  flowQuestionAsked: exitCodec(Schema.Boolean, ChangeNotFound),
   tellPreview: exitCodec(Schema.Void, Schema.Never),
 };
 
@@ -667,9 +682,13 @@ export interface ChangeRpc extends EventReceiverRpc {
   /** The change's workspace, base and project, for Precheck's diff. ChangeStateRefused when it holds no workspace. */
   workspace(): Promise<ExitJson>;
   precheckStarted(command: typeof PrecheckStartedCommand.Encoded): Promise<ExitJson>;
+  /** Whether Precheck's pass may still derive: ChangeStateRefused unless the change derives in that run, at that revision. */
+  precheckDeriving(command: typeof PrecheckDerivingCommand.Encoded): Promise<ExitJson>;
   effectsDerived(command: typeof EffectsDerivedCommand.Encoded): Promise<ExitJson>;
   precheckRefused(command: typeof PrecheckRefusedCommand.Encoded): Promise<ExitJson>;
   planCompiled(command: typeof PlanCompiledCommand.Encoded): Promise<ExitJson>;
+  /** Whether the change still asks this question on how Keel verifies it: false once it took it back. */
+  flowQuestionAsked(escalationId: string): Promise<ExitJson>;
   /** Tells the change where its candidate's preview answers, committing PreviewDeployed once. */
   tellPreview(command: typeof TellPreviewCommand.Encoded): Promise<ExitJson>;
 }

@@ -162,6 +162,12 @@ export async function changeUnderTest(
     get,
     /** The change as it stands; throws if it cannot be read. */
     current: async () => ok(await get()),
+    /** The commit the change carries, which a Precheck run is started for; throws when it carries none. */
+    carried: async () => {
+      const { commitSha } = ok(await get());
+      if (commitSha === undefined) throw new Error(`${changeId} carries no commit`);
+      return commitSha;
+    },
     declare: async (
       idempotencyKey = "declare-1",
       intent: {

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/settings.test.ts
+# kills: console.settings-proposals
+# why: the console offers to open proposals on a private project, which takes none whatever its settings say
+diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
+index 4a83fd29..6921810f 100644
+--- a/apps/console/src/engine/settings.ts
++++ b/apps/console/src/engine/settings.ts
+@@ -45,7 +45,6 @@ export function proposalsBy(
+  * them, and for settings kept before there was the setting); a private project takes none, whatever they say.
+  */
+ export function proposalsSaid(settings: ProjectSettings): ProposalsSaid {
+-  if (settings.visibility !== "public") return "none";
+   return settings.proposals ?? "open";
+ }
+ 

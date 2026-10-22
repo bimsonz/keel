@@ -8,12 +8,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   approveProposal,
+  awaitSubmission,
   changeWorkspace,
   closeProposal,
+  copiesOwed,
   decisionIdOf,
   FLOW_RULING_APPROVE,
   flowRulingIdOf,
   getChange,
+  giveBackCopies,
   planCompiled,
   precheckStarted,
   propose,
@@ -40,7 +43,9 @@ import {
   EventOutbox,
   HumanGate,
   KEEL_PROPOSAL_REF,
+  NamespaceUsage,
   type WithdrawRequest,
+  WorkspaceRebaser,
 } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -57,6 +62,7 @@ import {
   sampleProjectId,
 } from "@keeltown/testing";
 import { ChangeBounced } from "@keeltown/core/domain/coordination";
+import { PushRejected } from "@keeltown/core/domain/integration";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 
@@ -83,12 +89,37 @@ const MAIN = "refs/heads/main";
 function proposalObject(options: { readonly quota?: number } = {}) {
   const clock = makeManualClock();
   const code = makeCodeHostMemory();
-  const usage = makeNamespaceUsageMemory({
+  const counting = makeNamespaceUsageMemory({
     clock,
     ...(options.quota === undefined
       ? {}
       : { quotas: { defaults: { "repo-bytes": options.quota } } }),
   });
+  /** What was admitted and given back, as the namespaces' objects were asked. */
+  const counted: {
+    readonly method: "admit" | "record";
+    readonly namespace: NamespaceId;
+    readonly amount: number;
+    readonly key: string;
+  }[] = [];
+  const usage = {
+    layer: Layer.effect(
+      NamespaceUsage,
+      Effect.map(NamespaceUsage, (inner) =>
+        NamespaceUsage.of({
+          ...inner,
+          admit: (namespace, kind, amount, key) =>
+            Effect.tap(inner.admit(namespace, kind, amount, key), () =>
+              Effect.sync(() => void counted.push({ method: "admit", namespace, amount, key })),
+            ),
+          record: (namespace, kind, amount, key) =>
+            Effect.tap(inner.record(namespace, kind, amount, key), () =>
+              Effect.sync(() => void counted.push({ method: "record", namespace, amount, key })),
+            ),
+        }),
+      ),
+    ).pipe(Layer.provide(counting.layer)),
+  };
   const seeded = Effect.gen(function* () {
     const host = yield* CodeHost;
     const fixture = yield* CodeHostFixture;
@@ -105,6 +136,24 @@ function proposalObject(options: { readonly quota?: number } = {}) {
     yield* host.fork(UPSTREAM_TRUNK, WORKSPACE);
     return { base, proposed, granted };
   }).pipe(Effect.provide(code.layer));
+  /** Whether the next copy's push fails once it has admitted what it copies, as a push the code host refuses midway. */
+  const failingPush = { next: false };
+  const rebaser = Layer.effect(
+    WorkspaceRebaser,
+    Effect.map(WorkspaceRebaser, (held) =>
+      WorkspaceRebaser.of({
+        ...held,
+        pushProposal: (source, workspace, commit, haves, admit) => {
+          const fails = failingPush.next;
+          failingPush.next = false;
+          const pushed = held.pushProposal(source, workspace, commit, haves, admit);
+          return fails
+            ? Effect.andThen(pushed, Effect.fail(new PushRejected({ reason: "refused midway" })))
+            : pushed;
+        },
+      }),
+    ),
+  ).pipe(Layer.provide(makeWorkspaceRebaserMemory(code).layer));
   const layerWith = (granted: CommitSha) => {
     const workspaces = makeWorkspacePoolMemory({ baseSha: granted });
     // Every question a proposal's object takes back, as the namespace's object is asked to.
@@ -132,14 +181,14 @@ function proposalObject(options: { readonly quota?: number } = {}) {
         clock.layer,
         workspaces.layer,
         code.layer,
-        makeWorkspaceRebaserMemory(code).layer,
+        rebaser,
         usage.layer,
         makeLiveChangesMemory().layer,
         makeDecisionsMemory().layer,
       ),
     };
   };
-  return { seeded, layerWith, code };
+  return { seeded, layerWith, code, counted, failingPush };
 }
 
 const proposing = (
@@ -223,6 +272,10 @@ const receive = (event: EventEnvelope) =>
 
 const tagsOf = (log: readonly { readonly type: string }[]) => log.map((e) => e.type);
 
+/** A footprint in path order. */
+const byPath = (f: readonly { readonly path: string }[]) =>
+  f.toSorted((a, b) => a.path.localeCompare(b.path));
+
 describe("a proposal on its Change DO", () => {
   it.effect(
     "[change.proposal-flow-at] a proposal's workspace has Precheck read its checks at the upstream head it was granted at, never at its base, where its fork last met the upstream",
@@ -271,7 +324,11 @@ describe("a proposal on its Change DO", () => {
             "ChangeSubmitted",
           ]);
 
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           const parked = yield* planCompiled(changeId, compiling("precheck-1"));
           expect(parked).toMatchObject({
             state: "parked",
@@ -334,7 +391,11 @@ describe("a proposal on its Change DO", () => {
         const { layer } = object.layerWith(granted);
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1"));
           const asked = yield* requestProposalChanges(changeId, {
             by: MAINTAINER,
@@ -400,7 +461,11 @@ describe("a proposal on its Change DO", () => {
         ).pipe(Effect.provide(object.code.layer));
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1"));
           yield* approveProposal(changeId, {
             by: MAINTAINER,
@@ -445,7 +510,11 @@ describe("a proposal on its Change DO", () => {
         ).pipe(Effect.provide(object.code.layer));
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1"));
           yield* approveProposal(changeId, {
             by: MAINTAINER,
@@ -508,7 +577,11 @@ describe("a proposal on its Change DO", () => {
         const kept = object.layerWith(granted);
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           const parked = yield* planCompiled(changeId, compiling("precheck-1", true));
           expect(parked).toMatchObject({ state: "parked", parkReason: "awaiting-approval" });
           const before = (yield* EventOutbox).log(changeRef).length;
@@ -528,7 +601,11 @@ describe("a proposal on its Change DO", () => {
         const sent = again.layerWith(seeded.granted);
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(seeded.proposed, seeded.base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: seeded.proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1", true));
           yield* receive(ruledOn(flowRulingIdOf(changeId, "precheck-1"), "refuse"));
           const bounced = yield* getChange(changeId);
@@ -560,7 +637,11 @@ describe("a proposal on its Change DO", () => {
         ).pipe(Effect.provide(object.code.layer));
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1", true));
           yield* updateProposal(changeId, {
             proposer: PROPOSER,
@@ -574,7 +655,11 @@ describe("a proposal on its Change DO", () => {
           expect(withdrawn.map((w) => [w.namespace, w.escalationId])).toEqual([
             [UPSTREAM_NAMESPACE, flowRulingIdOf(changeId, "precheck-1")],
           ]);
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-2" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-2",
+            commitSha: later,
+          });
           yield* planCompiled(changeId, compiling("precheck-2", true));
           yield* closeProposal(changeId, {
             by: PROPOSER,
@@ -599,7 +684,11 @@ describe("a proposal on its Change DO", () => {
         const { layer } = object.layerWith(granted);
         yield* Effect.gen(function* () {
           yield* propose(changeId, proposing(proposed, base));
-          yield* precheckStarted(changeId, { revision: 1, instanceId: "precheck-1" });
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
           yield* planCompiled(changeId, compiling("precheck-1", true));
           const waiting = yield* approveProposal(changeId, {
             by: MAINTAINER,
@@ -615,6 +704,253 @@ describe("a proposal on its Change DO", () => {
           });
           yield* receive(ruledOn(flowRulingIdOf(changeId, "precheck-1"), FLOW_RULING_APPROVE));
           expect((yield* getChange(changeId)).state).toBe("queued");
+        }).pipe(Effect.provide(layer));
+      });
+    },
+  );
+  it.effect(
+    "[precheck.start-bound] a proposal moved while Precheck reads it: the run started for the commit it carried is refused at its start, a run for the new commit starts, and moved again while that run derives, its plan is refused and the next run's is taken",
+    () => {
+      const object = proposalObject();
+      return Effect.gen(function* () {
+        const { base, proposed, granted } = yield* object.seeded;
+        const [later, latest] = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+          Effect.all([
+            fixture.commit(FORK_TRUNK, MAIN, { "retry.ts": "export const retry = 2;\n" }),
+            fixture.commit(FORK_TRUNK, MAIN, { "retry.ts": "export const retry = 3;\n" }),
+          ]),
+        ).pipe(Effect.provide(object.code.layer));
+        const { layer } = object.layerWith(granted);
+        const moving = (commit: typeof proposed, idempotencyKey: string) =>
+          updateProposal(changeId, {
+            proposer: PROPOSER,
+            fork: { projectId: FORK, trunk: FORK_TRUNK },
+            commit,
+            base,
+            namespace: NAMESPACE,
+            projectId: sampleProjectId,
+            idempotencyKey,
+          });
+        yield* Effect.gen(function* () {
+          yield* propose(changeId, proposing(proposed, base));
+          // Moved before its first run started.
+          yield* moving(later, "update-1");
+          const first = yield* Effect.exit(
+            precheckStarted(changeId, {
+              revision: 1,
+              instanceId: "precheck-1",
+              commitSha: proposed,
+            }),
+          );
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-2",
+            commitSha: later,
+          });
+          // Moved again while that run derives.
+          yield* moving(latest, "update-2");
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-3",
+            commitSha: latest,
+          });
+          const second = yield* Effect.exit(planCompiled(changeId, compiling("precheck-2")));
+          const third = yield* planCompiled(changeId, compiling("precheck-3"));
+
+          expect(Exit.isFailure(first) && JSON.stringify(first.cause)).toContain(
+            "ChangeStateRefused",
+          );
+          expect(Exit.isFailure(second) && JSON.stringify(second.cause)).toContain(
+            "ChangeStateRefused",
+          );
+          expect(third).toMatchObject({
+            state: "parked",
+            parkReason: "awaiting-approval",
+            commitSha: latest,
+          });
+        }).pipe(Effect.provide(layer));
+      });
+    },
+  );
+  it.effect(
+    "[proposals.update-footprint] a proposal moved to another commit carries that commit's footprint, every path it touches against its base, on the change and on ProposalUpdated, which its project's index hears; [proposals.update-footprint-old-subscription] so does a project whose index was subscribed before it heard moves",
+    () => {
+      const object = proposalObject();
+      return Effect.gen(function* () {
+        const { base, proposed, granted } = yield* object.seeded;
+        const later = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+          fixture.commit(FORK_TRUNK, MAIN, {
+            "README.md": "upstream\n",
+            "retry.ts": "export const retry = 2;\n",
+            "backoff.ts": "export const backoff = 100;\n",
+          }),
+        ).pipe(Effect.provide(object.code.layer));
+        const { layer } = object.layerWith(granted);
+        yield* Effect.gen(function* () {
+          const proposedChange = yield* propose(changeId, proposing(proposed, base));
+          expect(proposedChange.intent.footprint).toEqual([{ path: "retry.ts", op: "create" }]);
+          // As a proposal opened before its project's index heard moves.
+          const outbox = yield* EventOutbox;
+          outbox.unsubscribe(`project:${sampleProjectId}`, ["ProposalUpdated"], changeRef);
+          const moved = yield* updateProposal(changeId, {
+            proposer: PROPOSER,
+            fork: { projectId: FORK, trunk: FORK_TRUNK },
+            commit: later,
+            base,
+            namespace: NAMESPACE,
+            projectId: sampleProjectId,
+            idempotencyKey: "update-1",
+          });
+          const both = [
+            { path: "backoff.ts", op: "create" },
+            { path: "retry.ts", op: "create" },
+          ];
+          expect(byPath(moved.intent.footprint)).toEqual(both);
+          const updated = outbox.log(changeRef).find((event) => event.type === "ProposalUpdated");
+          expect(byPath(Reflect.get(Object(updated?.payload), "footprint") ?? [])).toEqual(both);
+          expect(updated?.notified).toContain(`project:${sampleProjectId}`);
+        }).pipe(Effect.provide(layer));
+      });
+    },
+  );
+  it.effect(
+    "[proposals.giveback-on-close] once a proposal ends, what it copied into its workspace, first and on every move, is given back to its fork's namespace in one record, once; while it is open nothing is owed",
+    () => {
+      const object = proposalObject();
+      return Effect.gen(function* () {
+        const { base, proposed, granted } = yield* object.seeded;
+        const later = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+          fixture.commit(FORK_TRUNK, MAIN, {
+            "README.md": "upstream\n",
+            "retry.ts": "export const retry = 2;\n",
+          }),
+        ).pipe(Effect.provide(object.code.layer));
+        const { layer } = object.layerWith(granted);
+        yield* Effect.gen(function* () {
+          yield* propose(changeId, proposing(proposed, base));
+          yield* updateProposal(changeId, {
+            proposer: PROPOSER,
+            fork: { projectId: FORK, trunk: FORK_TRUNK },
+            commit: later,
+            base,
+            namespace: NAMESPACE,
+            projectId: sampleProjectId,
+            idempotencyKey: "update-1",
+          });
+          const open = yield* copiesOwed(changeId);
+          yield* giveBackCopies(changeId);
+          const copied = object.counted
+            .filter((c) => c.method === "admit")
+            .reduce((sum, c) => sum + c.amount, 0);
+          expect(open).toBe(false);
+          expect(object.counted.filter((c) => c.method === "record")).toEqual([]);
+
+          yield* closeProposal(changeId, {
+            by: PROPOSER,
+            projectId: sampleProjectId,
+            idempotencyKey: "close-1",
+          });
+          const owed = yield* copiesOwed(changeId);
+          yield* giveBackCopies(changeId);
+          yield* giveBackCopies(changeId);
+
+          expect(copied).toBeGreaterThan(0);
+          expect(owed).toBe(true);
+          expect(yield* copiesOwed(changeId)).toBe(false);
+          expect(object.counted.filter((c) => c.method === "record")).toEqual([
+            {
+              method: "record",
+              namespace: NAMESPACE,
+              amount: -copied,
+              key: `proposal-giveback:${changeId}`,
+            },
+          ]);
+        }).pipe(Effect.provide(layer));
+      });
+    },
+  );
+  it.effect(
+    "[proposals.giveback-failed-copy] what a move's copy admitted is owed back though the move then failed: once the proposal ends, its give-back holds every copy counted",
+    () => {
+      const object = proposalObject();
+      return Effect.gen(function* () {
+        const { base, proposed, granted } = yield* object.seeded;
+        const { layer } = object.layerWith(granted);
+        yield* Effect.gen(function* () {
+          yield* propose(changeId, proposing(proposed, base));
+          // A later commit of the fork's, which the first copy did not take.
+          const later = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+            fixture.commit(FORK_TRUNK, MAIN, {
+              "README.md": "upstream\n",
+              "retry.ts": "export const retry = 2;\n",
+            }),
+          );
+          object.failingPush.next = true;
+          const failed = yield* Effect.flip(
+            updateProposal(changeId, {
+              proposer: PROPOSER,
+              fork: { projectId: FORK, trunk: FORK_TRUNK },
+              commit: later,
+              base,
+              namespace: NAMESPACE,
+              projectId: sampleProjectId,
+              idempotencyKey: "update-1",
+            }),
+          );
+          yield* closeProposal(changeId, {
+            by: PROPOSER,
+            projectId: sampleProjectId,
+            idempotencyKey: "close-1",
+          });
+          yield* giveBackCopies(changeId);
+          const admitted = object.counted.filter((c) => c.method === "admit");
+
+          expect(failed).toMatchObject({ _tag: "PushRejected" });
+          expect(admitted.map((c) => c.key)).toEqual([
+            `proposal:${changeId}:${proposed}`,
+            `proposal:${changeId}:${later}`,
+          ]);
+          expect(admitted.map((c) => c.amount > 0)).toEqual([true, true]);
+          expect(object.counted.filter((c) => c.method === "record")).toEqual([
+            {
+              method: "record",
+              namespace: NAMESPACE,
+              amount: -admitted.reduce((sum, c) => sum + c.amount, 0),
+              key: `proposal-giveback:${changeId}`,
+            },
+          ]);
+        }).pipe(Effect.provide(layer));
+      });
+    },
+  );
+  it.effect(
+    "[probe-changes.awaiting-approval] a probe waiting on a proposal is told it waits for its approval, not for a submission, until its commit is approved; then it reads the submission",
+    () => {
+      const object = proposalObject();
+      return Effect.gen(function* () {
+        const { base, proposed, granted } = yield* object.seeded;
+        const { layer } = object.layerWith(granted);
+        yield* Effect.gen(function* () {
+          yield* propose(changeId, proposing(proposed, base));
+          const reading = yield* awaitSubmission(changeId, "workflow:Probe/probe-cfl");
+          yield* precheckStarted(changeId, {
+            revision: 1,
+            instanceId: "precheck-1",
+            commitSha: proposed,
+          });
+          yield* planCompiled(changeId, compiling("precheck-1"));
+          const parked = yield* awaitSubmission(changeId, "workflow:Probe/probe-cfl");
+          yield* approveProposal(changeId, {
+            by: MAINTAINER,
+            commit: proposed,
+            projectId: sampleProjectId,
+            idempotencyKey: "approve-1",
+          });
+          const approved = yield* awaitSubmission(changeId, "workflow:Probe/probe-cfl");
+
+          expect(reading).toEqual({ waiting: true, forApproval: true });
+          expect(parked).toEqual({ waiting: true, forApproval: true });
+          expect(approved).toMatchObject({ change: { commitSha: proposed } });
         }).pipe(Effect.provide(layer));
       });
     },

@@ -11,9 +11,9 @@ import {
 import { Instant, makeId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
-import { Effect, Schema } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
-import { AgentDirectory, EntityStore } from "@keeltown/core/ports";
+import { AgentDirectory, ChangePrecheck, EntityStore } from "@keeltown/core/ports";
 import { expect, vi } from "vitest";
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
@@ -32,6 +32,26 @@ export interface SeededAgent {
  * owned by the user who sponsors them, as the cutover leaves every agent.
  */
 export const POOL_ORG = Schema.decodeSync(NamespaceId)("org_01M4P00000000000000000000A");
+
+const unasked = (method: string) => () => Effect.die(new Error(`${method} is not asked here`));
+
+/**
+ * A ChangePrecheck whose pass may always derive, and that answers nothing
+ * else: for a test taking the derive step alone, on an instance no Change DO
+ * started. The pass's binding is the Change DO's own (precheck-derive.test.ts).
+ */
+export const passDerives = Layer.succeed(
+  ChangePrecheck,
+  ChangePrecheck.of({
+    workspace: unasked("workspace"),
+    started: unasked("started"),
+    deriving: () => Effect.void,
+    refused: unasked("refused"),
+    derived: unasked("derived"),
+    compiled: unasked("compiled"),
+    asks: unasked("asks"),
+  }),
+);
 export const POOL_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000S");
 
 /** A second tenant, org `elsewhere`, for what a caller outside org `pool` sees. */

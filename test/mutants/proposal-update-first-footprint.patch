@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.update-footprint
+# why: a proposal moved to another commit keeps its first commit's footprint, so its review box and nearby name paths it no longer touches
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0c2a20c2..40b698ad 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1640,7 +1640,7 @@ export const updateProposal: (
+         tx,
+         changeId,
+         ["ChangeNotFound", "ChangeStateRefused", "NotAProposal"],
+-        [{ ...moving, footprint: footprintOf(touched) }],
++        [moving],
+       );
+       if (Result.isSuccess(moved)) takeBackFlowQuestions(tx.store, "moved to another commit");
+       return Result.map(moved, asTransition);

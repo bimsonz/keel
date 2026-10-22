@@ -578,6 +578,11 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title:
       "Only its proposer moves a proposal to another commit: propose your own commit from your fork",
   },
+  "left-fork": {
+    kind: "escalate",
+    title:
+      "You no longer stand on the fork this proposal comes from: ask its owners to have you back to move it, or close it",
+  },
 };
 
 const refused = (reason: Exclude<RefusalReason, "role">): Decision =>
@@ -1007,8 +1012,19 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision 
   if (upstream._tag !== "Project") return hidden();
   if (upstream.visibility !== "public" || !proposal.proposalsOpen)
     return refused("proposals-closed");
-  if (principal._tag === "User") return decide(principal, "member", proposal.fork);
-  const works = decide(principal, "work", proposal.fork);
+  return standsOnFork(principal, proposal.fork);
+};
+
+/**
+ * Where a proposer must stand on the fork a proposal comes from: a person a
+ * member of its namespace, an agent working in it that a person sponsors.
+ */
+const standsOnFork = (
+  principal: Exclude<Principal, { readonly _tag: "Anonymous" }>,
+  proposedFrom: ProposalResource["fork"],
+): Decision => {
+  if (principal._tag === "User") return decide(principal, "member", proposedFrom);
+  const works = decide(principal, "work", proposedFrom);
   if (Result.isFailure(works)) return works;
   return principal.sponsored === true ? granted() : refused("sponsor-required");
 };
@@ -1026,7 +1042,9 @@ const approver = (principal: Principal, project: ProposalChangeResource["project
 /**
  * A proposal's own action. Its project is read first, so a proposal of a
  * project the caller may not see is not there; then its proposer alone moves
- * it to another commit, and closes it as whoever may approve it does.
+ * it to another commit, while they still stand on its fork as proposing asks
+ * (`left-fork` otherwise, or `sponsor-required` for an agent nobody sponsors
+ * any more), and closes it as whoever may approve it does, standing or not.
  */
 const onProposalChange = (
   principal: Principal,
@@ -1038,8 +1056,15 @@ const onProposalChange = (
   if (Result.isFailure(read)) return read;
   const theirs = proposed.proposer !== undefined && proposed.proposer === actorOf(principal);
   switch (need) {
-    case "proposer":
-      return theirs ? granted() : refused("proposer-only");
+    case "proposer": {
+      if (!theirs) return refused("proposer-only");
+      const stands =
+        proposed.fork === undefined ? refused("left-fork") : standsOnFork(principal, proposed.fork);
+      if (Result.isSuccess(stands)) return stands;
+      return stands.failure._tag === "AccessRefused" && stands.failure.reason === "sponsor-required"
+        ? stands
+        : refused("left-fork");
+    }
     case "proposerOrApprove":
       return theirs ? granted() : approver(principal, proposed.project);
     case "approve":

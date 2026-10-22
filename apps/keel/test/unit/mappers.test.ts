@@ -57,6 +57,7 @@ import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
 import { createProjectError } from "../../src/adapters/driving/http/operator.ts";
 import {
+  changeBody,
   inboxOk,
   statusOk,
   submitError,
@@ -346,6 +347,26 @@ describe("a status read's next actions", () => {
     expect(unsubmitted.status === 404 && unsubmitted.body.nextActions).toEqual([
       expect.objectContaining({ operationId: "adopt", args: { changeId: lapsed.id } }),
     ]);
+  });
+
+  it("[change-view.park-reason] says why a parked change waits, and on which question: a proposal for its approval, a change for a person's ruling; one not parked says neither", () => {
+    const question = makeId("esc", ulid());
+    const approval = change({ state: "parked", parkReason: "awaiting-approval" });
+    const ruling = change({
+      state: "parked",
+      parkReason: "awaiting-ruling",
+      escalationId: question,
+    });
+    const queued = change({ state: "queued" });
+
+    expect(changeBody(approval)).toMatchObject({ parkReason: "awaiting-approval" });
+    expect(changeBody(approval)).not.toHaveProperty("escalationId");
+    expect(changeBody(ruling)).toMatchObject({
+      parkReason: "awaiting-ruling",
+      escalationId: question,
+    });
+    expect(changeBody(queued)).not.toHaveProperty("parkReason");
+    expect(changeBody(queued)).not.toHaveProperty("escalationId");
   });
 });
 

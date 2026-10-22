@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/proposal.test.ts
+# kills: world.proposal-moved-footprint
+# why: the console shows a moved proposal's first footprint, so its review box names paths the commit a maintainer approves no longer touches
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index a1dd6a6f..17d77c85 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -745,7 +745,6 @@ export class World {
+         }
+         if (change !== undefined) {
+           // What the new commit touches; a move recorded before moves carried one keeps the first.
+-          if (event.payload.footprint !== undefined) change.footprint = event.payload.footprint;
+           delete change.parkedOn;
+           delete change.parkedFrom;
+           delete change.laneId;

@@ -613,6 +613,9 @@ model ProposalUpdated {
   /** What the proposer said of the new commit. */
   @maxLength(65536)
   note?: string;
+
+  /** Each path the new commit touches against the proposal's base: its footprint from now on. Absent on older events. */
+  footprint?: MFP.FootprintEntry[];
 }
 
 /** Someone holding `maintain` approved the proposal at this commit, and only this one: it goes back into the queue to be verified. */

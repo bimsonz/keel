@@ -138,9 +138,10 @@ const deriving = async (c: ChangeUnderTest, instanceId: string) => {
     ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change,
   ).id;
   await submit(c, lease, "submit-1");
-  expect(outcomeOf(await precheck((p) => p.started(c.changeId, { revision: 1, instanceId })))).toBe(
-    "ok",
-  );
+  const commitSha = await c.carried();
+  expect(
+    outcomeOf(await precheck((p) => p.started(c.changeId, { revision: 1, instanceId, commitSha }))),
+  ).toBe("ok");
   return lease;
 };
 
@@ -330,8 +331,11 @@ describe("[b21.effects-derived] Precheck records what it derived, once a pass", 
     );
     expect(outcomeOf(refused)).toBe("ok");
     await submitted(c, lease, await pushAgain(c), "submit-2");
+    const commitSha = await c.carried();
     const again = [
-      outcomeOf(await precheck((p) => p.started(c.changeId, { revision: 1, instanceId: "p-3" }))),
+      outcomeOf(
+        await precheck((p) => p.started(c.changeId, { revision: 1, instanceId: "p-3", commitSha })),
+      ),
       outcomeOf(await precheck((p) => p.derived(c.changeId, derivation("p-3", [])))),
     ];
     expect(again).toEqual(["ok", "ok"]);
@@ -356,7 +360,8 @@ describe("[b21.effects-derived] Precheck records what it derived, once a pass", 
     const effects = [derivedAtLeaf("per-session")];
 
     const early = await precheck((p) => p.derived(c.changeId, derivation("p-1", effects)));
-    await precheck((p) => p.started(c.changeId, { revision: 1, instanceId: "p-1" }));
+    const commitSha = await c.carried();
+    await precheck((p) => p.started(c.changeId, { revision: 1, instanceId: "p-1", commitSha }));
     const stale = await precheck((p) => p.derived(c.changeId, derivation("p-1", effects, 2)));
     const unknown = await precheck((p) =>
       p.derived(makeId("chg", ulid()), derivation("p-1", effects)),
@@ -373,6 +378,48 @@ describe("[b21.effects-derived] Precheck records what it derived, once a pass", 
     ).toBe("ok");
     await drainOutbox(c.stub);
     await vi.waitFor(async () => expect(await held.get()).toHaveLength(1), WAIT);
+  });
+
+  it("[b21.deriving-bound] a pass may derive only while the change derives in that run, at that revision: before its start, another run, a stale revision, an unknown change and a pass the change moved on from are refused", async () => {
+    await using held = await inertPrecheck();
+    const { change } = await project();
+    const c = await change();
+    const lease = heldLease(
+      ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change,
+    ).id;
+    await submit(c, lease, "submit-1");
+    const ask = async (instanceId: string, revision = 1, changeId = c.changeId) =>
+      outcomeOf(await precheck((p) => p.deriving(changeId, { revision, instanceId })));
+    const early = await ask("p-1");
+    const commitSha = await c.carried();
+    await precheck((p) => p.started(c.changeId, { revision: 1, instanceId: "p-1", commitSha }));
+    const asked = [
+      early,
+      await ask("p-1"),
+      await ask("p-0"),
+      await ask("p-1", 2),
+      await ask("p-1", 1, makeId("chg", ulid())),
+    ];
+    // Sent back and submitted again with new code: the first pass is no longer the change's.
+    await precheck((p) =>
+      p.refused(c.changeId, {
+        revision: 1,
+        instanceId: "p-1",
+        reasons: ["precheck:protected:src/secret.ts (src/secret*)"],
+        nextActions: [{ kind: "call", title: "Submit again", operationId: "submit" }],
+      }),
+    );
+    await submitted(c, lease, await pushAgain(c), "submit-2");
+    expect([...asked, await ask("p-1")]).toEqual([
+      "ChangeStateRefused",
+      "ok",
+      "ChangeStateRefused",
+      "ChangeStateRefused",
+      "ChangeNotFound",
+      "ChangeStateRefused",
+    ]);
+    await drainOutbox(c.stub);
+    await vi.waitFor(async () => expect(await held.get()).toHaveLength(2), WAIT);
   });
 
   it("[b21.workspace-intent] the workspace Precheck reads carries the change's current intent", async () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proposals.test.ts
+# kills: proposal.propose-serial
+# why: a propose retried while the first is still copying pushes over it, and when refused gives back the workspace the first commits with
+diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
+index 24cf4308..370908d3 100644
+--- a/apps/keel/src/adapters/driving/do/change.ts
++++ b/apps/keel/src/adapters/driving/do/change.ts
+@@ -242,7 +242,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+ 
+   /** Runs `call` once every copy before it has answered, whatever it answered. */
+   private oneCopyAtATime<A>(call: () => Promise<A>): Promise<A> {
+-    const turn = this.copying.then(call, call);
++    const turn = call();
+     this.copying = turn.catch(() => undefined);
+     return turn;
+   }

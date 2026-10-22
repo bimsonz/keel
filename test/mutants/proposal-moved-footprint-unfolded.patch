@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.update-footprint
+# why: the change folds a move without its footprint, so the change keeps the first commit's paths though the event names the new ones
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 49d4eac8..af39a259 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -1250,9 +1250,6 @@ export const evolveChange = (
+           "batchId",
+           "laneId",
+         ]),
+-        ...(event.footprint === undefined
+-          ? {}
+-          : { intent: { ...change.intent, footprint: event.footprint } }),
+         proposal,
+       };
+     }

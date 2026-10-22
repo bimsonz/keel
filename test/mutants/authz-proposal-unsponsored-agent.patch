@@ -2,12 +2,12 @@
 # kills: authz.proposals
 # why: an agent nobody sponsors proposes from a fork it works in
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e40376fe..3cd9a942 100644
+index cc146b62..cc7c9578 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -1010,7 +1010,7 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision
-   if (principal._tag === "User") return decide(principal, "member", proposal.fork);
-   const works = decide(principal, "work", proposal.fork);
+@@ -1026,7 +1026,7 @@ const standsOnFork = (
+   if (principal._tag === "User") return decide(principal, "member", proposedFrom);
+   const works = decide(principal, "work", proposedFrom);
    if (Result.isFailure(works)) return works;
 -  return principal.sponsored === true ? granted() : refused("sponsor-required");
 +  return granted();

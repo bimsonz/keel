@@ -23,6 +23,8 @@ import {
   sampleProjectId,
   ulidOf,
   heldLease,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
@@ -64,6 +66,8 @@ function changeObject() {
     makeCodeHostMemory().layer,
     makeLiveChangesMemory().layer,
     makeDecisionsMemory().layer,
+    makeEscalationsMemory().gate,
+    makeProjectNamespacesMemory().layer,
   );
 }
 

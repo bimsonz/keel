@@ -744,6 +744,8 @@ export class World {
           change.proposal = { ...proposal, commit: event.payload.commit };
         }
         if (change !== undefined) {
+          // What the new commit touches; a move recorded before moves carried one keeps the first.
+          if (event.payload.footprint !== undefined) change.footprint = event.payload.footprint;
           delete change.parkedOn;
           delete change.parkedFrom;
           delete change.laneId;

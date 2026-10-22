@@ -360,6 +360,13 @@ function changeView(change: Change, tell: Teller) {
     origin: change.origin,
     ...proposalView(change),
     state: change.state,
+    // Why it waits, and on which question, while it is parked.
+    ...(change.state !== "parked" || change.parkReason === undefined
+      ? {}
+      : {
+          parkReason: change.parkReason,
+          ...(change.escalationId === undefined ? {} : { escalationId: change.escalationId }),
+        }),
     revision: change.intent.revision,
     goal: change.intent.goal,
     footprint: change.intent.footprint.map(footprintView),

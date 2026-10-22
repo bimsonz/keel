@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.retry-counted-once
+# why: a proposal's retry under its key counts again, so a client retrying a slow propose spends its day's allowance
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 5e2431fe..e2e8523b 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -133,7 +133,7 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+     idempotencyKey: input.idempotencyKey,
+     fingerprint: input.fingerprint,
+   });
+-  const counted = `propose:${input.upstream}:${changeId}`;
++  const counted = `propose:${input.upstream}:${Math.random()}`;
+   yield* admitAccountRate(input.account, "proposals", counted).pipe(
+     Effect.tapError(() =>
+       ledger.release(input.upstream, {

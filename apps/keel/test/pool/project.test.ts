@@ -116,6 +116,7 @@ async function projectUnderTest(options: { readonly failSyncOnce?: boolean } = {
       readonly maxBatchSize: number;
       readonly verification?: "required" | "off";
       readonly visibility?: "private" | "public";
+      readonly proposals?: "open" | "closed";
     },
     requestId: string,
   ) =>
@@ -352,7 +353,7 @@ describe("a project's settings over real RPC", () => {
     expect(changes[0]).toMatchObject({ actor: `user:${p.maintainer}`, project: p.projectId });
   });
 
-  it("[b12.settings-audit] audits every field a PUT changes, and an absent verification turns it back on", async () => {
+  it("[b12.settings-audit] audits every field a PUT changes, and [settings.absent-keeps] an absent verification keeps what is stored", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
     ok(await p.putSettings({ protectedPaths: [], maxBatchSize: 8, verification: "off" }, "req-1"));
@@ -364,7 +365,7 @@ describe("a project's settings over real RPC", () => {
     expect(replaced).toEqual({
       protectedPaths: ["infra/**"],
       maxBatchSize: 4,
-      verification: "required",
+      verification: "off",
       visibility: "private",
       proposals: "open",
     });
@@ -374,10 +375,49 @@ describe("a project's settings over real RPC", () => {
         changes: [
           { field: "protectedPaths", from: [], to: ["infra/**"] },
           { field: "maxBatchSize", from: 8, to: 4 },
-          { field: "verification", from: "off", to: "required" },
         ],
       },
     ]);
+  });
+
+  it("[settings.absent-keeps] a PUT that leaves out proposals, visibility and verification keeps what is stored for each: a client that does not know a field never changes it", async () => {
+    const p = await projectUnderTest();
+    ok(await p.create());
+    ok(
+      await p.putSettings(
+        {
+          protectedPaths: [],
+          maxBatchSize: 8,
+          verification: "off",
+          visibility: "public",
+          proposals: "closed",
+        },
+        "req-1",
+      ),
+    );
+    const kept = ok(
+      await p.putSettings({ protectedPaths: ["infra/**"], maxBatchSize: 8 }, "req-2"),
+    );
+
+    expect(kept).toEqual({
+      protectedPaths: ["infra/**"],
+      maxBatchSize: 8,
+      verification: "off",
+      visibility: "public",
+      proposals: "closed",
+    });
+    expect(ok(await p.settings())).toEqual(kept);
+  });
+
+  it("[settings.replay-after-move] a PUT replayed under its request id after another PUT moved what it left out answers the settings as they stand, not a conflict", async () => {
+    const p = await projectUnderTest();
+    ok(await p.create());
+    const first = { protectedPaths: [], maxBatchSize: 8 };
+    ok(await p.putSettings(first, "req-1"));
+    ok(await p.putSettings({ ...first, proposals: "closed" }, "req-2"));
+    const replayed = await p.putSettings(first, "req-1");
+
+    expect(ok(replayed)).toMatchObject({ proposals: "closed" });
   });
 });
 
@@ -466,7 +506,7 @@ describe("a project's settings through the operator routes", () => {
     expect(await settingsChanges(p)).toHaveLength(1);
   });
 
-  it("[proposals.setting] a project takes proposals unless its settings close them: open by default, closed by a PUT that says so and audited, and open again when a PUT leaves them out", async () => {
+  it("[proposals.setting] a project takes proposals unless its settings close them: open by default, closed by a PUT that says so and audited, kept closed by a PUT that leaves them out, and open again when a PUT says so", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
     await placeProject(p.projectId);
@@ -475,12 +515,14 @@ describe("a project's settings through the operator routes", () => {
 
     const before = await settingsCall(user, p.projectId);
     const closed = await settingsCall(user, p.projectId, { ...put, proposals: "closed" });
-    const reopened = await settingsCall(user, p.projectId, put);
+    const kept = await settingsCall(user, p.projectId, put);
+    const reopened = await settingsCall(user, p.projectId, { ...put, proposals: "open" });
     const changes = await settingsChanges(p);
 
     expect(await before.json()).toMatchObject({ proposals: "open" });
     expect(closed.status).toBe(200);
     expect(await closed.json()).toMatchObject({ proposals: "closed" });
+    expect(await kept.json()).toMatchObject({ proposals: "closed" });
     expect(await reopened.json()).toMatchObject({ proposals: "open" });
     expect(changes.map((event) => event.payload)).toMatchObject([
       { changes: [{ field: "proposals", from: "open", to: "closed" }] },
@@ -488,7 +530,7 @@ describe("a project's settings through the operator routes", () => {
     ]);
   });
 
-  it("[b12.settings-visibility] keeps a public project public, audits each change, and reads settings stored before visibility as private", async () => {
+  it("[b12.settings-visibility] keeps a public project public, through a PUT that leaves visibility out too, audits each change, and reads settings stored before visibility as private", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
     await placeProject(p.projectId);
@@ -497,7 +539,8 @@ describe("a project's settings through the operator routes", () => {
 
     const published = await settingsCall(user, p.projectId, { ...put, visibility: "public" });
     const readPublic = await settingsCall(user, p.projectId);
-    const hidden = await settingsCall(user, p.projectId, put);
+    const kept = await settingsCall(user, p.projectId, put);
+    const hidden = await settingsCall(user, p.projectId, { ...put, visibility: "private" });
     const changes = await settingsChanges(p);
     // A row written before `visibility` existed: the stored settings hold none.
     await runInDurableObject(p.stub, (instance: ProjectDO) =>
@@ -515,6 +558,7 @@ describe("a project's settings through the operator routes", () => {
     expect(published.status).toBe(200);
     expect(await published.json()).toMatchObject({ visibility: "public" });
     expect(await readPublic.json()).toMatchObject({ visibility: "public" });
+    expect(await kept.json()).toMatchObject({ visibility: "public" });
     expect(await hidden.json()).toMatchObject({ visibility: "private" });
     expect(changes.map((event) => event.payload)).toMatchObject([
       { changes: [{ field: "visibility", from: "private", to: "public" }] },

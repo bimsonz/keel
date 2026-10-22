@@ -39,6 +39,8 @@ import {
   makeWorkspaceWriterMemory,
   sampleProjectId,
   heldLease,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Fiber, Layer, Result, Schema } from "effect";
 import { DeclareCommand, SubmitCommand } from "../../src/rpc/index.ts";
@@ -92,6 +94,8 @@ function world() {
       writer.layer,
       makeLiveChangesMemory().layer,
       makeDecisionsMemory().layer,
+      makeEscalationsMemory().gate,
+      makeProjectNamespacesMemory().layer,
     );
   return { clock, code, writer, asked, seeded, layerFor };
 }

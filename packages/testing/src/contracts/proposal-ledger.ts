@@ -43,5 +43,27 @@ export function describeProposalLedgerContract(
           expect(ids).not.toContain(yield* reserve(bob, "k1"));
         }).pipe(Effect.provide(make())),
     );
+
+    it.live(
+      "[proposals.contract.release] a place given back is free at once, and its key reserves anew; a key that reserved nothing gives back nothing",
+      () =>
+        Effect.gen(function* () {
+          const ledger = yield* ProposalLedger;
+          const projectId: ProjectId = makeId("prj", fresh());
+          const ann = userActor(makeId("usr", fresh()));
+          const reserve = (key: string) =>
+            ledger.reserve(projectId, { proposer: ann, idempotencyKey: key, fingerprint: key });
+          const release = (key: string) =>
+            ledger.release(projectId, { proposer: ann, idempotencyKey: key });
+          const ids: ChangeId[] = [];
+          for (let n = 1; n <= MAX_OPEN_PROPOSALS; n += 1) ids.push(yield* reserve(`k${n}`));
+          yield* release("never");
+          expect(yield* Effect.flip(reserve("extra"))).toMatchObject({ _tag: "ProposalLimit" });
+          yield* release("k1");
+          expect(ids).not.toContain(yield* reserve("extra"));
+          // Its key no longer holds a place: reserving it again is a new reservation, past the cap.
+          expect(yield* Effect.flip(reserve("k1"))).toMatchObject({ _tag: "ProposalLimit" });
+        }).pipe(Effect.provide(make())),
+    );
   });
 }

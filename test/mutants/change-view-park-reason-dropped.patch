@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts
+# kills: change-view.park-reason
+# why: a change's body never says why it is parked, so a client cannot tell a proposal waiting for approval from a change waiting for a ruling
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index c32936a2..e9b75920 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -364,7 +364,6 @@ function changeView(change: Change, tell: Teller) {
+     ...(change.state !== "parked" || change.parkReason === undefined
+       ? {}
+       : {
+-          parkReason: change.parkReason,
+           ...(change.escalationId === undefined ? {} : { escalationId: change.escalationId }),
+         }),
+     revision: change.intent.revision,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-ledger.test.ts
+# kills: proposal-ledger.pruned
+# why: a reservation prunes every proposer's lapsed places but not their keys, so another proposer's retry finds a reservation with no place
+diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
+index 4bd30333..cbf79861 100644
+--- a/packages/core/src/application/coordination/proposal-ledger.ts
++++ b/packages/core/src/application/coordination/proposal-ledger.ts
+@@ -55,7 +55,7 @@ const openKey = (proposer: string, changeId: string) => `${proposer}/${changeId}
+  * that arrives after all holds its place again (`hearProposal`).
+  */
+ const pruneLapsed = (store: Store, proposer: string, now: number): void => {
+-  for (const { id, value } of store.list(OPEN, `${proposer}/`)) {
++  for (const { id, value } of store.list(OPEN)) {
+     const open = decodeOpen(value);
+     if (open.proposed || now - open.at <= RESERVATION_TTL_MS) continue;
+     const changeId = id.slice(proposer.length + 1);

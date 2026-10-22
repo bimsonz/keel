@@ -2,14 +2,14 @@
 # kills: d21.pool.derived-stale
 # why: A change that moved on before its derivation was committed is decided and compiled anyway, so a plan is stored and recorded for a revision the change has left
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 908f4187..d94d16c4 100644
+index 28b5c54a..2a8d033f 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -158,7 +158,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+@@ -186,7 +186,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
          const derived = await step.do("derived", () =>
-           settle(runtime, commitDerivation(namespace, submission, kept.derivationRef)),
+           settle(runtime, commitDerivation(namespace, submission, kept.value.derivationRef)),
          );
 -        if (derived._tag === "Stale") return derived;
          return {
            _tag: "Done",
-           value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
+           value: { ...read, subjects: planSubjects(workspace.subjects, kept.value.subjects) },

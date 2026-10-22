@@ -18,6 +18,11 @@ const FIRST = "a".repeat(40);
 const SECOND = "b".repeat(40);
 const ANN = "user:usr_01J9PPPPPPPPPPPPPPPPPPPPPP";
 const MAY = "user:usr_01J9MMMMMMMMMMMMMMMMMMMMMM";
+const FIRST_PATHS = [{ path: "src/push.ts", op: "edit" as const }];
+const MOVED_PATHS = [
+  { path: "src/push.ts", op: "edit" as const },
+  { path: "test/push.test.ts", op: "create" as const },
+];
 
 /** A proposal's log as its Change object commits it, up to `upTo` steps: proposed, compiled and parked, asked for changes, moved, approved. */
 function proposed(upTo: number): World {
@@ -33,7 +38,7 @@ function proposed(upTo: number): World {
           origin: "proposal",
           revision: 1,
           goal: "Retry a refused push",
-          footprint: [],
+          footprint: FIRST_PATHS,
           premises: [],
         },
       });
@@ -73,7 +78,7 @@ function proposed(upTo: number): World {
       b.at(4).emit({
         type: "ProposalUpdated",
         entity,
-        payload: { changeId: PROPOSAL, commit: SECOND },
+        payload: { changeId: PROPOSAL, commit: SECOND, footprint: MOVED_PATHS },
       }),
     () =>
       b.at(5).emit({
@@ -117,5 +122,13 @@ describe("a proposal in the console's world", () => {
     expect(moved?.parkedOn).toBeUndefined();
     const approved = proposed(5).changes.get(PROPOSAL);
     expect(approved?.proposal?.approved).toBe(SECOND);
+  });
+
+  it("[world.proposal-moved-footprint] a proposal moved to another commit shows that commit's footprint, on its page too", () => {
+    expect(proposed(3).changes.get(PROPOSAL)?.footprint).toEqual(FIRST_PATHS);
+    expect(proposed(4).changes.get(PROPOSAL)?.footprint).toEqual(MOVED_PATHS);
+    expect(changePageOf(proposed(4), PROPOSAL, NO_RESOURCES)?.intent.footprint).toEqual(
+      MOVED_PATHS,
+    );
   });
 });

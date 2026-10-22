@@ -589,3 +589,41 @@ describe("[t694.claim] alternatives by claim key", () => {
     expect(heard.toSorted(byTarget)).toEqual(expected.toSorted(byTarget));
   });
 });
+
+describe("[live-index.proposal-moved] a proposal moved to another commit", () => {
+  it("[live-index.proposal-moved] is found near by the footprint of the commit it carries now, and no longer by the one it left", () => {
+    const at = index();
+    const moved = changeOf(0);
+    at.hear(
+      declared(0, {
+        goal: "Retry the fetch",
+        footprint: [{ path: "docs/retry.md", op: "create" }],
+        premises: [],
+      }),
+    );
+    at.hear(
+      eventOf(moved, {
+        _tag: "ProposalUpdated",
+        changeId: moved,
+        commit: "a".repeat(40),
+        footprint: [
+          { path: "src/retry.ts", op: "create" },
+          { path: "src/fetch.ts", op: "edit" },
+        ],
+      }),
+    );
+    const nearTo = (path: string) =>
+      liveNear(
+        at.store,
+        OUTSIDER,
+        decodeIntent({
+          revision: 1,
+          goal: "read",
+          footprint: [{ path, op: "edit" }],
+          premises: [],
+        }),
+      ).changes.map((live) => live.id);
+    expect(nearTo("src/fetch.ts")).toEqual([moved]);
+    expect(nearTo("docs/retry.md")).toEqual([]);
+  });
+});

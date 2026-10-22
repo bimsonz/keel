@@ -61,7 +61,7 @@ const started = async (c: ChangeUnderTest, instanceId: string) =>
   ok(
     decodeExit(
       ChangeCodecs.precheckStarted,
-      await c.stub.precheckStarted({ revision: 1, instanceId }),
+      await c.stub.precheckStarted({ revision: 1, instanceId, commitSha: await c.carried() }),
     ),
   );
 

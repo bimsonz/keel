@@ -4,6 +4,7 @@ import {
   liveAnchors,
   liveGoalOf,
   liveNear,
+  releaseProposal,
   reserveProposal,
 } from "@keeltown/core/application/coordination";
 import {
@@ -61,6 +62,7 @@ import {
   type ProjectRpc,
   PutSettingsCommand,
   RecordDeploymentCommand,
+  ReleaseProposalCommand,
   ReserveProposalCommand,
   SetDeployTargetCommand,
 } from "../../../rpc/index.ts";
@@ -244,6 +246,17 @@ export class ProjectDO
       Schema.decodeUnknownEffect(ReserveProposalCommand)(command).pipe(
         Effect.orDie,
         Effect.flatMap((reservation) => reserveProposal(projectId, reservation)),
+      ),
+    );
+  }
+
+  /** Gives back the place a proposal refused before it was made reserved. */
+  async releaseProposal(command: typeof ReleaseProposalCommand.Encoded) {
+    return this.answer(
+      ProjectCodecs.releaseProposal,
+      Schema.decodeUnknownEffect(ReleaseProposalCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap(releaseProposal),
       ),
     );
   }

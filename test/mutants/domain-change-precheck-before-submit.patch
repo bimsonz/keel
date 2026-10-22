@@ -2,15 +2,15 @@
 # kills: change.transitions, change.decide-evolvable
 # why: Precheck starts on a change that was never submitted
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 8b58b69..33f46cd 100644
+index 7c11109d..3f101e9b 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -423,7 +423,7 @@ export const decideChange = (
+@@ -848,7 +848,7 @@ export const decideChange = (
      }
  
      case "StartPrecheck":
--      return at("submitted")
-+      return at("submitted", "working")
+-      return at("submitted") && command.commitSha === change.commitSha
++      return at("submitted", "working") && command.commitSha === change.commitSha
          ? Result.succeed([
              PrecheckStarted.make({ changeId: id, revision, instanceId: command.instanceId }),
            ])

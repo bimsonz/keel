@@ -2,15 +2,15 @@
 # kills: proposals.limit
 # why: a proposer opens proposals on a project without end
 diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
-index 310a12e7..52813392 100644
+index 4bd30333..3a5ce7b4 100644
 --- a/packages/core/src/application/coordination/proposal-ledger.ts
 +++ b/packages/core/src/application/coordination/proposal-ledger.ts
-@@ -97,7 +97,7 @@ export const reserveProposal = Effect.fn("coordination/reserveProposal")(functio
-       store.put(OPEN, place, { at: now, proposed: false });
+@@ -113,7 +113,7 @@ export const reserveProposal = Effect.fn("coordination/reserveProposal")(functio
+       // Its place holds: a lapsed one went with its reservation, so this key is no retry of it.
        return reserved.changeId;
      }
 -    if (holding(store, reservation.proposer, now) >= MAX_OPEN_PROPOSALS)
 +    if (holding(store, reservation.proposer, now) > Number.MAX_SAFE_INTEGER)
        return new ProposalLimit({ projectId, limit: MAX_OPEN_PROPOSALS });
      store.put(RESERVED, key, { changeId: minted, fingerprint: reservation.fingerprint });
-     store.put(OPEN, openKey(reservation.proposer, minted), { at: now, proposed: false });
+     store.put(OPEN, openKey(reservation.proposer, minted), { at: now, proposed: false, key });

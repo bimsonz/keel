@@ -5,8 +5,16 @@ import {
   NotAForkOf,
   NotAProposal,
   ProposalEmpty,
+  TERMINAL,
 } from "../../domain/coordination/index.ts";
-import type { ChangeId, CommandActor, CommitSha, ProjectId } from "../../domain/kernel/index.ts";
+import type {
+  ChangeId,
+  CommandActor,
+  CommitSha,
+  NamespaceId,
+  ProjectId,
+} from "../../domain/kernel/index.ts";
+import { admitAccountRate, giveBackAccountRate } from "../identity/index.ts";
 import { Changes, CodeHost, ProjectNamespaces, ProposalLedger, Trunks } from "../ports/index.ts";
 import { projectRepos } from "./project-repos.ts";
 
@@ -22,6 +30,8 @@ export interface ProposeFromFork {
   readonly idempotencyKey: string;
   /** A hash of the request body, so a reused key is told apart from a retry. */
   readonly fingerprint: string;
+  /** The account the proposal counts against for the day: the proposer's, or an agent's sponsor's. */
+  readonly account: NamespaceId;
 }
 
 /**
@@ -42,6 +52,14 @@ const forkHolds = (fork: ProjectId, stops: readonly CommitSha[]) => {
       ),
     );
 };
+
+/**
+ * Whether a refusal is of the commit itself (its pack too large to copy, or
+ * past its fork's repo bytes), which no retry under the same key outlasts:
+ * what it was counted is given back.
+ */
+const refusedForItsCommit = (error: { readonly _tag: string; readonly kind?: string }): boolean =>
+  error._tag === "PackTooLarge" || (error._tag === "QuotaExceeded" && error.kind === "repo-bytes");
 
 /** The namespace a project belongs to: every project proposed to, and every fork, has one. */
 const namespaceOf = (projectId: ProjectId) =>
@@ -90,10 +108,14 @@ const baseOf = (fork: ProjectId, forkPoint: CommitSha, commit: CommitSha) =>
  * the upstream head of the newest point where the fork met `upstream` that
  * the commit holds, the fork point at the last; and a commit carrying nothing
  * past it is ProposalEmpty. The project's ledger then reserves the change id
- * for the proposer's key, capping what they have open there, and the change's
- * object makes the proposal: a retry reaches the same change. What it copies
- * in counts against the fork's namespace, the proposer's side: a stranger's
- * proposals never spend the repo bytes of the project they are proposed to.
+ * for the proposer's key, capping what they have open there; the proposal is
+ * counted against its account's proposals for the day, once for that change
+ * (QuotaExceeded `proposals` past the limit, and the place it reserved is
+ * given back at once); and the change's object makes the proposal: a retry
+ * reaches the same change, counted once. One refused for its commit (its pack,
+ * or its fork's repo bytes) is given back its count. What it copies in counts
+ * against the fork's namespace, the proposer's side: a stranger's proposals
+ * never spend the repo bytes of the project they are proposed to.
  */
 export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function* (
   input: ProposeFromFork,
@@ -105,23 +127,41 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
   const trunk = projectRepos(input.fork).trunk;
   const base = yield* baseOf(input.fork, origin.commit, input.commit);
   const namespace = yield* namespaceOf(input.fork);
-  const changeId = yield* (yield* ProposalLedger).reserve(input.upstream, {
+  const ledger = yield* ProposalLedger;
+  const changeId = yield* ledger.reserve(input.upstream, {
     proposer: input.proposer,
     idempotencyKey: input.idempotencyKey,
     fingerprint: input.fingerprint,
   });
-  const proposed: Change = yield* (yield* Changes).propose(changeId, {
-    changeId,
-    projectId: input.upstream,
-    fork: { projectId: input.fork, trunk },
-    proposer: input.proposer,
-    commit: input.commit,
-    base,
-    namespace,
-    goal: input.goal,
-    idempotencyKey: input.idempotencyKey,
-    fingerprint: input.fingerprint,
-  });
+  const counted = `propose:${input.upstream}:${changeId}`;
+  yield* admitAccountRate(input.account, "proposals", counted).pipe(
+    Effect.tapError(() =>
+      ledger.release(input.upstream, {
+        proposer: input.proposer,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    ),
+  );
+  const proposed: Change = yield* (yield* Changes)
+    .propose(changeId, {
+      changeId,
+      projectId: input.upstream,
+      fork: { projectId: input.fork, trunk },
+      proposer: input.proposer,
+      commit: input.commit,
+      base,
+      namespace,
+      goal: input.goal,
+      idempotencyKey: input.idempotencyKey,
+      fingerprint: input.fingerprint,
+    })
+    .pipe(
+      Effect.tapError((error) =>
+        refusedForItsCommit(error)
+          ? giveBackAccountRate(input.account, "proposals", counted)
+          : Effect.void,
+      ),
+    );
   return proposed;
 });
 
@@ -134,13 +174,18 @@ export interface UpdateFromFork {
   readonly commit: CommitSha;
   readonly note?: string | undefined;
   readonly idempotencyKey: string;
+  /** The account the move counts against for the day: the proposer's, or an agent's sponsor's. */
+  readonly account: NamespaceId;
 }
 
 /**
  * Moves a proposal to another commit of its own fork: one the fork's trunk
  * holds, as `proposeFromFork` asks of a first commit (CommitNotOnFork
- * otherwise). The change's object copies it in and submits it, with no
- * approval: it is checked, and waits for one, again.
+ * otherwise). The move is counted against its account's moves for the day,
+ * once for its key (QuotaExceeded `proposal-moves` past the limit), and given
+ * back when the proposal is gone or ended, or its commit is refused. The
+ * change's object copies it in and submits it, with no approval: it is
+ * checked, and waits for one, again.
  */
 export const updateFromFork = Effect.fn("integration/updateFromFork")(function* (
   input: UpdateFromFork,
@@ -153,15 +198,28 @@ export const updateFromFork = Effect.fn("integration/updateFromFork")(function* 
   const origin = Option.getOrUndefined(yield* trunks.origin(fork));
   if (origin?.kind !== "forked") return yield* new NotAForkOf({ fork, upstream: input.upstream });
   const base = yield* baseOf(fork, origin.commit, input.commit);
-  const moved: Change = yield* changes.updateProposal(input.changeId, {
-    proposer: input.proposer,
-    projectId: input.upstream,
-    fork: { projectId: fork, trunk: projectRepos(fork).trunk },
-    commit: input.commit,
-    base,
-    ...(input.note === undefined ? {} : { note: input.note }),
-    namespace: yield* namespaceOf(fork),
-    idempotencyKey: input.idempotencyKey,
-  });
+  const counted = `move:${input.changeId}:${input.idempotencyKey}`;
+  yield* admitAccountRate(input.account, "proposal-moves", counted);
+  const moved: Change = yield* changes
+    .updateProposal(input.changeId, {
+      proposer: input.proposer,
+      projectId: input.upstream,
+      fork: { projectId: fork, trunk: projectRepos(fork).trunk },
+      commit: input.commit,
+      base,
+      ...(input.note === undefined ? {} : { note: input.note }),
+      namespace: yield* namespaceOf(fork),
+      idempotencyKey: input.idempotencyKey,
+    })
+    .pipe(
+      Effect.tapError((error) =>
+        refusedForItsCommit(error) ||
+        error._tag === "ChangeNotFound" ||
+        error._tag === "NotAProposal" ||
+        (error._tag === "ChangeStateRefused" && TERMINAL.has(error.state))
+          ? giveBackAccountRate(input.account, "proposal-moves", counted)
+          : Effect.void,
+      ),
+    );
   return moved;
 });

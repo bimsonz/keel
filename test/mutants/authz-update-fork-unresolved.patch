@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: proposals.http-left-fork
+# why: the doorway never resolves a proposal's fork, so no proposer may move a proposal at all
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 4813ab65..a9321912 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -241,7 +241,7 @@ const proposalChange = (id: unknown) =>
+               _tag: "ProposalChange",
+               project,
+               proposer: proposal.proposer,
+-              fork: yield* projectResource(proposal.fork),
++              fork: undefined,
+             } satisfies ProposalChangeResource;
+           }),
+         ),

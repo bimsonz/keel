@@ -2,15 +2,15 @@
 # kills: d21.pool.subjects
 # why: The Workflow compiles without the change's own subjects, so the change the real Change DO says relies on a guarded subject is not exposed to its guard
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 6379ddf..173baf5 100644
+index 28b5c54a..5d17b661 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -141,7 +141,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+@@ -189,7 +189,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
          if (derived._tag === "Stale") return derived;
          return {
            _tag: "Done",
--          value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
-+          value: { ...read, subjects: planSubjects([], kept.subjects) },
+-          value: { ...read, subjects: planSubjects(workspace.subjects, kept.value.subjects) },
++          value: { ...read, subjects: planSubjects([], kept.value.subjects) },
          };
        };
        const found: Settled<PrecheckFindings> =

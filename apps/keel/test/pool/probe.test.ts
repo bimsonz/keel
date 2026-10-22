@@ -253,13 +253,15 @@ describe("Probe", () => {
       expect(output).toMatchObject({ outcome: "admitted" });
     });
 
-  it("[d22.pool.probe-deadline] a party that never submits within the wait ends the draft as no-submission on its Subject DO", async () => {
+  it("[d22.pool.probe-deadline] a party that never submits within the wait ends the draft as no-submission on its Subject DO: its wait runs out, it is read again, and the deadline has passed", async () => {
     const s = await suspected();
     const id = `probe-${s.conflictId}`;
     await using instance = await introspectWorkflowInstance(env.PROBE, id);
     await instance.modify(async (m) => {
       await m.mockStepResult({ name: "party A 1" }, ok({ _tag: "Waiting" }));
       await m.forceEventTimeout({ name: "change A 1" });
+      await m.mockStepResult({ name: "party A 2" }, ok({ _tag: "Waiting" }));
+      await m.mockStepResult({ name: "clock A 2" }, kept(Date.now() + 2 * 24 * 60 * 60 * 1000));
     });
     expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
     await instance.waitForStatus("complete");

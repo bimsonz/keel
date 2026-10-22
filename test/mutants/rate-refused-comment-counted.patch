@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.comments-daily
+# why: a comment refused because its issue is not there still counts against the day's allowance
+diff --git a/apps/keel/src/adapters/driving/http/issues.ts b/apps/keel/src/adapters/driving/http/issues.ts
+index 12ce859d..c9ced877 100644
+--- a/apps/keel/src/adapters/driving/http/issues.ts
++++ b/apps/keel/src/adapters/driving/http/issues.ts
+@@ -255,7 +255,7 @@ export function issueHandlers(run: Runner) {
+             ).pipe(
+               Effect.tapError((error) =>
+                 error._tag === "IssueNotFound"
+-                  ? giveBackAccountRate(account, "issue-comments", counted)
++                  ? Effect.void
+                   : Effect.void,
+               ),
+             ),

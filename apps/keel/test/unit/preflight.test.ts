@@ -14,6 +14,8 @@ import {
   sampleProjectId,
   ulidOf,
   heldLease,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
@@ -49,6 +51,8 @@ function project() {
       makeCodeHostMemory().layer,
       live.layer,
       makeDecisionsMemory().layer,
+      makeEscalationsMemory().gate,
+      makeProjectNamespacesMemory().layer,
     );
   /** Declares in that object, then delivers its events to the index, as the fan-out does after commit. */
   const declared = (

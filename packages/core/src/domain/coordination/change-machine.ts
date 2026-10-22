@@ -182,6 +182,8 @@ export type ChangeCommand =
       readonly commit: CommitSha;
       readonly base: CommitSha;
       readonly note?: string;
+      /** Another commit's footprint against its base: the proposal's from then on. */
+      readonly footprint?: readonly FootprintEntry[];
       readonly inWorkspace: boolean;
     }
   /** A proposal Precheck read waits for the approval of the commit it carries, as it is queued. */
@@ -224,7 +226,8 @@ export type ChangeCommand =
       readonly commitSha: CommitSha;
       readonly inWorkspace: boolean;
     }
-  | { readonly _tag: "StartPrecheck"; readonly instanceId: string }
+  /** Precheck's run starts on the commit it was started for, and on no other the change has moved to since. */
+  | { readonly _tag: "StartPrecheck"; readonly instanceId: string; readonly commitSha: CommitSha }
   /**
    * What Precheck derived from the submitted commit, committed on its own
    * before drift is classified: the subjects hear it whether the change then
@@ -657,9 +660,18 @@ export const decideChange = (
     case "ProposeCommit": {
       if (change.proposal === undefined) return notAProposal(change);
       // Its first commit once its workspace holds it; another anywhere but in a batch, which lands as it
-      // was, or while Precheck reads the last, whose pass would then judge a commit the proposal no longer carries.
+      // was. While Precheck reads the last, its pass is bound to that commit and its run, so it moves
+      // nothing once the proposal carries another.
       const first = at("working");
-      const again = at("drifted", "verifying", "queued", "bounced", "parked");
+      const again = at(
+        "submitted",
+        "deriving",
+        "drifted",
+        "verifying",
+        "queued",
+        "bounced",
+        "parked",
+      );
       if (!(first || again) || change.workspaceId === undefined) return refuse(change, command);
       if (!command.inWorkspace)
         return Result.fail(
@@ -697,6 +709,7 @@ export const decideChange = (
                 changeId: id,
                 commit: command.commit,
                 ...(command.note === undefined ? {} : { note: command.note }),
+                ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
               }),
               ...rebased,
               submitted,
@@ -838,7 +851,7 @@ export const decideChange = (
     }
 
     case "StartPrecheck":
-      return at("submitted")
+      return at("submitted") && command.commitSha === change.commitSha
         ? Result.succeed([
             PrecheckStarted.make({ changeId: id, revision, instanceId: command.instanceId }),
           ])
@@ -1221,11 +1234,11 @@ export const evolveChange = (
         ? { ...change, proposal: { fork: event.fork, proposer: event.proposer } }
         : illegal(change, event);
     case "ProposalUpdated": {
-      // Another commit, once Precheck answered the last and anywhere but in a batch: back to work to be
-      // submitted, with no approval and nothing held.
+      // Another commit, anywhere but in a batch: back to work to be submitted, with no approval and
+      // nothing held.
       if (
         change.proposal === undefined ||
-        !from("drifted", "verifying", "queued", "bounced", "parked")
+        !from("submitted", "deriving", "drifted", "verifying", "queued", "bounced", "parked")
       )
         return illegal(change, event);
       const { approved: _cleared, ...proposal } = change.proposal;
@@ -1237,6 +1250,9 @@ export const evolveChange = (
           "batchId",
           "laneId",
         ]),
+        ...(event.footprint === undefined
+          ? {}
+          : { intent: { ...change.intent, footprint: event.footprint } }),
         proposal,
       };
     }

@@ -2,15 +2,15 @@
 # kills: flow-ruling.names-paths
 # why: a flow ruling's question never names the paths Precheck found, so a maintainer cannot tell a package.json edit from a flow edit
 diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
-index c0810770..51267959 100644
+index aab61f94..97282024 100644
 --- a/packages/core/src/application/coordination/escalations.ts
 +++ b/packages/core/src/application/coordination/escalations.ts
-@@ -94,7 +94,7 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
+@@ -99,7 +99,7 @@ export const askFlowRuling = Effect.fn("coordination/askFlowRuling")(function* (
    const edits =
      asked.paths === undefined || asked.paths.length === 0
        ? "it edits paths whose change needs a person's ruling"
 -      : `it edits ${asked.paths.join(", ")}`;
 +      : "it edits paths whose change needs a person's ruling";
-   return yield* (yield* HumanGate).raise({
+   const gate = yield* HumanGate;
+   const raised = yield* gate.raise({
      namespace: asked.namespace,
-     escalationId: flowRulingIdOf(changeId, asked.instanceId),

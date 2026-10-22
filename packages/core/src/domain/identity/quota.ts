@@ -3,7 +3,10 @@ import { Instant, InstantSchema, NextAction } from "../kernel/index.ts";
 
 /**
  * What a namespace's usage is counted in. Repo bytes count
- * trunk only; container-minutes and model calls are per UTC day.
+ * trunk only; container-minutes and model calls are per UTC day, and so is
+ * what an account opens: proposals, their moves to another commit, issues and
+ * issue comments, each counted against a person's own namespace or an
+ * agent's sponsor's.
  */
 export const QuotaKind = Schema.Literals([
   "projects",
@@ -13,6 +16,10 @@ export const QuotaKind = Schema.Literals([
   "container-minutes",
   "model-calls",
   "concurrent-containers",
+  "proposals",
+  "proposal-moves",
+  "issues",
+  "issue-comments",
 ]);
 export type QuotaKind = typeof QuotaKind.Type;
 
@@ -30,10 +37,21 @@ export const DEFAULT_QUOTAS: Quotas = {
   "container-minutes": 120,
   "model-calls": 500,
   "concurrent-containers": 2,
+  proposals: 10,
+  "proposal-moves": 50,
+  issues: 10,
+  "issue-comments": 200,
 };
 
 /** The kinds counted per UTC day, reset at midnight. The rest are running totals. */
-export const DAILY_QUOTAS: ReadonlySet<QuotaKind> = new Set(["container-minutes", "model-calls"]);
+export const DAILY_QUOTAS: ReadonlySet<QuotaKind> = new Set([
+  "container-minutes",
+  "model-calls",
+  "proposals",
+  "proposal-moves",
+  "issues",
+  "issue-comments",
+]);
 
 /** The kinds that spend on verification, which the instance's kill switch stops. */
 export const SPEND_QUOTAS: ReadonlySet<QuotaKind> = new Set([

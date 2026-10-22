@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: rate.final-refusal-given-back
+# why: a proposal refused for a reason its retry outlasts is given back, and the retry, answered by its first admission, is never counted
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 5e2431fe..b0de1be1 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -59,7 +59,7 @@ const forkHolds = (fork: ProjectId, stops: readonly CommitSha[]) => {
+  * what it was counted is given back.
+  */
+ const refusedForItsCommit = (error: { readonly _tag: string; readonly kind?: string }): boolean =>
+-  error._tag === "PackTooLarge" || (error._tag === "QuotaExceeded" && error.kind === "repo-bytes");
++  error._tag !== "" || (error._tag === "QuotaExceeded" && error.kind === "repo-bytes");
+ 
+ /** The namespace a project belongs to: every project proposed to, and every fork, has one. */
+ const namespaceOf = (projectId: ProjectId) =>

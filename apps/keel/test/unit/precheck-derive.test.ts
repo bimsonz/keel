@@ -32,6 +32,7 @@ import {
 import {
   ChangePrecheck,
   type PrecheckDerived,
+  type PrecheckWorkspace,
   Projects,
   type RepoRef,
   SyntaxSource,
@@ -281,7 +282,8 @@ function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
     /**
      * Submits the change at revision 1 on `head` over `base`, starts its
      * Precheck and takes the `derive` step for these touched paths. The
-     * change declared no subject unless given some.
+     * change declared no subject unless given some. `movedOn`: the change is
+     * submitted again after the start, so the pass is no longer its own.
      */
     derive: (
       base: Committed,
@@ -289,9 +291,10 @@ function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
       touched: readonly string[],
       intent: Intent = intentWith(),
       subjects: readonly SubjectKey[] = [],
+      movedOn = false,
     ) =>
       Effect.gen(function* () {
-        changes.submit(changeId, 1, {
+        const held: PrecheckWorkspace = {
           workspaceId,
           repo: base.repo,
           baseSha: base.sha,
@@ -300,7 +303,8 @@ function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
           projectId,
           subjects,
           intent,
-        });
+        };
+        changes.submit(changeId, 1, held);
         const submission: PrecheckSubmission = {
           changeId,
           revision: 1,
@@ -309,6 +313,7 @@ function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
           instanceId: INSTANCE,
         };
         const workspace = yield* startPrecheck(submission);
+        if (movedOn) changes.submit(changeId, 1, held);
         const answer = yield* deriveSubmission(
           sampleNamespace,
           workspace,
@@ -668,6 +673,25 @@ describe("Precheck's derivation", () => {
             expect(answer.subjects).toEqual([]);
           }
       }),
+  );
+
+  it.effect(
+    "[d21.derive.superseded] a pass the change moved on from before it derived reads no code and no anchors, keeps nothing, and is refused as stale",
+    () => {
+      const world = derivingWorld();
+      return Effect.gen(function* () {
+        world.anchored(1, [{ subject: EVALUATION, anchors: [CALLER_ROLE] }]);
+        const base = yield* world.commit({ [GUARD]: "base\n" }, NO_CACHE);
+        const head = yield* world.commit({ [GUARD]: "head\n", [CACHE]: "new\n" }, ROLE_CACHE);
+        const exit = yield* Effect.exit(world.derive(base, head, [CACHE], intentWith(), [], true));
+        expect(Exit.isFailure(exit) ? Cause.findErrorOption(exit.cause) : undefined).toMatchObject({
+          value: { _tag: "ChangeStateRefused" },
+        });
+        expect(world.asked).toEqual([]);
+        expect(world.anchorReads).toEqual([]);
+        expect(world.evidence.documents.size).toBe(0);
+      });
+    },
   );
 
   it.effect(

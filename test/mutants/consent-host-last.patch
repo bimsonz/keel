@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/apps.test.ts
+# kills: consent.name-is-its-own
+# why: the consent page buries where the app sends the person back to, the one thing that gives away an app that is not what it calls itself
+diff --git a/apps/console/src/account/apps.ts b/apps/console/src/account/apps.ts
+index 1760f30f..4d576a75 100644
+--- a/apps/console/src/account/apps.ts
++++ b/apps/console/src/account/apps.ts
+@@ -61,7 +61,7 @@ export function consentTitle(name: string | null): string {
+  */
+ export function consentLede(asking: Pick<AppAsking, "returnsTo">, as: string): string {
+   const host = URL.parse(asking.returnsTo)?.host ?? asking.returnsTo;
+-  return `It will send you back to ${host}. If you did not start this from there, deny it. Allowed, it is signed in as ${as} at Keel's MCP server.`;
++  return `Allowed, it is signed in as ${as} at Keel's MCP server, and sends you back to ${host}.`;
+ }
+ 
+ /** An app the person allowed, as their settings list it. */

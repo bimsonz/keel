@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.approval-restarts-wait
+# why: once a proposal is approved, a submission it still owes is waited for only what is left of the day from the probe's start, often nothing
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 2a95feb5..27b34342 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -565,7 +565,7 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+           const forApproval = answered.forApproval === true;
+           const now = yield* steps.step(`clock ${side}${round} ${n}`, clock.now);
+           if (awaitingApproval && !forApproval)
+-            deadline = Math.max(deadline, now + PROBE_SUBMISSION_WAIT_MS);
++            deadline = Math.max(deadline, now);
+           awaitingApproval = forApproval;
+           const until = forApproval ? approvalDeadline : deadline;
+           if (now >= until) return { _tag: "Timeout" } satisfies PartyEnd;

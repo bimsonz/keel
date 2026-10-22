@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.wait-sliced
+# why: a day's wait that ends unheard ends the probe, so a proposal approved on its second day is never probed
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 2a95feb5..1262391e 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -569,11 +569,12 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+           awaitingApproval = forApproval;
+           const until = forApproval ? approvalDeadline : deadline;
+           if (now >= until) return { _tag: "Timeout" } satisfies PartyEnd;
+-          yield* steps.waitFor(
++          const heard = yield* steps.waitFor(
+             `change ${side}${round} ${n}`,
+             partyEventType(changeId),
+             Math.min(until - now, PROBE_WAIT_SLICE_MS),
+           );
++          if (!heard) return { _tag: "Timeout" } satisfies PartyEnd;
+         }
+       });
+ 

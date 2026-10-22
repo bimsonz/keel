@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.giveback-on-close, proposals.giveback-failed-copy
+# why: what a proposal's copies admitted is never kept, so its fork's namespace pays for them after the proposal ends
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 6f1fb26c..2466d845 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1359,7 +1359,7 @@ const admitCopy =
+       Effect.tap(() =>
+         Effect.sync(() => {
+           const kept = `${changeId}/${proposed}`;
+-          if (bytes > 0 && store.get(CHANGE_COPIED, kept) === undefined)
++          if (bytes < 0 && store.get(CHANGE_COPIED, kept) === undefined)
+             store.put(CHANGE_COPIED, kept, { namespace, bytes });
+         }),
+       ),

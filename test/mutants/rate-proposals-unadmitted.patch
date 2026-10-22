@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.proposals-daily
+# why: an account opens proposals without end, so a propose-and-close loop keeps Keel forking workspaces and parsing code
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index 370c35e4..8a3cf802 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -134,14 +134,6 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+     fingerprint: input.fingerprint,
+   });
+   const counted = `propose:${input.upstream}:${changeId}`;
+-  yield* admitAccountRate(input.account, "proposals", counted).pipe(
+-    Effect.tapError(() =>
+-      ledger.release(input.upstream, {
+-        proposer: input.proposer,
+-        idempotencyKey: input.idempotencyKey,
+-      }),
+-    ),
+-  );
+   const proposed: Change = yield* (yield* Changes)
+     .propose(changeId, {
+       changeId,

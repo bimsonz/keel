@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/account-rate.test.ts
+# kills: rate.kinds-daily
+# why: a proposal's moves are a running total, so after fifty an account never moves a proposal again
+diff --git a/packages/core/src/domain/identity/quota.ts b/packages/core/src/domain/identity/quota.ts
+index e7ad1256..3809e745 100644
+--- a/packages/core/src/domain/identity/quota.ts
++++ b/packages/core/src/domain/identity/quota.ts
+@@ -48,7 +48,6 @@ export const DAILY_QUOTAS: ReadonlySet<QuotaKind> = new Set([
+   "container-minutes",
+   "model-calls",
+   "proposals",
+-  "proposal-moves",
+   "issues",
+   "issue-comments",
+ ]);

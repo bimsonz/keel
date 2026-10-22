@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals-http.test.ts
+# kills: rate.comments-daily
+# why: an account writes issue comments without end
+diff --git a/apps/keel/src/adapters/driving/http/issues.ts b/apps/keel/src/adapters/driving/http/issues.ts
+index 12ce859d..a28710d1 100644
+--- a/apps/keel/src/adapters/driving/http/issues.ts
++++ b/apps/keel/src/adapters/driving/http/issues.ts
+@@ -242,7 +242,7 @@ export function issueHandlers(run: Runner) {
+       const counted = `comment:${projectId}:${input.number}:${input["idempotency-key"]}`;
+       return run(
+         caller,
+-        admitAccountRate(account, "issue-comments", counted).pipe(
++        Effect.void.pipe(
+           Effect.andThen(
+             Issues.use((issues) =>
+               issues.comment({

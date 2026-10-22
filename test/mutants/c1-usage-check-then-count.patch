@@ -2,10 +2,10 @@
 # kills: usage.contract.serialised
 # why: The count is read before a yield and the decision made on it afterwards, so racing admissions each decide on a stale count and pass the limit together
 diff --git a/packages/core/src/application/identity/namespace-usage.ts b/packages/core/src/application/identity/namespace-usage.ts
-index c81576c7..45d3f56c 100644
+index c3fa495f..8a421958 100644
 --- a/packages/core/src/application/identity/namespace-usage.ts
 +++ b/packages/core/src/application/identity/namespace-usage.ts
-@@ -120,6 +120,8 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+@@ -122,6 +122,8 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
    const store = yield* EntityStore;
    const now = yield* (yield* Clock).now;
    const instance = yield* InstanceQuotas;
@@ -14,8 +14,8 @@ index c81576c7..45d3f56c 100644
    const answer = store.transaction((): Result.Result<QuotaAdmitted, QuotaExceeded> => {
      const id = `${namespace}/${kind}/admit/${key}`;
      const first = store.get(KEY, id);
-@@ -128,7 +130,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
-       if (keyed.exceeded !== undefined) return Result.fail(keyed.exceeded);
+@@ -133,7 +135,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+         return Result.fail(exceeded);
        if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);
      }
 -    const used = usedAt(store, namespace, kind, now);

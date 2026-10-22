@@ -186,6 +186,7 @@ export const openAgentSession: (
   input,
 ) => Sessions.use((sessions) => sessions.open(principal, input));
 
+export * from "./account-rate.ts";
 export * from "./enrol.ts";
 export * from "./gate.ts";
 export * from "./inbox.ts";

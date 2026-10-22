@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/live-near.test.ts
+# kills: live-index.proposal-moved
+# why: the project's index ignores a proposal's move, so nearby and preflight find it by paths it no longer touches
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index e593ec03..ede361fd 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -287,8 +287,7 @@ export function hearLiveChange(
+       // A proposal moved to another commit is near by that commit's footprint from now on.
+       if (live === undefined) return [];
+       const { footprint } = Schema.decodeUnknownSync(ProposalUpdated)(event.payload);
+-      if (footprint !== undefined)
+-        putLive(store, changeId, live, { ...live, intent: { ...live.intent, footprint } });
++      if (footprint !== undefined) void footprint;
+       return [];
+     }
+     case "EffectsDerived": {

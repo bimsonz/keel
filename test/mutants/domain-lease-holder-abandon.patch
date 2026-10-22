@@ -2,11 +2,11 @@
 # kills: authz.lease-holder, a11.abandon-stale
 # why: an agent's withdrawal checks only the lease, so another agent of the project withdraws a change it does not hold
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 1209660e..ebe45707 100644
+index d4fcca5d..d094c210 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1416,10 +1416,6 @@ const abandonCall: (
-   Clock | EntityStore | EventOutbox
+@@ -1925,10 +1925,6 @@ const abandonCall: (
+   Clock | EntityStore | EventOutbox | HumanGate | ProjectNamespaces
  > = Effect.fn("coordination/abandon")(function* (changeId: ChangeId, command: AbandonChange) {
    const { authority } = command;
 -  if (authority._tag === "Lease") {

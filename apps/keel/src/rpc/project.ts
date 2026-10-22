@@ -324,6 +324,12 @@ export const ReserveProposalCommand = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/** The place a proposal refused before it was made gives back, by its proposer's key. */
+export const ReleaseProposalCommand = Schema.Struct({
+  proposer: CommandActor,
+  idempotencyKey: Schema.String,
+});
+
 /** What is done to an issue by its `#n` (core's `IssueMove`). */
 export const IssueMove = Schema.Union([
   Schema.TaggedStruct("Comment", { body: CommentText }),
@@ -394,6 +400,7 @@ export const ProjectCodecs = {
   deliveryRefused: exitCodec(Schema.Void, ProjectNotFound),
   openIssue: exitCodec(Issue, IdempotencyConflict),
   reserveProposal: exitCodec(ChangeId, Schema.Union([ProposalLimit, IdempotencyConflict])),
+  releaseProposal: exitCodec(Schema.Void, Schema.Never),
   moveIssue: exitCodec(IssueMovedView, Schema.Union([IssueNotFound, IdempotencyConflict])),
   issues: exitCodec(IssuePageView, Schema.Never),
   issue: exitCodec(IssueThreadView, IssueNotFound),
@@ -441,6 +448,8 @@ export interface ProjectRpc extends EventReceiverRpc {
   openIssue(command: typeof OpenIssueCommand.Encoded): Promise<ExitJson>;
   /** Reserves a proposal's change id by its proposer's key, within what one proposer may have open. */
   reserveProposal(command: typeof ReserveProposalCommand.Encoded): Promise<ExitJson>;
+  /** Gives back the place a proposal refused before it was made reserved, by its proposer's key. */
+  releaseProposal(command: typeof ReleaseProposalCommand.Encoded): Promise<ExitJson>;
   /** Comments on, closes or reopens issue `#n`, idempotent by the caller's key. */
   moveIssue(command: typeof MoveIssueCommand.Encoded): Promise<ExitJson>;
   /** A page of the project's issues, newest first, with the open and closed totals. */

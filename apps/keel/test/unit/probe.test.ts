@@ -9,6 +9,7 @@ import {
   abRef,
   type FreshnessSlots,
   partyEventType,
+  PROBE_APPROVAL_WAIT_MS,
   type ProbeEnd,
   type ProbeRun,
   type ProbeSteps,
@@ -64,6 +65,8 @@ import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
 import { ProbeSourcesCodeHost } from "../../src/adapters/driven/gitcore/probe-sources.ts";
 import { memorySteps } from "./memory-steps.ts";
+
+const DAY = 24 * 60 * 60 * 1000;
 
 const MAIN = "refs/heads/main";
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -652,6 +655,102 @@ describe("probeConflict", () => {
         expect(yield* w.view()).toMatchObject({
           probe: { state: "discarded", discarded: "draft-failed" },
         });
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.waits-for-approval] [probe.wait-sliced] a party that is a proposal waiting for a maintainer's approval is waited for past the day a submission is, a day a wait and read again between: approved three days on, it is drafted",
+    () => {
+      const w = probeWorld();
+      let heads: { readonly T: CommitSha; readonly headA: CommitSha; readonly headB: CommitSha };
+      let days = 0;
+      const s = memorySteps({
+        onWait: (type, timeoutMs) => {
+          if (type !== partyEventType(w.B)) return Effect.succeed(false);
+          days += 1;
+          // Three days pass unheard; on the fourth it is approved and submitted.
+          return days <= 3
+            ? Effect.sync(() => {
+                w.clock.advance(timeoutMs);
+                return false;
+              })
+            : Effect.as(
+                w.changes.submit(w.B, { repo: w.wsB, head: heads.headB, base: heads.T }),
+                true,
+              );
+        },
+      });
+      return Effect.gen(function* () {
+        heads = yield* w.setup;
+        yield* w.changes.submit(w.A, { repo: w.wsA, head: heads.headA, base: heads.T });
+        yield* w.changes.awaitApproval(w.B);
+        const end = yield* w.run(s.steps());
+        expect(end.outcome).toBe("admitted");
+        expect(s.waits.map((x) => [x.type, x.timeoutMs])).toEqual(
+          Array.from({ length: 4 }, () => [partyEventType(w.B), DAY]),
+        );
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.approval-deadline] [probe.wait-sliced] a proposal nobody approves within the approval wait is waited for a day at a time, then ends the draft as no-submission",
+    () => {
+      const w = probeWorld();
+      const s = memorySteps({
+        onWait: (_, timeoutMs) =>
+          Effect.sync(() => {
+            w.clock.advance(timeoutMs);
+            return false;
+          }),
+      });
+      return Effect.gen(function* () {
+        const heads = yield* w.setup;
+        yield* w.changes.submit(w.A, { repo: w.wsA, head: heads.headA, base: heads.T });
+        yield* w.changes.awaitApproval(w.B);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({ outcome: "draft-failed", reason: "no-submission", attempts: 0 });
+        expect(s.waits.map((x) => x.timeoutMs)).toEqual(
+          Array.from({ length: PROBE_APPROVAL_WAIT_MS / DAY }, () => DAY),
+        );
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.approval-restarts-wait] once a proposal's approval ends its wait, a submission it still owes is waited for a day from then, not from the probe's start",
+    () => {
+      const w = probeWorld();
+      let heads: { readonly T: CommitSha; readonly headA: CommitSha; readonly headB: CommitSha };
+      let approved = false;
+      const s = memorySteps({
+        onWait: (type) => {
+          if (type !== partyEventType(w.B)) return Effect.succeed(false);
+          if (!approved) {
+            approved = true;
+            // Approved three days on, then sent back before its world was read: it owes a submission.
+            return Effect.andThen(
+              Effect.sync(() => w.clock.advance(3 * DAY)),
+              Effect.as(w.changes.declare(w.B), true),
+            );
+          }
+          return Effect.andThen(
+            Effect.sync(() => w.clock.advance(60_000)),
+            Effect.as(
+              w.changes.submit(w.B, { repo: w.wsB, head: heads.headB, base: heads.T }),
+              true,
+            ),
+          );
+        },
+      });
+      return Effect.gen(function* () {
+        heads = yield* w.setup;
+        yield* w.changes.submit(w.A, { repo: w.wsA, head: heads.headA, base: heads.T });
+        yield* w.changes.awaitApproval(w.B);
+        const end = yield* w.run(s.steps());
+        expect(end.outcome).toBe("admitted");
+        expect(s.waits.map((x) => x.timeoutMs)).toEqual([DAY, DAY]);
       });
     },
   );

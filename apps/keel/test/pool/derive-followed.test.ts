@@ -20,7 +20,7 @@ import { SyntaxSourceTreeSitter } from "../../src/adapters/driven/syntax/syntax-
 import { SYNTAX_WASM } from "../../src/adapters/driven/syntax/wasm.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { drainAfter, drainOutbox, POOL_ORG } from "./helpers.ts";
+import { drainAfter, drainOutbox, passDerives, POOL_ORG } from "./helpers.ts";
 
 const key = Schema.decodeUnknownSync(SubjectKey);
 
@@ -87,6 +87,7 @@ const derivedFrom = (
           ),
           SyntaxSourceTreeSitter(SYNTAX_WASM).pipe(Layer.provide(c.code.layer)),
           EvidenceStoreR2(env.ARCHIVE),
+          passDerives,
         ),
       ),
     ),

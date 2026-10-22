@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.replay-keeps-question
+# why: a revised change leaves the last pass's unruled question on how Keel verifies it open in the maintainers' questions
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0c2a20c2..493a4df5 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1799,7 +1799,6 @@ const reviseCall: (
+       );
+       if (Result.isFailure(revised)) return Result.fail(revised.failure);
+       if (after !== undefined) subscribeSubjects(tx, changeId, after);
+-      takeBackFlowQuestions(tx.store, "was revised");
+       return Result.succeed(
+         withSurfaced(asTransition(revised.success), surfaced(tx, changeId, preflight)),
+       );

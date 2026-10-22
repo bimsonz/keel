@@ -2,15 +2,15 @@
 # kills: authz.proposals
 # why: a person proposes from any fork they can read, not only one whose namespace they are a member of
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index e40376fe..ed354383 100644
+index cc146b62..d2024a92 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -1007,7 +1007,7 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision
-   if (upstream._tag !== "Project") return hidden();
-   if (upstream.visibility !== "public" || !proposal.proposalsOpen)
-     return refused("proposals-closed");
--  if (principal._tag === "User") return decide(principal, "member", proposal.fork);
-+  if (principal._tag === "User") return decide(principal, "read", proposal.fork);
-   const works = decide(principal, "work", proposal.fork);
+@@ -1023,7 +1023,7 @@ const standsOnFork = (
+   principal: Exclude<Principal, { readonly _tag: "Anonymous" }>,
+   proposedFrom: ProposalResource["fork"],
+ ): Decision => {
+-  if (principal._tag === "User") return decide(principal, "member", proposedFrom);
++  if (principal._tag === "User") return decide(principal, "read", proposedFrom);
+   const works = decide(principal, "work", proposedFrom);
    if (Result.isFailure(works)) return works;
    return principal.sponsored === true ? granted() : refused("sponsor-required");

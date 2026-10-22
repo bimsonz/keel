@@ -27,7 +27,10 @@ const keep = (waiters: Map<ChangeId, Subscriber[]>, changeId: ChangeId, subscrib
  */
 export function makeProbeChangesMemory(
   notify: (subscriber: Subscriber, changeId: ChangeId) => void = () => {},
-): ProbeChangesHarness {
+): ProbeChangesHarness & {
+  /** The change is a proposal Precheck read, its commit waiting for a maintainer's approval. */
+  readonly awaitApproval: (changeId: ChangeId) => Effect.Effect<void>;
+} {
   const changes = new Map<ChangeId, { readonly party: PartyAnswer; readonly plan: PlanState }>();
   const waiting = {
     submission: new Map<ChangeId, Subscriber[]>(),
@@ -88,6 +91,13 @@ export function makeProbeChangesMemory(
         });
         tell(waiting.submission, changeId);
         tell(waiting.plan, changeId);
+      }),
+    awaitApproval: (changeId) =>
+      Effect.sync(() => {
+        changes.set(changeId, {
+          party: { _tag: "Waiting", forApproval: true },
+          plan: planOf(changeId),
+        });
       }),
     waiting: (changeId) => [...(waiting.submission.get(changeId) ?? [])],
     waitingPlan: (changeId) => [...(waiting.plan.get(changeId) ?? [])],

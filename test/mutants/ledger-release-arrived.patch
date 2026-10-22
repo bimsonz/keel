@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-ledger.test.ts
+# kills: proposal-ledger.release
+# why: a release takes the place of a proposal that arrived, so its proposer holds more open than the cap
+diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
+index de16828d..39ae4c53 100644
+--- a/packages/core/src/application/coordination/proposal-ledger.ts
++++ b/packages/core/src/application/coordination/proposal-ledger.ts
+@@ -146,7 +146,6 @@ export const releaseProposal = Effect.fn("coordination/releaseProposal")(functio
+     if (held === undefined) return;
+     const { changeId } = decodeReserved(held);
+     const place = store.get(OPEN, openKey(release.proposer, changeId));
+-    if (place !== undefined && decodeOpen(place).proposed) return;
+     store.remove(OPEN, openKey(release.proposer, changeId));
+     store.remove(PROPOSER, changeId);
+     store.remove(RESERVED, key);

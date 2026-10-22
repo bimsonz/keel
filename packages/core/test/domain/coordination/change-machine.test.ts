@@ -359,7 +359,12 @@ const build = (
     case "Submit":
       return { _tag: "Submit", leaseId: token, commitSha: SHA, inWorkspace: step.flag };
     case "StartPrecheck":
-      return { _tag: "StartPrecheck", instanceId: `precheck-${step.pick}` };
+      // Mostly for the commit it carries; now and then for one it has moved off.
+      return {
+        _tag: "StartPrecheck",
+        instanceId: `precheck-${step.pick}`,
+        commitSha: step.flag ? (state?.commitSha ?? SHA) : NEVER_BASE,
+      };
     case "DeriveEffects":
       return {
         _tag: "DeriveEffects",
@@ -677,7 +682,7 @@ const oracle = (
         ? "submitted"
         : "refused";
     case "StartPrecheck":
-      return key === "submitted" ? "deriving" : "refused";
+      return key === "submitted" && command.commitSha === before.commitSha ? "deriving" : "refused";
     case "DeriveEffects":
       return key === "deriving" && before.derivationRef === undefined ? "deriving" : "refused";
     case "Drift":
@@ -859,7 +864,7 @@ const declaring = (answered: Preflight): ChangeCommand => ({
 const declare = declaring(preflight);
 const start: ChangeCommand = { _tag: "Start", workspaceId: makeId("wsp", ulid(3)), baseSha: BASE };
 const submit: ChangeCommand = { _tag: "Submit", leaseId: LEASE, commitSha: SHA, inWorkspace: true };
-const precheck: ChangeCommand = { _tag: "StartPrecheck", instanceId: "precheck-1" };
+const precheck: ChangeCommand = { _tag: "StartPrecheck", instanceId: "precheck-1", commitSha: SHA };
 const compile: ChangeCommand = {
   _tag: "CompilePlan",
   drift: [],
@@ -2896,7 +2901,10 @@ const changeFolds = (
     case "ProposalUpdated": {
       // Another commit, anywhere but in a batch: back to work, holding nothing it waited with, unapproved.
       const { proposal } = f;
-      if (proposal === undefined || !inState("drifted", "verifying", "queued", "bounced", "parked"))
+      if (
+        proposal === undefined ||
+        !inState("submitted", "deriving", "drifted", "verifying", "queued", "bounced", "parked")
+      )
         return "illegal";
       return {
         ...f,
@@ -3360,11 +3368,11 @@ describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
     // Sixty-five shapes of change, an agent's and a proposal's, nothing among them and two of them
     // one fold past the tour (no lease lapses while the platform holds a change), each meeting the
     // first two events of a kind at each revision, eighty-two in all their forms, at four instants:
-    // 65 × 82 × 4 = 21320 folds. The table takes 2724 of them and refuses the rest.
+    // 65 × 82 × 4 = 21320 folds. The table takes 2756 of them and refuses the rest.
     const shape = foldShape(cases);
     expect({ ...shape, rows: shape.rows.length }).toEqual({
       folds: 21320,
-      refused: 18596,
+      refused: 18564,
       rows: 65,
     });
   });
@@ -3516,7 +3524,7 @@ describe("a proposal from a fork", () => {
       ...awaiting,
       [approve(SHA), 0],
       [proposeCommit(NEXT), 0],
-      [{ _tag: "StartPrecheck", instanceId: "precheck-2" }, 0],
+      [{ _tag: "StartPrecheck", instanceId: "precheck-2", commitSha: NEXT }, 0],
       [compile, 0],
       [queue, 0],
       [awaitApproval, 0],
@@ -3550,7 +3558,7 @@ describe("a proposal from a fork", () => {
     }
   });
 
-  it("[machine.proposal-update-waits-precheck] a new commit waits until Precheck has answered the last: while a pass reads one, submitted or deriving, another is refused, so no pass can judge a commit other than the one the proposal carries", () => {
+  it("[machine.proposal-update-mid-pass] a new commit is taken while Precheck reads the last, submitted or deriving: the proposal is submitted again at it, and the old pass's start, derivation and plan are refused, so no pass judges a commit the proposal no longer carries", () => {
     const submitted = [
       [proposing, 0],
       [start, 0],
@@ -3558,12 +3566,22 @@ describe("a proposal from a fork", () => {
     ] as const;
     for (const during of [submitted, [...submitted, [precheck, 0]]] as const) {
       const moved = drive([...during, [proposeCommit(NEXT), 0]]);
-      expect(failureOf(moved.results.at(-1))?._tag).toBe("ChangeStateRefused");
-      expect(moved.state?.commitSha).toBe(SHA);
+      expect(moved.keys.at(-1)).toBe("submitted");
+      expect(tagsOf(moved.log).slice(-2)).toEqual(["ProposalUpdated", "ChangeSubmitted"]);
+      expect(moved.state?.commitSha).toBe(NEXT);
+      // The old pass, started for SHA, is refused at its start; its plan finds no pass deriving.
+      const old = drive([...during, [proposeCommit(NEXT), 0], [precheck, 0]]);
+      expect(failureOf(old.results.at(-1))?._tag).toBe("ChangeStateRefused");
+      const planned = drive([...during, [proposeCommit(NEXT), 0], [compile, 0]]);
+      expect(failureOf(planned.results.at(-1))?._tag).toBe("ChangeStateRefused");
+      // The pass started for the new commit derives it.
+      const next = drive([
+        ...during,
+        [proposeCommit(NEXT), 0],
+        [{ _tag: "StartPrecheck", instanceId: "precheck-2", commitSha: NEXT }, 0],
+      ]);
+      expect(next.keys.at(-1)).toBe("deriving");
     }
-    // Once the pass answered (a plan, a drift, a refusal), the proposer moves it.
-    const answered = drive([...awaiting, [proposeCommit(NEXT), 0]]);
-    expect(answered.keys.at(-1)).toBe("submitted");
   });
 
   it("[machine.proposal-update-rebased] a new commit on another base takes the proposal's base with it: ProposalUpdated, ChangeRebased from the base it had, and ChangeSubmitted on the new one; on the same base, no rebase", () => {

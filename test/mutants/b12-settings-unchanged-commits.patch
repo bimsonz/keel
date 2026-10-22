@@ -2,14 +2,14 @@
 # kills: b12.settings-audit
 # why: an unchanged PUT still commits a ProjectSettingsChanged with no changes, so a retry is not a no-op
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index a2f353b..5f6f147 100644
+index 2fc631ff..09b9139d 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
-@@ -144,7 +144,6 @@ export const changeSettings: (
-           : Result.fail(conflict);
+@@ -185,7 +185,6 @@ export const changeSettings: (
        tx.store.put(SETTINGS_REQUEST, requestId, { fingerprint });
-       const changes = changesBetween(held(tx.store, projectId), next);
--      if (changes.length === 0) return Result.succeed({ value: next, drafts: [] });
-       tx.store.put(PROJECT_SETTINGS, projectId, asStored(encodeSettings(next)));
+       const replaced = next(tx.store);
+       const changes = changesBetween(held(tx.store, projectId), replaced);
+-      if (changes.length === 0) return Result.succeed({ value: replaced, drafts: [] });
+       tx.store.put(PROJECT_SETTINGS, projectId, asStored(encodeSettings(replaced)));
        const changed = ProjectSettingsChanged.make({ projectId, changes, by });
        return Result.succeed({

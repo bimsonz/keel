@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: proposals.giveback-on-close
+# why: a give-back is not marked, so every run of its deadline gives the same bytes back again and the fork's count falls below what it holds
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 561b18d2..0dbc00c2 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1375,7 +1375,7 @@ export const giveBackCopies: (
+   const usage = yield* NamespaceUsage;
+   for (const [namespace, bytes] of owed)
+     yield* usage.record(namespace, REPO_BYTES, -bytes, `proposal-giveback:${changeId}`);
+-  store.put(CHANGE_GIVEN_BACK, changeId, true);
++  void CHANGE_GIVEN_BACK;
+ });
+ 
+ /**

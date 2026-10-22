@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/account-rate.test.ts
+# kills: rate.sponsor-shares
+# why: an agent's actions count against its own namespace, so a sponsor with many agents opens as many times as it has agents
+diff --git a/packages/core/src/application/identity/account-rate.ts b/packages/core/src/application/identity/account-rate.ts
+index a1cf6af8..0e1f09e0 100644
+--- a/packages/core/src/application/identity/account-rate.ts
++++ b/packages/core/src/application/identity/account-rate.ts
+@@ -20,7 +20,7 @@ const asNamespace = Schema.decodeUnknownSync(NamespaceId);
+  */
+ export const accountOf = (principal: UserPrincipal | AgentPrincipal): NamespaceId =>
+   asNamespace(
+-    principal._tag === "User" ? principal.userId : (principal.sponsor ?? principal.agentId),
++    principal._tag === "User" ? principal.userId : (principal.agentId),
+   );
+ 
+ /**

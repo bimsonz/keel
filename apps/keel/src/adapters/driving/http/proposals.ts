@@ -21,7 +21,7 @@ import {
   ProjectId,
   userActor,
 } from "@keeltown/core/kernel";
-import { Changes, type PackTooLarge, ProjectViews } from "@keeltown/core/ports";
+import { Changes, Clock, type PackTooLarge, ProjectViews } from "@keeltown/core/ports";
 import { Effect, Result, Schema } from "effect";
 import type {
   ApproveProposalResult,
@@ -37,6 +37,7 @@ import { projectIn } from "./decisions.ts";
 import { problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import { summaryBody } from "./views.ts";
+import { accountOfCaller, isAccountRate, rateLimited } from "./account-rate.ts";
 import { changeBody, changeNotFound } from "./work-loop.ts";
 
 type Input<A extends keyof Operations<Caller>> = Parameters<Operations<Caller>[A]>[1];
@@ -291,10 +292,18 @@ export function proposalHandlers(run: Runner) {
             commit: commit.success,
             goal: input.goal,
           }),
+          account: accountOfCaller(caller),
         }).pipe(
-          Effect.match({
-            onSuccess: (change): ProposeResult => ({ status: 201, body: changeBody(change) }),
-            onFailure: (error): ProposeResult => proposeError(caller, error),
+          Effect.matchEffect({
+            onSuccess: (change) =>
+              Effect.succeed<ProposeResult>({ status: 201, body: changeBody(change) }),
+            onFailure: (error) =>
+              error._tag === "QuotaExceeded" && isAccountRate(error)
+                ? Effect.map(
+                    Effect.flatMap(Clock, (clock) => clock.now),
+                    (now): ProposeResult => rateLimited(caller, error, now),
+                  )
+                : Effect.succeed<ProposeResult>(proposeError(caller, error)),
           }),
         ),
       );
@@ -335,13 +344,18 @@ export function proposalHandlers(run: Runner) {
           commit: commit.success,
           ...(input.note === undefined ? {} : { note: input.note }),
           idempotencyKey: input["idempotency-key"],
+          account: accountOfCaller(caller),
         }).pipe(
-          Effect.match({
-            onSuccess: (change): UpdateProposalResult => ({
-              status: 200,
-              body: changeBody(change),
-            }),
-            onFailure: (error): UpdateProposalResult => proposeError(caller, error),
+          Effect.matchEffect({
+            onSuccess: (change) =>
+              Effect.succeed<UpdateProposalResult>({ status: 200, body: changeBody(change) }),
+            onFailure: (error) =>
+              error._tag === "QuotaExceeded" && isAccountRate(error)
+                ? Effect.map(
+                    Effect.flatMap(Clock, (clock) => clock.now),
+                    (now): UpdateProposalResult => rateLimited(caller, error, now),
+                  )
+                : Effect.succeed<UpdateProposalResult>(proposeError(caller, error)),
           }),
         ),
       );

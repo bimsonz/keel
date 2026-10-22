@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: change.agent-question-withdrawn
+# why: a question a maintainer ruled on is not marked heard, so the change later tries to take back an answered question
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index d4fcca5d..5a148475 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -2901,7 +2901,7 @@ const commandFor = (
+       const { escalationId, decisionId, option, summary } = recorded.value;
+       // A ruling on a question on how Keel verifies it answers it: nothing is left to take back.
+       const asked = store.get(CHANGE_FLOW_ASKED, escalationId);
+-      if (asked !== undefined && decodeFlowAsked(asked).heard === undefined)
++      if (asked !== undefined && decodeFlowAsked(asked).heard === "never")
+         store.put(CHANGE_FLOW_ASKED, escalationId, { heard: option });
+       // A proposal still waiting for its approval hears the ruling on how Keel verifies it first: an
+       // approve is kept for the approval, which then queues it, and anything else sends it back.
