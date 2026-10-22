@@ -3,11 +3,13 @@ import {
   AgentId,
   BatchId,
   ChangeId,
+  CommandActor,
   CommitSha,
   ContentHash,
   EscalationId,
   InstantSchema,
   LeaseId,
+  ProjectId,
   RunRef,
   WorkspaceId,
 } from "../kernel/index.ts";
@@ -43,7 +45,12 @@ export const TERMINAL: ReadonlySet<ChangeState> = new Set(["landed", "withdrawn"
 /** Whether the change waits on its agent. In every other non-terminal state the platform owns it. */
 export const isAgentOwned = (state: ChangeState): boolean => AGENT_OWNED.has(state);
 
-export const ParkReason = Schema.Literals(["awaiting-ruling", "lease-lapsed"]);
+/**
+ * Why a change is parked: a person's ruling it waits on, a lease that lapsed
+ * while its agent held it, or, for a proposal, the approval of the commit it
+ * carries, which comes before anything is verified.
+ */
+export const ParkReason = Schema.Literals(["awaiting-ruling", "lease-lapsed", "awaiting-approval"]);
 export type ParkReason = typeof ParkReason.Type;
 
 /**
@@ -53,7 +60,8 @@ export type ParkReason = typeof ParkReason.Type;
 export const PushRefusedReason = Schema.Literals(["pack-too-large", "repo-bytes-quota"]);
 export type PushRefusedReason = typeof PushRefusedReason.Type;
 
-export const ChangeOrigin = Schema.Literals(["agent", "auditor", "operator"]);
+/** Where a change started: an agent's declare, Keel's own (auditor, operator), or a proposal from a fork. */
+export const ChangeOrigin = Schema.Literals(["agent", "auditor", "operator", "proposal"]);
 export type ChangeOrigin = typeof ChangeOrigin.Type;
 
 /** What an agent declares before writing code. Each revision is immutable. */
@@ -82,16 +90,33 @@ export type Lease = typeof Lease.Type;
 /** A lease lapses this long after its last renewal. */
 export const LEASE_TTL_MS = 15 * 60 * 1000;
 
+/**
+ * Where a proposal comes from and where it stands: the fork its commits are
+ * copied from, who proposed it (a person, or an agent a person sponsors), and
+ * the commit an approval named, while it stands. The commit it carries is the
+ * change's own `commitSha`.
+ */
+export const Proposal = Schema.Struct({
+  fork: ProjectId,
+  proposer: CommandActor,
+  approved: Schema.optional(CommitSha),
+});
+export type Proposal = typeof Proposal.Type;
+
 export const Change = Schema.Struct({
   id: ChangeId,
-  agentId: AgentId,
+  /** The agent holding the change. Absent on a proposal, which no agent holds: Keel holds it, and its proposer moves it. */
+  agentId: Schema.optional(AgentId),
   /** The run of that agent which holds the change: the one that declared it, or last adopted it. */
   run: Schema.optional(RunRef),
   origin: ChangeOrigin,
+  /** On a proposal alone. */
+  proposal: Schema.optional(Proposal),
   state: ChangeState,
   parkReason: Schema.optional(ParkReason),
   intent: Intent,
-  lease: Lease,
+  /** Absent on a proposal: no agent holds it, so no lease is issued, renewed, lapsed or adopted. */
+  lease: Schema.optional(Lease),
   workspaceId: Schema.optional(WorkspaceId),
   createdAt: InstantSchema,
   /** The change's base: its workspace's head when granted. Precheck diffs against it. */
@@ -106,7 +131,7 @@ export const Change = Schema.Struct({
   batchId: Schema.optional(BatchId),
   /** The escalation it waits on, while Parked awaiting a ruling. */
   escalationId: Schema.optional(EscalationId),
-  /** Where it was parked from awaiting a ruling, and so where its resume returns it. */
+  /** Where it was parked from awaiting a ruling or an approval, and so where its resume or approval returns it. */
   parkedFrom: Schema.optional(Schema.Literals(["verifying", "queued"])),
   /** The plan it was last compiled to (PlanCompiled), carried onto ChangeQueued and ChangeRequeued. */
   planHash: Schema.optional(ContentHash),

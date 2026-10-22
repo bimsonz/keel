@@ -2,22 +2,15 @@
 # kills: change.fold-table
 # why: the fold parks a change for a lapsed lease in any state, where a lapse parks only a change that waits on its agent
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..ebdc688c 100644
+index 916513b7..a99d0851 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1084,13 +1084,11 @@ export const evolveChange = (
+@@ -1382,7 +1382,7 @@ export const evolveChange = (
              }
            : illegal(change, event);
        }
--      return isAgentOwned(change.state)
--        ? {
-+      return {
+-      return isAgentOwned(change.state) && change.lease !== undefined
++      return change.lease !== undefined
+         ? {
              ...moveTo(change, "parked"),
              parkReason: "lease-lapsed",
-             lease: { ...change.lease, state: "lapsed" },
--          }
--        : illegal(change, event);
-+          };
-     case "ChangeResumed":
-       return from("parked") && change.parkReason === "awaiting-ruling"
-         ? moveTo(change, change.parkedFrom ?? "verifying", [

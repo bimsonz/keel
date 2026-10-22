@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: proposals.not-a-fork
+# why: a fork of another project proposes to this one
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index e9a732a9..003af405 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -100,7 +100,7 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+ ) {
+   const trunks = yield* Trunks;
+   const origin = Option.getOrUndefined(yield* trunks.origin(input.fork));
+-  if (origin?.kind !== "forked" || origin.project !== input.upstream)
++  if (origin?.kind !== "forked")
+     return yield* new NotAForkOf({ fork: input.fork, upstream: input.upstream });
+   const trunk = projectRepos(input.fork).trunk;
+   const base = yield* baseOf(input.fork, origin.commit, input.commit);

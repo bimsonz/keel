@@ -205,8 +205,14 @@ model ChangeSummary {
   /** Why it is parked, while it is. */
   parkReason?: ParkReason;
 
-  /** The agent holding it now: the adopter after an adoption. */
-  agentId: AgentId;
+  /** The agent holding it now: the adopter after an adoption. Absent on a proposal, which no agent holds. */
+  agentId?: AgentId;
+
+  /** Where the change started; absent on a summary read before origins were kept, which is `agent`. */
+  origin?: ChangeOrigin;
+
+  /** Where a proposal comes from and where it stands: on a proposal alone. */
+  proposal?: ChangeProposal;
 
   goal: string;
   revision: int32;

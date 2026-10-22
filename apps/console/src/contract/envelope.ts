@@ -60,6 +60,11 @@ export const EVENT_TYPES = [
   "ChangeAdopted",
   "ChangeWithdrawn",
   "ChangeSuperseded",
+  // coordination: proposals from forks
+  "ChangeProposed",
+  "ProposalUpdated",
+  "ProposalApproved",
+  "ProposalChangesRequested",
   "LeaseLapsed",
   "LeaseRestarted",
   // coordination: subjects and premises

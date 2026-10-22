@@ -1,5 +1,6 @@
 import {
   Change,
+  ChangeOrigin,
   ChangeState,
   ParkReason,
   Proposition,
@@ -27,6 +28,7 @@ import {
 import {
   AgentId,
   ChangeId,
+  CommandActor,
   CommitSha,
   ConflictId,
   DecisionId,
@@ -87,7 +89,18 @@ export const ChangeSummary = Schema.Struct({
   number: Schema.Int,
   state: ChangeState,
   parkReason: Schema.optional(ParkReason),
-  agentId: AgentId,
+  /** Absent on a proposal, which no agent holds. */
+  agentId: Schema.optional(AgentId),
+  origin: Schema.optional(ChangeOrigin),
+  /** On a proposal alone. */
+  proposal: Schema.optional(
+    Schema.Struct({
+      fork: ProjectId,
+      commit: CommitSha,
+      proposer: CommandActor,
+      approved: Schema.optional(CommitSha),
+    }),
+  ),
   goal: Schema.String,
   revision: Schema.Int,
   declaredAt: InstantSchema,
@@ -97,10 +110,15 @@ export const ChangeSummary = Schema.Struct({
 /** Trunk's head and height: TrunkInitialized is height 0, and each advance adds 1. */
 export const TrunkView = Schema.Struct({ head: CommitSha, height: Schema.Int });
 
-/** A project's changes, newest `#n` first: in one `state` when given, numbered below `cursor`, at most `limit` (1–100, default 50). */
+/**
+ * A project's changes, newest `#n` first: in one `state` when given, its
+ * proposals alone (open, or landed and closed) when `proposals` is, numbered
+ * below `cursor`, at most `limit` (1–100, default 50).
+ */
 export const ChangesRead = Schema.Struct({
   project: ProjectId,
   state: Schema.optional(ChangeState),
+  proposals: Schema.optional(Schema.Literals(["open", "closed"])),
   cursor: Schema.optional(Schema.Int),
   limit: Schema.optional(Schema.Int),
 });

@@ -15,6 +15,15 @@ const ends = { ChangeWithdrawn: c("withdrawn"), ChangeSuperseded: c("superseded"
 /** Adoption of a lapsed lease, where the change waits on its agent: under the platform a lease does not lapse. */
 const waits = (state: string) => ({ ChangeAdopted: c(state) });
 const lapses = { ChangeParked: c("parked.leaseLapsed") };
+/** A proposal moved to another commit: back to work to be submitted, from anywhere but a batch or a Precheck pass. */
+const reproposed = { ProposalUpdated: c("working") };
+/** Past its plan and not yet batched, a change parks for a person's ruling, or a proposal for its approval. */
+const waitsForAPerson = {
+  ChangeParked: [
+    { target: c("parked.awaitingRuling"), guard: "for a ruling" },
+    { target: c("parked.awaitingApproval"), guard: "a proposal, for its approval" },
+  ],
+};
 
 export const changeChart: Chart = {
   id: "change",
@@ -41,20 +50,30 @@ export const changeChart: Chart = {
         ...ends,
       },
     },
-    drifted: { on: { IntentRevised: c("working"), ...lapses, ...waits("drifted"), ...ends } },
+    drifted: {
+      on: {
+        IntentRevised: c("working"),
+        ...lapses,
+        ...waits("drifted"),
+        ...reproposed,
+        ...ends,
+      },
+    },
     verifying: {
       on: {
         ChangeQueued: c("queued"),
-        ChangeParked: c("parked.awaitingRuling"),
+        ...waitsForAPerson,
         ChangeBounced: c("bounced"),
+        ...reproposed,
         ...ends,
       },
     },
     queued: {
       on: {
         ChangeBatched: c("integrating"),
-        ChangeParked: c("parked.awaitingRuling"),
+        ...waitsForAPerson,
         ChangeBounced: c("bounced"),
+        ...reproposed,
         ...ends,
       },
     },
@@ -72,6 +91,7 @@ export const changeChart: Chart = {
         ChangeRebased: c("bounced"),
         ...lapses,
         ...waits("bounced"),
+        ...reproposed,
         ...ends,
       },
     },
@@ -88,6 +108,19 @@ export const changeChart: Chart = {
             ChangeBounced: c("bounced"),
             // Held by another question: it waits on that one, from where it first parked.
             ChangeParked: c("parked.awaitingRuling"),
+            ...reproposed,
+          },
+        },
+        // A proposal Precheck read waits for the approval of the commit it carries before anything is verified.
+        awaitingApproval: {
+          on: {
+            ProposalApproved: [
+              { target: c("verifying"), guard: "parked from Verifying" },
+              { target: c("queued"), guard: "parked from Queued" },
+            ],
+            // A ruling against it while it waits: on a conflict, or on how Keel verifies.
+            ChangeBounced: c("bounced"),
+            ...reproposed,
           },
         },
         leaseLapsed: {

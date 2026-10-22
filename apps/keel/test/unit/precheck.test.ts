@@ -28,6 +28,7 @@ import {
   CodeHost,
   FlowSpecSource,
   PlanStore,
+  type PrecheckCompiled,
   type PrecheckWorkspace,
 } from "@keeltown/core/ports";
 import {
@@ -107,6 +108,8 @@ function precheckWorld(
   const plans = makePlanStoreMemory();
   /** What reached the plan store and the Change DO, in order. */
   const recorded: string[] = [];
+  /** Each plan Precheck recorded on the Change DO, as it was sent. */
+  const compiledPlans: PrecheckCompiled[] = [];
   projects.setSettings(projectId, {
     protectedPaths: (options.protectedPaths ?? ["infra/**"]).map((g) => Glob.make(g)),
     maxBatchSize: 4,
@@ -166,18 +169,16 @@ function precheckWorld(
         return ChangePrecheck.of({
           ...precheck,
           compiled: (id, plan) =>
-            precheck
-              .compiled(id, plan)
-              .pipe(
-                Effect.tap(() =>
-                  Effect.sync(
-                    () =>
-                      void recorded.push(
-                        `compiled ${plan.planHash}${plan.needsRuling === true ? " needs-ruling" : ""}`,
-                      ),
-                  ),
-                ),
+            precheck.compiled(id, plan).pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  compiledPlans.push(plan);
+                  recorded.push(
+                    `compiled ${plan.planHash}${plan.needsRuling === true ? " needs-ruling" : ""}`,
+                  );
+                }),
               ),
+            ),
         });
       }),
     ).pipe(Layer.provide(changes.layer)),
@@ -215,7 +216,8 @@ function precheckWorld(
   /**
    * Seeds the change as submitted at revision 1 on `commitSha`, judged
    * against `base` (none: an older submission that carries no base). The
-   * workspace view serves the change's current base, the grant's when none.
+   * workspace view serves the change's current base, the grant's when none,
+   * and its flow is read there.
    */
   const submit = (
     granted: CommitSha,
@@ -228,12 +230,36 @@ function precheckWorld(
       repo,
       baseSha: base ?? granted,
       grantedSha: granted,
+      flowAt: base ?? granted,
       projectId,
       subjects: options.subjects ?? [],
       intent: { revision: 1, goal: "the change under Precheck", footprint: [], premises: [] },
     };
     changes.submit(changeId, 1, workspace);
     return { changeId, revision: 1, commitSha, baseSha: base, instanceId };
+  };
+
+  /**
+   * Seeds a proposal as submitted at revision 1 on `commitSha`, a fork's
+   * commit judged against `base`, where the fork last met the upstream, in a
+   * workspace granted at the upstream's head `granted`: its flow is read there.
+   */
+  const propose = (
+    granted: CommitSha,
+    commitSha: CommitSha,
+    base: CommitSha,
+  ): PrecheckSubmission => {
+    changes.submit(changeId, 1, {
+      workspaceId,
+      repo,
+      baseSha: base,
+      grantedSha: granted,
+      flowAt: granted,
+      projectId,
+      subjects: options.subjects ?? [],
+      intent: { revision: 1, goal: "the proposal under Precheck", footprint: [], premises: [] },
+    });
+    return { changeId, revision: 1, commitSha, baseSha: base, instanceId: "precheck-evt_1" };
   };
 
   /** Grants the workspace and submits the last of `pushes` (each a whole tree) at revision 1, on the grant. */
@@ -286,11 +312,13 @@ function precheckWorld(
     layer,
     reads,
     recorded,
+    compiledPlans,
     storedPlan,
     grant,
     push,
     trunk,
     submit,
+    propose,
     submitted,
     run,
   };
@@ -312,6 +340,23 @@ const GUARD: AdmittedGuard = {
       anchors: [{ path: "src/a.ts", commit: CommitSha.make("a".repeat(40)) }],
     },
   },
+};
+
+/** A flow like keel/keel's: its own check on every path, and package.json a human-class path. */
+const UPSTREAM_FLOW = {
+  flow: { _tag: "step", step: "upstream.check" },
+  steps: [
+    {
+      id: "upstream.check",
+      kind: "deterministic",
+      evidenceCeiling: "proof",
+      outcomes: ["pass", "fail", "abstain"],
+      budget: { usd: 0.05, cpuMs: 1_200_000, tokens: 0 },
+      appliesTo: { paths: ["**"], subjects: [] },
+      run: { command: "pnpm test", timeoutMs: 1_200_000 },
+    },
+  ],
+  humanClassPaths: ["package.json"],
 };
 
 const withFile = (path: string, data = "changed\n"): FixtureFiles => ({
@@ -519,6 +564,51 @@ describe("Precheck", () => {
         if (untouched._tag !== "Compile") throw new Error(`not compiled: ${untouched._tag}`);
         expect([needsRuling(untouched), untouched.ruledPaths]).toEqual([false, undefined]);
         expect(plain.changes.stateOf(changeId)).toBe("queued");
+      });
+    },
+  );
+
+  it.effect(
+    "[precheck.proposal-flow-upstream] compiles a proposal under the flow at the upstream head its workspace was granted at, never its base's, and flags the human-class paths it edits; a change still reads its base's",
+    () => {
+      const base = { ...BASE_FILES, [FLOW]: JSON.stringify({}) };
+      const upstream = { ...base, [FLOW]: JSON.stringify(UPSTREAM_FLOW) };
+      const work = {
+        ...base,
+        "package.json": '{"scripts":{"test":"true"}}',
+        "src/a.ts": "changed\n",
+      };
+      const proposals = precheckWorld({ baseFiles: base });
+      const changes = precheckWorld({ baseFiles: base });
+      return Effect.gen(function* () {
+        const forked = yield* proposals.grant();
+        const head = yield* proposals.trunk(forked, upstream);
+        const proposed = yield* proposals.run(
+          proposals.propose(head, yield* proposals.push(work), forked),
+        );
+        if (proposed._tag !== "Compile") throw new Error(`not compiled: ${proposed._tag}`);
+        expect(proposals.reads.filter((r) => r.method === "flow")).toEqual([
+          { method: "flow", base: head },
+        ]);
+        expect(proposals.storedPlan(proposed.planHash).steps.map((s) => s.id)).toEqual(
+          expect.arrayContaining(["upstream.check", "keel.human-class"]),
+        );
+        expect(proposed.ruledPaths).toEqual(["package.json"]);
+        expect(proposals.compiledPlans.map((p) => p.ruledPaths)).toEqual([["package.json"]]);
+
+        const granted = yield* changes.grant();
+        yield* changes.trunk(granted, upstream);
+        const plain = yield* changes.run(
+          changes.submit(granted, yield* changes.push(work), granted),
+        );
+        if (plain._tag !== "Compile") throw new Error(`not compiled: ${plain._tag}`);
+        expect(changes.reads.filter((r) => r.method === "flow")).toEqual([
+          { method: "flow", base: granted },
+        ]);
+        expect(changes.storedPlan(plain.planHash).steps.map((s) => s.id)).not.toContain(
+          "upstream.check",
+        );
+        expect([needsRuling(plain), plain.ruledPaths]).toEqual([false, undefined]);
       });
     },
   );

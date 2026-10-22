@@ -2,12 +2,12 @@
 # kills: b21.workspace-intent
 # why: the workspace Precheck reads leaves out the intent, so derivation cannot tell a declared effect from an undeclared one
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index dbee8ba..06ce83d 100644
+index 203b3b42..f50b1907 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -611,7 +611,7 @@ export const changeWorkspace: (
-     ...held,
+@@ -1028,7 +1028,7 @@ export const changeWorkspace: (
      baseSha: change.baseSha,
+     flowAt: change.proposal === undefined ? change.baseSha : held.grantedSha,
      subjects: intentSubjects(change.intent),
 -    intent: change.intent,
 +    intent: { ...change.intent, declaredEffects: [] },

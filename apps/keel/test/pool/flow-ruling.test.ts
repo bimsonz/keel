@@ -5,6 +5,7 @@
 // handler resumes it into the lane or bounces it. Only a person rules: an
 // agent's token and a change's workspace token are refused. A person signed
 // in as themselves over MCP lists the question and rules with its tool.
+import { heldLease } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
 import {
   askFlowRuling,
@@ -46,7 +47,7 @@ const namespaceObject = () =>
 
 /** Declares, pushes, submits and starts Precheck: the change is deriving, awaiting its plan. */
 async function deriving(c: ChangeUnderTest) {
-  const lease = ok(await c.declare(`declare-${c.changeId}`, {})).change.lease.id;
+  const lease = heldLease(ok(await c.declare(`declare-${c.changeId}`, {})).change).id;
   await drainOutbox(c.stub);
   const commitSha = await c.push();
   ok(
@@ -212,7 +213,7 @@ describe("a change to how Keel verifies, on the real Change and namespace object
         await c.stub.submit({
           agentId: c.agentId,
           projectId: c.projectId,
-          leaseId: declared.change.lease.id,
+          leaseId: heldLease(declared.change).id,
           commitSha,
           idempotencyKey: "s-1",
         }),
@@ -316,7 +317,7 @@ describe("a change to how Keel verifies, on the real Change and namespace object
     const c = await changeUnderTest(projectId, "project");
     await seedAgent({ id: c.agentId, projectId });
     const maintainer = await seedUser(uniqueHandle("keeper"), { role: "maintainer" });
-    const lease = ok(await c.declare(`declare-${c.changeId}`, {})).change.lease.id;
+    const lease = heldLease(ok(await c.declare(`declare-${c.changeId}`, {})).change).id;
     await drainOutbox(c.stub);
     const commitSha = await c.push();
     const submitted = async (key: string, instanceId: string) => {

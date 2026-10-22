@@ -136,6 +136,38 @@ export function projectEvents(project: string = id("prj")) {
         changeId,
         by: "contract",
       } as { _tag: string }),
+    /** A proposal of `fork`'s `commit` by `proposer`, as its Change object commits it: submitted, no agent holding it. */
+    proposed: (changeId: string, fork: string, commit: string, proposer: string) => [
+      envelope(changeRef(changeId), {
+        _tag: "IntentDeclared",
+        changeId,
+        origin: "proposal",
+        revision: 1,
+        goal: "a proposal",
+        footprint: [],
+        premises: [],
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeProposed",
+        changeId,
+        fork,
+        commit,
+        proposer,
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeStarted",
+        changeId,
+        workspaceId: id("wsp"),
+        baseSha: sha(1),
+      } as { _tag: string }),
+      envelope(changeRef(changeId), {
+        _tag: "ChangeSubmitted",
+        changeId,
+        revision: 1,
+        commitSha: commit,
+        workspaceId: id("wsp"),
+      } as { _tag: string }),
+    ],
     trunkInitialized: (head: string) =>
       envelope({ kind: "trunk", id: project }, {
         _tag: "TrunkInitialized",

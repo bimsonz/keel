@@ -11,6 +11,7 @@ import {
   resumeTrunk,
   seedTrunk,
   syncFromUpstream,
+  upstreamPoints,
   cancelBatch,
   syncMirror,
   syncTrunk,
@@ -214,6 +215,13 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     );
     await this.afterSync();
     return answer;
+  }
+
+  async upstreamPoints() {
+    return this.answer(
+      TrunkCodecs.upstreamPoints,
+      Effect.map(upstreamPoints(this.projectId), (points) => ({ points })),
+    );
   }
 
   async cancel(cancel: typeof BatchCancel.Encoded) {

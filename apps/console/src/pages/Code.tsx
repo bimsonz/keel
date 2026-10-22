@@ -15,7 +15,10 @@ import { Link, navigate, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { CloneField } from "../views/Clone.tsx";
 import { Repository } from "../views/Repository.tsx";
-import { maintains } from "../engine/settings.ts";
+import { maintains, owns } from "../engine/settings.ts";
+import type { ProjectView } from "../contract/keel/index.ts";
+import { ForkBar } from "../views/ForkBar.tsx";
+import type { ReaderMark } from "../views/Frame.tsx";
 import { KEEL_QUICKSTART } from "../own.ts";
 
 type CodeRoute = Extract<Route, { at: "code" | "commits" | "commit" }>;
@@ -272,7 +275,41 @@ function About() {
 const leadsTo = (directory: string, path: string): boolean =>
   path === directory || path.startsWith(`${directory}/`);
 
-export function CodePage({ route, mode }: { route: CodeRoute; mode: Mode }) {
+/**
+ * A fork's bar, where the project is one whose upstream Keel names to this reader: Sync fork for its owners, and
+ * Propose for whoever works in it and is signed in.
+ */
+function forkBarOf(
+  source: ReturnType<typeof usePlayer>["source"],
+  project: ProjectView | undefined,
+  reader: ReaderMark | undefined,
+) {
+  const upstream = project?.forkedFrom;
+  if (project === undefined || upstream === undefined) return null;
+  const sync = owns(project) ? source.syncUpstream : undefined;
+  return (
+    <ForkBar
+      upstream={upstream}
+      {...(sync === undefined ? {} : { sync })}
+      propose={
+        project.viewer !== undefined && reader?.name !== undefined && source.proposals !== undefined
+      }
+    />
+  );
+}
+
+export function CodePage({
+  route,
+  mode,
+  project,
+  reader,
+}: {
+  route: CodeRoute;
+  mode: Mode;
+  /** The project as Keel shows it to this reader: a fork's bar is drawn from it. */
+  project?: ProjectView;
+  reader?: ReaderMark;
+}) {
   const player = usePlayer();
   const version = useWorldVersion();
   const where = useWhere();
@@ -324,6 +361,7 @@ export function CodePage({ route, mode }: { route: CodeRoute; mode: Mode }) {
         ? {
             banner: (
               <>
+                {forkBarOf(player.source, project, reader)}
                 <WaitingOnARuling />
                 <QuickSetup />
               </>

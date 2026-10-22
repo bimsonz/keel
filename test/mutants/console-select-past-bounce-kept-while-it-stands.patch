@@ -2,11 +2,11 @@
 # kills: change.bounce-kept
 # why: a change that stands bounced draws its bounce twice, once as past
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 467268ca..87a7538a 100644
+index 50082ce7..1b6ebf0d 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -675,7 +675,7 @@ export function changePageOf(
-   const by = world.agents.get(change.agentId);
+@@ -699,7 +699,7 @@ export function changePageOf(
+   const by = authorEntryOf(world, change);
    const bounce = change.state === "bounced" ? change.bounce : undefined;
    // A bounce it has moved on from is still Keel's record of it: a withdrawal or another try does not undo it.
 -  const past = change.state === "bounced" ? undefined : change.bounce;

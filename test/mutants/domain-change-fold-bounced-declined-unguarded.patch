@@ -2,10 +2,10 @@
 # kills: change.fold-table
 # why: the fold takes a bounce for a declined batch in any state and for any batch, where only a change integrating in that batch is bounced by it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..55f5ea47 100644
+index 916513b7..77b70eb2 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1035,15 +1035,13 @@ export const evolveChange = (
+@@ -1322,15 +1322,13 @@ export const evolveChange = (
          : illegal(change, event);
      case "ChangeBounced":
        if (event.declined !== undefined)
@@ -21,5 +21,5 @@ index 49027283..55f5ea47 100644
 -          : illegal(change, event);
 +            ]);
        if (event.decisionId !== undefined)
-         return from("parked") && change.parkReason === "awaiting-ruling"
-           ? moveTo(change, "bounced", [
+         return from("parked") &&
+           (change.parkReason === "awaiting-ruling" || change.parkReason === "awaiting-approval")

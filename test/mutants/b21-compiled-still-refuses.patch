@@ -2,15 +2,15 @@
 # kills: b21.proven-blocks
 # why: a plan compiled under block with a proof standing still asks to queue, which the machine refuses as blocked
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bcad1bed..4d59b97a 100644
+index 203b3b42..e9647775 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1938,7 +1938,7 @@ export const planCompiled: (
+@@ -2520,7 +2520,7 @@ export const planCompiled: (
        (store) => {
          const blockers = blockersOf(store, plan.predicatePolicy);
          const bounce = conflictBounce(blockers.openProvenConflicts);
 -        if (bounce !== undefined) return [compile, bounce];
 +        void bounce;
-         // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
-         // conflict already with a person holds the change too: either the moment it is queued.
-         const asked =
+         // A proposal waits for the approval of its commit before anything is verified. A question on how
+         // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
+         if (storedChange(store, changeId)?.proposal !== undefined) {

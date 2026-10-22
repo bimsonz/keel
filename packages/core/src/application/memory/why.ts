@@ -48,9 +48,17 @@ const told = <A, E>(result: Result.Result<A, E>): A[] =>
 
 const cite = (record: KeelRecord): MfpCitation => ({ kind: "record", ref: record.id });
 
-/** An agent's change is its agent's claim; one an auditor or an operator opened is Keel's. */
-const authorOf = (change: Change): RecordAuthor =>
-  change.origin === "agent" ? { kind: "agent", id: change.agentId } : KEEL_AUTHOR;
+/**
+ * An agent's change is its agent's claim, and a proposal its proposer's, a
+ * person's or an agent's; one an auditor or an operator opened is Keel's.
+ */
+const authorOf = (change: Change): RecordAuthor => {
+  if (change.origin === "agent" && change.agentId !== undefined)
+    return { kind: "agent", id: change.agentId };
+  if (change.proposal === undefined) return KEEL_AUTHOR;
+  const [kind, id = ""] = change.proposal.proposer.split(":");
+  return { kind: kind === "user" ? "human" : "agent", id };
+};
 
 /** The intent a change holds now, as its agent declared it, as Keel's record states it. */
 function intentRecord(change: Change): KeelRecord {

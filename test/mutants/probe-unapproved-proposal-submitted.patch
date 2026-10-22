@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.proposal-unapproved
+# why: a Probe reads an unapproved proposal as submitted, so Keel drafts, builds and runs a stranger's code before anyone approves it
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index 7edee24d..eddadd4e 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -85,8 +85,6 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
+   if (UNSUBMITTED.has(change.state)) return { _tag: "Unsubmitted" };
+   // A proposal is no world until a maintainer approves the commit it carries: before that Keel drafts,
+   // builds and runs nothing of it, and the Probe waits for the approval as for a submission.
+-  if (change.proposal !== undefined && change.proposal.approved !== change.commitSha)
+-    return { _tag: "Unsubmitted" };
+   return { _tag: "Submitted", head: change.commitSha, base: change.baseSha };
+ };
+ 

@@ -22,7 +22,7 @@ export const lapsesAt = (lease: Lease): Instant => instant(lease.renewedAt + LEA
 export const deadlinePassed = (lease: Lease, now: Instant): boolean =>
   lease.state === "lapsed" || (lease.state === "active" && now >= lapsesAt(lease));
 
-/** Whether the change waits on its agent, so that its lease's deadline runs: agent-owned, or parked for adoption. */
+/** Whether the change waits on its agent, so that its lease's deadline runs: agent-owned, or parked for adoption. A proposal has no lease to run. */
 const waitsOnAgent = (change: Change): boolean =>
   isAgentOwned(change.state) || (change.state === "parked" && change.parkReason === "lease-lapsed");
 
@@ -36,7 +36,7 @@ const waitsOnAgent = (change: Change): boolean =>
  * change, under the rule before this one, does not stand either.
  */
 export const isLapsed = (change: Change, now: Instant): boolean =>
-  waitsOnAgent(change) && deadlinePassed(change.lease, now);
+  change.lease !== undefined && waitsOnAgent(change) && deadlinePassed(change.lease, now);
 
 /**
  * Whether the change's lease is still its holder's permit: active, or recorded
@@ -45,7 +45,8 @@ export const isLapsed = (change: Change, now: Instant): boolean =>
  * change back restarts it.
  */
 export const leaseStands = (change: Change): boolean =>
-  change.lease.state === "active" || (change.lease.state === "lapsed" && !waitsOnAgent(change));
+  change.lease !== undefined &&
+  (change.lease.state === "active" || (change.lease.state === "lapsed" && !waitsOnAgent(change)));
 
 const readChange = (changeId: string): NextAction => ({
   kind: "read",
@@ -64,7 +65,8 @@ const adoptChange = (changeId: string): NextAction => ({
 /**
  * The lease check every mutating call on a change makes: the call must carry
  * the change's current lease, and that lease must not have lapsed. "No lease"
- * is never permission, and a refusal always says what to do next.
+ * is never permission, and a refusal always says what to do next: a change no
+ * agent holds (a proposal) takes no call under a lease at all.
  */
 export const checkLease = (
   change: Change,
@@ -72,6 +74,7 @@ export const checkLease = (
   now: Instant,
 ): Result.Result<void, LeaseStale> => {
   if (
+    change.lease === undefined ||
     leaseId !== change.lease.id ||
     (change.lease.state !== "active" && change.lease.state !== "lapsed")
   ) {
@@ -107,7 +110,15 @@ export const renew = (
   leaseId: LeaseId,
   now: Instant,
 ): Result.Result<Change, LeaseStale> =>
-  Result.map(checkLease(change, leaseId, now), () => ({
-    ...change,
-    lease: { ...change.lease, renewedAt: now },
-  }));
+  Result.flatMap(checkLease(change, leaseId, now), () =>
+    change.lease === undefined
+      ? Result.fail(
+          new LeaseStale({
+            changeId: change.id,
+            leaseId,
+            reason: "stale",
+            nextActions: [readChange(change.id)],
+          }),
+        )
+      : Result.succeed({ ...change, lease: { ...change.lease, renewedAt: now } }),
+  );

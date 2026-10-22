@@ -74,7 +74,7 @@ export function settingsProject(projectId: string): Result.Result<ProjectId, Iss
     : Result.fail([{ path: ["path", "projectId"], message: "Expected a project id (prj_…)" }]);
 }
 
-/** A PUT's settings: the project's protected globs, its batch size, and `verification` and `visibility` only when given. */
+/** A PUT's settings: the project's protected globs, its batch size, and `verification`, `visibility` and `proposals` only when given. */
 export function putSettingsInput(
   input: Input<"Operator_putSettings">,
 ): Result.Result<{ readonly projectId: ProjectId; readonly settings: PutProjectSettings }, Issues> {
@@ -90,11 +90,12 @@ export function putSettingsInput(
       maxBatchSize: input.maxBatchSize,
       ...(input.verification === undefined ? {} : { verification: input.verification }),
       ...(input.visibility === undefined ? {} : { visibility: input.visibility }),
+      ...(input.proposals === undefined ? {} : { proposals: input.proposals }),
     },
   });
 }
 
-/** The project's settings, `verification` and `visibility` always present. GET and PUT answer the same body. */
+/** The project's settings, `verification`, `visibility` and `proposals` always present. GET and PUT answer the same body. */
 export function settingsOk(
   settings: ProjectSettings,
 ): Extract<Operator_getSettingsResult, { readonly status: 200 }> {
@@ -105,6 +106,7 @@ export function settingsOk(
       maxBatchSize: settings.maxBatchSize,
       verification: settings.verification,
       visibility: settings.visibility,
+      proposals: settings.proposals,
     },
   };
 }
@@ -137,6 +139,18 @@ const syncAgain = (title: string) => ({
   operationId: "Operator_syncUpstream",
 });
 
+/** A fork whose owner may no longer read the project it was taken from: Keel reads nothing of it for them. */
+export function upstreamUnread(caller: Caller): Operator_syncUpstreamResult {
+  return {
+    status: 403,
+    body: problem(403, "auth.forbidden", caller.requestId, {
+      detail:
+        "You may no longer read the project this fork was taken from, so Keel syncs nothing from it for you. Nothing was moved.",
+      nextActions: [],
+    }),
+  };
+}
+
 /** A sync's refusals, each with nothing moved. */
 export function syncUpstreamError(caller: Caller, error: SyncRefused): Operator_syncUpstreamResult {
   switch (error._tag) {
@@ -153,8 +167,24 @@ export function syncUpstreamError(caller: Caller, error: SyncRefused): Operator_
         status: 409,
         body: problem(409, "project.not_imported", caller.requestId, {
           detail:
-            "Only a project imported from a Git URL has an upstream to sync from. Nothing was moved.",
+            "Only a project imported from a Git URL or forked from another has an upstream to sync from. Nothing was moved.",
           nextActions: [],
+        }),
+      };
+    case "SyncConflicts":
+      return {
+        status: 409,
+        body: problem(409, "trunk.sync_conflicts", caller.requestId, {
+          detail: `The fork's work and its upstream's both changed ${error.path} (${error.reason}), and Keel will not merge them. Nothing was moved.`,
+          nextActions: [
+            {
+              kind: "call" as const,
+              title: `Land a change in the fork that takes the upstream's version of ${error.path}`,
+              operationId: "declare",
+              args: { path: error.path },
+            },
+            syncAgain("Sync again once that change has landed"),
+          ],
         }),
       };
     case "NotFastForward":

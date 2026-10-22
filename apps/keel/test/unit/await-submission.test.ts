@@ -94,6 +94,48 @@ describe("[b21.await-one-transaction] the read and the subscribe are one transac
   );
 });
 
+describe("[b21.await-proposal] a Probe waits for a proposal's approval", () => {
+  it.effect(
+    "[b21.await-proposal] a proposal parked for approval is no submission yet: a Probe waits on it and hears its approval, and an approved one is answered at once",
+    () =>
+      Effect.gen(function* () {
+        yield* declared;
+        const store = yield* EntityStore;
+        const outbox = yield* EventOutbox;
+        const stored = decode(store.get(CHANGE, changeId));
+        const proposed = (approved?: CommitSha) =>
+          JSON.parse(
+            JSON.stringify(
+              encode({
+                ...stored,
+                state: "parked",
+                parkReason: "awaiting-approval",
+                commitSha: sha(1),
+                baseSha: sha(2),
+                proposal: {
+                  fork: makeId("prj", ulidOf(21)),
+                  proposer: `user:${makeId("usr", ulidOf(22))}`,
+                  ...(approved === undefined ? {} : { approved }),
+                },
+              }),
+            ),
+          );
+        store.put(CHANGE, changeId, proposed());
+        const waiting = yield* awaitSubmission(changeId, "workflow:Probe/unapproved");
+        expect(waiting).toEqual({ waiting: true });
+        expect(
+          outbox.subscribers("ProposalApproved", {
+            entity: { kind: "change", id: changeId },
+            affected: [],
+          }),
+        ).toContain("workflow:Probe/unapproved");
+        store.put(CHANGE, changeId, proposed(sha(1)));
+        const answered = yield* awaitSubmission(changeId, "workflow:Probe/approved");
+        expect("waiting" in answered).toBe(false);
+      }).pipe(Effect.provide(layers)),
+  );
+});
+
 describe("[b21.await-agrees] the Change DO and the Probe read a submission by one rule", () => {
   it.effect(
     "[b21.await-agrees] in every state, with or without a commit, a base and a landing, it waits and subscribes exactly when the Probe would read Unsubmitted",

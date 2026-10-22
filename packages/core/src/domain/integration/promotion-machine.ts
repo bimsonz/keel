@@ -119,15 +119,17 @@ export type PromotionCommand =
   | { readonly _tag: "Resume"; readonly by: CommandActor; readonly head: CommitSha }
   | {
       /**
-       * An owner asks for trunk's main to move from `from`, its head, to `to`,
-       * the head of the upstream branch its import took. The caller has
-       * already found that `to` descends from `from`; the move itself waits
-       * for the read-back.
+       * An owner asks for trunk's main to move from `from`, its head, to `to`:
+       * the head of the upstream branch its import took, or of the trunk its
+       * fork was taken from, or Keel's merge of that head (`merged`) into a
+       * fork that holds work of its own. The caller has already found that
+       * `to` descends from `from`; the move itself waits for the read-back.
        */
       readonly _tag: "Sync";
       readonly by: CommandActor;
       readonly from: CommitSha;
       readonly to: CommitSha;
+      readonly merged?: CommitSha | undefined;
     }
   | {
       /**
@@ -251,6 +253,7 @@ const readBackSync = (
         to: sync.to,
         by: sync.by,
         upstream: sync.upstream,
+        ...(sync.merged === undefined ? {} : { merged: sync.merged }),
         ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),
       }),
     ]);
@@ -513,9 +516,10 @@ export const decidePromotion = (
         : refuse(trunk, command);
 
     case "Sync": {
-      // Only an import has an upstream; its origin names the URL and branch.
+      // Only an import or a fork has an upstream: its origin names the URL and branch, or the project.
       const { origin } = trunk;
-      if (origin?.kind !== "imported") return Result.fail(new NotImported({ projectId }));
+      if (origin?.kind !== "imported" && origin?.kind !== "forked")
+        return Result.fail(new NotImported({ projectId }));
       // A sync starts only between groups, from the head trunk holds, and never during another sync.
       if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
         return refuse(trunk, command);
@@ -527,7 +531,12 @@ export const decidePromotion = (
           from: command.from,
           to: command.to,
           by: command.by,
-          upstream: { url: origin.url, ref: origin.ref },
+          ...(origin.kind === "imported"
+            ? { upstream: { url: origin.url, ref: origin.ref } }
+            : {
+                upstream: { project: origin.project },
+                ...(command.merged === undefined ? {} : { merged: command.merged }),
+              }),
         }),
       ]);
     }
@@ -538,6 +547,26 @@ export const decidePromotion = (
     }
   }
 };
+
+/** How many of a fork's syncs its trunk remembers: an older one's commits are based on an older point, or the fork point. */
+export const MAX_SYNC_POINTS = 32;
+
+/** Where a trunk met its upstream: one sync point. */
+export interface UpstreamPoint {
+  /** Trunk's head the sync left. */
+  readonly at: CommitSha;
+  /** The upstream trunk head it took: `at` itself for a fast-forward, the merged head for Keel's merge. */
+  readonly upstream: CommitSha;
+}
+
+/**
+ * Every point where a fork met its upstream, newest first: each sync it
+ * remembers, then the fork point. A trunk that is no fork met none.
+ */
+export const upstreamPointsOf = (trunk: Trunk): readonly UpstreamPoint[] =>
+  trunk.origin?.kind === "forked"
+    ? [...(trunk.points ?? []), { at: trunk.origin.commit, upstream: trunk.origin.commit }]
+    : [];
 
 const illegal = (state: Trunk | undefined, event: TrunkEvent): never => {
   throw new IllegalTransition(
@@ -760,7 +789,13 @@ export const evolvePromotion = (
         ? {
             ...trunk,
             phase: "syncing",
-            sync: { from: event.from, to: event.to, by: event.by, upstream: event.upstream },
+            sync: {
+              from: event.from,
+              to: event.to,
+              by: event.by,
+              upstream: event.upstream,
+              ...(event.merged === undefined ? {} : { merged: event.merged }),
+            },
           }
         : illegal(trunk, event);
 
@@ -781,6 +816,15 @@ export const evolvePromotion = (
             // Batches queued during the sync wait for the debounce, as after an advance.
             phase: settled(trunk.queue),
             ...(event.height === undefined ? {} : { height: event.height }),
+            // A fork remembers where it met its upstream: a proposal from it is based on the newest such point.
+            ...("project" in sync.upstream
+              ? {
+                  points: [
+                    { at: event.to, upstream: sync.merged ?? event.to },
+                    ...(trunk.points ?? []),
+                  ].slice(0, MAX_SYNC_POINTS),
+                }
+              : {}),
           }
         : illegal(trunk, event);
     }

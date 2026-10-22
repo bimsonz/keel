@@ -9,11 +9,13 @@ import { env } from "cloudflare:workers";
 import { Effect, Layer } from "effect";
 import { afterAll, afterEach, expect, it, vi } from "vitest";
 import { CodeHostArtifacts } from "../../src/adapters/driven/artifacts/code-host.ts";
+import { ArtifactsObjects } from "../../src/adapters/driven/artifacts/objects.ts";
 import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
 import { artifactsFixture } from "./fixture.ts";
 
 const NAMESPACE = "keel-ws-00";
 const host = CodeHostArtifacts({ [NAMESPACE]: env.WORKSPACES });
+const objects = ArtifactsObjects({ [NAMESPACE]: env.WORKSPACES });
 const fixture = artifactsFixture(NAMESPACE, env.WORKSPACES);
 const MAIN = "refs/heads/main";
 /** An admission that admits every pack. */
@@ -48,7 +50,9 @@ it("[sync.live] relays trunk into an empty repo, then each new head, keeping com
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED, objects).pipe(
+              Layer.provide(host),
+            ),
             host,
             fixture.layer,
           ),
@@ -93,7 +97,7 @@ it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuse
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging }, UNSIGNED).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging }, UNSIGNED, objects).pipe(Layer.provide(host)),
             host,
             fixture.layer,
           ),
@@ -138,7 +142,7 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging }, UNSIGNED).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging }, UNSIGNED, objects).pipe(Layer.provide(host)),
             host,
             fixture.layer,
           ),
@@ -242,7 +246,9 @@ it("[take.live] brings an empty repo its source's whole history in one fetch and
       program.pipe(
         Effect.provide(
           Layer.mergeAll(
-            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED).pipe(Layer.provide(host)),
+            TrunkWriterGitCore({ trunk, staging: trunk }, UNSIGNED, objects).pipe(
+              Layer.provide(host),
+            ),
             host,
             fixture.layer,
           ),

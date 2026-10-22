@@ -32,7 +32,10 @@ export const PERSON_INSTRUCTIONS =
   "You are signed in as a person, and what you do here is done as them. " +
   "`Operator_listEscalations` lists the questions Keel has put to them, each naming what it is about and the options it offers. " +
   "Read a change a question is about with `diff`, and an issue with `issues` and `issue`. " +
-  "Rule only when they have told you their ruling: `Operator_giveRuling` names one of the question's options and records the decision as theirs.";
+  "Rule only when they have told you their ruling: `Operator_giveRuling` names one of the question's options and records the decision as theirs. " +
+  "`proposals` lists what forks of a project propose to it, each waiting for approval before Keel verifies anything. " +
+  "Read one with `change` and `diff`, and approve it only when they have told you to: `approveProposal` names the commit you read, " +
+  "and is refused if its proposer has moved it since. `requestProposalChanges` asks for changes with their comment, and `closeProposal` closes it.";
 
 /** What the gate admitted travels to the tool handlers inside AuthInfo, in the same isolate. */
 const ADMITTED = "admitted";

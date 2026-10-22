@@ -49,6 +49,16 @@ export const byAgent = (
 /** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */
 export const userActor = (userId: UserId): CommandActor => `user:${userId}`;
 
+/** Who an actor is: an agent or a user, by id. */
+export const actorParts = (
+  actor: CommandActor,
+):
+  | { readonly kind: "agent"; readonly id: AgentId }
+  | { readonly kind: "user"; readonly id: UserId } =>
+  actor.startsWith("agent:")
+    ? { kind: "agent", id: AgentId.make(actor.slice("agent:".length)) }
+    : { kind: "user", id: UserId.make(actor.slice("user:".length)) };
+
 /**
  * The envelope every event is committed in (docs/domain/events.md). The payload
  * is one of the contexts' tagged event schemas; its `_tag` is the event type.

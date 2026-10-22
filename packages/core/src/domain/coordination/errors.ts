@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import {
   AgentId,
   ChangeId,
+  CommitSha,
   ConflictId,
   EscalationId,
   GuardId,
@@ -9,6 +10,7 @@ import {
   LeaseId,
   NamespaceId,
   NextAction,
+  ProjectId,
   WorkspaceId,
 } from "../kernel/index.ts";
 import { ChangeState } from "./change.ts";
@@ -25,6 +27,52 @@ export class ChangeNotFound extends Schema.TaggedError<ChangeNotFound>()("Change
   changeId: ChangeId,
   nextActions,
 }) {}
+
+/** A proposal's own command on a change that is no proposal: an agent's, or Keel's. */
+export class NotAProposal extends Schema.TaggedError<NotAProposal>()("NotAProposal", {
+  changeId: ChangeId,
+  nextActions,
+}) {}
+
+/** A proposal names a project as its fork that was not forked from the project it is proposed to. */
+export class NotAForkOf extends Schema.TaggedError<NotAForkOf>()("NotAForkOf", {
+  fork: ProjectId,
+  upstream: ProjectId,
+}) {}
+
+/** A proposal names a commit its fork's trunk does not hold: only what landed in the fork is proposed. */
+export class CommitNotOnFork extends Schema.TaggedError<CommitNotOnFork>()("CommitNotOnFork", {
+  fork: ProjectId,
+  commit: CommitSha,
+}) {}
+
+/** A proposal's commit carries nothing past where its fork last met the project: there is nothing to propose. */
+export class ProposalEmpty extends Schema.TaggedError<ProposalEmpty>()("ProposalEmpty", {
+  fork: ProjectId,
+  commit: CommitSha,
+  base: CommitSha,
+}) {}
+
+/** The proposer already has `limit` proposals open on the project: one must close or land first. */
+export class ProposalLimit extends Schema.TaggedError<ProposalLimit>()("ProposalLimit", {
+  projectId: ProjectId,
+  limit: Schema.Int,
+}) {}
+
+/**
+ * An approval, or a request for changes, names a commit the proposal no
+ * longer carries: its proposer moved it since the reviewer read it. `current`
+ * is the one it carries now.
+ */
+export class ProposalCommitMoved extends Schema.TaggedError<ProposalCommitMoved>()(
+  "ProposalCommitMoved",
+  {
+    changeId: ChangeId,
+    commit: CommitSha,
+    current: CommitSha,
+    nextActions,
+  },
+) {}
 
 /**
  * The call carried a lease that is not the change's active lease: another

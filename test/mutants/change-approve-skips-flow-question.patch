@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: change.proposal-approve-asks
+# why: an approval queues a proposal whose change to how Keel verifies nobody has ruled on
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 203b3b42..a53b26de 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1515,10 +1515,7 @@ export const approveProposal = (changeId: ChangeId, command: ApproveProposal) =>
+         ? undefined
+         : flowRulingIdOf(changeId, change.precheckInstance);
+     const asked = flow === undefined ? undefined : store.get(CHANGE_FLOW_ASKED, flow);
+-    const waitOn =
+-      asked !== undefined && decodeFlowAsked(asked).heard !== FLOW_RULING_APPROVE
+-        ? flow
+-        : awaitedEscalation(store);
++    const waitOn = awaitedEscalation(store);
+     return [
+       { _tag: "Approve", commit: command.commit, by: command.by },
+       ...(waitOn === undefined ? [] : [{ _tag: "Park" as const, escalationId: waitOn }]),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.proposals
+# why: an agent that maintains a project approves its proposals while nobody sponsors it
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e40376fe..1756df1f 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -1020,7 +1020,7 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision
+ const approver = (principal: Principal, project: ProposalChangeResource["project"]): Decision => {
+   const maintains = decide(principal, "maintain", project);
+   if (Result.isFailure(maintains) || principal._tag !== "Agent") return maintains;
+-  return principal.sponsored === true ? granted() : refused("sponsor-required");
++  return granted();
+ };
+ 
+ /**

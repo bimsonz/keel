@@ -3,6 +3,7 @@ import {
   NotImported,
   PromotionState,
   PromotionStateRefused,
+  SyncConflicts,
   TrunkNotInitialized,
   TrunkOrigin,
 } from "@keeltown/core/domain/integration";
@@ -67,6 +68,11 @@ export const UpstreamUnreachable = Schema.TaggedStruct("UpstreamUnreachable", {
   reason: Schema.Literals(["unreachable", "branch-gone"]),
 });
 
+/** Every point where a fork met its upstream, newest first, ending at the fork point; none for a trunk that is no fork. */
+export const UpstreamPoints = Schema.Struct({
+  points: Schema.Array(Schema.Struct({ at: CommitSha, upstream: CommitSha })),
+});
+
 /** A batch speculation cancels, behind the failed batch `because`, with its members. */
 export const BatchCancel = Schema.Struct({
   batchId: BatchId,
@@ -103,8 +109,10 @@ export const TrunkCodecs = {
       UpstreamUnreachable,
       ImportTooLarge,
       QuotaExceeded,
+      SyncConflicts,
     ]),
   ),
+  upstreamPoints: exitCodec(UpstreamPoints, Schema.Never),
   cancel: exitCodec(CancelAnswer, TrunkNotInitialized),
   destroy: exitCodec(Schema.Void, Schema.Never),
 };
@@ -165,14 +173,18 @@ export interface TrunkRpc {
   sync(): Promise<ExitJson>;
   /**
    * Moves an imported trunk's main forward to the head of the upstream
-   * branch its import took, as `by`, an owner, asked: refused, with nothing
-   * moved, when trunk was not imported, is not between groups, upstream
-   * cannot be read, its head does not descend from trunk's, or its new
-   * history is over what a relay carries or over the namespace's repo
-   * bytes. A move the code host keeps busy is finished on the Trunk DO's
-   * own deadline, and answers `synced` false until then.
+   * branch its import took, or a fork's to its upstream trunk's head or
+   * Keel's merge of it, as `by`, an owner, asked: refused, with nothing
+   * moved, when trunk was neither imported nor forked, is not between
+   * groups, upstream cannot be read, an import's upstream head does not
+   * descend from trunk's, a fork's work and its upstream's both changed a
+   * path apart, or the new history is over what a relay carries or over the
+   * namespace's repo bytes. A move the code host keeps busy is finished on
+   * the Trunk DO's own deadline, and answers `synced` false until then.
    */
   syncUpstream(by: CommandActor): Promise<ExitJson>;
+  /** Where a fork met its upstream, newest first, ending at the fork point: what a proposal from it is based on. */
+  upstreamPoints(): Promise<ExitJson>;
   /**
    * Cancels a batch speculation verified behind a failed one: `dropped` when
    * it was queued here or its verdict has not arrived (it never promotes),

@@ -64,12 +64,25 @@ export function changeListInput(
   });
 }
 
-const summaryBody = (summary: ChangeSummary) => ({
+export const summaryBody = (summary: ChangeSummary) => ({
   changeId: summary.changeId,
   number: summary.number,
   state: summary.state,
   ...(summary.parkReason === undefined ? {} : { parkReason: summary.parkReason }),
-  agentId: summary.agentId,
+  ...(summary.agentId === undefined ? {} : { agentId: summary.agentId }),
+  ...(summary.origin === undefined ? {} : { origin: summary.origin }),
+  ...(summary.proposal === undefined
+    ? {}
+    : {
+        proposal: {
+          fork: summary.proposal.fork,
+          commit: summary.proposal.commit,
+          proposer: summary.proposal.proposer,
+          ...(summary.proposal.approved === undefined
+            ? {}
+            : { approved: summary.proposal.approved }),
+        },
+      }),
   goal: summary.goal,
   revision: summary.revision,
   declaredAt: iso(summary.declaredAt),

@@ -72,6 +72,7 @@ import {
   clockTime,
   dateTime,
 } from "./parts.tsx";
+import { Review, type ReviewProps } from "./Review.tsx";
 
 /** A claim in full: what makes two declared effects the same one. A bound's unit and the scope are part of it. */
 function ClaimLine({ proposition }: { proposition: Proposition }) {
@@ -550,14 +551,21 @@ function Status({
   const requeued = change.state === "queued" ? state.requeued : undefined;
   // A change parked because its agent's lease lapsed waits on its agent: no person is asked anything.
   const lapsed = change.state === "parked" && state.parkedOn === "lease-lapsed";
+  // A proposal from a fork waits for a maintainer's review of the commit it carries before anything is verified.
+  const reviewed = change.state === "parked" && state.parkedOn === "awaiting-approval";
   const waiting = lapsed
     ? { title: "Waiting on its agent", said: "Lease lapsed" }
-    : requeued === undefined
-      ? WAITING_ON[change.state]
-      : {
-          title: "Requeued",
-          said: `${clockTime(requeued.at)} · ${REQUEUED[requeued.reason]}${requeued.times > 1 ? ` (×${requeued.times})` : ""}`,
-        };
+    : reviewed
+      ? {
+          title: "Review required",
+          said: "A maintainer approves the commit it carries before Keel verifies anything of it",
+        }
+      : requeued === undefined
+        ? WAITING_ON[change.state]
+        : {
+            title: "Requeued",
+            said: `${clockTime(requeued.at)} · ${REQUEUED[requeued.reason]}${requeued.times > 1 ? ` (×${requeued.times})` : ""}`,
+          };
   return (
     <Row
       lead
@@ -1079,12 +1087,15 @@ export function Change({
   mode,
   tab,
   ruling,
+  review,
 }: {
   state: ChangePageState;
   mode: Mode;
   tab: ChangeTab;
   /** A question the change waits on, where the page has it in words. */
   ruling?: ChangeRuling;
+  /** A proposal's review, where it waits for one and the page can send it. */
+  review?: Omit<ReviewProps, "proposal">;
 }) {
   const { change, intent, verdict, escalation, plan, diff } = state;
   const { route } = useWhere();
@@ -1136,16 +1147,24 @@ export function Change({
         meta={
           <>
             <span className="flex flex-wrap items-center gap-x-1.5 text-kumo-default">
-              {agent}
-              {pill === "landed"
-                ? "landed 1 commit into trunk"
-                : pill === "closed"
-                  ? change.state === "withdrawn"
-                    ? "withdrew this change"
-                    : "had this change superseded"
-                  : change.commit === ""
-                    ? "wants to land a change into trunk"
-                    : "wants to land 1 commit into trunk"}
+              {state.proposal === undefined ? (
+                agent
+              ) : (
+                <strong className="font-semibold text-kumo-strong">
+                  {state.proposal.proposerName}
+                </strong>
+              )}
+              {state.proposal !== undefined && pill !== "landed" && pill !== "closed"
+                ? `proposes 1 commit into trunk from a fork, at ${state.proposal.commit.slice(0, 8)}`
+                : pill === "landed"
+                  ? "landed 1 commit into trunk"
+                  : pill === "closed"
+                    ? change.state === "withdrawn"
+                      ? "withdrew this change"
+                      : "had this change superseded"
+                    : change.commit === ""
+                      ? "wants to land a change into trunk"
+                      : "wants to land 1 commit into trunk"}
             </span>
             <HeldRun held={state.held} className="a-link-quiet" />
             <span>
@@ -1187,6 +1206,11 @@ export function Change({
         <Split
           main={
             <>
+              {review !== undefined &&
+                state.proposal !== undefined &&
+                state.parkedOn === "awaiting-approval" && (
+                  <Review proposal={state.proposal} {...review} />
+                )}
               <MergeBox
                 state={state}
                 checks={checks}

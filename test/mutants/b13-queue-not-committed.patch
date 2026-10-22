@@ -2,10 +2,10 @@
 # kills: b13.queued
 # why: planCompiled stops at PlanCompiled, so the change waits in Verifying for a step L1 does not have
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bcad1bed..f2c5aa78 100644
+index 203b3b42..09e84940 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1935,22 +1935,7 @@ export const planCompiled: (
+@@ -2517,29 +2517,7 @@ export const planCompiled: (
        changeId,
        "planCompiled",
        plan,
@@ -13,6 +13,13 @@ index bcad1bed..f2c5aa78 100644
 -        const blockers = blockersOf(store, plan.predicatePolicy);
 -        const bounce = conflictBounce(blockers.openProvenConflicts);
 -        if (bounce !== undefined) return [compile, bounce];
+-        // A proposal waits for the approval of its commit before anything is verified. A question on how
+-        // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
+-        if (storedChange(store, changeId)?.proposal !== undefined) {
+-          if (plan.needsRuling === true)
+-            store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
+-          return [compile, { _tag: "Queue", laneId, blockers }, { _tag: "AwaitApproval" }];
+-        }
 -        // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
 -        // conflict already with a person holds the change too: either the moment it is queued.
 -        const asked =

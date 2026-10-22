@@ -5,6 +5,7 @@
 // that question; a maintainer's approve over the deployed fetch handler resumes
 // it, the lane takes the drop as accepted, and the change lands through the real
 // Trunk DO with that many fewer. A refuse sends another back.
+import { heldLease } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
 import {
   decisionIdOf,
@@ -45,7 +46,7 @@ const namespaceObject = () =>
 
 /** Queues the change: declared, submitted, Precheck started and its plan compiled, all by hand. */
 async function queue(c: ChangeUnderTest) {
-  const lease = ok(await c.declare()).change.lease.id;
+  const lease = heldLease(ok(await c.declare()).change).id;
   ok(
     decodeExit(
       ChangeCodecs.submit,

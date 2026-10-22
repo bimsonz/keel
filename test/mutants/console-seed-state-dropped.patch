@@ -2,12 +2,12 @@
 # kills: seed.snapshot
 # why: a change drawn from the snapshot is drawn as declared, whatever state Keel's snapshot says it is in
 diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
-index 935f79f1..b2cc28e0 100644
+index b65cbbf5..dce29acf 100644
 --- a/apps/console/src/engine/seed.ts
 +++ b/apps/console/src/engine/seed.ts
-@@ -38,7 +38,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
-       label: `#${change.number}`,
-       agentId: change.agentId,
+@@ -59,7 +59,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
+             },
+           }),
        goal: change.goal,
 -      state: change.state,
 +      state: "declared",

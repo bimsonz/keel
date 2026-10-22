@@ -2,15 +2,20 @@
 # kills: sync.imported-only
 # why: a trunk that was not imported reads and fetches an upstream before anything refuses it
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index d3bfebf6..38260dd2 100644
+index 2497bf76..87f54319 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -798,7 +798,7 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
+@@ -931,7 +931,12 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
    const trunk = trunkOf(yield* EntityStore, projectId);
    if (trunk === undefined) return yield* new TrunkNotInitialized({ projectId });
    const { origin } = trunk;
--  if (origin?.kind !== "imported") return yield* new NotImported({ projectId });
-+  if (origin?.kind !== "imported" && origin !== undefined && trunk.head === "") return yield* new NotImported({ projectId });
+-  if (origin?.kind !== "imported" && origin?.kind !== "forked")
++  if (
++    origin?.kind !== "imported" &&
++    origin?.kind !== "forked" &&
++    origin !== undefined &&
++    trunk.head === ""
++  )
+     return yield* new NotImported({ projectId });
    if (trunk.phase !== "idle" && trunk.phase !== "debouncing")
      return yield* new PromotionStateRefused({ projectId, phase: trunk.phase, command: "Sync" });
-   const upstream = { url: origin.url, ref: origin.ref };

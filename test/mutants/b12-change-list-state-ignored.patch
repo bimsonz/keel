@@ -2,15 +2,15 @@
 # kills: b12.change-list
 # why: the list ignores the asked state and answers every change
 diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
-index 8de3573..6522a8b 100644
+index 3c921717..72f8775c 100644
 --- a/packages/core/src/application/memory/change-views.ts
 +++ b/packages/core/src/application/memory/change-views.ts
-@@ -133,7 +133,7 @@ export const listChanges: (
+@@ -234,7 +234,7 @@ export const listChanges: (
    const below = read.cursor;
    const matching = summariesOf(store, read.project).filter(
      (summary) =>
 -      (read.state === undefined || summary.state === read.state) &&
 +      true &&
+       proposalAsked(summary, read.proposals) &&
        (below === undefined || summary.number < below),
    );
-   const items = matching.slice(0, limit);

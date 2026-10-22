@@ -19,7 +19,13 @@ import {
   type Proposition,
   SubjectKey,
 } from "../../../src/domain/coordination/index.ts";
-import { CommitSha, ContentHash, Instant, makeId } from "../../../src/domain/kernel/index.ts";
+import {
+  CommitSha,
+  ContentHash,
+  Instant,
+  makeId,
+  userActor,
+} from "../../../src/domain/kernel/index.ts";
 import { MATRIX_WORLDS } from "../../../src/application/verification/index.ts";
 import type { Probe } from "../../../src/domain/verification/index.ts";
 import { fc } from "../../support/fast-check.ts";
@@ -118,6 +124,30 @@ describe("probe-conflict", () => {
         (state, commitSha, baseSha, landedCommit) => {
           expect(submissionStateOf({ state, commitSha, baseSha, landedCommit })).toEqual(
             expectedSubmission(state, commitSha, baseSha, landedCommit),
+          );
+        },
+      ),
+    );
+  });
+
+  it("[probe-conflict.proposal-unapproved] a proposal is no party's world until a maintainer approves the commit it carries: before that the Probe waits, and Keel drafts, builds and runs nothing of it", () => {
+    const proposal = { fork: makeId("prj", ulid(9)), proposer: userActor(makeId("usr", ulid(8))) };
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...ChangeState.literals),
+        fc.constantFrom(undefined, sha(1), sha(4)),
+        (state, approved) => {
+          const change = { state, commitSha: sha(1), baseSha: sha(2), landedCommit: sha(3) };
+          const asAgents = submissionStateOf(change);
+          expect(
+            submissionStateOf({
+              ...change,
+              proposal: { ...proposal, ...(approved === undefined ? {} : { approved }) },
+            }),
+          ).toEqual(
+            asAgents._tag === "Submitted" && approved !== sha(1)
+              ? { _tag: "Unsubmitted" }
+              : asAgents,
           );
         },
       ),

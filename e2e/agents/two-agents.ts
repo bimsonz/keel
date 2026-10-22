@@ -173,7 +173,12 @@ for (
 const landedBy = new Map<string, string>();
 const agentOf = new Map<string, string>();
 for (const e of events) {
-  if (e.payload._tag === "IntentDeclared" && e.project === project.id)
+  // A proposal from a fork names no agent: none of this run's.
+  if (
+    e.payload._tag === "IntentDeclared" &&
+    e.project === project.id &&
+    e.payload.agentId !== undefined
+  )
     agentOf.set(e.payload.changeId, e.payload.agentId);
   if (
     e.payload._tag === "TrunkAdvanced" &&

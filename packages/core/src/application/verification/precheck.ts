@@ -186,21 +186,22 @@ export const precheckPolicy = Effect.fn("verification/precheckPolicy")(function*
   return policy;
 });
 
-/** The base commit's flow sources, or why they could not be read. */
+/** The flow sources a change's checks are read from, or why they could not be read. */
 export type FlowRead =
   | { readonly _tag: "Read"; readonly sources: FlowSources }
   | { readonly _tag: "Unreadable"; readonly reason: string };
 
 /**
- * What decides the change's checks, read from the submission's base, never
- * its head: a change cannot edit its own checks. A workspace or commit the
- * host cannot find is a refusal the agent can act on, never a defect.
+ * What decides the change's checks, read at `at` (its base, or a proposal's
+ * upstream head), never its head: a change cannot edit its own checks. A
+ * workspace or commit the host cannot find is a refusal the agent can act
+ * on, never a defect.
  */
 export const readFlowSources = Effect.fn("verification/readFlowSources")(function* (
   workspace: PrecheckWorkspace,
-  base: CommitSha,
+  at: CommitSha,
 ) {
-  return yield* (yield* FlowSpecSource).read(workspace.repo, base).pipe(
+  return yield* (yield* FlowSpecSource).read(workspace.repo, at).pipe(
     Effect.map((sources): FlowRead => ({ _tag: "Read", sources })),
     Effect.catchTags({
       RepoNotFound: (e) =>
@@ -262,8 +263,9 @@ export const listGuards = Effect.fn("verification/listGuards")(function* (
 /**
  * The reads Precheck makes of a commit that descends from its base, one
  * durable step each, so which commit each reads is decided here and nowhere
- * else: the diff from the base to the commit, the project's policy, the
- * base's flow (never the head's) and the project's admitted guards.
+ * else: the diff from the base to the commit, the project's policy, the flow
+ * where the workspace says (the base's, or a proposal's upstream head's;
+ * never the head's) and the project's admitted guards.
  */
 export const precheckReads = (
   workspace: PrecheckWorkspace,
@@ -272,7 +274,7 @@ export const precheckReads = (
 ) => ({
   touched: diffSubmission(workspace, ancestry.base, submission.commitSha),
   policy: precheckPolicy(workspace),
-  flow: readFlowSources(workspace, ancestry.base),
+  flow: readFlowSources(workspace, workspace.flowAt),
   guards: listGuards(workspace),
 });
 
@@ -501,6 +503,7 @@ export const recordPlan = Effect.fn("verification/recordPlan")(function* (
     costEstimate: decision.costEstimate,
     predicatePolicy: decision.predicatePolicy,
     ...(needsRuling(decision) ? { needsRuling: true } : {}),
+    ...(decision.ruledPaths === undefined ? {} : { ruledPaths: decision.ruledPaths }),
   });
 });
 

@@ -2,18 +2,22 @@
 # kills: lane.member-author
 # why: The Lane names no agent for a member, so a landing keeps whatever author its pushed commit typed
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2dfc..369d4523 100644
+index bf0c698d..2ebaf3d8 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -968,11 +968,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+@@ -1481,15 +1481,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
            // Its handle is the directory's: given at sign-up and never after, so every compose of a
            // member reads the same one (an agent a person enrolled has none, and is written by its id).
            // The run is the one that holds the change.
--          agent: {
--            id: change.agentId,
--            handle: Option.getOrUndefined(agent)?.handle,
--            run: change.run?.id,
--          },
+-          ...(agentId === undefined
+-            ? {}
+-            : {
+-                agent: {
+-                  id: agentId,
+-                  handle: Option.getOrUndefined(agent)?.handle,
+-                  run: change.run?.id,
+-                },
+-              }),
+           ...(proposer === undefined ? {} : { proposer }),
          } satisfies CandidateMember;
        }).pipe(Effect.orDie),
-     { concurrency: "unbounded" },

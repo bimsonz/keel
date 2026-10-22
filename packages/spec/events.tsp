@@ -158,11 +158,17 @@ union ChangeOrigin {
   agent: "agent",
   auditor: "auditor",
   operator: "operator",
+
+  /** Proposed from a fork of the project: no agent holds it, and its proposer moves it with the proposal operations. */
+  proposal: "proposal",
 }
 
 union ParkReason {
   awaitingRuling: "awaiting-ruling",
   leaseLapsed: "lease-lapsed",
+
+  /** A proposal waits for someone holding `maintain` to approve the commit it proposes: nothing is verified before. */
+  awaitingApproval: "awaiting-approval",
 }
 
 /** Another change near this one. Footprint overlap is exposure: it never opens a conflict. */
@@ -296,7 +302,9 @@ model Drift {
 model IntentDeclared {
   _tag: "IntentDeclared";
   changeId: ChangeId;
-  agentId: AgentId;
+
+  /** The agent that declared the change and holds it. Absent on a proposal, which no agent holds: its `ChangeProposed` names its proposer. */
+  agentId?: AgentId;
 
   /** The run of the agent that declared the change, when its token named one: the run that holds it. */
   run?: RunRef;
@@ -455,6 +463,9 @@ model PlanCompiled {
 
   /** The predicate policy compiled for the change; the Change DO applies it to a proven conflict. */
   predicatePolicy?: EventPredicatePolicies;
+
+  /** The paths the change touches that need a person's ruling (its plan holds the human-class gate); absent when none do. */
+  ruledPaths?: string[];
 }
 
 model ChangeQueued {
@@ -576,6 +587,52 @@ model ChangeResumed {
   _tag: "ChangeResumed";
   changeId: ChangeId;
   decisionId: DecisionId;
+}
+
+/** A change on a project whose code comes from a fork of it: committed beside its `IntentDeclared`. */
+model ChangeProposed {
+  _tag: "ChangeProposed";
+  changeId: ChangeId;
+
+  /** The fork the commit was proposed from. */
+  fork: ProjectId;
+
+  /** The commit on the fork's trunk the proposal carries. */
+  commit: CommitSha;
+
+  /** Who proposed it: a person, or an agent a person sponsors. */
+  proposer: CommandActor;
+}
+
+/** Its proposer moved the proposal to another commit of the fork: it is checked again and waits for approval again. */
+model ProposalUpdated {
+  _tag: "ProposalUpdated";
+  changeId: ChangeId;
+  commit: CommitSha;
+
+  /** What the proposer said of the new commit. */
+  @maxLength(65536)
+  note?: string;
+}
+
+/** Someone holding `maintain` approved the proposal at this commit, and only this one: it goes back into the queue to be verified. */
+model ProposalApproved {
+  _tag: "ProposalApproved";
+  changeId: ChangeId;
+  commit: CommitSha;
+  by: CommandActor;
+}
+
+/** Someone holding `maintain` asked the proposer for changes to the proposal at this commit: it stays where it waits. */
+model ProposalChangesRequested {
+  _tag: "ProposalChangesRequested";
+  changeId: ChangeId;
+  commit: CommitSha;
+  by: CommandActor;
+
+  @minLength(1)
+  @maxLength(65536)
+  comment: string;
 }
 
 model ChangeAdopted {
@@ -1645,24 +1702,43 @@ model SyncUpstream {
   ref: string;
 }
 
-/** An owner asked for trunk's main to move from `from` to `to`, its upstream branch's head, which descends from it: written before the move, resolved by one `TrunkSynced` or `PromotionFrozen`. */
+/** The upstream a fork syncs from: the project it was forked from, on this Keel. */
+model ForkUpstream {
+  project: ProjectId;
+}
+
+/**
+ * An owner asked for trunk's main to move from `from` to `to`, which descends from it: an import's upstream branch's
+ * head, or a fork's upstream trunk head or Keel's merge of it. Written before the move, resolved by one `TrunkSynced`
+ * or `PromotionFrozen`.
+ */
 model TrunkSyncStarted {
   _tag: "TrunkSyncStarted";
   projectId: ProjectId;
   from: CommitSha;
   to: CommitSha;
   by: string;
-  upstream: SyncUpstream;
+  upstream: SyncUpstream | ForkUpstream;
+
+  /** The fork's upstream trunk head that `to` merges, when `to` is Keel's merge commit of it; absent when `to` is upstream's head itself. */
+  merged?: CommitSha;
 }
 
-/** Trunk's main moved forward to its upstream branch's head, each upstream commit kept as upstream made it. No change landed, so none is named. */
+/**
+ * Trunk's main moved forward to its upstream's head, each upstream commit kept as upstream made it: for a fork that
+ * held work of its own, to a merge commit Keel made and signed, whose second parent is that head (`merged`). No change
+ * landed, so none is named.
+ */
 model TrunkSynced {
   _tag: "TrunkSynced";
   projectId: ProjectId;
   from: CommitSha;
   to: CommitSha;
   by: string;
-  upstream: SyncUpstream;
+  upstream: SyncUpstream | ForkUpstream;
+
+  /** The fork's upstream trunk head that `to` merges, when `to` is Keel's merge commit of it; absent when `to` is upstream's head itself. */
+  merged?: CommitSha;
 
   /** Trunk's height after the sync, counted as an advance is. */
   @minValue(1)
@@ -2082,6 +2158,10 @@ union KeelEvent {
   AlternativeLanded,
   ChangeParked,
   ChangeResumed,
+  ChangeProposed,
+  ProposalUpdated,
+  ProposalApproved,
+  ProposalChangesRequested,
   ChangeAdopted,
   ChangeWithdrawn,
   ChangeSuperseded,

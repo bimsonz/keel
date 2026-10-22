@@ -2,13 +2,15 @@
 # kills: authz.issues
 # why: anyone signed in closes and reopens anyone's issue on a public project, not only its author and the project's maintainers
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index dbf68d04..4be3aa2b 100644
+index e40376fe..8fab8cbb 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -946,5 +946,5 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
-       : principal._tag === "Agent"
-         ? agentActor(principal.agentId)
-         : undefined;
--  return actor === issue.author ? granted() : decide(principal, "maintain", issue.project);
-+  return actor !== undefined ? granted() : decide(principal, "maintain", issue.project);
+@@ -979,7 +979,7 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
+   const read = decide(principal, "read", issue.project);
+   if (Result.isFailure(read)) return read;
+   if (issue.author === undefined) return hidden();
+-  return actorOf(principal) === issue.author
++  return actorOf(principal) !== undefined
+     ? granted()
+     : decide(principal, "maintain", issue.project);
  };

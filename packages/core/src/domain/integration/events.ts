@@ -318,10 +318,15 @@ export const SyncUpstream = Schema.Struct({
 });
 export type SyncUpstream = typeof SyncUpstream.Type;
 
+/** The upstream a fork syncs from: the project it was forked from, on this Keel. */
+export const ForkUpstream = Schema.Struct({ project: ProjectId });
+export type ForkUpstream = typeof ForkUpstream.Type;
+
 /**
  * The write-ahead entry of a sync from upstream: an owner asked for trunk's
- * main to move from `from` to `to`, the upstream branch's head, which
- * descends from it. Written before the move, and resolved by exactly one
+ * main to move from `from` to `to`, which descends from it: an import's
+ * upstream branch's head, or a fork's upstream trunk head or Keel's merge of
+ * it (`merged`). Written before the move, and resolved by exactly one
  * `TrunkSynced` or `PromotionFrozen`.
  */
 export const TrunkSyncStarted = Schema.TaggedStruct("TrunkSyncStarted", {
@@ -329,18 +334,24 @@ export const TrunkSyncStarted = Schema.TaggedStruct("TrunkSyncStarted", {
   from: CommitSha,
   to: CommitSha,
   by: Schema.String,
-  upstream: SyncUpstream,
+  upstream: Schema.Union([SyncUpstream, ForkUpstream]),
+  /** The fork's upstream trunk head `to` merges, when `to` is Keel's merge commit of it. */
+  merged: Schema.optional(CommitSha),
 });
 /**
- * Trunk's main moved forward to its upstream branch's head, each upstream
- * commit kept as upstream made it: no change landed, so no change is named.
+ * Trunk's main moved forward to its upstream's head, each upstream commit
+ * kept as upstream made it: for a fork that held work of its own, to a merge
+ * commit Keel made and signed, whose second parent is that head (`merged`).
+ * No change landed, so no change is named.
  */
 export const TrunkSynced = Schema.TaggedStruct("TrunkSynced", {
   projectId: ProjectId,
   from: CommitSha,
   to: CommitSha,
   by: Schema.String,
-  upstream: SyncUpstream,
+  upstream: Schema.Union([SyncUpstream, ForkUpstream]),
+  /** The fork's upstream trunk head `to` merges, when `to` is Keel's merge commit of it. */
+  merged: Schema.optional(CommitSha),
   /** Trunk's height after the sync, counted as an advance is. */
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
 });

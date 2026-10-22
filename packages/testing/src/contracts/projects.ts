@@ -143,6 +143,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
           maxBatchSize: 4,
           verification: "required",
           visibility: "public",
+          proposals: "closed",
         };
         const projectId = yield* harness.withSettings(settings);
         expect(yield* (yield* Projects).settings(projectId)).toEqual(settings);
@@ -161,6 +162,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
             maxBatchSize: 8,
             verification: "required",
             visibility: "private",
+            proposals: "open",
           });
         }).pipe(Effect.provide(harness.layer));
       },
@@ -182,9 +184,19 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const readOff = yield* projects.settings(project.id);
         const turnedOn = yield* projects.putSettings(by, project.id, off, "req-2");
 
-        expect(turnedOff).toEqual({ ...off, verification: "off", visibility: "private" });
+        expect(turnedOff).toEqual({
+          ...off,
+          verification: "off",
+          visibility: "private",
+          proposals: "open",
+        });
         expect(readOff).toEqual(turnedOff);
-        expect(turnedOn).toEqual({ ...off, verification: "required", visibility: "private" });
+        expect(turnedOn).toEqual({
+          ...off,
+          verification: "required",
+          visibility: "private",
+          proposals: "open",
+        });
         expect(yield* projects.settings(project.id)).toEqual(turnedOn);
       }).pipe(Effect.provide(harness.layer));
     });

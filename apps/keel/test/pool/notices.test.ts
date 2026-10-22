@@ -1,3 +1,4 @@
+import { heldLease } from "@keeltown/testing";
 import { env, exports } from "cloudflare:workers";
 import { type AgentId, type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import { Exit, Schema } from "effect";
@@ -69,7 +70,7 @@ describe("no self-loops", () => {
     // Precheck's steps are driven by hand here, so the instance the submit starts stays inert.
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     const sha = await c.push();
     ok(
       decodeExit(

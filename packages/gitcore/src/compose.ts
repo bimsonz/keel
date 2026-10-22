@@ -164,6 +164,60 @@ export async function restack(
   return { commits, objects: [...objects.values()] };
 }
 
+/** A merge of `theirs` into `ours` on a base the caller names, and how its commit reads. */
+export interface MergeOnBaseSpec extends RestackOptions {
+  readonly base: string;
+  readonly ours: string;
+  readonly theirs: string;
+  readonly author: Signature;
+  readonly committer: Signature;
+  readonly message: string;
+}
+
+/** A merge commit, its tree, and what a repo holding both parents lacks for it: the merged trees and blobs, and the commit. */
+export interface MergedCommit {
+  readonly oid: string;
+  readonly tree: string;
+  readonly objects: readonly GitObject[];
+}
+
+/**
+ * Merges `theirs` into `ours` on `base` (`mergeTrees(tree(base), tree(ours),
+ * tree(theirs))`, never a merge-base walk, which reads all history) and
+ * commits the merged tree with parents `ours` then `theirs`, signed as
+ * `restack` signs. Throws `Refusal` at the first path GitCore will not merge,
+ * having written nothing, and `MissingObject` for an object no reader holds.
+ */
+export async function mergeOnBase(
+  reader: ObjectReader,
+  spec: MergeOnBaseSpec,
+): Promise<MergedCommit> {
+  const r = new CachingReader(reader);
+  const [base, ours, theirs] = await Promise.all(
+    [spec.base, spec.ours, spec.theirs].map((oid) => r.readCommit(oid)),
+  );
+  if (base === undefined || ours === undefined || theirs === undefined)
+    throw new Error("three commits were read");
+  const merged = await mergeTrees(r, base.tree, ours.tree, theirs.tree, spec);
+  const commit: CommitSpec = {
+    tree: merged.tree,
+    parents: [spec.ours, spec.theirs],
+    author: spec.author,
+    committer: spec.committer,
+    message: spec.message,
+  };
+  const unsigned = encodeCommit(commit);
+  const body =
+    spec.sign === undefined
+      ? unsigned
+      : encodeCommit({ ...commit, gpgsig: await spec.sign(unsigned) });
+  return {
+    oid: await hashObject("commit", body),
+    tree: merged.tree,
+    objects: [...merged.newObjects.values(), { type: "commit", body }],
+  };
+}
+
 /**
  * Commits each member over a tree composed elsewhere (by MergeBox), as
  * `restack` commits it over its own merge: the same author, committer,

@@ -2,11 +2,11 @@
 # kills: change.held-lapse-void
 # why: a restart moves the deadline of a lease recorded Lapsed but leaves it Lapsed, so the change goes back to its agent under a lease no call can carry
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c9f50e0..3d8a117e 100644
+index 916513b7..0b22eb97 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1166,7 +1166,7 @@ export const evolveChange = (
-       return (change.lease.state === "active" || change.lease.state === "lapsed") &&
+@@ -1437,7 +1437,7 @@ export const evolveChange = (
+         (change.lease.state === "active" || change.lease.state === "lapsed") &&
          event.leaseId === change.lease.id &&
          isAgentOwned(change.state)
 -        ? { ...change, lease: { ...change.lease, state: "active", renewedAt: committed.at } }

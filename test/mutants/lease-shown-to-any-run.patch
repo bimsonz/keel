@@ -2,13 +2,13 @@
 # kills: b12.held-lease
 # why: a change's lease is shown to every run of its agent, not only the run that holds it
 diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
-index 2953dfb4..a050148e 100644
+index 64513312..ca4e7ce0 100644
 --- a/apps/keel/src/adapters/driving/http/work-loop.ts
 +++ b/apps/keel/src/adapters/driving/http/work-loop.ts
-@@ -1288,7 +1288,7 @@ function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
+@@ -1420,7 +1420,7 @@ function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
      reader !== undefined &&
      leaseStands(change) &&
-     reader.agentId === change.lease.agentId &&
+     reader.agentId === change.lease?.agentId &&
 -    (change.run === undefined || change.run.id === reader.run?.id)
 +    true
    );

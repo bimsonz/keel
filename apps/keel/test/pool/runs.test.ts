@@ -3,6 +3,7 @@
 // read (the inbox, a tool result's notices, whoami's session, the stream and
 // the socket) is that run's. Every read goes token, gate, handler, port,
 // object; the run is only ever the one the token names.
+import { heldLease } from "@keeltown/testing";
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { IntentDeclared, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
@@ -362,7 +363,7 @@ async function rely(token: string, c: ChangeUnderTest, key: string): Promise<voi
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "keel-lease": (await c.current()).lease.id,
+      "keel-lease": heldLease(await c.current()).id,
       "idempotency-key": key,
     },
     body: JSON.stringify({
@@ -602,7 +603,7 @@ describe("an agent's two runs, each with its own token", () => {
 
     const inRun = await putSettings(agent.a.token, agent.projectId, off);
     expect(inRun.status).toBe(200);
-    expect(await inRun.json()).toStrictEqual({ ...off, visibility: "private" });
+    expect(await inRun.json()).toStrictEqual({ ...off, visibility: "private", proposals: "open" });
     expect((await putSettings(agent.plain, agent.projectId, open)).status).toBe(200);
 
     // Its token names one project: another of its own answers that, and a private project of another agent is not there for it.

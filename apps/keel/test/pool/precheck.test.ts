@@ -27,7 +27,7 @@ import {
   type PrecheckWorkspace,
   PROJECTOR,
 } from "@keeltown/core/ports";
-import { CodeHostFixture, TEST_GUARD } from "@keeltown/testing";
+import { CodeHostFixture, TEST_GUARD, heldLease } from "@keeltown/testing";
 import { Effect, Layer, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
@@ -105,7 +105,7 @@ const INVOICES: AdmittedGuard = {
  */
 async function pushed(premises: readonly Proposition[] = [], on?: ChangeUnderTest) {
   const c = on ?? (await changeUnderTest());
-  const lease = ok(await c.declare("declare-1", { premises })).change.lease.id;
+  const lease = heldLease(ok(await c.declare("declare-1", { premises })).change).id;
   const commitSha = await c.push();
   const submit = async () =>
     void ok(
@@ -419,7 +419,7 @@ describe("Precheck", () => {
     await drainOutbox(neighbour.stub);
 
     // This change declares no premise and no effect, and pushes the module without its cache, then with it.
-    const lease = ok(await c.declare("declare-1")).change.lease.id;
+    const lease = heldLease(ok(await c.declare("declare-1")).change).id;
     const workspace = ok(decodeExit(ChangeCodecs.workspace, await c.stub.workspace()));
     const { base, head } = await pushedOver(
       c,
@@ -558,7 +558,7 @@ describe("Precheck", () => {
     await drainOutbox(neighbour.stub);
 
     // This change declares nothing, and adds a log to `price`.
-    const lease = ok(await c.declare("declare-1")).change.lease.id;
+    const lease = heldLease(ok(await c.declare("declare-1")).change).id;
     const workspace = ok(decodeExit(ChangeCodecs.workspace, await c.stub.workspace()));
     const { base, head } = await pushedOver(
       c,

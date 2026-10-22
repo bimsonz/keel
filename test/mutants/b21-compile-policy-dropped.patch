@@ -2,14 +2,14 @@
 # kills: b21.compile-policy
 # why: PlanCompiled drops the plan's predicate policy, so the change forgets it and a later proof only advises
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 351ed36..035a2ab 100644
+index 203b3b42..19b2f772 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1168,7 +1168,6 @@ export const planCompiled: (
+@@ -2506,7 +2506,6 @@ export const planCompiled: (
        planHash: plan.planHash,
        steps: plan.steps,
        costEstimate: plan.costEstimate,
 -      ...(plan.predicatePolicy === undefined ? {} : { predicatePolicy: plan.predicatePolicy }),
+       ...(plan.ruledPaths === undefined ? {} : { ruledPaths: plan.ruledPaths }),
      };
      // A change with no workspace was never declared: CompilePlan alone refuses it.
-     if (project === undefined)

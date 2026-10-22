@@ -2,13 +2,13 @@
 # kills: shrink.its-question
 # why: a change parked on its drop in tests is resumed by a ruling on another question
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 30a1dd69..1c2c000a 100644
+index 203b3b42..300c1112 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2381,8 +2381,7 @@ const commandFor = (
-       const recorded = decodeRecorded(event.payload);
-       if (Option.isNone(recorded)) return undefined;
-       const { escalationId, decisionId, option, summary } = recorded.value;
+@@ -2835,8 +2835,7 @@ const commandFor = (
+           refusable: true,
+         };
+       }
 -      if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
 -        return undefined;
 +      if (change.parkReason !== "awaiting-ruling") return undefined;

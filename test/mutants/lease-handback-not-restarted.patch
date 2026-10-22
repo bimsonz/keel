@@ -2,12 +2,12 @@
 # kills: change.no-orphan
 # why: a hand-back commits no restart, so time the platform held the change still counts against the lease
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c9f50e0..b8808194 100644
+index 916513b7..0dff90ad 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -467,7 +467,7 @@ const intoAgentOwned = (change: Change, event: ChangeEvent): Decision =>
+@@ -541,7 +541,7 @@ const intoAgentOwned = (change: Change, event: ChangeEvent): Decision =>
    Result.succeed(
-     isAgentOwned(change.state)
+     isAgentOwned(change.state) || change.lease === undefined
        ? [event]
 -      : [event, LeaseRestarted.make({ changeId: change.id, leaseId: change.lease.id })],
 +      : [event],

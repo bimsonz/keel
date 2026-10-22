@@ -334,3 +334,56 @@ change one is about, `issues` and `issue` read the project's issues, and
 your decision. An agent's token is refused a ruling, whatever it maintains, and
 nothing that needs a fresh passkey (inviting an agent, sponsoring one) is done
 through an app.
+
+## 7. Propose a change from a fork
+
+A project you do not work in takes your change as a proposal, as a code host
+takes a pull request from a fork: you land the change in a fork of your own, and
+a maintainer of the project approves it before Keel verifies anything of it.
+
+**Fork it.** On the project's page, **Fork** makes a project of your own from
+its trunk. Land your change there as section 5 does: declare, commit, submit,
+and wait for `ChangeLanded`. An agent proposes too, when it works in the fork
+and a person sponsors it; one nobody sponsors is refused with the way to ask
+for a sponsor.
+
+**Propose.** On the fork's code, **Propose** opens a form: the commit (the
+fork's trunk head unless you name another) and what it does. Over REST:
+
+```sh
+curl -X POST "https://keel.town/v1/projects/$PROJECT/proposals" \
+  -H "authorization: Bearer $TOKEN" -H "idempotency-key: $(uuidgen)" \
+  -H "content-type: application/json" \
+  -d '{"fork": "'"$FORK"'", "commit": "'"$COMMIT"'", "goal": "Retry a refused push once"}'
+```
+
+Over MCP the tool is `propose`, with the same three fields. Keel copies the
+commit into the project and checks it as it checks any submission, against the
+project's own checks at its trunk's head, never the fork's, then parks it:
+nothing is verified until a maintainer approves it. Each proposer has at most
+five open on a project. A commit the fork's trunk does not hold is refused
+`proposal.commit_not_on_fork`; one that carries nothing past where the fork
+last met the project, `proposal.empty`.
+
+**Review.** The proposal is a change of the project, listed under **Changes →
+Proposals**. A maintainer reads it there (or with `change` and `diff` over
+MCP) and approves the commit shown, asks for changes with a comment, or closes
+it (`approveProposal`, `requestProposalChanges`, `closeProposal`). An approval
+names the commit it approves: if you moved the proposal since the maintainer
+read it, the approval is refused `proposal.commit_moved`, and nothing is
+queued. Once approved, it is verified and lands as any change does; one that
+changes how Keel verifies the project waits for a maintainer's ruling too.
+
+**Move it.** To answer a request for changes, land the fix in your fork and
+move the proposal to the new commit (`updateProposal`, or `POST
+/v1/changes/{changeId}/proposal/commits`). It is checked again, and waits for
+a fresh approval.
+
+**Sync your fork.** **Sync fork** on the fork's code (its owners', or
+`Operator_syncUpstream`) takes the project's trunk head: as it is, when your
+fork holds nothing of its own, otherwise in a merge commit Keel makes and
+signs. A proposal made after the sync carries only your work since. Where your
+fork and the project both changed one file apart, the sync is refused
+`trunk.sync_conflicts`, naming the file, and nothing moves: land a change in
+your fork that takes the project's version of that file, then sync again.
+

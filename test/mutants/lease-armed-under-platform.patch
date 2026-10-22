@@ -2,15 +2,15 @@
 # kills: b11.lapse-held
 # why: the Change DO arms the lease's deadline while the platform holds the change, and not again at the hand-back
 diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
-index af52018..73005c3 100644
+index cbff72f2..c16df6e2 100644
 --- a/apps/keel/src/adapters/driving/do/change.ts
 +++ b/apps/keel/src/adapters/driving/do/change.ts
-@@ -341,7 +341,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+@@ -391,7 +391,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
    private async armLease(): Promise<void> {
      const change = await this.runtime.runPromise(Effect.option(getChange(this.changeId)));
      const held =
 -      Option.isSome(change) && isAgentOwned(change.value.state) ? change.value : undefined;
 +      Option.isSome(change) ? change.value : undefined;
-     const active = held?.lease.state === "active" ? held.lease : undefined;
+     // A proposal has no lease: no agent holds it, so nothing lapses.
+     const active = held?.lease?.state === "active" ? held.lease : undefined;
      const keep = active === undefined ? undefined : leaseDeadline(active.id);
-     for (const armed of armedAlarms(this.ctx.storage)) {

@@ -2,12 +2,12 @@
 # kills: carded.holders
 # why: an agent that holds several of a page's changes is asked for once a change, not once
 diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
-index 4e01ece6..6da8e011 100644
+index 6af42b3b..c0541cde 100644
 --- a/apps/console/src/engine/holder.ts
 +++ b/apps/console/src/engine/holder.ts
-@@ -19,7 +19,7 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
-     const change = world.changes.get(changeId);
-     if (change !== undefined) holders.add(change.agentId);
+@@ -20,7 +20,7 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
+     const holder = change === undefined ? undefined : authorAgentOf(change);
+     if (holder !== undefined) holders.add(holder);
    }
 -  return [...holders];
 +  return changeIds.flatMap((id) => (holders.has(world.changes.get(id)?.agentId ?? "") ? [world.changes.get(id)?.agentId ?? ""] : []));

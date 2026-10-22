@@ -4,6 +4,7 @@
 // so the pool collecting its workspace is observable; the other cases use the
 // harness's change (an in-memory pool and code host, a manual clock), reached
 // over RPC from the deployed fetch handler as any change is.
+import { heldLease } from "@keeltown/testing";
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
@@ -87,7 +88,7 @@ async function heldChange() {
   const c = await changeUnderTest(projectId);
   const declared = ok(await c.declare());
   const holder = await tokenFor(await seedAgent({ id: c.agentId, projectId }));
-  return { c, declared, projectId, holder, lease: declared.change.lease.id };
+  return { c, declared, projectId, holder, lease: heldLease(declared.change).id };
 }
 
 const poolStub = (projectId: ProjectId) =>
@@ -279,7 +280,7 @@ describe("abandoning a change through the doorways", () => {
     expect(adopted.status).toBe(200);
     expect([old.status, old.body.code]).toEqual([409, "change.held_by_other"]);
     expect(stored.state).toBe("working");
-    expect(stored.lease.id).toBe(adopted.body.result.lease.id);
+    expect(heldLease(stored).id).toBe(adopted.body.result.lease.id);
   });
 
   it("[a11.abandon-no-lease] an agent that sends no lease is 400 request.invalid, told to send the keel-lease header", async () => {

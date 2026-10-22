@@ -2,8 +2,10 @@ import type {
   CommitInput,
   CommittedChange,
   LeasedCall,
+  ProposeChange,
   RebasedChange,
   Revised,
+  UpdateProposal,
 } from "@keeltown/core/application/coordination";
 import { CommitParentRefused } from "@keeltown/core/application/coordination";
 import {
@@ -16,10 +18,14 @@ import {
   checkLease,
   CommitNotInWorkspace,
   isLapsed,
+  type Lease,
   LeaseNotLapsed,
   LeaseStale,
   lapsesAt,
+  NotAProposal,
   PoolExhausted,
+  type Proposal,
+  ProposalCommitMoved,
   type Intent,
   type Preflight,
   reviseIntent,
@@ -56,6 +62,13 @@ import {
 import { Duration, Clock as EffectClock, Effect, Layer, Option, Result } from "effect";
 
 const MEMORY_BASE = CommitSha.make("0".repeat(40));
+
+/** The lease an agent's change holds: every change this adapter declares is an agent's, and holds one. */
+const leaseOf = (change: Change): Lease => {
+  if (change.lease === undefined) throw new Error(`${change.id} holds no lease`);
+  return change.lease;
+};
+
 /** What a rebase answers: the change on its base, and the workspace branch holding it. */
 const rebasedAnswer = (change: Change): RebasedChange => ({
   change,
@@ -292,6 +305,46 @@ export function makeChangesMemory(
     { readonly fingerprint: string; readonly answer: Omit<CommittedChange, "change"> }
   >();
   const workspaces = new Map<ChangeId, WorkspaceId>();
+  /** Each proposal made through `propose`, in order, and the key each was made under. */
+  const proposed: { readonly changeId: ChangeId; readonly input: ProposeChange }[] = [];
+  /** Each proposal moved through `updateProposal`, in order, as it was asked. */
+  const updated: { readonly changeId: ChangeId; readonly input: UpdateProposal }[] = [];
+  const proposals = new Map<
+    string,
+    { readonly changeId: ChangeId; readonly fingerprint: string }
+  >();
+  /** A proposal of the project the doorway authorised: another project's reads as not found. */
+  const proposalOf = (
+    changeId: ChangeId,
+    projectId: ProjectId,
+  ): Result.Result<Change & { readonly proposal: Proposal }, ChangeNotFound | NotAProposal> => {
+    const change = changes.get(changeId);
+    if (change === undefined || projects.get(changeId) !== projectId)
+      return Result.fail(new ChangeNotFound({ changeId }));
+    return change.proposal === undefined
+      ? Result.fail(new NotAProposal({ changeId }))
+      : Result.succeed({ ...change, proposal: change.proposal });
+  };
+  /** A reviewer's move on the commit they read: the commit it carries, or ProposalCommitMoved. */
+  const reviewed = (
+    changeId: ChangeId,
+    asked: { readonly projectId: ProjectId; readonly commit: CommitSha },
+    move: (change: Change) => Change,
+  ) =>
+    Effect.suspend(
+      (): Effect.Effect<Change, ChangeNotFound | NotAProposal | ProposalCommitMoved> => {
+        const found = proposalOf(changeId, asked.projectId);
+        if (Result.isFailure(found)) return Effect.fail(found.failure);
+        const change = found.success;
+        if (change.commitSha !== undefined && change.commitSha !== asked.commit)
+          return Effect.fail(
+            new ProposalCommitMoved({ changeId, commit: asked.commit, current: change.commitSha }),
+          );
+        const moved = move(change);
+        changes.set(changeId, moved);
+        return Effect.succeed(moved);
+      },
+    );
   const pushed = new Map<WorkspaceId, Set<string>>();
   const reservations = new Map<
     string,
@@ -329,7 +382,7 @@ export function makeChangesMemory(
           : yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
       const change = changes.get(input.changeId);
       if (change === undefined) return yield* new ChangeNotFound({ changeId: input.changeId });
-      if (change.lease.id !== input.lease || change.lease.state !== "active")
+      if (leaseOf(change).id !== input.lease || leaseOf(change).state !== "active")
         return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
       if (!states.has(change.state))
         return yield* new ChangeStateRefused({ changeId: change.id, state: change.state, command });
@@ -385,7 +438,7 @@ export function makeChangesMemory(
       if (TERMINAL.has(change.state)) return yield* refused;
       // A test's `lapse` stands for the deadline passing, which the lease reads as lapsed.
       const leased: Change = lapsed.has(changeId)
-        ? { ...change, lease: { ...change.lease, state: "lapsed" } }
+        ? { ...change, lease: { ...leaseOf(change), state: "lapsed" } }
         : change;
       const lease = checkLease(leased, leaseId, now);
       if (Result.isFailure(lease)) return yield* lease.failure;
@@ -415,6 +468,10 @@ export function makeChangesMemory(
   };
   return {
     changes,
+    /** Each proposal made through `propose`, in order, as it was asked. */
+    proposed: () => [...proposed],
+    /** Each proposal moved to another commit through `updateProposal`, in order, as it was asked. */
+    moved: () => [...updated],
     /** Each change's project and workspace: what a test seeds to read a change it never declared. */
     projects,
     workspaces,
@@ -492,7 +549,7 @@ export function makeChangesMemory(
             const change = changes.get(input.changeId);
             if (change === undefined)
               return yield* new ChangeNotFound({ changeId: input.changeId });
-            if (change.lease.id !== input.lease || change.lease.state !== "active") {
+            if (leaseOf(change).id !== input.lease || leaseOf(change).state !== "active") {
               return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
             }
             if (!AGENT_OWNED.has(change.state))
@@ -539,12 +596,12 @@ export function makeChangesMemory(
             if (!lapsed.has(changeId) && !isLapsed(change, now))
               return yield* new LeaseNotLapsed({
                 changeId,
-                lapsesAt: lapsesAt(change.lease),
+                lapsesAt: lapsesAt(leaseOf(change)),
                 nextActions: [
                   {
                     kind: "wait",
                     title: "Wait for the lease to lapse: adoption needs a Lapsed lease",
-                    args: { lapsesAt: lapsesAt(change.lease) },
+                    args: { lapsesAt: lapsesAt(leaseOf(change)) },
                   },
                 ],
               });
@@ -594,8 +651,8 @@ export function makeChangesMemory(
             if (TERMINAL.has(change.state)) return yield* refused;
             if (
               authority._tag === "Lease" &&
-              (change.lease.id !== authority.leaseId ||
-                change.lease.state !== "active" ||
+              (leaseOf(change).id !== authority.leaseId ||
+                leaseOf(change).state !== "active" ||
                 lapsed.has(changeId) ||
                 isLapsed(change, now))
             )
@@ -605,7 +662,7 @@ export function makeChangesMemory(
             const withdrawn: Change = {
               ...ended,
               state: "withdrawn",
-              lease: { ...change.lease, state: "released" },
+              lease: { ...leaseOf(change), state: "released" },
             };
             changes.set(changeId, withdrawn);
             withdrawals.set(`${changeId} ${idempotencyKey}`, body);
@@ -664,7 +721,7 @@ export function makeChangesMemory(
               });
             committedEdits.push({ changeId: change.id, input });
             const commitSha = CommitSha.make(committedEdits.length.toString(16).padStart(40, "c"));
-            const renewed: Change = { ...change, lease: { ...change.lease, renewedAt: now } };
+            const renewed: Change = { ...change, lease: { ...leaseOf(change), renewedAt: now } };
             changes.set(change.id, renewed);
             const answer = {
               commit: { commitSha, tree: "d".repeat(40), changed: input.edits.length },
@@ -691,7 +748,7 @@ export function makeChangesMemory(
             const change = changes.get(input.changeId);
             if (change === undefined)
               return yield* new ChangeNotFound({ changeId: input.changeId });
-            if (change.lease.id !== input.lease || change.lease.state !== "active")
+            if (leaseOf(change).id !== input.lease || leaseOf(change).state !== "active")
               return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
             const onto = options.trunkHead ?? MEMORY_TRUNK_HEAD;
             if (
@@ -765,8 +822,8 @@ export function makeChangesMemory(
             if (change === undefined) return yield* new ChangeNotFound({ changeId });
             if (replayed !== undefined) return change;
             if (
-              change.lease.id !== input.lease ||
-              (change.lease.state !== "active" && change.lease.state !== "lapsed")
+              leaseOf(change).id !== input.lease ||
+              (leaseOf(change).state !== "active" && leaseOf(change).state !== "lapsed")
             )
               return yield* new LeaseStale({ changeId, leaseId: input.lease });
             distinctions.set(`${changeId} ${idempotencyKey}`, body);
@@ -786,6 +843,66 @@ export function makeChangesMemory(
             return change === undefined || projectId === undefined
               ? Effect.fail(new ChangeNotFound({ changeId }))
               : Effect.succeed({ change, projectId });
+          }),
+        // A proposal waits submitted on the fork's commit, as its Change DO leaves it once copied.
+        propose: (changeId, input) =>
+          Effect.gen(function* () {
+            const key = `${input.proposer} ${input.idempotencyKey}`;
+            const replayed = proposals.get(key);
+            if (replayed !== undefined) {
+              const change = changes.get(replayed.changeId);
+              if (replayed.fingerprint !== input.fingerprint || change === undefined)
+                return yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
+              return change;
+            }
+            const now = Instant(yield* EffectClock.currentTimeMillis);
+            const change: Change = {
+              id: changeId,
+              origin: "proposal",
+              proposal: { fork: input.fork.projectId, proposer: input.proposer },
+              state: "submitted",
+              intent: { revision: 1, goal: input.goal, footprint: [], premises: [] },
+              createdAt: now,
+              baseSha: input.base,
+              commitSha: input.commit,
+            };
+            changes.set(changeId, change);
+            projects.set(changeId, input.projectId);
+            proposals.set(key, { changeId, fingerprint: input.fingerprint });
+            proposed.push({ changeId, input });
+            return change;
+          }),
+        updateProposal: (changeId, input) =>
+          Effect.suspend(() => {
+            const found = proposalOf(changeId, input.projectId);
+            if (Result.isFailure(found)) return Effect.fail(found.failure);
+            const { approved: _approved, ...proposal } = found.success.proposal;
+            const next: Change = {
+              ...found.success,
+              proposal,
+              state: "submitted",
+              commitSha: input.commit,
+            };
+            changes.set(changeId, next);
+            updated.push({ changeId, input });
+            return Effect.succeed(next);
+          }),
+        approveProposal: (changeId, input) =>
+          reviewed(changeId, input, (change) => ({
+            ...change,
+            state: "queued",
+            ...(change.proposal === undefined
+              ? {}
+              : { proposal: { ...change.proposal, approved: input.commit } }),
+          })),
+        requestProposalChanges: (changeId, input) => reviewed(changeId, input, (change) => change),
+        closeProposal: (changeId, input) =>
+          Effect.suspend(() => {
+            const found = proposalOf(changeId, input.projectId);
+            if (Result.isFailure(found)) return Effect.fail(found.failure);
+            const closed: Change = { ...found.success, state: "withdrawn" };
+            changes.set(changeId, closed);
+            return Effect.succeed(closed);
           }),
         awaitSubmission: (changeId, waitSeconds) =>
           Effect.gen(function* () {

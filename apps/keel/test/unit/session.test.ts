@@ -48,6 +48,7 @@ import {
   sampleOrgId,
   sampleProjectId,
   ulidOf,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import * as fc from "fast-check";
@@ -387,7 +388,7 @@ function replay(steps: readonly Step[]): {
     const run =
       actor === undefined || step.run === undefined ? undefined : actor === agentId ? mine : THEIRS;
     const sent = run === undefined ? {} : { run };
-    const leaseId = change?.lease.id ?? fresh("lse");
+    const leaseId = change?.lease?.id ?? fresh("lse");
     const commands: Record<(typeof KINDS)[number], ChangeCommand> = {
       declare: {
         _tag: "Declare",
@@ -453,8 +454,8 @@ function replay(steps: readonly Step[]): {
     .filter(
       (change) =>
         !TERMINAL.has(change.state) &&
-        change.lease.agentId === agentId &&
-        change.lease.state === "active",
+        heldLease(change).agentId === agentId &&
+        heldLease(change).state === "active",
     )
     .map((change) => change.id)
     .toSorted();

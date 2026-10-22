@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-ledger.test.ts
+# kills: proposals.lapsed-retry-counted
+# why: a retry of a key whose place lapsed takes its place back with no cap, so a proposer opens more than five
+diff --git a/packages/core/src/application/coordination/proposal-ledger.ts b/packages/core/src/application/coordination/proposal-ledger.ts
+index 310a12e7..2ffe4cf4 100644
+--- a/packages/core/src/application/coordination/proposal-ledger.ts
++++ b/packages/core/src/application/coordination/proposal-ledger.ts
+@@ -91,7 +91,7 @@ export const reserveProposal = Effect.fn("coordination/reserveProposal")(functio
+         open !== undefined &&
+         !decodeOpen(open).proposed &&
+         now - decodeOpen(open).at > RESERVATION_TTL_MS;
+-      if (!lapsed) return reserved.changeId;
++      if (!lapsed || lapsed) return reserved.changeId;
+       if (holding(store, reservation.proposer, now) >= MAX_OPEN_PROPOSALS)
+         return new ProposalLimit({ projectId, limit: MAX_OPEN_PROPOSALS });
+       store.put(OPEN, place, { at: now, proposed: false });

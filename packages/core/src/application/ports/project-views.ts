@@ -1,15 +1,16 @@
 import { Context, type Effect, Schema } from "effect";
-import { Change, ChangeState, ParkReason } from "../../domain/coordination/index.ts";
+import { Change, ChangeOrigin, ChangeState, ParkReason } from "../../domain/coordination/index.ts";
 import {
   AgentId,
   ChangeId,
+  CommandActor,
   CommitSha,
   type ConflictId,
   GuardId,
   InstantSchema,
   NextAction,
   ProbeId,
-  type ProjectId,
+  ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
   Conflict,
@@ -34,7 +35,19 @@ export const ChangeSummary = Schema.Struct({
   number: Schema.Int,
   state: ChangeState,
   parkReason: Schema.optional(ParkReason),
-  agentId: AgentId,
+  /** The agent holding it; absent on a proposal, which no agent holds. */
+  agentId: Schema.optional(AgentId),
+  /** Where it started; absent on a summary folded before origins were kept, which is an agent's. */
+  origin: Schema.optional(ChangeOrigin),
+  /** On a proposal alone: the fork it came from, the commit it carries, who proposed it and what was approved. */
+  proposal: Schema.optional(
+    Schema.Struct({
+      fork: ProjectId,
+      commit: CommitSha,
+      proposer: CommandActor,
+      approved: Schema.optional(CommitSha),
+    }),
+  ),
   goal: Schema.String,
   revision: Schema.Int,
   declaredAt: InstantSchema,
@@ -60,6 +73,8 @@ export type TrunkView = typeof TrunkView.Type;
 export interface ChangeListRead {
   readonly project: ProjectId;
   readonly state?: ChangeState | undefined;
+  /** The project's proposals alone: those still open, or those that landed or were closed. */
+  readonly proposals?: "open" | "closed" | undefined;
   /** The last `#n` an earlier page returned: this page holds the changes numbered below it. */
   readonly cursor?: number | undefined;
   /** 1–100; absent is 50. */

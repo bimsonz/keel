@@ -1222,6 +1222,96 @@ export class KeelClient {
     );
   }
 
+  /** Proposes a commit of `fork`, a fork of the project, back to the project: it waits for a maintainer's approval. */
+  propose(
+    projectId: string,
+    proposal: { readonly fork: string; readonly commit: string; readonly goal: string },
+    options: Idempotent = {},
+  ): Promise<WireOutputs["propose"]> {
+    return this.call(
+      "propose",
+      { projectId, ...proposal, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** A project's proposals, newest first: the open ones unless `state` says closed. */
+  proposals(
+    projectId: string,
+    options: CallOptions & {
+      readonly state?: "open" | "closed";
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["proposals"]> {
+    return this.call(
+      "proposals",
+      { projectId, state: options.state, cursor: options.cursor, limit: options.limit },
+      options,
+    );
+  }
+
+  /** Moves a proposal to another commit of its fork: its proposer's alone. */
+  updateProposal(
+    changeId: string,
+    commit: string,
+    options: Idempotent & { readonly note?: string } = {},
+  ): Promise<WireOutputs["updateProposal"]> {
+    return this.call(
+      "updateProposal",
+      {
+        changeId,
+        commit,
+        ...(options.note === undefined ? {} : { note: options.note }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
+  /** Approves a proposal at the commit read; another is refused, so a silent update is never approved. */
+  approveProposal(
+    changeId: string,
+    commit: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["approveProposal"]> {
+    return this.call(
+      "approveProposal",
+      { changeId, commit, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Asks for changes to a proposal at the commit read: it goes on waiting. */
+  requestProposalChanges(
+    changeId: string,
+    commit: string,
+    comment: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["requestProposalChanges"]> {
+    return this.call(
+      "requestProposalChanges",
+      { changeId, commit, comment, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Closes a proposal: its proposer's, or a maintainer's. */
+  closeProposal(
+    changeId: string,
+    options: Idempotent & { readonly reason?: string } = {},
+  ): Promise<WireOutputs["closeProposal"]> {
+    return this.call(
+      "closeProposal",
+      {
+        changeId,
+        ...(options.reason === undefined ? {} : { reason: options.reason }),
+        "idempotency-key": keyOf(options),
+      },
+      options,
+    );
+  }
+
   /** Trunk's history from `ref`, newest first; pass a page's `nextCursor` for the next. */
   commits(
     projectId: string,

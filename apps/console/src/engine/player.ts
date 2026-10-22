@@ -18,6 +18,7 @@ import type {
   KeelInvited,
   KeelRemembered,
   KeelIssued,
+  KeelProposed,
   KeelSettings,
   KeelSync,
   KeelTargeted,
@@ -48,6 +49,7 @@ export type ConsoleSource = KeelEventSource &
   Partial<KeelTargeted> &
   Partial<KeelRemembered> &
   Partial<KeelIssued> &
+  Partial<KeelProposed> &
   Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;
@@ -557,6 +559,16 @@ export class Player {
     return (
       this.source.canRule?.(escalationId) ?? this.source.openGate?.()?.escalationId === escalationId
     );
+  }
+
+  /**
+   * The reader's own write moved the log (a proposal approved, asked for changes or closed): what it committed is
+   * read now, rather than at the next follow. Its effect still arrives through the log, never applied here.
+   */
+  async moved(): Promise<void> {
+    await this.#drain();
+    this.#reveal();
+    this.#changed();
   }
 
   /** Answer a question. The answer is never applied here: its effect arrives through the log. */

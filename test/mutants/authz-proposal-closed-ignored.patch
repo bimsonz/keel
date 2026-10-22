@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.proposals
+# why: a public project closed to proposals takes them all the same
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e40376fe..1965d831 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -1005,7 +1005,7 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision
+   if (Result.isFailure(read)) return read;
+   const { upstream } = proposal;
+   if (upstream._tag !== "Project") return hidden();
+-  if (upstream.visibility !== "public" || !proposal.proposalsOpen)
++  if (upstream.visibility !== "public")
+     return refused("proposals-closed");
+   if (principal._tag === "User") return decide(principal, "member", proposal.fork);
+   const works = decide(principal, "work", proposal.fork);

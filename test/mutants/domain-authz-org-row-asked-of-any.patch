@@ -2,12 +2,12 @@
 # kills: authz.org-rows
 # why: an org's own action asked of a namespace that is no org is decided on it, where it is asked of nothing.
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index dbf68d04..7e8fb286 100644
+index e40376fe..c9d95e3f 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -909,7 +909,7 @@ export const authorize = <A extends Action>(
-     return refused("org-project");
-   if (resource._tag === "Issue") return onIssue(principal, resource);
+@@ -948,7 +948,7 @@ export const authorize = <A extends Action>(
+   if (resource._tag === "Proposal") return onProposal(principal, resource);
+   if (resource._tag === "ProposalChange") return onProposalChange(principal, need, resource);
    const on: Resource =
 -    noOrg(asked, resource) || notPersonal(asked, resource) ? { _tag: "Missing" } : resource;
 +    notPersonal(asked, resource) ? { _tag: "Missing" } : resource;

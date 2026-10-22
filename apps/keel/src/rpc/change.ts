@@ -12,27 +12,31 @@ import {
   Intent,
   LeaseNotLapsed,
   LeaseStale,
+  NotAProposal,
   PoolExhausted,
   PredicatePolicies,
+  ProposalCommitMoved,
   Preflight,
   Proposition,
   RevisionMismatch,
   SubjectKey,
 } from "@keeltown/core/domain/coordination";
 import { DeployTargetName } from "@keeltown/core/domain/delivery";
-import { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { IdempotencyConflict, QuotaExceeded } from "@keeltown/core/domain/identity";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import { PackTooLarge } from "./trunk.ts";
 import {
   AgentId,
   CandidateId,
   ChangeId,
+  CommandActor,
   CommitSha,
   ConflictId,
   ContentHash,
   DecisionId,
   DeploymentId,
   LeaseId,
+  NamespaceId,
   NextAction,
   ProjectId,
   RunRef,
@@ -239,6 +243,70 @@ export const WithdrawAuthority = Schema.Union([
 ]);
 export type WithdrawAuthority = typeof WithdrawAuthority.Type;
 
+/** A fork, and its trunk's repo: where a proposal's commits are copied from. */
+const ProposalFork = Schema.Struct({ projectId: ProjectId, trunk: RepoRef });
+
+/**
+ * Propose a fork's commit to the project (core's `ProposeChange`), as the
+ * project's ledger reserved this change's id: copied into a workspace of the
+ * project, admitted against its namespace's repo bytes, and submitted on
+ * `base`. Idempotent by Idempotency-Key; `fingerprint` hashes the request.
+ */
+export const ProposeCommand = Schema.Struct({
+  projectId: ProjectId,
+  fork: ProposalFork,
+  proposer: CommandActor,
+  commit: CommitSha,
+  base: CommitSha,
+  namespace: NamespaceId,
+  goal: Schema.String,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+/** Move a proposal to another commit of its fork, by its proposer (core's `UpdateProposal`). */
+export const UpdateProposalCommand = Schema.Struct({
+  proposer: CommandActor,
+  projectId: ProjectId,
+  fork: ProposalFork,
+  commit: CommitSha,
+  base: CommitSha,
+  note: Schema.optional(Schema.String),
+  namespace: NamespaceId,
+  idempotencyKey: Schema.String,
+});
+
+/** Approve a proposal at the commit its reviewer read (core's `ApproveProposal`). */
+export const ApproveProposalCommand = Schema.Struct({
+  by: CommandActor,
+  commit: CommitSha,
+  projectId: ProjectId,
+  idempotencyKey: Schema.String,
+});
+
+/** Ask for changes to a proposal at the commit its reviewer read (core's `RequestProposalChanges`). */
+export const RequestProposalChangesCommand = Schema.Struct({
+  ...ApproveProposalCommand.fields,
+  comment: Schema.String,
+});
+
+/** Close a proposal, by its proposer or by someone who may approve it (core's `CloseProposal`). */
+export const CloseProposalCommand = Schema.Struct({
+  by: CommandActor,
+  projectId: ProjectId,
+  reason: Schema.optional(Schema.String),
+  idempotencyKey: Schema.String,
+});
+
+/** Why a proposal was not approved, asked for changes or closed: nothing moved. */
+const ProposalMoveRefused = Schema.Union([
+  ChangeNotFound,
+  ChangeStateRefused,
+  NotAProposal,
+  ProposalCommitMoved,
+  IdempotencyConflict,
+]);
+
 /** Withdraw a change. */
 export const AbandonCommand = Schema.Struct({
   authority: WithdrawAuthority,
@@ -279,16 +347,18 @@ export const SubmissionStatus = Schema.Struct({
  * Where Precheck diffs a change: its workspace repo; its base (the change's
  * own `baseSha`: the grant's until a rebase moves it); the commit it was
  * granted at (`grantedSha`, its fork point, which never moves, so an ancestry
- * walk can stop there); the project whose settings hold `protectedPaths`;
- * the subjects the change's intent names, which the plan's guards are
- * compiled against; and that intent, which derivation reads what the change
- * declared from.
+ * walk can stop there); where its flow is read (`flowAt`: the base, or a
+ * proposal's upstream head); the project whose settings hold
+ * `protectedPaths`; the subjects the change's intent names, which the plan's
+ * guards are compiled against; and that intent, which derivation reads what
+ * the change declared from.
  */
 export const ChangeWorkspace = Schema.Struct({
   workspaceId: WorkspaceId,
   repo: RepoRef,
   baseSha: CommitSha,
   grantedSha: CommitSha,
+  flowAt: CommitSha,
   projectId: ProjectId,
   subjects: Schema.Array(SubjectKey),
   intent: Intent,
@@ -336,6 +406,8 @@ export const PlanCompiledCommand = Schema.Struct({
   predicatePolicy: Schema.optional(PredicatePolicies),
   /** The plan holds the human-class gate: the change parks for a maintainer's ruling as it is queued. */
   needsRuling: Schema.optional(Schema.Literal(true)),
+  /** The paths the gate is for: PlanCompiled names them. */
+  ruledPaths: Schema.optional(Schema.Array(Schema.String)),
 });
 export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
 
@@ -437,6 +509,33 @@ export const ChangeCodecs = {
       IdempotencyConflict,
     ]),
   ),
+  // PushRejected: the workspace stayed busy; PackTooLarge: the fork's commits are over the relay cap.
+  propose: exitCodec(
+    Change,
+    Schema.Union([
+      ChangeStateRefused,
+      PoolExhausted,
+      IdempotencyConflict,
+      PushRejected,
+      PackTooLarge,
+      QuotaExceeded,
+    ]),
+  ),
+  updateProposal: exitCodec(
+    Change,
+    Schema.Union([
+      ChangeNotFound,
+      ChangeStateRefused,
+      NotAProposal,
+      IdempotencyConflict,
+      PushRejected,
+      PackTooLarge,
+      QuotaExceeded,
+    ]),
+  ),
+  approveProposal: exitCodec(Change, ProposalMoveRefused),
+  requestProposalChanges: exitCodec(Change, ProposalMoveRefused),
+  closeProposal: exitCodec(Change, ProposalMoveRefused),
   // Nor does abandon.
   abandon: exitCodec(
     Change,
@@ -535,6 +634,16 @@ export interface ChangeRpc extends EventReceiverRpc {
   refreshWorkspace(command: typeof RefreshCommand.Encoded): Promise<ExitJson>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<ExitJson>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<ExitJson>;
+  /** Makes the proposal this change is reserved for: the fork's commit copied in and submitted. */
+  propose(command: typeof ProposeCommand.Encoded): Promise<ExitJson>;
+  /** Moves the proposal to another commit of its fork, by its proposer. */
+  updateProposal(command: typeof UpdateProposalCommand.Encoded): Promise<ExitJson>;
+  /** Approves the proposal at the commit its reviewer read. */
+  approveProposal(command: typeof ApproveProposalCommand.Encoded): Promise<ExitJson>;
+  /** Asks for changes to the proposal at the commit its reviewer read. */
+  requestProposalChanges(command: typeof RequestProposalChangesCommand.Encoded): Promise<ExitJson>;
+  /** Closes the proposal. */
+  closeProposal(command: typeof CloseProposalCommand.Encoded): Promise<ExitJson>;
   /**
    * The change once its submission state moves, or as it stands after
    * `waitMs` (0–30,000). An in-DO waiter with a setTimeout deadline; no polling.

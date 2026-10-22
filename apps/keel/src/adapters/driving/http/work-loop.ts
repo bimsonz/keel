@@ -332,11 +332,33 @@ function envelope<R>(
   };
 }
 
+/** A proposal as the API shows it: where it comes from, the commit it carries, who proposed it and what was approved. */
+function proposalView(change: Change) {
+  const { proposal, commitSha } = change;
+  if (proposal === undefined || commitSha === undefined) return {};
+  return {
+    proposal: {
+      fork: proposal.fork,
+      commit: commitSha,
+      proposer: proposal.proposer,
+      ...(proposal.approved === undefined ? {} : { approved: proposal.approved }),
+    },
+  };
+}
+
+/** The lease an agent's change holds: one it declared, adopted or moves under its lease always has one. */
+function leaseOf(change: Change): Lease {
+  if (change.lease === undefined) throw new Error(`${change.id} holds no lease: no agent holds it`);
+  return change.lease;
+}
+
 function changeView(change: Change, tell: Teller) {
   const ref = `change:${change.id}`;
   return {
     id: change.id,
-    agentId: change.agentId,
+    ...(change.agentId === undefined ? {} : { agentId: change.agentId }),
+    origin: change.origin,
+    ...proposalView(change),
     state: change.state,
     revision: change.intent.revision,
     goal: change.intent.goal,
@@ -494,7 +516,7 @@ function unplaced(change: Change) {
         operationId: "revise",
         args: {
           changeId: change.id,
-          "keel-lease": change.lease.id,
+          "keel-lease": leaseOf(change).id,
           "if-match": `"${change.intent.revision}"`,
         },
       },
@@ -514,7 +536,7 @@ export function declareOk(declared: Declared): DeclareResult {
         change: changeView(change, tell),
         preflight: preflightView(change.id, preflight, tell),
         workspace: workspaceView(workspace),
-        lease: leaseView(change.lease),
+        lease: leaseView(leaseOf(change)),
       },
       [
         ...footprint.next,
@@ -1381,6 +1403,9 @@ export function relyError(
  * agent holding its lease, under the change's run when it has one, reads the
  * lease too, so a lease it lost track of can be read back.
  */
+/** A change as the API shows it, bare, to a reader who holds no lease on it. */
+export const changeBody = (change: Change) => changeView(change, teller());
+
 export function changeOk(change: Change, reader?: AgentClaims): ChangeResult {
   const view = changeView(change, teller());
   return {
@@ -1394,14 +1419,14 @@ function holdsLease(change: Change, reader: AgentClaims | undefined): boolean {
   return (
     reader !== undefined &&
     leaseStands(change) &&
-    reader.agentId === change.lease.agentId &&
+    reader.agentId === change.lease?.agentId &&
     (change.run === undefined || change.run.id === reader.run?.id)
   );
 }
 
 /** The lease as its holder reads it, with no lapse time while the platform holds the change. */
 function heldLeaseView(change: Change) {
-  const { lease } = change;
+  const lease = leaseOf(change);
   return {
     id: lease.id,
     renewedAt: iso(lease.renewedAt),
@@ -1464,7 +1489,7 @@ export function adoptOk(adopted: Adopted): AdoptResult {
       `Adopted ${change.id} (${change.state}) under a new lease. Pull its workspace, carry on, then submit.`,
       {
         change: changeView(change, tell),
-        lease: leaseView(change.lease),
+        lease: leaseView(leaseOf(change)),
         ...(workspace === undefined ? {} : { workspace: workspaceView(workspace) }),
       },
       [statusOf(change.id)],

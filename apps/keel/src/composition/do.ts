@@ -199,13 +199,20 @@ export type ChangeServices =
   | WorkspaceRebaser
   | WorkspaceWriter
   | LiveChanges
-  | Decisions;
+  | Decisions
+  | NamespaceUsage
+  | HumanGate
+  | ProjectNamespaces;
 
 /**
  * The Change DO takes its workspace from its project's WorkspacePool DO and
  * asks the code host whether a submitted commit is in it. A rebase reads
  * trunk's head from the Trunk DO and relays trunk into the workspace's
- * keel/trunk; it never holds a trunk write token.
+ * keel/trunk; it never holds a trunk write token. A proposal's commits,
+ * copied from its fork, are admitted against the fork's namespace's repo
+ * bytes on that namespace's usage object. A proposal that moves or closes takes
+ * back its open questions from its project's namespace object, which it finds
+ * in D1's `projects` table.
  */
 export function changeServices(env: Env): Layer.Layer<ChangeServices> {
   const host = codeHostLayer(env);
@@ -217,6 +224,9 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
     WorkspaceWriterGitCore(artifactsObjects(env), env.KEEL_HOST).pipe(Layer.provide(host)),
     liveChangesLayer(env),
     decisionsLayer(env),
+    NamespaceUsageRpc(env.NAMESPACE_USAGE),
+    HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+    ProjectNamespacesD1(env.DB),
   );
 }
 
@@ -238,24 +248,28 @@ export function poolServices(env: Env): Layer.Layer<PoolServices> {
   );
 }
 
-/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, and what counts each landing against the project's namespace. */
-export type TrunkServices = TrunkWriter | CodeHost | NamespaceUsage | ProjectNamespaces;
+/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, what counts each landing against the project's namespace, and the other projects' trunks a fork syncs from. */
+export type TrunkServices = TrunkWriter | CodeHost | NamespaceUsage | ProjectNamespaces | Trunks;
 
 /**
  * The Trunk DO writes and syncs its project's trunk through GitCore over the
  * code host, and reads each candidate it promotes from staging. It finds its
  * project's namespace in D1's `projects` table and counts what it lands into that
- * namespace's usage object. `projectId` is read lazily, on first use, from the
- * object's name.
+ * namespace's usage object. A fork's sync asks its upstream's Trunk DO for its
+ * head, and reads trunk's objects over the Artifacts binding to merge it.
+ * `projectId` is read lazily, on first use, from the object's name.
  */
 export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
   return Layer.suspend(() => {
     const host = codeHostLayer(env);
     return Layer.mergeAll(
       host,
-      TrunkWriterGitCore(projectRepos(projectId()), commitSigning(env)).pipe(Layer.provide(host)),
+      TrunkWriterGitCore(projectRepos(projectId()), commitSigning(env), artifactsObjects(env)).pipe(
+        Layer.provide(host),
+      ),
       NamespaceUsageRpc(env.NAMESPACE_USAGE),
       ProjectNamespacesD1(env.DB),
+      TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     );
   });
 }
@@ -283,6 +297,7 @@ export type LaneServices =
   | StagingWriter
   | Projects
   | ProjectNamespaces
+  | Namespaces
   | PlanStore
   | HumanGate;
 
@@ -291,7 +306,8 @@ export type LaneServices =
  * settings from the Project DO (verification may be off), reads each queued
  * change's plan and stores a batch's union of them in R2, composes and bundles
  * candidates through GitCore over the Artifacts bindings (one handle per repo
- * per compose), names each member's agent by the handle D1's directory holds, stores bundles in R2 for the namespace D1's `projects` table
+ * per compose), names each member's agent by the handle D1's directory holds, and a
+ * proposal's proposer by that or their own namespace's, stores bundles in R2 for the namespace D1's `projects` table
  * places its project in, starts KeelVerify, and moves staging's
  * main after trunk. A batch of one that drops tests is put to the project's
  * maintainers on the object of the namespace its project belongs to. It never
@@ -332,6 +348,7 @@ export function laneServices(
       ProjectsRpc(project),
       places,
       AgentDirectoryD1(env.DB),
+      NamespacesD1(env.DB),
       CandidateComposerTiered(objects, commitSigning(env), box).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW, {

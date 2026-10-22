@@ -67,6 +67,7 @@ export * from "./platform-function.ts";
 export * from "./project-namespaces.ts";
 export * from "./project-views.ts";
 export * from "./projects.ts";
+export * from "./proposal-ledger.ts";
 export * from "./recall.ts";
 export * from "./repo-server.ts";
 export * from "./session-store.ts";

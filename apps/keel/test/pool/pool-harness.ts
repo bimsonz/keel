@@ -116,6 +116,7 @@ export async function followTrunk(
       view: unused,
       sync: unused,
       syncUpstream: unused,
+      upstreamPoints: unused,
       cancel: unused,
       destroy: unused,
     }),

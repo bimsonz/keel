@@ -31,6 +31,7 @@ import type {
   Sponsorships,
   Invitations,
   Issues,
+  ProposalLedger,
   NamespaceAgents,
   ProjectAgents,
   SponsorRequests,
@@ -86,6 +87,7 @@ export type IsolateServices =
   | Sponsorships
   | Invitations
   | Issues
+  | ProposalLedger
   | NamespaceAgents
   | ProjectAgents
   | SponsorRequests

@@ -206,7 +206,7 @@ export function hearSubject(
       const declared = Schema.decodeUnknownSync(IntentDeclared)(event.payload);
       after = under(key, declared, before);
       relier = declared.changeId;
-      heldBy(tx, changeId, declared.agentId);
+      if (declared.agentId !== undefined) heldBy(tx, changeId, declared.agentId);
       break;
     }
     case "IntentRevised": {

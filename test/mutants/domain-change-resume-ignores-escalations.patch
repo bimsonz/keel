@@ -2,10 +2,10 @@
 # kills: change.no-resume-past-escalation, change.transitions
 # why: a resume is taken whatever is still awaited, so the first of two rulings puts the change back in its queue with the other question open
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..a3f5784f 100644
+index 916513b7..b3d3efc3 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -833,10 +833,9 @@ export const decideChange = (
+@@ -1033,10 +1033,9 @@ export const decideChange = (
        if (!(at("parked") && change.parkReason === "awaiting-ruling"))
          return refuse(change, command);
        // The ruling on one question does not release a change another question still holds.
@@ -18,4 +18,4 @@ index f61b7350..a3f5784f 100644
 +      ]);
  
      case "Adopt":
-       if (
+       // No agent holds a proposal, so none takes it over: its proposer moves it.

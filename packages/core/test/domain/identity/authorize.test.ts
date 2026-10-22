@@ -21,6 +21,8 @@ import {
   type NamespaceResource,
   type Principal,
   type ProjectResource,
+  type ProposalChangeResource,
+  type ProposalResource,
   type Resource,
   type ResourceKind,
   type Right,
@@ -207,6 +209,36 @@ const issueArb: fc.Arbitrary<IssueResource> = fc.oneof(
   { weight: 1, arbitrary: fc.record({ _tag: fc.constant("Issue"), project: projectArb }) },
 );
 
+/** A proposal: a project proposed to and the fork proposed from, each one of the drawn projects or none. */
+const proposalArb: fc.Arbitrary<ProposalResource> = fc.record({
+  _tag: fc.constant("Proposal"),
+  upstream: fc.oneof(
+    { weight: 6, arbitrary: projectArb },
+    { weight: 1, arbitrary: fc.constant(MISSING) },
+  ),
+  fork: fc.oneof(
+    { weight: 6, arbitrary: projectArb },
+    { weight: 1, arbitrary: fc.constant(MISSING) },
+  ),
+  proposalsOpen: fc.boolean(),
+});
+
+/** A proposed change of a project, with its proposer; one that is no proposal has none. */
+const proposalChangeArb: fc.Arbitrary<ProposalChangeResource> = fc.oneof(
+  {
+    weight: 6,
+    arbitrary: fc.record({
+      _tag: fc.constant("ProposalChange"),
+      project: fc.oneof(
+        { weight: 6, arbitrary: projectArb },
+        { weight: 1, arbitrary: fc.constant(MISSING) },
+      ),
+      proposer: authorArb,
+    }),
+  },
+  { weight: 1, arbitrary: fc.record({ _tag: fc.constant("ProposalChange"), project: projectArb }) },
+);
+
 const forkArb: fc.Arbitrary<ForkResource> = fc.record({
   _tag: fc.constant("Fork"),
   source: fc.oneof(
@@ -243,6 +275,10 @@ const resourceArb = (kind: ResourceKind): fc.Arbitrary<Resource> => {
       return forkArb;
     case "Issue":
       return issueArb;
+    case "Proposal":
+      return proposalArb;
+    case "ProposalChange":
+      return proposalChangeArb;
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -292,6 +328,8 @@ const GOVERNING: ReadonlySet<Need> = new Set([
   "sponsorOrMaintain",
   "sponsorOrMaintainAsUser",
   "inviterOrMaintain",
+  "approve",
+  "proposerOrApprove",
 ]);
 /** The governing needs only a person meets, wherever an agent governs: an invitation names the person who answers for the agent. */
 const PEOPLE_ONLY: ReadonlySet<Need> = new Set([
@@ -324,17 +362,25 @@ const actorOf = (p: Principal) =>
 
 /**
  * What someone of neither the project nor its org is granted beyond a public
- * read: an issue on a public project (a person, or an agent a person
- * sponsors), and closing or reopening an issue they opened.
+ * read: an issue on a public project, and a proposal to one that takes them
+ * (a person, or an agent a person sponsors); closing or reopening an issue
+ * they opened, and moving or closing a proposal they made.
  */
 const outsiderWrites = (p: Principal, action: Action, resource: Resource): boolean => {
   const need = needOf(action);
+  const answeredFor = p._tag === "User" || (p._tag === "Agent" && p.sponsored === true);
   if (need === "participate")
+    return resource._tag === "Project" && resource.visibility === "public" && answeredFor;
+  if (need === "propose")
     return (
-      resource._tag === "Project" &&
-      resource.visibility === "public" &&
-      (p._tag === "User" || (p._tag === "Agent" && p.sponsored === true))
+      resource._tag === "Proposal" &&
+      resource.upstream._tag === "Project" &&
+      resource.upstream.visibility === "public" &&
+      resource.proposalsOpen &&
+      answeredFor
     );
+  if (need === "proposer" || need === "proposerOrApprove")
+    return resource._tag === "ProposalChange" && resource.proposer === actorOf(p);
   return need === "authorOrMaintain" && resource._tag === "Issue" && resource.author === actorOf(p);
 };
 
@@ -451,6 +497,11 @@ const ofResource = (principal: Principal, resource: Resource): boolean => {
       return principal._tag === "User" && inside(principal, resource.target.namespace);
     // An issue is of its project: whoever is of the project is of its issues.
     case "Issue":
+      return ofResource(principal, resource.project);
+    // A proposal is of the project it is proposed to, and so is a proposed change.
+    case "Proposal":
+      return ofResource(principal, resource.upstream);
+    case "ProposalChange":
       return ofResource(principal, resource.project);
     default:
       return false;
@@ -1070,6 +1121,17 @@ describe("authorize", () => {
       Agent: { _tag: "Agent", agentId: BOT },
       Fork: { _tag: "Fork", source: project(PRJ_1, "private"), target: into(ORG_1) },
       Issue: { _tag: "Issue", project: project(PRJ_1, "private"), author: STRANGER },
+      Proposal: {
+        _tag: "Proposal",
+        upstream: project(PRJ_1, "public"),
+        fork: project(PRJ_3, "public"),
+        proposalsOpen: true,
+      },
+      ProposalChange: {
+        _tag: "ProposalChange",
+        project: project(PRJ_1, "private"),
+        proposer: STRANGER,
+      },
     };
     const taken = OWNED_ACTIONS.filter((a) => GOVERNING.has(needOf(a))).flatMap((action) => {
       const result = outcome(decide(governor, action, persons[kindOf(action)]));
@@ -1443,6 +1505,17 @@ describe("authorize", () => {
           project: project(PRJ_1, "public", { personOwned }),
           author: STRANGER,
         },
+        Proposal: {
+          _tag: "Proposal",
+          upstream: project(PRJ_1, "public", { personOwned }),
+          fork: project(PRJ_3, "public"),
+          proposalsOpen: true,
+        },
+        ProposalChange: {
+          _tag: "ProposalChange",
+          project: project(PRJ_1, "public", { personOwned }),
+          proposer: STRANGER,
+        },
       };
       return OWNED_ACTIONS.flatMap((action) => {
         const kind = kindOf(action);
@@ -1518,6 +1591,116 @@ describe("authorize", () => {
     expect(
       outcome(authorize({ ...stranger, suspended: true }, "closeIssue", opened(STRANGER))),
     ).toBe("403:user-suspended");
+  });
+
+  it("[authz.proposals] a member of the fork, or an agent working in it that a person sponsors, proposes to a public project that takes proposals; a person who maintains it approves, or an agent that maintains it and a person sponsors; the proposer alone moves a proposal, and closes it as an approver does", () => {
+    const upstream = project(PRJ_1, "public");
+    const privateFork = project(PRJ_3, "private");
+    const openFork = project(PRJ_3, "public");
+    const proposal = (over: Partial<ProposalResource> = {}): ProposalResource => ({
+      _tag: "Proposal",
+      upstream,
+      fork: privateFork,
+      proposalsOpen: true,
+      ...over,
+    });
+    // A person of the fork's org, and of nothing upstream.
+    const stranger = user({ memberships: [{ org: ORG_2, role: "member" }] });
+    const nobody = user({ memberships: [] });
+    const sponsored = agentOn(PRJ_3, { sponsored: true });
+    const loose = agentOn(PRJ_3);
+    expect(outcome(authorize(stranger, "propose", proposal()))).toBe("ok:");
+    expect(outcome(authorize(nobody, "propose", proposal({ fork: openFork })))).toBe("403:role");
+    expect(outcome(authorize(nobody, "propose", proposal()))).toBe("404");
+    expect(outcome(authorize(sponsored, "propose", proposal()))).toBe("ok:");
+    expect(outcome(authorize(loose, "propose", proposal()))).toBe("403:sponsor-required");
+    expect(nextOf(authorize(loose, "propose", proposal()))).toEqual(["askSponsor"]);
+    expect(
+      outcome(
+        authorize(agentOn(PRJ_4, { sponsored: true }), "propose", proposal({ fork: openFork })),
+      ),
+    ).toBe("403:foreign-project");
+    expect(outcome(authorize({ ...sponsored, paused: true }, "propose", proposal()))).toBe(
+      "403:agent-paused",
+    );
+    expect(outcome(authorize(ANON, "propose", proposal()))).toBe("401");
+    // A private project takes none: it is not there to an outsider, and closed to its own.
+    const privately = proposal({ upstream: project(PRJ_1, "private"), proposalsOpen: false });
+    expect(outcome(authorize(stranger, "propose", privately))).toBe("404");
+    const both = user({
+      memberships: [
+        { org: ORG_1, role: "member" },
+        { org: ORG_2, role: "member" },
+      ],
+    });
+    expect(outcome(authorize(both, "propose", privately))).toBe("403:proposals-closed");
+    expect(
+      outcome(authorize(both, "propose", proposal({ upstream: project(PRJ_1, "private") }))),
+    ).toBe("403:proposals-closed");
+    expect(outcome(authorize(stranger, "propose", proposal({ proposalsOpen: false })))).toBe(
+      "403:proposals-closed",
+    );
+    expect(outcome(authorize(stranger, "propose", proposal({ upstream: MISSING })))).toBe("404");
+    expect(outcome(authorize(stranger, "propose", proposal({ fork: MISSING })))).toBe("404");
+
+    const theirs = userActor(stranger.userId);
+    const proposed = (
+      proposer: CommandActor | undefined,
+      at: ProjectResource = upstream,
+    ): ProposalChangeResource => ({
+      _tag: "ProposalChange",
+      project: at,
+      ...(proposer === undefined ? {} : { proposer }),
+    });
+    const maintainer = user({
+      userId: USERS[2] ?? makeId("usr", ulid(3)),
+      memberships: [{ org: ORG_1, role: "maintainer" }],
+    });
+    const member = user({
+      userId: USERS[2] ?? makeId("usr", ulid(3)),
+      memberships: [{ org: ORG_1, role: "member" }],
+    });
+    expect(outcome(authorize(maintainer, "approveProposal", proposed(theirs)))).toBe("ok:");
+    expect(outcome(authorize(maintainer, "requestProposalChanges", proposed(theirs)))).toBe("ok:");
+    expect(outcome(authorize(member, "approveProposal", proposed(theirs)))).toBe("403:role");
+    expect(outcome(authorize(stranger, "approveProposal", proposed(theirs)))).toBe("403:role");
+    expect(outcome(authorize(stranger, "requestProposalChanges", proposed(theirs)))).toBe(
+      "403:role",
+    );
+    // Where no person owns, an agent that maintains approves while a person sponsors it.
+    const unowned = project(PRJ_1, "public", { personOwned: false });
+    const governor = agentOn(PRJ_1, { standing: GOVERNS, sponsored: true });
+    expect(outcome(authorize(governor, "approveProposal", proposed(theirs, unowned)))).toBe("ok:");
+    expect(
+      outcome(
+        authorize({ ...governor, sponsored: false }, "approveProposal", proposed(theirs, unowned)),
+      ),
+    ).toBe("403:sponsor-required");
+    // Where a person owns, no agent approves, whatever it is said to govern.
+    expect(outcome(authorize(governor, "approveProposal", proposed(theirs)))).toBe(
+      "403:users-only",
+    );
+    // Its proposer alone moves it to another commit.
+    expect(outcome(authorize(stranger, "updateProposal", proposed(theirs)))).toBe("ok:");
+    expect(outcome(authorize(maintainer, "updateProposal", proposed(theirs)))).toBe(
+      "403:proposer-only",
+    );
+    expect(
+      outcome(authorize(sponsored, "updateProposal", proposed(agentActor(sponsored.agentId)))),
+    ).toBe("ok:");
+    expect(outcome(authorize(stranger, "updateProposal", proposed(undefined)))).toBe(
+      "403:proposer-only",
+    );
+    // Its proposer closes it, and whoever may approve it.
+    expect(outcome(authorize(stranger, "closeProposal", proposed(theirs)))).toBe("ok:");
+    expect(outcome(authorize(maintainer, "closeProposal", proposed(theirs)))).toBe("ok:");
+    expect(outcome(authorize(member, "closeProposal", proposed(theirs)))).toBe("403:role");
+    // A proposal of a project the caller may not see is not there; nobody signed in is told to sign in.
+    expect(
+      outcome(authorize(stranger, "closeProposal", proposed(theirs, project(PRJ_1, "private")))),
+    ).toBe("404");
+    expect(outcome(authorize(ANON, "approveProposal", proposed(theirs)))).toBe("401");
+    expect(outcome(authorize(ANON, "proposals", upstream))).toBe("ok:public");
   });
 
   it("[authz.suspended] a suspended user or org is refused, and an org's insiders are told why", () => {

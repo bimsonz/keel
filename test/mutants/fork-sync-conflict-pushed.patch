@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-sync.test.ts
+# kills: fork-sync.conflict
+# why: a sync whose merge GitCore refused moves the fork to the upstream's head, and the fork's own work is gone
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 2497bf76..c9fada92 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -894,11 +894,8 @@ const fetchFork = Effect.fn("integration/fetchFork")(function* (
+       message: `Merge ${origin.project} at ${to}`,
+     })
+     .pipe(
+-      Effect.catchTag("MergeRefused", (refused) =>
+-        Effect.andThen(
+-          writer.dropUpstream,
+-          Effect.fail(new SyncConflicts({ projectId, path: refused.path, reason: refused.reason })),
+-        ),
++      Effect.catchTag("MergeRefused", () =>
++        Effect.succeed({ commit: to, bytes: PACK_OVERHEAD_BYTES }),
+       ),
+     );
+   return {

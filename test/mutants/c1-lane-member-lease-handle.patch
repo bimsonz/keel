@@ -2,15 +2,18 @@
 # kills: lane.member-author
 # why: The handle is read for the lease's holder, so a landing is written by one agent's id under another's handle
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2dfc..a4bc5ee5 100644
+index bf0c698d..11fe0682 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -955,7 +955,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-           [changes.get(changeId), changes.workspace(changeId)],
+@@ -1459,7 +1459,10 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
            { concurrency: 2 },
          );
--        const agent = yield* directory.findAgent(change.agentId);
-+        const agent = yield* directory.findAgent(change.lease.agentId);
+         const { agentId, proposal } = change;
+-        const agent = agentId === undefined ? Option.none() : yield* directory.findAgent(agentId);
++        const agent =
++          agentId === undefined
++            ? Option.none()
++            : yield* directory.findAgent(change.lease?.agentId ?? agentId);
          if (change.commitSha === undefined)
            return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
-         return {
+         // A proposal is its proposer's, by the commit of the fork it was approved at.

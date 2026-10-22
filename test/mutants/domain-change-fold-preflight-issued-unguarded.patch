@@ -2,12 +2,12 @@
 # kills: change.fold-table
 # why: the fold takes PreflightIssued with its guard gone: `from("declared", "working") && event.revision === change.intent.revision`.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..041d4f4b 100644
+index 916513b7..c0b3567f 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -969,9 +969,7 @@ export const evolveChange = (
-     case "IntentDeclared":
-       return illegal(change, event);
+@@ -1255,9 +1255,7 @@ export const evolveChange = (
+         ? change
+         : illegal(change, event);
      case "PreflightIssued":
 -      return from("declared", "working") && event.revision === change.intent.revision
 -        ? change

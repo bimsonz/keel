@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: change.proposal-flow-at
+# why: Precheck reads a proposal's checks at its base, where its fork last met the upstream, so a fork's own edit of the checks judges it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 203b3b42..cabfdbf9 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1026,7 +1026,7 @@ export const changeWorkspace: (
+   return {
+     ...held,
+     baseSha: change.baseSha,
+-    flowAt: change.proposal === undefined ? change.baseSha : held.grantedSha,
++    flowAt: change.baseSha,
+     subjects: intentSubjects(change.intent),
+     intent: change.intent,
+   };

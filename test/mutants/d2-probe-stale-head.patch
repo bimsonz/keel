@@ -2,14 +2,14 @@
 # kills: probe-conflict.submission
 # why: A bounced or working change is read at the commit it submitted before its rebase, so its world is a commit it no longer stands by
 diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
-index ed4ad70..8a6ec59 100644
+index 7edee24d..2b711c87 100644
 --- a/packages/core/src/application/verification/probe-conflict.ts
 +++ b/packages/core/src/application/verification/probe-conflict.ts
-@@ -80,7 +80,6 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
+@@ -82,7 +82,6 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
        : { _tag: "Landed", landing: change.landedCommit };
    if (change.commitSha === undefined || change.baseSha === undefined)
      return { _tag: "Unsubmitted" };
 -  if (UNSUBMITTED.has(change.state)) return { _tag: "Unsubmitted" };
-   return { _tag: "Submitted", head: change.commitSha, base: change.baseSha };
- };
- 
+   // A proposal is no world until a maintainer approves the commit it carries: before that Keel drafts,
+   // builds and runs nothing of it, and the Probe waits for the approval as for a submission.
+   if (change.proposal !== undefined && change.proposal.approved !== change.commitSha)

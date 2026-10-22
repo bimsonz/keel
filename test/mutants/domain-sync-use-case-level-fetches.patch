@@ -2,14 +2,14 @@
 # kills: sync.level
 # why: an upstream at trunk's head is fetched and counted again on every sync
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index d3bfebf6..9daa9ffe 100644
+index 2497bf76..1ff144c4 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -807,7 +807,6 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
+@@ -834,7 +834,6 @@ const fetchImport = Effect.fn("integration/fetchImport")(function* (
+   const to = yield* writer.upstreamHead(upstream);
    if (to === undefined)
      return yield* new UpstreamUnreachable({ ...upstream, reason: "branch-gone" });
-   const from = trunk.head;
--  if (to === from) return { from, to, synced: false } satisfies UpstreamSynced;
+-  if (to === from) return undefined;
    const haves = from === origin.commit ? [from] : [from, origin.commit];
    const bytes = yield* writer
      .fetchUpstream(upstream, to, haves)

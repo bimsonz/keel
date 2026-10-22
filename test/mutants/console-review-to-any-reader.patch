@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/views/review.test.ts
+# kills: review.others
+# why: anyone reading a proposal is offered to approve it or ask for changes, not only a maintainer
+diff --git a/apps/console/src/views/Review.tsx b/apps/console/src/views/Review.tsx
+index 1e7b612d..36ba1bd9 100644
+--- a/apps/console/src/views/Review.tsx
++++ b/apps/console/src/views/Review.tsx
+@@ -97,7 +97,7 @@ export function Review({ proposal, reader, onApprove, onRequestChanges, onClose
+       )}
+       <div className="a-merge-row" data-tone="quiet">
+         <div className="flex min-w-0 flex-1 flex-col gap-2">
+-          {reader === "maintainer" ? (
++          {reader !== "proposer" ? (
+             <form
+               className="flex flex-col gap-2"
+               onSubmit={(event) => {

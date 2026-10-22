@@ -2,15 +2,15 @@
 # kills: change.ruling-bounces, change.transitions
 # why: a ruling's decision bounces a change that is queued and not parked: one that was not waiting for the ruling
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..d27c436b 100644
+index 916513b7..7ce36668 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -766,7 +766,7 @@ export const decideChange = (
+@@ -964,7 +964,7 @@ export const decideChange = (
        }
        if (command.decisionId !== undefined) {
-         // A ruling goes against a change only while the change waits for it.
--        if (!awaitingRuling) return refuse(change, command);
-+        if (!(awaitingRuling || at("queued"))) return refuse(change, command);
+         // A ruling goes against a change only while the change waits for a person.
+-        if (!awaitingPerson) return refuse(change, command);
++        if (!(awaitingPerson || at("queued"))) return refuse(change, command);
          return intoAgentOwned(
            change,
            ChangeBounced.make({

@@ -2,15 +2,20 @@
 # kills: parked.reason
 # why: a change parked because its agent's lease lapsed is shown as waiting on a person's ruling
 diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
-index e553fe14..6058526e 100644
+index cc656316..e6fb7bf1 100644
 --- a/apps/console/src/engine/lists.ts
 +++ b/apps/console/src/engine/lists.ts
-@@ -244,8 +244,6 @@ function listing<Entry, Row, Filter extends string>(
+@@ -252,12 +252,7 @@ function listing<Entry, Row, Filter extends string>(
  export function filtersOfChange(
-   change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
+   change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom" | "proposal">,
  ): readonly ChangeFilter[] {
--  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling")
--    return change.parkedFrom === "bounced" ? FILTERS_OF_CHANGE.bounced : ["open"];
-   return FILTERS_OF_CHANGE[change.state];
- }
- 
+-  const filters =
+-    change.state === "parked" && change.parkedOn !== "awaiting-ruling"
+-      ? change.parkedFrom === "bounced"
+-        ? FILTERS_OF_CHANGE.bounced
+-        : (["open"] as const)
+-      : FILTERS_OF_CHANGE[change.state];
++  const filters = FILTERS_OF_CHANGE[change.state];
+   // An open proposal from a fork is one of the project's proposals too, as a code host lists a fork's pull requests.
+   return change.proposal !== undefined && filters.includes("open")
+     ? [...filters, "proposals"]

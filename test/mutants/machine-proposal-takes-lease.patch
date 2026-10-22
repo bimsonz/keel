@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: machine.proposal-no-lease
+# why: a call under any lease moves a proposal, which no agent holds
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 916513b7..bb29bdd1 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -637,7 +637,7 @@ export const decideChange = (
+     return refuse(change, command);
+ 
+   const leaseId = leaseOf(command);
+-  if (leaseId !== undefined) {
++  if (leaseId !== undefined && change.proposal === undefined) {
+     const lease = checkLease(change, leaseId, now);
+     if (Result.isFailure(lease)) return Result.fail(lease.failure);
+   }

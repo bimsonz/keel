@@ -268,8 +268,11 @@ export function hearLiveChange(
           : { declaredEffects: declared.declaredEffects }),
       };
       putLive(store, changeId, live, { id: declared.changeId, intent, derived: [] });
-      store.put(LIVE_AGENT, changeId, declared.agentId);
-      tx.outbox.subscribe(`agent:${declared.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+      // A proposal no agent holds has nobody to tell of its alternatives.
+      if (declared.agentId !== undefined) {
+        store.put(LIVE_AGENT, changeId, declared.agentId);
+        tx.outbox.subscribe(`agent:${declared.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+      }
       return [];
     }
     case "IntentRevised": {

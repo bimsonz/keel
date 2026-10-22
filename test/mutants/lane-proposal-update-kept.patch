@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.proposal-updated-dropped
+# why: a proposal moved to another commit stays queued in its lane under the approval of the one it left
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index bf0c698d..f96d36f4 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -663,9 +663,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+       }
+       case "ChangeWithdrawn":
+       case "ChangeSuperseded":
+-      case "ChangeBounced":
+-      // A proposal at another commit is checked again and waits for its own approval: it joins at the back.
+-      case "ProposalUpdated": {
++      case "ChangeBounced": {
+         const ended = decodeEnded(event.payload);
+         // One held for a ruling is in no queue, and its kept plan goes with it.
+         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);

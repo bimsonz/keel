@@ -2,12 +2,12 @@
 # kills: issues.fixes
 # why: a change whose goal says Fixes #n lands and its issue stays open
 diff --git a/apps/keel/src/adapters/driving/do/project.ts b/apps/keel/src/adapters/driving/do/project.ts
-index 23ff9ead..dc8b3e02 100644
+index 3aa96bc3..112d5386 100644
 --- a/apps/keel/src/adapters/driving/do/project.ts
 +++ b/apps/keel/src/adapters/driving/do/project.ts
-@@ -212,7 +212,7 @@ export class ProjectDO
-   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
+@@ -217,7 +217,7 @@ export class ProjectDO
      const projectId = projectIdOf(this.ctx.id.name);
+     hearProposal(tx.store, event);
      // Read before the index forgets the change: a landing closes the issues its goal names.
 -    const closing = event.type === "ChangeLanded" ? closedBy(tx, projectId, event) : [];
 +    const closing: ReturnType<typeof closedBy> = [];

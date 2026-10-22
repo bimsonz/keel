@@ -2,12 +2,13 @@
 // trailers come from the request and the deployment's host alone, and each
 // author from its submitted commit, so a recompose gives the same SHAs. Every
 // commit is signed by the deployment's key, or nothing is composed at all.
-import { CommitSha, Instant, makeId } from "@keeltown/core/kernel";
+import { agentActor, CommitSha, Instant, makeId, userActor } from "@keeltown/core/kernel";
 import {
   CandidateComposer,
   type CandidateRequest,
   CodeHost,
   type MemberAgent,
+  type MemberProposer,
   type RepoRef,
 } from "@keeltown/core/ports";
 import {
@@ -99,7 +100,11 @@ const ADA: Signature = { name: "Ada Lovelace", email: "ada@example.com", time: 1
  * repo by a composer holding `signing`: the compose's Exit, how many pushes
  * staging was sent, and the commit an unsigned restack would give.
  */
-async function composedBy(signing: CommitSigningConfig, agent?: MemberAgent) {
+async function composedBy(
+  signing: CommitSigningConfig,
+  agent?: MemberAgent,
+  proposer?: MemberProposer,
+) {
   const code = makeCodeHostMemory();
   const staging: RepoRef = { namespace: "memory", name: "prj-staging" };
   const workspace: RepoRef = { namespace: "memory", name: "prj-ws-1" };
@@ -152,7 +157,7 @@ async function composedBy(signing: CommitSigningConfig, agent?: MemberAgent) {
         ...REQUEST,
         staging,
         base: at.base,
-        members: [{ ...member, repo: workspace, base: at.base, head: at.head, agent }],
+        members: [{ ...member, repo: workspace, base: at.base, head: at.head, agent, proposer }],
       });
       const exit = yield* Effect.exit(compose);
       const unsigned = encodeCommit({
@@ -254,6 +259,56 @@ describe("the GitCore composer's restack", () => {
         tree,
         parents: [base],
         // The date and offset stay the submitted commit's.
+        author: { ...ADA, ...author },
+        committer: KEEL,
+        message: "Retry the webhook on 503",
+        trailers,
+      };
+      const expected = await hashObject(
+        "commit",
+        encodeCommit({ ...spec, gpgsig: await sshSignature(key, encodeCommit(spec)) }),
+      );
+      if (!Exit.isSuccess(exit)) throw new Error(defectOf(exit));
+      expect(exit.value.commitSha).toBe(expected);
+    }
+  });
+
+  it("[compose.proposal-author] a proposal's commit is its proposer's, a person under Keel's people domain or an agent under its agents domain, named in trailers with the fork and commit it was proposed from, and no agent", async () => {
+    const keys = await makeCommitSigningKeys();
+    const key = await importSshSigningKey(keys.signingKey);
+    const PERSON = makeId("usr", "01J9PPPPPPPPPPPPPPPPPPPPPP");
+    const AGENT = makeId("agt", "01J9AAAAAAAAAAAAAAAAAAAAAA");
+    const FORK = makeId("prj", "01J9FFFFFFFFFFFFFFFFFFFFFF");
+    const from = { project: FORK, commit: sha("f") };
+    const proposedFrom = ["Proposed-From", `${FORK}@${sha("f")}`] as const;
+    const cases = [
+      {
+        proposer: { actor: userActor(PERSON), handle: "stranger", from },
+        author: { name: "stranger", email: `${PERSON}@people.keel.test` },
+        trailers: [
+          ["Change-Id", CHANGE],
+          ["Keel-Proposer", `user:${PERSON}`],
+          proposedFrom,
+          ["Declared-Author", "Ada Lovelace <ada@example.com>"],
+        ],
+      },
+      {
+        // An agent with no handle is written by its id.
+        proposer: { actor: agentActor(AGENT), from },
+        author: { name: AGENT, email: `${AGENT}@agents.keel.test` },
+        trailers: [
+          ["Change-Id", CHANGE],
+          ["Keel-Proposer", `agent:${AGENT}`],
+          proposedFrom,
+          ["Declared-Author", "Ada Lovelace <ada@example.com>"],
+        ],
+      },
+    ] as const;
+    for (const { proposer, author, trailers } of cases) {
+      const { base, tree, exit } = await composedBy({ host: HOST, ...keys }, undefined, proposer);
+      const spec = {
+        tree,
+        parents: [base],
         author: { ...ADA, ...author },
         committer: KEEL,
         message: "Retry the webhook on 503",

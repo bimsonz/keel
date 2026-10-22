@@ -2,15 +2,15 @@
 # kills: t35.lane-holds
 # why: the lane keeps a parked change in its queue, so it forms a batch with a change that waits on a person
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 1562ba3..0c84a27 100644
+index bf0c698d..9095049d 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -286,7 +286,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+@@ -630,7 +630,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
        case "ChangeParked": {
-         // Held for a person's ruling: out of the queue, its plan kept for when it resumes.
+         // Held for a person's ruling or approval: out of the queue, its plan kept for when it resumes.
          const parked = decodeParked(event.payload);
--        return parked.reason === "awaiting-ruling" && lane.queue.includes(parked.changeId)
-+        return parked.reason === "never" && lane.queue.includes(parked.changeId)
+-        return (parked.reason === "awaiting-ruling" || parked.reason === "awaiting-approval") &&
++        return (parked.reason === "never" || parked.reason === "awaiting-approval") &&
+           lane.queue.includes(parked.changeId)
            ? { ...lane, queue: lane.queue.filter((id) => id !== parked.changeId) }
            : undefined;
-       }

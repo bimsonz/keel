@@ -34,6 +34,7 @@ import {
   makeWorkspacePoolMemory,
   makeWorkspaceRebaserMemory,
   sampleProjectId,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import {
@@ -100,7 +101,7 @@ const declared = Effect.gen(function* () {
   const { change } = yield* declare(declaring);
   const held = yield* changeWorkspace(changeId);
   yield* (yield* CodeHost).fork(repos.mirror, held.repo);
-  return { lease: change.lease.id, held };
+  return { lease: heldLease(change).id, held };
 });
 
 const rebasing = (leaseId: LeaseId, idempotencyKey = "rebase-1") => ({

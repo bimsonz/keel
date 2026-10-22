@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/trunk-sync.test.ts
+# kills: fork-sync.merge
+# why: a fork holding work of its own is fast-forwarded to its upstream's head, and its work is gone from trunk
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 2497bf76..62f96d99 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -884,7 +884,7 @@ const fetchFork = Effect.fn("integration/fetchFork")(function* (
+     }),
+   );
+   const admitted = bytes - PACK_OVERHEAD_BYTES;
+-  if (yield* writer.descends(from, to, [met.upstream])) return { to, admitted } satisfies Fetched;
++  if (true) return { to, admitted } satisfies Fetched;
+   const merge = yield* writer
+     .mergeUpstream({
+       ours: from,

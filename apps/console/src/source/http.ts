@@ -59,6 +59,12 @@ import type {
   CloseIssueInput,
   ReopenIssueInput,
   ProjectIssue,
+  Change,
+  ProposeInput,
+  ProposalsInput,
+  ApproveProposalInput,
+  RequestProposalChangesInput,
+  CloseProposalInput,
   DecisionView,
   Memory_getDecisionInput,
   Memory_listDecisionsInput,
@@ -106,6 +112,7 @@ import {
   type KeelOrgAgents,
   type KeelRemembered,
   type KeelIssued,
+  type KeelProposed,
   type KeelSponsorship,
   type KeelEventSource,
   KeelRefused,
@@ -156,6 +163,7 @@ export type HttpSource = KeelEventSource &
   KeelInvited &
   KeelRemembered &
   KeelIssued &
+  KeelProposed &
   KeelTargeted &
   KeelAgents;
 
@@ -529,6 +537,26 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
 }
 
 /** One project's log, repository and questions, read from Keel as whoever is signed in. */
+/**
+ * One Idempotency-Key per proposal a page asks for: the same commit and goal
+ * asked again (after a busy pool, say) is the same request and reaches the
+ * reservation its first attempt made; another commit or goal is another.
+ */
+export function proposalKeys(): (proposal: {
+  readonly commit: string;
+  readonly goal: string;
+}) => string {
+  const keys = new Map<string, string>();
+  return ({ commit, goal }) => {
+    const body = `${commit}\n${goal}`;
+    const known = keys.get(body);
+    if (known !== undefined) return known;
+    const made = `console:propose:${crypto.randomUUID()}`;
+    keys.set(body, made);
+    return made;
+  };
+}
+
 export function createHttpSource(project: ProjectView, options: HttpOptions = {}): HttpSource {
   const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
@@ -873,6 +901,102 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         );
         if (!response.ok) throw await refusalOf(response);
         return answered<ProjectIssue>(response);
+      },
+    },
+    // The project's proposals from forks, and its own to the project it was forked from: Keel's operations at the
+    // project's and each change's own address. Each move carries a key made for the one attempt.
+    proposals: {
+      async listProposals(asked, signal) {
+        const input: ProposalsInput = { projectId: project.id, ...asked };
+        const { projectId, ...query } = input;
+        const response = await read(
+          `/v1/projects/${encodeURIComponent(projectId)}/proposals${queryOf({ ...query })}`,
+          signal,
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ChangeSummaryPage>(response);
+      },
+      async approve(changeId, commit) {
+        const input: ApproveProposalInput = {
+          changeId,
+          commit,
+          "idempotency-key": `console:approve:${crypto.randomUUID()}`,
+        };
+        const response = await request(
+          `${origin}/v1/changes/${encodeURIComponent(input.changeId)}/proposal/approval`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": input["idempotency-key"],
+            },
+            body: JSON.stringify({ commit: input.commit }),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<Change>(response);
+      },
+      async requestChanges(changeId, commit, comment) {
+        const input: RequestProposalChangesInput = {
+          changeId,
+          commit,
+          comment,
+          "idempotency-key": `console:request-changes:${crypto.randomUUID()}`,
+        };
+        const response = await request(
+          `${origin}/v1/changes/${encodeURIComponent(input.changeId)}/proposal/changes-requested`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": input["idempotency-key"],
+            },
+            body: JSON.stringify({ commit: input.commit, comment: input.comment }),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<Change>(response);
+      },
+      async close(changeId) {
+        const input: CloseProposalInput = {
+          changeId,
+          "idempotency-key": `console:close-proposal:${crypto.randomUUID()}`,
+        };
+        const response = await request(
+          `${origin}/v1/changes/${encodeURIComponent(input.changeId)}/proposal/close`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": input["idempotency-key"],
+            },
+            body: JSON.stringify({}),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<Change>(response);
+      },
+      async propose(upstream, proposal, idempotencyKey) {
+        const {
+          projectId,
+          "idempotency-key": key,
+          ...body
+        }: ProposeInput = {
+          projectId: upstream,
+          "idempotency-key": idempotencyKey,
+          fork: project.id,
+          ...proposal,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/proposals`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json", "idempotency-key": key },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<Change>(response);
       },
     },
     // The agents invited to this one project: Keel's own three operations at the project's own address. Each

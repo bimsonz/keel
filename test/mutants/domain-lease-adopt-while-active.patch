@@ -2,12 +2,12 @@
 # kills: lease.adopt-iff-lapsed
 # why: A change is adopted from under an agent whose lease is alive
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..ed97d261 100644
+index 916513b7..8f6dab2c 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -840,7 +840,7 @@ export const decideChange = (
- 
-     case "Adopt":
+@@ -1042,7 +1042,7 @@ export const decideChange = (
+       // No agent holds a proposal, so none takes it over: its proposer moves it.
+       if (change.lease === undefined) return refuse(change, command);
        if (
 -        !isLapsed(change, now) ||
 +        change.lease.state === "released" ||

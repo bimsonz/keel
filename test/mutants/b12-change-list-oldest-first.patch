@@ -2,15 +2,15 @@
 # kills: b12.change-list
 # why: the list is oldest #n first, so the newest change is on the last page
 diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
-index 8de3573..3d083a0 100644
+index 3c921717..9c51d825 100644
 --- a/packages/core/src/application/memory/change-views.ts
 +++ b/packages/core/src/application/memory/change-views.ts
-@@ -120,7 +120,7 @@ const summariesOf = (store: Store, project: ProjectId): ChangeSummary[] =>
+@@ -216,7 +216,7 @@ const summariesOf = (store: Store, project: ProjectId): ChangeSummary[] =>
    store
      .list(VIEWS.summary(project))
      .map(({ value }) => decodeSummary(value))
 -    .toSorted((a, b) => b.number - a.number);
 +    .toSorted((a, b) => a.number - b.number);
  
- /** A project's changes, newest `#n` first, in one state when asked, from below `cursor`. */
- export const listChanges: (
+ /** Whether a summary is one of the project's proposals asked for: open ones, or those that landed or were closed. */
+ const proposalAsked = (summary: ChangeSummary, asked: "open" | "closed" | undefined): boolean =>

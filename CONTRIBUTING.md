@@ -44,7 +44,7 @@ A change to Keel lands through Keel, never through a pull request: trunk takes n
 Declaring a change on keel/keel takes a place in the `keel` org: its members, and the agents they invite, land changes here. If you are not a member, you can still help:
 
 - **Report a bug or ask for something** in an issue at [keel.town/keel/keel/issues](https://keel.town/keel/keel/issues): any signed-in person may open one, and so may an agent a person sponsors, by the `openIssue` tool or `POST /v1/projects/{projectId}/issues`. A change whose goal says "Fixes #n" closes issue #n when it lands.
-- **Propose a change from a fork** of keel/keel, once that is built: a maintainer approves each proposal before Keel verifies and lands it. Until then, describe the change in an issue.
+- **Propose a change from a fork** of keel/keel: fork it on keel.town, land your change in the fork as its member does below, then propose the commit it landed as, by **Propose** on the fork's code, the `propose` tool or `POST /v1/projects/{projectId}/proposals`. A maintainer approves the commit before Keel verifies anything of it; once approved, it is verified and lands as any change does. **Sync fork** on the fork's code keeps it up with keel/keel. [docs/quickstart.md](docs/quickstart.md#7-propose-a-change-from-a-fork) walks through it.
 - **Report a vulnerability** privately, as [SECURITY.md](SECURITY.md) says, never in an issue.
 
 The steps below are a member's.

@@ -12,7 +12,7 @@ import { agentName } from "./audience.ts";
 import { type BatchState, type CanvasStep, batchState, stepsOf, whyOf } from "./canvas.ts";
 import { type FlowBatch, type FlowChange, type Stage, waitsOnItsAgent } from "./flow.ts";
 import type { Cards } from "./holder.ts";
-import type { World } from "./world.ts";
+import { authorAgentOf, type World } from "./world.ts";
 
 /** How long a landed branch takes to dissolve. */
 export const DISSOLVE_MS = 30_000;
@@ -428,14 +428,16 @@ export function growthOf(
         fork.standing === "moving" && (change.stage === "declared" || change.stage === "precheck"),
       fade,
     });
-    if (entry !== undefined) {
+    // A proposal no agent made has nobody to draw beside it.
+    const author = entry === undefined ? undefined : authorAgentOf(entry);
+    if (entry !== undefined && author !== undefined) {
       const agentCentre = agentBeside(centre);
-      const called = agentName(world.agents.get(entry.agentId), cards.get(entry.agentId));
+      const called = agentName(world.agents.get(author), cards.get(author));
       const agent: AgentNode = {
-        ...box(`agent:${change.id}:${entry.agentId}`, SIZE.agent, agentCentre),
+        ...box(`agent:${change.id}:${author}`, SIZE.agent, agentCentre),
         fade,
         kind: "agent",
-        agentId: entry.agentId,
+        agentId: author,
         name: called ?? "Agent",
         ...(entry.run === undefined ? {} : { run: entry.run.label ?? entry.run.id }),
       };

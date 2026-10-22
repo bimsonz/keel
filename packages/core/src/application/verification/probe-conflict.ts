@@ -56,7 +56,8 @@ export type PartySubmission =
   | { readonly _tag: "Gone"; readonly state: ChangeState };
 
 /** The fields of a Change a party's world is read from: `landedCommit` is its commit on trunk, once it landed. */
-export type PartyChange = Pick<Change, "state" | "commitSha" | "baseSha" | "landedCommit">;
+export type PartyChange = Pick<Change, "state" | "commitSha" | "baseSha" | "landedCommit"> &
+  Partial<Pick<Change, "proposal">>;
 
 /**
  * A party's current submission, read from its Change: `commitSha` is the
@@ -64,7 +65,8 @@ export type PartyChange = Pick<Change, "state" | "commitSha" | "baseSha" | "land
  * in a state only a rebase leaves (which moves its base before it submits
  * again), the Probe waits for its next ChangeSubmitted; a change with no
  * `baseSha` (only one submitted before submissions carried it) waits too,
- * and the wait's deadline ends it. A workspace branch's moving head is never
+ * and so does a proposal until its commit is approved; the wait's deadline
+ * ends it. A workspace branch's moving head is never
  * read: a probe's evidence cites a fixed commit.
  *
  * The one rule for both sides of the wait: the Change DO's `awaitSubmission`
@@ -81,6 +83,10 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
   if (change.commitSha === undefined || change.baseSha === undefined)
     return { _tag: "Unsubmitted" };
   if (UNSUBMITTED.has(change.state)) return { _tag: "Unsubmitted" };
+  // A proposal is no world until a maintainer approves the commit it carries: before that Keel drafts,
+  // builds and runs nothing of it, and the Probe waits for the approval as for a submission.
+  if (change.proposal !== undefined && change.proposal.approved !== change.commitSha)
+    return { _tag: "Unsubmitted" };
   return { _tag: "Submitted", head: change.commitSha, base: change.baseSha };
 };
 

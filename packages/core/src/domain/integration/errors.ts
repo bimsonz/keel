@@ -47,9 +47,21 @@ export class TrunkNotInitialized extends Schema.TaggedError<TrunkNotInitialized>
   { projectId: ProjectId },
 ) {}
 
-/** Trunk did not start from an import, so it has no upstream to sync from. */
+/** Trunk did not start from an import or a fork, so it has no upstream to sync from. */
 export class NotImported extends Schema.TaggedError<NotImported>()("NotImported", {
   projectId: ProjectId,
+}) {}
+
+/**
+ * A fork's work and its upstream's both changed a path in ways Keel will not
+ * merge: `path` is the first it stopped at, and `reason` why. Nothing moved;
+ * a change in the fork that takes the upstream's version of the path lets the
+ * next sync through.
+ */
+export class SyncConflicts extends Schema.TaggedError<SyncConflicts>()("SyncConflicts", {
+  projectId: ProjectId,
+  path: Schema.String,
+  reason: Schema.String,
 }) {}
 
 /**

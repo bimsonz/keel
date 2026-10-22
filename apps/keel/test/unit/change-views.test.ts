@@ -42,6 +42,33 @@ const read = (memory: ReturnType<typeof makeProjectViewsMemory>, request: Change
   );
 
 describe("the Projector's change list", () => {
+  it("[views.proposals] a proposal's summary says where it came from and who proposed it, and a project's proposals list holds its open ones or its closed ones, never its other changes", () => {
+    const memory = makeProjectViewsMemory();
+    const events = projectEvents();
+    const fork = nextId("prj");
+    const proposer = `user:${nextId("usr")}`;
+    const commit = "c".repeat(40);
+    const [open, closed, plain] = [nextId("chg"), nextId("chg"), nextId("chg")];
+    for (const event of [
+      ...events.proposed(open, fork, commit, proposer),
+      ...events.proposed(closed, fork, commit, proposer),
+      events.withdrawn(closed),
+      events.declared(plain, nextId("agt"), "a goal"),
+    ])
+      Effect.runSync(memory.arrive(event));
+    const opened = read(memory, { project: events.project, proposals: "open" });
+    expect(opened.items.map((item) => item.changeId)).toEqual([open]);
+    expect(opened.items[0]).toMatchObject({
+      origin: "proposal",
+      proposal: { fork, commit, proposer },
+    });
+    expect(opened.items[0]?.agentId).toBeUndefined();
+    expect(
+      read(memory, { project: events.project, proposals: "closed" }).items.map((i) => i.changeId),
+    ).toEqual([closed]);
+    expect(read(memory, { project: events.project }).items).toHaveLength(3);
+  });
+
   it("[b12.change-list] walking the pages yields the project's changes in the asked state, newest #n first, each once", () => {
     fc.assert(
       fc.property(

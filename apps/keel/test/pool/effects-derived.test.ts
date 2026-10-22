@@ -18,7 +18,7 @@ import {
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { ChangePrecheck, EventOutbox, type PrecheckDerived } from "@keeltown/core/ports";
-import { CodeHostFixture } from "@keeltown/testing";
+import { CodeHostFixture, heldLease } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
@@ -134,8 +134,9 @@ const pushAgain = async (c: ChangeUnderTest) => {
 
 /** Declares `c` naming billing only, submits it, and starts its Precheck pass by hand as `instanceId`. */
 const deriving = async (c: ChangeUnderTest, instanceId: string) => {
-  const lease = ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change
-    .lease.id;
+  const lease = heldLease(
+    ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change,
+  ).id;
   await submit(c, lease, "submit-1");
   expect(outcomeOf(await precheck((p) => p.started(c.changeId, { revision: 1, instanceId })))).toBe(
     "ok",
@@ -348,8 +349,9 @@ describe("[b21.effects-derived] Precheck records what it derived, once a pass", 
     await using held = await inertPrecheck();
     const { change } = await project();
     const c = await change();
-    const lease = ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change
-      .lease.id;
+    const lease = heldLease(
+      ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change,
+    ).id;
     await submit(c, lease, "submit-1");
     const effects = [derivedAtLeaf("per-session")];
 
@@ -377,8 +379,9 @@ describe("[b21.effects-derived] Precheck records what it derived, once a pass", 
     await using held = await inertPrecheck();
     const { change } = await project();
     const c = await change();
-    const lease = ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change
-      .lease.id;
+    const lease = heldLease(
+      ok(await c.declare(`declare-${c.changeId}`, { declaredEffects: [billed] })).change,
+    ).id;
     await submit(c, lease, "submit-1");
     const workspace = await precheck((p) => p.workspace(c.changeId));
     expect(workspace).toMatchObject({

@@ -105,10 +105,46 @@ export interface SubjectEntry {
   decisionIds: string[];
 }
 
+/**
+ * Where a proposal comes from and where it stands, as its own events tell it: the fork, the commit it carries,
+ * who proposed it, the commit a maintainer approved while that stands, and the last request for changes.
+ */
+export interface ProposalEntry {
+  fork: string;
+  commit: string;
+  /** `user:<id>` or `agent:<id>`. */
+  proposer: string;
+  approved?: string;
+  requested?: { by: string; comment: string; commit: string; at: string };
+}
+
+/**
+ * The agent a change is shown as made by: the one holding it, or for a proposal the agent that proposed it.
+ * None for a person's proposal, which no agent made.
+ */
+export const authorAgentOf = (
+  change: Pick<ChangeEntry, "agentId" | "proposal">,
+): string | undefined =>
+  change.agentId ??
+  (change.proposal?.proposer.startsWith("agent:") === true
+    ? change.proposal.proposer.slice("agent:".length)
+    : undefined);
+
+/** The enrolled agent a change is shown as made by, where the log enrolled one. */
+export const authorEntryOf = (world: World, change: Pick<ChangeEntry, "agentId" | "proposal">) => {
+  const agentId = authorAgentOf(change);
+  return agentId === undefined ? undefined : world.agents.get(agentId);
+};
+
 export interface ChangeEntry {
   id: string;
   label: string;
-  agentId: string;
+  /** The agent holding it. None on a proposal, which no agent holds: its proposer moves it. */
+  agentId?: string;
+  /** On a proposal from a fork alone. */
+  proposal?: ProposalEntry;
+  /** The paths its plan holds for a person's ruling, as Precheck named them. */
+  ruledPaths?: string[];
   goal: string;
   state: ChangeState;
   revision: number;
@@ -662,7 +698,7 @@ export class World {
           id: event.payload.changeId,
           // Keel numbers a project's changes as it records them: #1, #2, … Without one, part of the id.
           label: event.label ?? short(event.payload.changeId),
-          agentId: event.payload.agentId,
+          ...(event.payload.agentId === undefined ? {} : { agentId: event.payload.agentId }),
           goal: event.payload.goal,
           state: "declared",
           revision: 1,
@@ -685,7 +721,55 @@ export class World {
           precedents: [],
           ...(event.payload.run === undefined ? {} : { run: event.payload.run }),
         });
-        this.#holds(event.payload.agentId, event.payload.run, event.at);
+        // A proposal is no agent's: its proposer moves it, and nobody holds it.
+        if (event.payload.agentId !== undefined)
+          this.#holds(event.payload.agentId, event.payload.run, event.at);
+        break;
+      }
+      case "ChangeProposed": {
+        const change = this.#change(event.payload.changeId);
+        if (change !== undefined)
+          change.proposal = {
+            fork: event.payload.fork,
+            commit: event.payload.commit,
+            proposer: event.payload.proposer,
+          };
+        break;
+      }
+      case "ProposalUpdated": {
+        // Another commit of the fork: checked again, and waiting for its own approval.
+        const change = this.#change(event.payload.changeId, "working");
+        if (change?.proposal !== undefined) {
+          const { approved: _approved, ...proposal } = change.proposal;
+          change.proposal = { ...proposal, commit: event.payload.commit };
+        }
+        if (change !== undefined) {
+          delete change.parkedOn;
+          delete change.parkedFrom;
+          delete change.laneId;
+          delete change.batchId;
+        }
+        break;
+      }
+      case "ProposalApproved": {
+        const change = this.#change(event.payload.changeId);
+        if (change === undefined) break;
+        // Back to where it waited for the approval, as Keel's change machine moves it.
+        change.state = change.parkedFrom ?? "queued";
+        delete change.parkedOn;
+        delete change.parkedFrom;
+        if (change.proposal !== undefined) change.proposal.approved = event.payload.commit;
+        break;
+      }
+      case "ProposalChangesRequested": {
+        const change = this.#change(event.payload.changeId);
+        if (change?.proposal !== undefined)
+          change.proposal.requested = {
+            by: event.payload.by,
+            comment: event.payload.comment,
+            commit: event.payload.commit,
+            at: event.at,
+          };
         break;
       }
       case "PreflightIssued": {
@@ -813,6 +897,8 @@ export class World {
             stepCount: event.payload.steps,
             costEstimate: event.payload.costEstimate,
           };
+          if (event.payload.ruledPaths === undefined) delete change.ruledPaths;
+          else change.ruledPaths = [...event.payload.ruledPaths];
           this.planned.plans += 1;
           this.planned.usd += event.payload.costEstimate;
         }

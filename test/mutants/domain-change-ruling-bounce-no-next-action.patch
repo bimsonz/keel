@@ -2,15 +2,15 @@
 # kills: change.ruling-bounces
 # why: a bounce by a ruling with no actions given carries none, so the agent ruled against is told nothing to do
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2549e49a..f901f137 100644
+index 916513b7..bc88daee 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -736,7 +736,7 @@ export const decideChange = (
+@@ -972,7 +972,7 @@ export const decideChange = (
              decisionId: command.decisionId,
              reasons: command.reasons,
-             nextActions:
+             nextActions: forProposal(
 -              command.nextActions.length > 0 ? command.nextActions : ruledAgainstActions(id),
 +              command.nextActions,
+             ),
            }),
          );
-       }

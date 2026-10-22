@@ -2,15 +2,15 @@
 # kills: carded.changes
 # why: the list of changes names an agent from the log's enrolment alone, so a visitor and an agent that signed itself up are shown an agent with no name
 diff --git a/apps/console/src/engine/lists.ts b/apps/console/src/engine/lists.ts
-index 3d9c6991..e9385075 100644
+index cc656316..fc35b4ff 100644
 --- a/apps/console/src/engine/lists.ts
 +++ b/apps/console/src/engine/lists.ts
-@@ -258,7 +258,7 @@ export function changesOf(
-         goal: change.goal,
+@@ -313,7 +313,7 @@ export function changesOf(
          state: change.state,
          // An agent the reader has no name for is one all the same.
--        agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
-+        agent: agentName(by) ?? "an agent",
+         agent:
+-          agentName(by, author === undefined ? undefined : cards.get(author)) ??
++          agentName(by) ??
+           (author === undefined && change.proposal !== undefined ? "a person" : "an agent"),
          agentClass: by?.class ?? "unnamed",
          held: heldUnder(cards, change),
-         ...(subject === undefined ? {} : { subject }),

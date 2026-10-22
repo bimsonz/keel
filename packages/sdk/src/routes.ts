@@ -204,6 +204,36 @@ export const ROUTES = {
     path: "/projects/{projectId}/issues/{number}/reopen",
     headers: ["idempotency-key"],
   },
+  propose: {
+    method: "POST",
+    path: "/projects/{projectId}/proposals",
+    headers: ["idempotency-key"],
+  },
+  proposals: {
+    method: "GET",
+    path: "/projects/{projectId}/proposals",
+    query: ["state", "cursor", "limit"],
+  },
+  updateProposal: {
+    method: "POST",
+    path: "/changes/{changeId}/proposal/commits",
+    headers: ["idempotency-key"],
+  },
+  approveProposal: {
+    method: "POST",
+    path: "/changes/{changeId}/proposal/approval",
+    headers: ["idempotency-key"],
+  },
+  requestProposalChanges: {
+    method: "POST",
+    path: "/changes/{changeId}/proposal/changes-requested",
+    headers: ["idempotency-key"],
+  },
+  closeProposal: {
+    method: "POST",
+    path: "/changes/{changeId}/proposal/close",
+    headers: ["idempotency-key"],
+  },
   Lattices_listLattices: { method: "GET", path: "/lattices" },
   Inbox_getSnapshot: { method: "GET", path: "/events/snapshot", query: ["project"] },
   Views_getVerdict: { method: "GET", path: "/verdicts/{verdictId}" },

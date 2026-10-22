@@ -2,10 +2,10 @@
 # kills: composer.agent-author
 # why: An agent's author address is under Keel's host itself, where a person's address could one day be
 diff --git a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
-index 7532946..83f068b 100644
+index 0a9d1707..2d8921df 100644
 --- a/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/commit-signing.ts
-@@ -51,7 +51,7 @@ export const agentAuthor = (
+@@ -52,7 +52,7 @@ export const agentAuthor = (
    host: string,
  ): { readonly name: string; readonly email: string } => ({
    name: agent.handle ?? agent.id,
@@ -13,4 +13,4 @@ index 7532946..83f068b 100644
 +  email: `${agent.id}@${host}`,
  });
  
- /** Keel as the committer of what it composes at `at` (milliseconds). */
+ /**

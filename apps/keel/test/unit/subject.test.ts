@@ -22,6 +22,7 @@ import {
   makeWorkspacePoolMemory,
   sampleProjectId,
   ulidOf,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
@@ -124,9 +125,9 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         expect(unrelated.filter((subscriber) => subscriber.startsWith("subj:"))).toEqual([]);
 
         yield* revise(A, {
-          agentId: declared.change.agentId,
+          agentId: heldLease(declared.change).agentId,
           projectId: sampleProjectId,
-          leaseId: declared.change.lease.id,
+          leaseId: heldLease(declared.change).id,
           ifMatchRevision: 1,
           premisesAdded: [],
           premisesRetracted: [],
@@ -134,9 +135,9 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
           idempotencyKey: "revise-a",
         });
         yield* rely(A, {
-          agentId: declared.change.agentId,
+          agentId: heldLease(declared.change).agentId,
           projectId: sampleProjectId,
-          leaseId: declared.change.lease.id,
+          leaseId: heldLease(declared.change).id,
           premise: proposition({
             subject: "billing.invoices.totals",
             predicate: "invariant",
@@ -240,9 +241,9 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         // A adds a second premise at the leaf and retracts the first: only the new one is relied.
         const before = (yield* logOf(A).pipe(Effect.provide(a))).length;
         yield* revise(A, {
-          agentId: declaredA.change.agentId,
+          agentId: heldLease(declaredA.change).agentId,
           projectId: sampleProjectId,
-          leaseId: declaredA.change.lease.id,
+          leaseId: heldLease(declaredA.change).id,
           ifMatchRevision: 1,
           premisesAdded: [fastChecks],
           premisesRetracted: [freshPerRequest],
@@ -269,9 +270,9 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
         // A revision that leaves the premise held relies nothing again.
         const held = (yield* logOf(A).pipe(Effect.provide(a))).length;
         yield* revise(A, {
-          agentId: declaredA.change.agentId,
+          agentId: heldLease(declaredA.change).agentId,
           projectId: sampleProjectId,
-          leaseId: declaredA.change.lease.id,
+          leaseId: heldLease(declaredA.change).id,
           ifMatchRevision: 2,
           goal: "owners can revoke collaborators at once",
           premisesAdded: [],

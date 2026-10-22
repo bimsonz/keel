@@ -45,7 +45,19 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
     world.changes.set(change.changeId, {
       id: change.changeId,
       label: `#${change.number}`,
-      agentId: change.agentId,
+      ...(change.agentId === undefined ? {} : { agentId: change.agentId }),
+      ...(change.proposal === undefined
+        ? {}
+        : {
+            proposal: {
+              fork: change.proposal.fork,
+              commit: change.proposal.commit,
+              proposer: change.proposal.proposer,
+              ...(change.proposal.approved === undefined
+                ? {}
+                : { approved: change.proposal.approved }),
+            },
+          }),
       goal: change.goal,
       state: change.state,
       revision: change.revision,

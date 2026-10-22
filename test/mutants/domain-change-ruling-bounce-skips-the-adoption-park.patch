@@ -2,22 +2,22 @@
 # kills: change.ruling-bounces
 # why: a ruling's bounce hands the change back under a lapsed lease without parking it, so it sits bounced with no agent holding it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..ed946ded 100644
+index 916513b7..e58f0e3c 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -767,8 +767,7 @@ export const decideChange = (
+@@ -965,8 +965,7 @@ export const decideChange = (
        if (command.decisionId !== undefined) {
-         // A ruling goes against a change only while the change waits for it.
-         if (!awaitingRuling) return refuse(change, command);
+         // A ruling goes against a change only while the change waits for a person.
+         if (!awaitingPerson) return refuse(change, command);
 -        return intoAgentOwned(
 -          change,
 +        return Result.succeed([
            ChangeBounced.make({
              changeId: id,
              decisionId: command.decisionId,
-@@ -776,7 +775,7 @@ export const decideChange = (
-             nextActions:
+@@ -975,7 +974,7 @@ export const decideChange = (
                command.nextActions.length > 0 ? command.nextActions : ruledAgainstActions(id),
+             ),
            }),
 -        );
 +        ]);

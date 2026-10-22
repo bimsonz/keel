@@ -22,6 +22,7 @@ import {
   type LeaseNotLapsed,
   type LeaseStale,
   type Intent,
+  NotAProposal,
   type IntentRevision,
   type PoolExhausted,
   type PredicatePolicies,
@@ -37,7 +38,7 @@ import {
   isAgentOwned,
   lapsesAt,
 } from "../../domain/coordination/index.ts";
-import { IdempotencyConflict } from "../../domain/identity/index.ts";
+import { IdempotencyConflict, type QuotaExceeded } from "../../domain/identity/index.ts";
 import {
   DecisionRecorded,
   PrecedentDistinguished,
@@ -55,6 +56,7 @@ import {
 } from "../../domain/integration/index.ts";
 import {
   type CommandActor,
+  actorParts,
   type AgentId,
   byAgent,
   type DecisionId,
@@ -66,10 +68,13 @@ import {
   contentHashOf,
   Counterpart,
   type EntityRef,
+  EscalationId,
   type EventEnvelope,
+  Glob,
   type Instant,
   type Json,
   type LeaseId,
+  type NamespaceId,
   NextAction,
   ProjectId,
   sha256HexOfBytes,
@@ -95,10 +100,14 @@ import {
   type EventDraft,
   EventOutbox,
   EVERY_TYPE,
+  HumanGate,
   Ids,
   type IndexedDecision,
   LiveChanges,
   type LiveNear,
+  NamespaceUsage,
+  type RepoRef,
+  type TreeChange,
   type Remedy,
   type Stored,
   type Subscriber,
@@ -107,6 +116,7 @@ import {
   type Transition,
   KEEL_TRUNK_REF,
   type PackTooLarge,
+  ProjectNamespaces,
   Trunks,
   WorkspacePool,
   type WorkspaceGrant,
@@ -184,10 +194,13 @@ export type HeldWorkspace = typeof HeldWorkspace.Type;
 /**
  * What Precheck and the Lane read of a change's workspace: Precheck diffs
  * `repo` against `baseSha` (the change's base), stops an ancestry walk at
- * `grantedSha`, and reads `projectId`'s settings.
+ * `grantedSha`, reads the change's flow at `flowAt`, and reads `projectId`'s
+ * settings.
  */
 export interface WorkspaceView extends HeldWorkspace {
   readonly baseSha: CommitSha;
+  /** The base, or for a proposal `grantedSha`: the upstream's head, never a commit of the fork's. */
+  readonly flowAt: CommitSha;
   /** The subject of each premise and declared effect of the current intent, each once and without ancestors. */
   readonly subjects: readonly SubjectKey[];
   /** The change's current intent: Precheck derives its effects against what it declared. */
@@ -256,8 +269,9 @@ export function subjectKeysOf(
 }
 /**
  * What the change's lane hears from it: each queueing, each requeue (the lane
- * re-enqueues only then, never by itself), and a bounce or an end that drops
- * it from the queue.
+ * re-enqueues only then, never by itself), a park and a resume, a proposal's
+ * approval (a resume) and its move to another commit, and a bounce or an end
+ * that drops it from the queue.
  */
 export const LANE_HEARS = [
   "ChangeQueued",
@@ -267,11 +281,50 @@ export const LANE_HEARS = [
   "ChangeResumed",
   "ChangeWithdrawn",
   "ChangeSuperseded",
+  "ProposalApproved",
+  "ProposalUpdated",
 ] as const;
 /** Where the Change DO keeps the verdicts it heard on its batch, by verdict id, until BatchFailed names one. */
 export const CHANGE_BATCH_VERDICT = "change-batch-verdict";
 /** Where the Change DO marks each shrink ruling it parked on, by escalation id: only those resume or bounce it. */
 const CHANGE_SHRINK_RULING = "change-shrink-ruling";
+/**
+ * Where it keeps the question on how Keel verifies a proposal, by escalation
+ * id, asked of the Precheck run whose plan held the gate: the proposal waits
+ * for its approval first, and a ruling heard meanwhile is kept here (`heard`)
+ * until the approval asks whether it still has to wait for one.
+ */
+const CHANGE_FLOW_ASKED = "change-flow-asked";
+const FlowAsked = Schema.Struct({ heard: Schema.optional(Schema.String) });
+const decodeFlowAsked = Schema.decodeUnknownSync(FlowAsked);
+/** What a question taken back is recorded as having heard: nothing is left to rule on. */
+const FLOW_WITHDRAWN = "withdrawn";
+
+/**
+ * Takes back each question on how Keel verifies the proposal that nobody has
+ * ruled on, in its project's namespace: it moved to another commit, or it
+ * closed, so nothing is left to rule on. Each is recorded as withdrawn, so it
+ * is taken back once.
+ */
+const withdrawFlowQuestions = (changeId: ChangeId, projectId: ProjectId, reason: string) =>
+  Effect.gen(function* () {
+    const store = yield* EntityStore;
+    const open = store
+      .list(CHANGE_FLOW_ASKED)
+      .filter(({ value }) => decodeFlowAsked(value).heard === undefined);
+    if (open.length === 0) return;
+    const place = yield* (yield* ProjectNamespaces).byId(projectId);
+    if (Option.isNone(place)) return;
+    const gate = yield* HumanGate;
+    for (const { id } of open) {
+      yield* gate.withdraw({
+        namespace: place.value.namespace,
+        escalationId: Schema.decodeUnknownSync(EscalationId)(id),
+        reason: `${changeId} ${reason}`,
+      });
+      store.put(CHANGE_FLOW_ASKED, id, { heard: FLOW_WITHDRAWN });
+    }
+  });
 
 export interface DeclareChange {
   /** The id the agent's AgentSession reserved for `idempotencyKey`. */
@@ -482,6 +535,8 @@ export interface CompiledPlan extends PrecheckStep {
   readonly predicatePolicy?: PredicatePolicies | undefined;
   /** The plan holds the human-class gate: the change parks for a maintainer's ruling asked of this Precheck run as it is queued. */
   readonly needsRuling?: true | undefined;
+  /** The paths the gate is for, as Precheck found them: carried onto PlanCompiled. */
+  readonly ruledPaths?: readonly string[] | undefined;
 }
 
 /** What Precheck derived from the submission's code: the effects, and its own reference for the derivation. */
@@ -547,9 +602,11 @@ const holdingRefusal = (
   const change = storedChange(store, changeId);
   if (change === undefined || heldWorkspace(store, changeId)?.projectId !== caller.projectId)
     return notFound(changeId);
-  if (change.agentId === caller.agentId) return undefined;
+  // A proposal no agent holds: the lease the call carries is no lease of it, which the machine says.
+  if (change.agentId === caller.agentId || change.agentId === undefined) return undefined;
   // While Keel holds the change its lease cannot lapse, so there is no time to give.
-  const lapses = isAgentOwned(change.state) ? lapsesAt(change.lease) : undefined;
+  const lapses =
+    isAgentOwned(change.state) && change.lease !== undefined ? lapsesAt(change.lease) : undefined;
   return new ChangeHeldByOther({
     changeId,
     holder: change.agentId,
@@ -847,9 +904,10 @@ export const changeRead: (
   },
 );
 
-/** What a waiter on a change's submission hears, once: its next submission, or its end before one. */
+/** What a waiter on a change's submission hears, once: its next submission, a proposal's approval, or its end before one. */
 export const AWAIT_SUBMISSION_HEARS = [
   "ChangeSubmitted",
+  "ProposalApproved",
   "ChangeWithdrawn",
   "ChangeSuperseded",
 ] as const;
@@ -906,7 +964,7 @@ const awaitChange = (
  * The change with its project when `submissionStateOf` reads anything but
  * Unsubmitted from it: a current submission, its landing, or its end.
  * Otherwise `waiting`, with `subscriber` told once of its next
- * ChangeSubmitted, ChangeWithdrawn or ChangeSuperseded. The Probe reads the
+ * ChangeSubmitted, ProposalApproved, ChangeWithdrawn or ChangeSuperseded. The Probe reads the
  * answer with the same rule, so it never waits unsubscribed.
  */
 export const awaitSubmission: (
@@ -1000,6 +1058,7 @@ export const changeWorkspace: (
   return {
     ...held,
     baseSha: change.baseSha,
+    flowAt: change.proposal === undefined ? change.baseSha : held.grantedSha,
     subjects: intentSubjects(change.intent),
     intent: change.intent,
   };
@@ -1118,6 +1177,417 @@ export const declare: (
     return yield* refused(change, "Declare");
   return { change, preflight: issuedPreflight(committed.events), grant };
 });
+
+/** What a proposal's copied commits count against: its fork's namespace's repo bytes. */
+const REPO_BYTES = "repo-bytes";
+
+/** The paths a proposal is declared to touch, at most this many: preflight finds its neighbours through them. */
+const PROPOSAL_FOOTPRINT_MAX = 300;
+
+/**
+ * The events its project's object hears of a proposal: what its live-change
+ * index hears of any change, and the proposal itself, which its ledger counts
+ * among its proposer's open proposals.
+ */
+export const PROPOSAL_INDEX_HEARS = [...LIVE_INDEX_HEARS, "ChangeProposed"] as const;
+
+/**
+ * A proposal of a fork's commit, as its Change DO is asked to make it by the
+ * doorway, which found the fork to be this project's and the base where it
+ * last met it.
+ */
+export interface ProposeChange {
+  /** The id the project's ledger reserved for the proposer's Idempotency-Key. */
+  readonly changeId: ChangeId;
+  /** The project proposed to. */
+  readonly projectId: ProjectId;
+  /** The fork the commit comes from, and its trunk's repo, which Keel copies from. */
+  readonly fork: { readonly projectId: ProjectId; readonly trunk: RepoRef };
+  readonly proposer: CommandActor;
+  readonly commit: CommitSha;
+  /** Where the fork last met this project: one of its commits, the proposal's base. */
+  readonly base: CommitSha;
+  /** The fork's namespace: what is copied counts against its repo bytes, never the project's proposed to. */
+  readonly namespace: NamespaceId;
+  readonly goal: string;
+  readonly idempotencyKey: string;
+  /** A hash of the request body, so a reused key is told apart from a retry. */
+  readonly fingerprint: string;
+}
+
+/** Another commit of the fork for an open proposal, by its proposer. */
+export interface UpdateProposal {
+  readonly proposer: CommandActor;
+  /** The change's project as the doorway authorised it: a proposal of another reads as not found. */
+  readonly projectId: ProjectId;
+  /** The proposal's own fork, and its trunk's repo. */
+  readonly fork: { readonly projectId: ProjectId; readonly trunk: RepoRef };
+  readonly commit: CommitSha;
+  /** Where the fork last met the project before `commit`: the base it is judged from. */
+  readonly base: CommitSha;
+  readonly note?: string | undefined;
+  /** The fork's namespace, which the commits copied in count against. */
+  readonly namespace: NamespaceId;
+  readonly idempotencyKey: string;
+}
+
+/** An approval of a proposal at the commit its reviewer read, by someone the doorway let approve it. */
+export interface ApproveProposal {
+  readonly by: CommandActor;
+  readonly commit: CommitSha;
+  /** The change's project as the doorway authorised it: a proposal of another reads as not found. */
+  readonly projectId: ProjectId;
+  readonly idempotencyKey: string;
+}
+
+/** A request for changes to a proposal at the commit its reviewer read. */
+export interface RequestProposalChanges extends ApproveProposal {
+  readonly comment: string;
+}
+
+/** A proposal closed by its proposer, or by someone who may approve it. */
+export interface CloseProposal {
+  readonly by: CommandActor;
+  readonly projectId: ProjectId;
+  readonly reason?: string | undefined;
+  readonly idempotencyKey: string;
+}
+
+/** The agent an actor is, when it is one. */
+const agentOf = (actor: CommandActor): AgentId | undefined => {
+  const parts = actorParts(actor);
+  return parts.kind === "agent" ? parts.id : undefined;
+};
+
+/** A proposal's footprint: each path its diff touches, by what happened to it. */
+const footprintOf = (touched: readonly TreeChange[]): readonly FootprintEntry[] =>
+  touched.slice(0, PROPOSAL_FOOTPRINT_MAX).map(({ path, change }) => ({
+    path: Glob.make(path),
+    op: change === "added" ? "create" : change === "deleted" ? "delete" : "edit",
+  }));
+
+/**
+ * Admits the pack a proposal's commit is copied in against its fork's
+ * namespace's repo bytes, once per change and commit: a copy retried is the
+ * same admission.
+ */
+const admitCopy =
+  (
+    usage: NamespaceUsage["Service"],
+    namespace: NamespaceId,
+    changeId: ChangeId,
+    proposed: CommitSha,
+  ) =>
+  (bytes: number) =>
+    usage
+      .admit(namespace, REPO_BYTES, bytes, `proposal:${changeId}:${proposed}`)
+      .pipe(Effect.asVoid);
+
+/**
+ * Proposes a fork's commit to this project: takes a workspace, copies the
+ * fork's commits into its `keel/proposal` (admitted against the fork's
+ * repo bytes), then commits IntentDeclared, PreflightIssued, ChangeProposed,
+ * ChangeStarted on the proposal's base and ChangeSubmitted in one
+ * transaction, so Precheck reads it at once. No agent holds it, and no lease
+ * is issued. An agent proposer hears every event, as an agent hears its own
+ * change's. A retry with the same key answers the change as it stands and
+ * copies nothing; another body under the key is an IdempotencyConflict. A
+ * refused proposal gives back the workspace it took.
+ */
+export const propose: (
+  changeId: ChangeId,
+  command: ProposeChange,
+) => Effect.Effect<
+  Change,
+  | ChangeStateRefused
+  | PoolExhausted
+  | IdempotencyConflict
+  | PushRejected
+  | PackTooLarge
+  | QuotaExceeded,
+  | Clock
+  | EntityStore
+  | EventOutbox
+  | WorkspacePool
+  | WorkspaceRebaser
+  | NamespaceUsage
+  | CodeHost
+  | LiveChanges
+> = Effect.fn("coordination/propose")(function* (changeId: ChangeId, command: ProposeChange) {
+  // A retry asks for no workspace and copies nothing: its first answer stands.
+  const prior = (yield* EventOutbox).committed(changeRef(changeId), command.idempotencyKey);
+  if (prior !== undefined)
+    return yield* prior.fingerprint === command.fingerprint
+      ? Effect.orDie(getChange(changeId))
+      : Effect.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
+  const ended = storedChange(yield* EntityStore, changeId);
+  if (ended !== undefined && TERMINAL.has(ended.state)) return yield* refused(ended, "Propose");
+  const grant = yield* (yield* WorkspacePool).grant(command.projectId, changeId);
+  const committed = yield* Effect.gen(function* () {
+    // Its own workspace repo always exists, and so does a fork the doorway just read: a missing one is a defect.
+    yield* (yield* WorkspaceRebaser)
+      .pushProposal(
+        command.fork.trunk,
+        grant.repo,
+        command.commit,
+        [command.base, grant.baseSha],
+        admitCopy(yield* NamespaceUsage, command.namespace, changeId, command.commit),
+      )
+      .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+    const touched = yield* (yield* CodeHost)
+      .diffTrees(grant.repo, command.base, command.commit)
+      .pipe(Effect.orDie);
+    const intent: Intent = {
+      revision: 1,
+      goal: command.goal,
+      footprint: footprintOf(touched),
+      premises: [],
+    };
+    const near = yield* nearOf(command.projectId, changeId, intent);
+    return yield* commit(
+      {
+        entity: changeRef(changeId),
+        cause: command.idempotencyKey,
+        fingerprint: command.fingerprint,
+        actor: command.proposer,
+        project: command.projectId,
+      },
+      (tx) => {
+        const { preflight } = preflightFor(changeId, intent, near, []);
+        const proposed = transition(
+          tx,
+          changeId,
+          ["ChangeStateRefused"],
+          [
+            {
+              _tag: "Propose",
+              changeId,
+              proposer: command.proposer,
+              fork: command.fork.projectId,
+              commit: command.commit,
+              goal: command.goal,
+              footprint: intent.footprint,
+              preflight,
+            },
+            { _tag: "Start", workspaceId: grant.workspaceId, baseSha: command.base },
+            {
+              _tag: "ProposeCommit",
+              commit: command.commit,
+              base: command.base,
+              inWorkspace: true,
+            },
+          ],
+        );
+        if (Result.isFailure(proposed)) return Result.fail(proposed.failure);
+        tx.store.put(
+          CHANGE_WORKSPACE,
+          changeId,
+          encodeHeld({
+            workspaceId: grant.workspaceId,
+            repo: { namespace: grant.repo.namespace, name: grant.repo.name },
+            grantedSha: grant.baseSha,
+            projectId: command.projectId,
+          }),
+        );
+        const agent = agentOf(command.proposer);
+        if (agent !== undefined) tx.outbox.subscribe(`agent:${agent}`, EVERY_TYPE);
+        tx.outbox.subscribe(PRECHECK, ["ChangeSubmitted"]);
+        tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
+        tx.outbox.subscribe(
+          `project:${command.projectId}`,
+          PROPOSAL_INDEX_HEARS,
+          changeRef(changeId),
+        );
+        return Result.succeed(
+          withSurfaced(asTransition(proposed.success), surfaced(tx, changeId, preflight)),
+        );
+      },
+    );
+  }).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
+  if (!committed.duplicate) return committed.value;
+  // Raced by its own retry: the first commit stands.
+  yield* releaseUnheld(changeId, command.projectId, grant);
+  if (!committed.sameCommand)
+    return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
+  return yield* Effect.orDie(getChange(changeId));
+});
+
+/** What a proposal's own commands are refused with, besides a change of another project. */
+const PROPOSAL_REFUSALS = [
+  "ChangeNotFound",
+  "ChangeStateRefused",
+  "NotAProposal",
+  "ProposalCommitMoved",
+] as const;
+
+/**
+ * Moves an open proposal to another commit of its fork, by its proposer: the
+ * machine is asked first, so a proposal in a batch or ended copies nothing;
+ * then the commit is copied over the one before (admitted as a proposal's
+ * first is) and ProposalUpdated and ChangeSubmitted are committed: it is read
+ * again and waits for approval again, whatever was approved. A fork other
+ * than the proposal's own reads as no such change. A retry with the same key
+ * answers the change as it stands; another body is an IdempotencyConflict.
+ */
+export const updateProposal: (
+  changeId: ChangeId,
+  command: UpdateProposal,
+) => Effect.Effect<
+  Change,
+  | ChangeNotFound
+  | ChangeStateRefused
+  | NotAProposal
+  | IdempotencyConflict
+  | PushRejected
+  | PackTooLarge
+  | QuotaExceeded,
+  | Clock
+  | EntityStore
+  | EventOutbox
+  | WorkspaceRebaser
+  | NamespaceUsage
+  | HumanGate
+  | ProjectNamespaces
+> = Effect.fn("coordination/updateProposal")(function* (
+  changeId: ChangeId,
+  command: UpdateProposal,
+) {
+  const store = yield* EntityStore;
+  const change = storedChange(store, changeId);
+  const held = heldWorkspace(store, changeId);
+  if (change === undefined || held === undefined || held.projectId !== command.projectId)
+    return yield* notFound(changeId);
+  const fingerprint = fingerprintOf("updateProposal", askedOf(command));
+  const prior = (yield* EventOutbox).committed(changeRef(changeId), command.idempotencyKey);
+  if (prior !== undefined)
+    return yield* prior.fingerprint === fingerprint
+      ? getChange(changeId)
+      : Effect.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
+  if (change.proposal === undefined)
+    return yield* new NotAProposal({ changeId, nextActions: [readChange(changeId)] });
+  if (change.proposal.fork !== command.fork.projectId) return yield* notFound(changeId);
+  const moving: ChangeCommand = {
+    _tag: "ProposeCommit",
+    commit: command.commit,
+    base: command.base,
+    ...(command.note === undefined ? {} : { note: command.note }),
+    inWorkspace: true,
+  };
+  const decided = decideChange(change, moving, { now: yield* (yield* Clock).now, changeId });
+  if (Result.isFailure(decided)) {
+    const refusal = decided.failure;
+    if (isOneOf(["ChangeNotFound", "ChangeStateRefused", "NotAProposal"], refusal))
+      return yield* Effect.fail(refusal);
+    return yield* Effect.die(
+      new Error(`ProposeCommit was refused with ${refusal._tag}`, { cause: refusal }),
+    );
+  }
+  yield* (yield* WorkspaceRebaser)
+    .pushProposal(
+      command.fork.trunk,
+      held.repo,
+      command.commit,
+      [change.baseSha ?? held.grantedSha, held.grantedSha],
+      admitCopy(yield* NamespaceUsage, command.namespace, changeId, command.commit),
+    )
+    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+  const committed = yield* commit(
+    {
+      entity: changeRef(changeId),
+      cause: command.idempotencyKey,
+      fingerprint,
+      actor: command.proposer,
+      project: held.projectId,
+    },
+    (tx) =>
+      Result.map(
+        transition(
+          tx,
+          changeId,
+          ["ChangeNotFound", "ChangeStateRefused", "NotAProposal"],
+          [moving],
+        ),
+        asTransition,
+      ),
+  );
+  yield* withdrawFlowQuestions(changeId, held.projectId, "moved to another commit");
+  return yield* settled(changeId, command.idempotencyKey, committed);
+});
+
+/**
+ * Commits a proposal's own command, by someone the doorway authorised on the
+ * change's project, in one transaction: a change of another project reads as
+ * not found. A retry with the same key answers the change as it stands.
+ */
+const onProposal = (
+  changeId: ChangeId,
+  command: {
+    readonly by: CommandActor;
+    readonly projectId: ProjectId;
+    readonly idempotencyKey: string;
+  },
+  method: string,
+  commands: (store: Store) => readonly ChangeCommand[],
+) =>
+  Effect.gen(function* () {
+    const committed = yield* commit(
+      {
+        entity: changeRef(changeId),
+        cause: command.idempotencyKey,
+        fingerprint: fingerprintOf(method, askedOf(command)),
+        actor: command.by,
+        ...inProject(yield* EntityStore, changeId),
+      },
+      (tx) =>
+        heldWorkspace(tx.store, changeId)?.projectId === command.projectId
+          ? Result.map(
+              transition(tx, changeId, PROPOSAL_REFUSALS, commands(tx.store)),
+              asTransition,
+            )
+          : Result.fail(notFound(changeId)),
+    );
+    return yield* settled(changeId, command.idempotencyKey, committed);
+  });
+
+/**
+ * Approves a proposal at the commit its reviewer read: ProposalApproved takes
+ * it back to the queue. A question still with a person parks it again in the
+ * same commit: the question on how Keel verifies it, asked of its Precheck run
+ * and not yet ruled `approve`, or else a conflict of its with a person.
+ */
+export const approveProposal = (changeId: ChangeId, command: ApproveProposal) =>
+  onProposal(changeId, command, "approveProposal", (store): readonly ChangeCommand[] => {
+    const change = storedChange(store, changeId);
+    const flow =
+      change?.precheckInstance === undefined
+        ? undefined
+        : flowRulingIdOf(changeId, change.precheckInstance);
+    const asked = flow === undefined ? undefined : store.get(CHANGE_FLOW_ASKED, flow);
+    const waitOn =
+      asked !== undefined && decodeFlowAsked(asked).heard !== FLOW_RULING_APPROVE
+        ? flow
+        : awaitedEscalation(store);
+    return [
+      { _tag: "Approve", commit: command.commit, by: command.by },
+      ...(waitOn === undefined ? [] : [{ _tag: "Park" as const, escalationId: waitOn }]),
+    ];
+  });
+
+/** Asks a proposal's proposer for changes, at the commit its reviewer read: it goes on waiting. */
+export const requestProposalChanges = (changeId: ChangeId, command: RequestProposalChanges) =>
+  onProposal(changeId, command, "requestProposalChanges", () => [
+    { _tag: "RequestChanges", commit: command.commit, by: command.by, comment: command.comment },
+  ]);
+
+/** Closes a proposal: ChangeWithdrawn, by its proposer or by whoever may approve it, and its open questions taken back. */
+export const closeProposal = (changeId: ChangeId, command: CloseProposal) =>
+  onProposal(changeId, command, "closeProposal", () => [
+    {
+      _tag: "Withdraw",
+      authority: { _tag: "Proposal", by: actorParts(command.by).id },
+      ...(command.reason === undefined ? {} : { reason: command.reason }),
+    },
+  ]).pipe(Effect.tap(() => withdrawFlowQuestions(changeId, command.projectId, "was closed")));
 
 /** Revises the intent under the lease, at the revision the caller last read. */
 const reviseCall: (
@@ -2085,6 +2555,7 @@ export const planCompiled: (
       steps: plan.steps,
       costEstimate: plan.costEstimate,
       ...(plan.predicatePolicy === undefined ? {} : { predicatePolicy: plan.predicatePolicy }),
+      ...(plan.ruledPaths === undefined ? {} : { ruledPaths: plan.ruledPaths }),
     };
     // A change with no workspace was never declared: CompilePlan alone refuses it.
     if (project === undefined)
@@ -2098,6 +2569,13 @@ export const planCompiled: (
         const blockers = blockersOf(store, plan.predicatePolicy);
         const bounce = conflictBounce(blockers.openProvenConflicts);
         if (bounce !== undefined) return [compile, bounce];
+        // A proposal waits for the approval of its commit before anything is verified. A question on how
+        // Keel verifies it is asked of this run all the same: it waits on that once it is approved.
+        if (storedChange(store, changeId)?.proposal !== undefined) {
+          if (plan.needsRuling === true)
+            store.put(CHANGE_FLOW_ASKED, flowRulingIdOf(changeId, plan.instanceId), {});
+          return [compile, { _tag: "Queue", laneId, blockers }, { _tag: "AwaitApproval" }];
+        }
         // A change to how Keel verifies waits for a maintainer's ruling asked of this Precheck run, and a
         // conflict already with a person holds the change too: either the moment it is queued.
         const asked =
@@ -2381,6 +2859,30 @@ const commandFor = (
       const recorded = decodeRecorded(event.payload);
       if (Option.isNone(recorded)) return undefined;
       const { escalationId, decisionId, option, summary } = recorded.value;
+      // A proposal still waiting for its approval hears the ruling on how Keel verifies it first: an
+      // approve is kept for the approval, which then queues it, and anything else sends it back.
+      if (
+        change.parkReason === "awaiting-approval" &&
+        change.precheckInstance !== undefined &&
+        escalationId === flowRulingIdOf(change.id, change.precheckInstance) &&
+        store.get(CHANGE_FLOW_ASKED, escalationId) !== undefined
+      ) {
+        if (option === FLOW_RULING_APPROVE) {
+          store.put(CHANGE_FLOW_ASKED, escalationId, { heard: option });
+          return {};
+        }
+        return {
+          command: {
+            _tag: "Bounce",
+            decisionId,
+            reasons: [
+              `${decisionId}: a maintainer did not approve this change to how Keel verifies (${summary}).`,
+            ],
+            nextActions: [],
+          },
+          refusable: true,
+        };
+      }
       if (change.parkReason !== "awaiting-ruling" || change.escalationId !== escalationId)
         return undefined;
       // The drop in tests it was parked on: an approve takes it back into the queue, any other answer sends it back.

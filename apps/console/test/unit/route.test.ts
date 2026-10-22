@@ -28,6 +28,8 @@ const ADDRESSES: [string, Route][] = [
   ["/acme/demo/changes", { at: "changes", filter: "open", shown: 50 }],
   ["/acme/demo/changes?state=landed", { at: "changes", filter: "landed", shown: 50 }],
   ["/acme/demo/changes?state=bounced", { at: "changes", filter: "bounced", shown: 50 }],
+  ["/acme/demo/changes?state=proposals", { at: "changes", filter: "proposals", shown: 50 }],
+  ["/acme/demo/propose", { at: "new-proposal" }],
   ["/acme/demo/changes?state=closed&shown=150", { at: "changes", filter: "closed", shown: 150 }],
   ["/acme/demo/changes/7", { at: "change", name: "7", tab: "overview" }],
   ["/acme/demo/changes/7/checks", { at: "change", name: "7", tab: "checks" }],

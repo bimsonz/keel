@@ -38,6 +38,7 @@ import {
   makeWorkspaceRebaserMemory,
   makeWorkspaceWriterMemory,
   sampleProjectId,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Fiber, Layer, Result, Schema } from "effect";
 import { DeclareCommand, SubmitCommand } from "../../src/rpc/index.ts";
@@ -111,7 +112,7 @@ const declared = Effect.gen(function* () {
   const { change, grant: declaredGrant } = yield* declare(declaring);
   const held = yield* changeWorkspace(changeId);
   yield* (yield* CodeHost).fork(repos.mirror, held.repo);
-  return { lease: change.lease.id, held, grant: declaredGrant };
+  return { lease: heldLease(change).id, held, grant: declaredGrant };
 });
 
 const committing = (leaseId: LeaseId, expectedHead: CommitSha, idempotencyKey = "commit-1") => ({
@@ -139,8 +140,8 @@ describe("commit", () => {
           expect(made.parent).toBe(base);
           expect(yield* (yield* CodeHost).head(held.repo, MAIN)).toBe(made.commit.commitSha);
           expect(w.writer.committed.map((c) => c.commit)).toEqual([made.commit.commitSha]);
-          expect((yield* getChange(changeId)).lease.renewedAt).toBe(w.clock.now());
-          expect(made.change.lease.renewedAt).toBe(w.clock.now());
+          expect(heldLease(yield* getChange(changeId)).renewedAt).toBe(w.clock.now());
+          expect(heldLease(made.change).renewedAt).toBe(w.clock.now());
         }).pipe(Effect.provide(w.layerFor(base)));
       });
     },
@@ -229,7 +230,7 @@ describe("commit", () => {
         return yield* Effect.gen(function* () {
           const { lease } = yield* declared;
           const first = yield* commitEdits(changeId, committing(lease, base));
-          const renewedAt = (yield* getChange(changeId)).lease.renewedAt;
+          const renewedAt = heldLease(yield* getChange(changeId)).renewedAt;
           w.clock.advance(60_000);
           const moved = yield* Effect.flip(
             commitEdits(changeId, {
@@ -243,7 +244,7 @@ describe("commit", () => {
             head: first.commit.commitSha,
           });
           // Refused after the lease check, the call still renews the lease: its agent is at work.
-          expect((yield* getChange(changeId)).lease.renewedAt).toBe(renewedAt + 60_000);
+          expect(heldLease(yield* getChange(changeId)).renewedAt).toBe(renewedAt + 60_000);
         }).pipe(Effect.provide(w.layerFor(base)));
       });
     },

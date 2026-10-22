@@ -331,12 +331,14 @@ describe("a project's settings over real RPC", () => {
       maxBatchSize: 8,
       verification: "required",
       visibility: "private",
+      proposals: "open",
     });
     expect(off).toEqual({
       protectedPaths: [],
       maxBatchSize: 8,
       verification: "off",
       visibility: "private",
+      proposals: "open",
     });
     expect(ok(await p.settings())).toEqual(off);
     expect([unchanged, retried]).toEqual([off, off]);
@@ -364,6 +366,7 @@ describe("a project's settings over real RPC", () => {
       maxBatchSize: 4,
       verification: "required",
       visibility: "private",
+      proposals: "open",
     });
     expect(changes.map((event) => event.payload)).toMatchObject([
       { changes: [{ field: "verification", from: "required", to: "off" }] },
@@ -416,9 +419,9 @@ describe("a project's settings through the operator routes", () => {
       (await agentPut.json<{ detail: string }>()).detail,
     ]).toEqual(["Refused: foreign-project.", "Refused: users-only."]);
     expect(put.status).toBe(200);
-    expect(await put.json()).toEqual({ ...off, visibility: "private" });
+    expect(await put.json()).toEqual({ ...off, visibility: "private", proposals: "open" });
     expect(got.status).toBe(200);
-    expect(await got.json()).toEqual({ ...off, visibility: "private" });
+    expect(await got.json()).toEqual({ ...off, visibility: "private", proposals: "open" });
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
       actor: `user:${user.userId}`,
@@ -455,12 +458,34 @@ describe("a project's settings through the operator routes", () => {
     const body = await reused.json<{ code: string; nextActions: { operationId?: string }[] }>();
 
     expect([first.status, replayed.status, unchanged.status]).toEqual([200, 200, 200]);
-    expect(await replayed.json()).toEqual({ ...off, visibility: "private" });
+    expect(await replayed.json()).toEqual({ ...off, visibility: "private", proposals: "open" });
     expect([reused.status, reusedUnchanged.status]).toEqual([409, 409]);
     expect(body.code).toBe("request.idempotency_conflict");
     expect(body.nextActions.map((action) => action.operationId)).toEqual(["Operator_putSettings"]);
-    expect(ok(await p.settings())).toEqual({ ...off, visibility: "private" });
+    expect(ok(await p.settings())).toEqual({ ...off, visibility: "private", proposals: "open" });
     expect(await settingsChanges(p)).toHaveLength(1);
+  });
+
+  it("[proposals.setting] a project takes proposals unless its settings close them: open by default, closed by a PUT that says so and audited, and open again when a PUT leaves them out", async () => {
+    const p = await projectUnderTest();
+    ok(await p.create());
+    await placeProject(p.projectId);
+    const user = (await maintainer()).token;
+    const put = { protectedPaths: [], maxBatchSize: 8 };
+
+    const before = await settingsCall(user, p.projectId);
+    const closed = await settingsCall(user, p.projectId, { ...put, proposals: "closed" });
+    const reopened = await settingsCall(user, p.projectId, put);
+    const changes = await settingsChanges(p);
+
+    expect(await before.json()).toMatchObject({ proposals: "open" });
+    expect(closed.status).toBe(200);
+    expect(await closed.json()).toMatchObject({ proposals: "closed" });
+    expect(await reopened.json()).toMatchObject({ proposals: "open" });
+    expect(changes.map((event) => event.payload)).toMatchObject([
+      { changes: [{ field: "proposals", from: "open", to: "closed" }] },
+      { changes: [{ field: "proposals", from: "closed", to: "open" }] },
+    ]);
   });
 
   it("[b12.settings-visibility] keeps a public project public, audits each change, and reads settings stored before visibility as private", async () => {
@@ -500,6 +525,7 @@ describe("a project's settings through the operator routes", () => {
       maxBatchSize: 3,
       verification: "required",
       visibility: "private",
+      proposals: "open",
     });
   });
 });

@@ -2,12 +2,12 @@
 # kills: change.held-lapse-void
 # why: a hand-back parks a change whose lease was recorded Lapsed while the platform held it, so a lapse that does not stand strands the change until someone adopts it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c9f50e0..5c3eb77e 100644
+index 916513b7..0189711b 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -467,7 +467,9 @@ const intoAgentOwned = (change: Change, event: ChangeEvent): Decision =>
+@@ -541,7 +541,9 @@ const intoAgentOwned = (change: Change, event: ChangeEvent): Decision =>
    Result.succeed(
-     isAgentOwned(change.state)
+     isAgentOwned(change.state) || change.lease === undefined
        ? [event]
 -      : [event, LeaseRestarted.make({ changeId: change.id, leaseId: change.lease.id })],
 +      : change.lease.state === "lapsed"

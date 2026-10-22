@@ -2,15 +2,15 @@
 # kills: change.transitions
 # why: A change is withdrawn while its batch still holds it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 1093838..07261d9 100644
+index 916513b7..20eb9bf2 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -396,7 +396,7 @@ export const decideChange = (state: Change | undefined, command: ChangeCommand,
-     }
- 
-     case "Withdraw":
--      return at("integrating")
-+      return at("landed")
+@@ -1109,7 +1109,7 @@ export const decideChange = (
+         return notAProposal(change);
+       // Under a lease the change is its holder's: the check above found the lease the call carries.
+       const by = authority._tag === "Lease" ? change.lease?.agentId : authority.by;
+-      return at("integrating") || by === undefined
++      return at("landed") || by === undefined
          ? refuse(change, command)
          : Result.succeed([
              ChangeWithdrawn.make({

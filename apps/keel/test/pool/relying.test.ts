@@ -2,6 +2,7 @@
 // change is the harness's real Change DO, reading its project's real Project
 // DO index; the subjects it names are real Subject DOs, reached by the
 // fan-out. The doorways are REST and MCP, from the deployed fetch handler.
+import { heldLease } from "@keeltown/testing";
 import { runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { subjectAddress, subjectIdOf } from "@keeltown/core/application/coordination";
@@ -157,7 +158,7 @@ describe("[b21.rely] relying on a premise through the doorways", () => {
     const a = await change();
     const token = await holderOf(a);
     const declared = ok(await a.declare("declare-a"));
-    const lease = declared.change.lease.id;
+    const lease = heldLease(declared.change).id;
 
     const response = await relyRest(a, token, lease, "rely-key-0001");
     const body = await response.json<{
@@ -290,7 +291,7 @@ describe("[b21.revise-route] revising at the revision last read", () => {
     const { change } = await project();
     const a = await change();
     const token = await holderOf(a);
-    const lease = ok(await a.declare("declare-a")).change.lease.id;
+    const lease = heldLease(ok(await a.declare("declare-a")).change).id;
     const effects = { declaredEffects: [Schema.encodeSync(Proposition)(cachedPerSession)] };
 
     const revised = await reviseRest(a, token, lease, "revise-key-0001", '"1"', effects);

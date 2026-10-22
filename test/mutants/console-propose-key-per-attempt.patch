@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/proposal-keys.test.ts
+# kills: proposal-keys.one-per-body
+# why: the console asks for a proposal under a new key each time, so retries after a busy pool hold five places and lock its proposer out
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 4fbaea26..9caeac0c 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -550,7 +550,7 @@ export function proposalKeys(): (proposal: {
+   return ({ commit, goal }) => {
+     const body = `${commit}\n${goal}`;
+     const known = keys.get(body);
+-    if (known !== undefined) return known;
++    if (known === "") return known;
+     const made = `console:propose:${crypto.randomUUID()}`;
+     keys.set(body, made);
+     return made;

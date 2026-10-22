@@ -17,6 +17,7 @@ import { DecisionPage } from "./pages/Decision.tsx";
 import { DecisionsPage } from "./pages/Decisions.tsx";
 import { IssuePage } from "./pages/Issue.tsx";
 import { IssuesPage } from "./pages/Issues.tsx";
+import { NewProposalPage } from "./pages/NewProposal.tsx";
 import { NewIssuePage } from "./pages/NewIssue.tsx";
 import { type HomeAccount, HomePage } from "./pages/Home.tsx";
 import { InsightsFrame, InsightsPage } from "./pages/Insights.tsx";
@@ -123,13 +124,14 @@ function useReader(live: boolean): Reader | undefined {
         setReader({ mark: {}, orgs: [] });
         return;
       }
-      setReader({ mark: { name: nameOf(who) }, orgs: [] });
+      setReader({ mark: { id: who.id, name: nameOf(who) }, orgs: [] });
       // Keel lists a user's orgs once they have a handle; one who has none yet has no org.
       if (who.handle === undefined) return;
       const orgs = await account.orgs();
       if (!here) return;
       setReader({
         mark: {
+          id: who.id,
           name: nameOf(who),
           handle: who.handle,
           orgs: accountsOf(orgs, who),
@@ -162,17 +164,34 @@ function Page({
     case "code":
     case "commits":
     case "commit":
-      return <CodePage route={route} mode={mode} />;
+      return (
+        <CodePage
+          route={route}
+          mode={mode}
+          project={project}
+          {...(reader === undefined ? {} : { reader })}
+        />
+      );
     case "issues":
       return <IssuesPage state={route.state} reader={reader} />;
     case "issue":
       return <IssuePage number={route.number} reader={reader} />;
     case "new-issue":
       return <NewIssuePage reader={reader} />;
+    case "new-proposal":
+      return <NewProposalPage project={project} reader={reader} />;
     case "changes":
       return <ChangesPage filter={route.filter} shown={route.shown} />;
     case "change":
-      return <ChangePage name={route.name} tab={route.tab} mode={mode} />;
+      return (
+        <ChangePage
+          name={route.name}
+          tab={route.tab}
+          mode={mode}
+          project={project}
+          {...(reader === undefined ? {} : { reader })}
+        />
+      );
     case "conflicts":
       return (
         <InsightsFrame at="conflicts">

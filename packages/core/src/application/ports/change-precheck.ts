@@ -22,16 +22,24 @@ import type { RepoRef } from "./code-host.ts";
 /**
  * Where Precheck diffs a change: its workspace's repo, its base (the grant's
  * until a rebase moves it), the commit it was granted at (`grantedSha`, its
- * fork point, which never moves), the project whose settings hold the
- * protected globs, the subjects the change declared it touches or relies
- * on (its premises' and effects'), which compile selects guards by, and its
- * current intent, which derivation reads what it declared from.
+ * fork point, which never moves), the commit its flow is read at, the project
+ * whose settings hold the protected globs, the subjects the change declared
+ * it touches or relies on (its premises' and effects'), which compile selects
+ * guards by, and its current intent, which derivation reads what it declared
+ * from.
  */
 export interface PrecheckWorkspace {
   readonly workspaceId: WorkspaceId;
   readonly repo: RepoRef;
   readonly baseSha: CommitSha;
   readonly grantedSha: CommitSha;
+  /**
+   * Where the change's checks are read: its base, or, for a proposal, the
+   * upstream head its workspace was granted at. A proposal's base is where
+   * its fork last met the upstream, and nothing in the fork's history, which
+   * its proposer writes, decides how the upstream verifies it.
+   */
+  readonly flowAt: CommitSha;
   readonly projectId: ProjectId;
   /** The subject of each premise and declared effect of the change's current intent, each once and without ancestors. */
   readonly subjects: readonly SubjectKey[];
@@ -59,6 +67,8 @@ export interface PrecheckCompiled extends PrecheckCall {
   readonly predicatePolicy?: PredicatePolicies | undefined;
   /** The plan holds the human-class gate (the change edits `.keel/flow`): it parks for a maintainer's ruling as it is queued. */
   readonly needsRuling?: true | undefined;
+  /** The paths the gate is for: PlanCompiled names them, so a reviewer sees them flagged. */
+  readonly ruledPaths?: readonly string[] | undefined;
 }
 
 /** Precheck derived the submission's effects from its code: `derivationRef` is Precheck's own name for the derivation. */

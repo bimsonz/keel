@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: fork-sync.points
+# why: a fork's sync records no point where it met its upstream, so a proposal after it is based on the fork point
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index de8db2ba..8e28c344 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -817,7 +817,7 @@ export const evolvePromotion = (
+             phase: settled(trunk.queue),
+             ...(event.height === undefined ? {} : { height: event.height }),
+             // A fork remembers where it met its upstream: a proposal from it is based on the newest such point.
+-            ...("project" in sync.upstream
++            ...(false
+               ? {
+                   points: [
+                     { at: event.to, upstream: sync.merged ?? event.to },

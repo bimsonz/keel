@@ -296,6 +296,7 @@ function derivingWorld(reader?: Layer.Layer<SyntaxSource>) {
           repo: base.repo,
           baseSha: base.sha,
           grantedSha: base.sha,
+          flowAt: base.sha,
           projectId,
           subjects,
           intent,

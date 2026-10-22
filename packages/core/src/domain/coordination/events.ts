@@ -5,6 +5,7 @@ import {
   BatchId,
   CandidateId,
   ChangeId,
+  CommandActor,
   CommitSha,
   ConflictId,
   ContentHash,
@@ -42,7 +43,8 @@ import { Suggestion } from "./change.ts";
 
 export const IntentDeclared = Schema.TaggedStruct("IntentDeclared", {
   changeId: ChangeId,
-  agentId: AgentId,
+  /** Absent on a proposal, which no agent holds: its ChangeProposed names its proposer. */
+  agentId: Schema.optional(AgentId),
   /** The run of the agent that declared the change, when its token named one: the run that holds it. */
   run: Schema.optional(RunRef),
   origin: ChangeOrigin,
@@ -51,7 +53,34 @@ export const IntentDeclared = Schema.TaggedStruct("IntentDeclared", {
   footprint: Schema.Array(FootprintEntry),
   premises: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
-  leaseId: LeaseId,
+  /** The lease the declaring agent holds; absent on a proposal, which none holds. */
+  leaseId: Schema.optional(LeaseId),
+});
+/** A change whose code comes from a fork of its project: committed with its IntentDeclared. */
+export const ChangeProposed = Schema.TaggedStruct("ChangeProposed", {
+  changeId: ChangeId,
+  fork: ProjectId,
+  commit: CommitSha,
+  proposer: CommandActor,
+});
+/** Its proposer moved the proposal to another commit of the fork: it is checked again, and waits for approval again. */
+export const ProposalUpdated = Schema.TaggedStruct("ProposalUpdated", {
+  changeId: ChangeId,
+  commit: CommitSha,
+  note: Schema.optional(Schema.String.check(Schema.isMaxLength(65_536))),
+});
+/** Someone holding `maintain` approved the proposal at this commit and no other: it goes back to where it waited. */
+export const ProposalApproved = Schema.TaggedStruct("ProposalApproved", {
+  changeId: ChangeId,
+  commit: CommitSha,
+  by: CommandActor,
+});
+/** Someone holding `maintain` asked for changes to the proposal at this commit: it goes on waiting. */
+export const ProposalChangesRequested = Schema.TaggedStruct("ProposalChangesRequested", {
+  changeId: ChangeId,
+  commit: CommitSha,
+  by: CommandActor,
+  comment: Schema.NonEmptyString.check(Schema.isMaxLength(65_536)),
 });
 export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
   changeId: ChangeId,
@@ -142,6 +171,8 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
   costEstimate: Schema.Finite,
   /** The predicate policy compiled for the change; the Change DO applies it to a proven conflict. Absent, or a predicate left out, is `advise`. */
   predicatePolicy: Schema.optional(PredicatePolicies),
+  /** The paths the change touches that need a person's ruling (its plan holds the human-class gate); absent when none do. */
+  ruledPaths: Schema.optional(Schema.Array(Schema.String)),
 });
 export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
   changeId: ChangeId,
@@ -361,6 +392,10 @@ export const CoordinationEvent = Schema.Union([
   AlternativeLanded,
   ChangeParked,
   ChangeResumed,
+  ChangeProposed,
+  ProposalUpdated,
+  ProposalApproved,
+  ProposalChangesRequested,
   ChangeAdopted,
   ChangeWithdrawn,
   ChangeSuperseded,

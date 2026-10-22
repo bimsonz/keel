@@ -37,12 +37,22 @@ const TITLES: Record<ProblemCode, string> = {
   "service.unavailable": "Keel cannot serve this right now",
   "service.not_implemented": "This operation is part of the contract but not implemented yet",
   "internal.defect": "Keel hit a defect while serving this request",
-  "project.not_imported": "The project was not imported, so it has no upstream to sync from",
+  "project.not_imported":
+    "The project was neither imported nor forked, so it has no upstream to sync from",
   "project.upstream_unreachable":
     "The project's upstream did not answer, or no longer holds its branch",
   "trunk.not_fast_forward":
     "Trunk holds commits its upstream lacks, so it cannot move forward to upstream's head",
   "trunk.busy": "Trunk is promoting, frozen or already syncing",
+  "trunk.sync_conflicts":
+    "The fork's work and its upstream's changed one path in ways Keel will not merge",
+  "proposal.not_a_fork":
+    "The project named as the fork was not forked from the project proposed to",
+  "proposal.commit_not_on_fork": "The fork's trunk does not hold the commit proposed",
+  "proposal.empty": "The commit carries nothing past where the fork last met the project",
+  "proposal.limit": "The proposer already has as many proposals open on the project as Keel allows",
+  "proposal.commit_moved": "The proposal no longer carries the commit named: its proposer moved it",
+  "change.not_a_proposal": "The change is no proposal: only a proposal is moved this way",
   "change.not_found": "No such change",
   "change.diff_unavailable": "Keel holds no diff of this change",
   "conflict.not_found": "No such conflict",

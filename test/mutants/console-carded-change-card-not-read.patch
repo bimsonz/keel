@@ -2,14 +2,14 @@
 # kills: carded.change
 # why: a change's own page names its agent from the log's enrolment alone, and never from Keel's card
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 59b46c5a..30e7807d 100644
+index 50082ce7..5c172b3e 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -707,7 +707,7 @@ export function changePageOf(
+@@ -743,7 +743,7 @@ export function changePageOf(
        ...(change.submittedAt === undefined ? {} : { submittedAt: change.submittedAt }),
        ...(change.laneId === undefined ? {} : { lane: laneName(change.laneId) }),
      },
--    agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
+-    agent: { ...shownAgent(by, cardOfAuthor(cards, change)), model: by?.model ?? "" },
 +    agent: { ...shownAgent(by), model: by?.model ?? "" },
      held: heldUnder(cards, change),
      session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },

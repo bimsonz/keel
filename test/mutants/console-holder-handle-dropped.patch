@@ -2,12 +2,12 @@
 # kills: http.agents
 # why: a change's holder is never given its handle, so it never leads to its own page
 diff --git a/apps/console/src/engine/holder.ts b/apps/console/src/engine/holder.ts
-index 17437678..b2b6e70a 100644
+index 6af42b3b..7dd1ccf6 100644
 --- a/apps/console/src/engine/holder.ts
 +++ b/apps/console/src/engine/holder.ts
-@@ -25,7 +25,6 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[]
- export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {
-   const handle = cards.get(change.agentId)?.handle;
+@@ -39,7 +39,6 @@ export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {
+   const agentId = authorAgentOf(change);
+   const handle = agentId === undefined ? undefined : cards.get(agentId)?.handle;
    return {
 -    ...(handle === undefined ? {} : { handle }),
      ...(change.run === undefined

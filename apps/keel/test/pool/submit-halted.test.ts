@@ -1,6 +1,7 @@
 // A submission while the namespace of its project has its verification spend
 // stopped, through the real doorway, gate and Change DO: refused at the door,
 // with what its owner does next, and taken once the namespace is resumed.
+import { heldLease } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
 import { makeId, NamespaceId, UserId } from "@keeltown/core/kernel";
 import { NamespaceUsage } from "@keeltown/core/ports";
@@ -35,7 +36,7 @@ describe("[submit.halted] a submission while its namespace's verification spend 
     const projectId = makeId("prj", ulid());
     await placeProject(projectId, org);
     const c = await changeUnderTest(projectId, "memory", false);
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     const sha = await c.push();
     const token = await tokenFor(
       await seedAgent({ projectId, id: c.agentId, org, sponsor: owner }),

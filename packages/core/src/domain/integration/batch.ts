@@ -12,6 +12,7 @@ import {
   BatchAttribution,
   MemberCommit,
   PromotionFrozenReason,
+  ForkUpstream,
   SyncUpstream,
   TrunkOrigin,
 } from "./events.ts";
@@ -147,7 +148,14 @@ export const Trunk = Schema.Struct({
   solo: Schema.optional(Schema.Literal(true)),
   /** The open sync from upstream, from its TrunkSyncStarted until TrunkSynced or a freeze resolves it. */
   sync: Schema.optional(
-    Schema.Struct({ from: CommitSha, to: CommitSha, by: Schema.String, upstream: SyncUpstream }),
+    Schema.Struct({
+      from: CommitSha,
+      to: CommitSha,
+      by: Schema.String,
+      upstream: Schema.Union([SyncUpstream, ForkUpstream]),
+      /** A fork's upstream trunk head, when `to` is Keel's merge commit of it. */
+      merged: Schema.optional(CommitSha),
+    }),
   ),
   frozen: Schema.optional(
     Schema.Struct({
@@ -156,5 +164,11 @@ export const Trunk = Schema.Struct({
       reason: Schema.optional(PromotionFrozenReason),
     }),
   ),
+  /**
+   * A fork's syncs, newest first, at most MAX_SYNC_POINTS: each the head the
+   * sync put trunk at (`at`) and the upstream trunk head it took (`upstream`,
+   * the same commit for a fast-forward). Absent until a fork's first sync.
+   */
+  points: Schema.optional(Schema.Array(Schema.Struct({ at: CommitSha, upstream: CommitSha }))),
 });
 export type Trunk = typeof Trunk.Type;

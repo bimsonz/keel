@@ -222,6 +222,37 @@ export interface KeelIssues {
   reopenIssue(number: number): Promise<Keel.ProjectIssue>;
 }
 
+/**
+ * A project's proposals from forks, and this project's own proposals to the project it was forked from. Keel
+ * decides who may move each: the console sends the reader's session and shows what Keel answers.
+ */
+export interface KeelProposals {
+  /** A page of the project's proposals, newest first: `GET /v1/projects/{id}/proposals`. */
+  listProposals(
+    asked: { state: "open" | "closed"; cursor?: string },
+    signal?: AbortSignal,
+  ): Promise<Keel.ChangeSummaryPage>;
+  /** Approves a proposal at the commit the reader saw; another is refused, never approved. */
+  approve(changeId: string, commit: string): Promise<Keel.Change>;
+  /** Asks for changes to a proposal at the commit the reader saw, with what to change. */
+  requestChanges(changeId: string, commit: string, comment: string): Promise<Keel.Change>;
+  close(changeId: string): Promise<Keel.Change>;
+  /**
+   * Proposes a commit of this project, a fork, back to `upstream`, the project it was forked from, under
+   * `key`: the page's one key for that commit and goal (`proposalKeys`), so asking again is one request.
+   */
+  propose(
+    upstream: string,
+    proposal: { commit: string; goal: string },
+    key: string,
+  ): Promise<Keel.Change>;
+}
+
+/** A project's source that has Keel's proposals: a test fixture's has none. */
+export interface KeelProposed {
+  proposals: KeelProposals;
+}
+
 /** A project's source that has Keel's issues: a test fixture's has none. */
 export interface KeelIssued {
   issues: KeelIssues;

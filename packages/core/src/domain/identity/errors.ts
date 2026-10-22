@@ -164,6 +164,8 @@ export const RefusalReason = Schema.Literals([
   "private-source",
   "org-project",
   "sponsor-required",
+  "proposals-closed",
+  "proposer-only",
 ]);
 export type RefusalReason = typeof RefusalReason.Type;
 

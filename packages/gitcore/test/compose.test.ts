@@ -11,6 +11,7 @@ import { ZERO_OID } from "../src/bytes.ts";
 import {
   FallbackReader,
   MemberRefused,
+  mergeOnBase,
   type RestackMember,
   restack,
   restackOnTrees,
@@ -453,4 +454,78 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
     },
     DEADLINE_MS,
   );
+});
+
+/** A repo with BASE on main, `ours` and `theirs` each one commit on it: answers the three commits. */
+const forked = (ours: (t: TreeModel) => void, theirs: (t: TreeModel) => void) => {
+  const repo = stagingWith([
+    ...trunkOf(BASE),
+    edit(2, ours, "refs/heads/ours"),
+    edit(3, theirs, "refs/heads/theirs"),
+  ]);
+  const at = (ref: string) => run(repo.dir, ["rev-parse", ref]).stdout.toString().trim();
+  return {
+    ...repo,
+    base: at("refs/heads/main"),
+    ours: at("refs/heads/ours"),
+    theirs: at("refs/heads/theirs"),
+  };
+};
+
+describe("mergeOnBase", () => {
+  it("[gitcore.merge-on-base] merges theirs into ours on the base it is given, as one signed commit whose parents are ours then theirs and whose tree is git's merge, which the repo takes whole", async () => {
+    const repo = forked(
+      (t) => t.set("src/a.ts", file("export const a = 10;\n")),
+      (t) => {
+        t.set("src/b.ts", file("export const b = 20;\n"));
+        t.set("docs/new.md", file("new\n"));
+      },
+    );
+    try {
+      const merged = await mergeOnBase(repo.reader, {
+        base: repo.base,
+        ours: repo.ours,
+        theirs: repo.theirs,
+        author: KEEL,
+        committer: KEEL,
+        message: "Merge upstream\n",
+        sign: fakeSign,
+      });
+      const pushed = await pushTo(repo.dir, "refs/heads/merged", merged.oid, merged.objects);
+      expect(pushed.kind).toBe("applied");
+      expect(missing(repo.dir, merged.oid)).toEqual([]);
+      expect(
+        run(repo.dir, ["rev-list", "--parents", "-n", "1", merged.oid]).stdout.toString().trim(),
+      ).toBe(`${merged.oid} ${repo.ours} ${repo.theirs}`);
+      const oracle = gitMergeTree(repo.dir, repo.ours, repo.theirs, repo.base);
+      expect(oracle.outcome).toBe("clean");
+      expect(oracle.outcome === "crashed" ? undefined : oracle.tree).toBe(merged.tree);
+      expect(run(repo.dir, ["cat-file", "-p", merged.oid]).stdout.toString()).toContain(
+        "gpgsig -----BEGIN SSH SIGNATURE-----",
+      );
+    } finally {
+      repo.cleanup();
+    }
+  });
+
+  it("[gitcore.merge-on-base-refused] a path both sides changed apart is Refusal naming it, and nothing is written", async () => {
+    const repo = forked(
+      (t) => t.set("src/a.ts", file("export const a = 10;\n")),
+      (t) => t.set("src/a.ts", file("export const a = 11;\n")),
+    );
+    try {
+      const refused = await mergeOnBase(repo.reader, {
+        base: repo.base,
+        ours: repo.ours,
+        theirs: repo.theirs,
+        author: KEEL,
+        committer: KEEL,
+        message: "Merge upstream\n",
+      }).catch((e: unknown) => e);
+      expect(refused).toBeInstanceOf(Refusal);
+      expect(refused instanceof Refusal ? refused.path : undefined).toBe("src/a.ts");
+    } finally {
+      repo.cleanup();
+    }
+  });
 });

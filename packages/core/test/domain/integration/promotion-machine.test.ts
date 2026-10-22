@@ -21,6 +21,7 @@ import {
   Trunk,
   TrunkEvent,
   type TrunkOrigin,
+  upstreamPointsOf,
 } from "../../../src/domain/integration/index.ts";
 import {
   type BatchId,
@@ -441,8 +442,8 @@ const oracle = (
     case "Resume":
       return before.phase === "frozen" ? settled(before, 0) : "refused";
     case "Sync":
-      // Only an import has an upstream, and a sync starts between groups, from trunk's own head.
-      if (before.origin?.kind !== "imported") return "refused";
+      // Only an import or a fork has an upstream, and a sync starts between groups, from trunk's own head.
+      if (before.origin?.kind !== "imported" && before.origin?.kind !== "forked") return "refused";
       if (before.phase !== "idle" && before.phase !== "debouncing") return "refused";
       if (command.from !== before.head) return "refused";
       return command.to === command.from ? "noop" : "syncing";
@@ -2063,12 +2064,24 @@ const reached = () => {
 
 describe("a sync from upstream", { timeout: PROPERTY_TIMEOUT }, () => {
   const UP = sha(0x3001);
-  const sync = (from: CommitSha = H0, to: CommitSha = UP): PromotionCommand => ({
+  const sync = (
+    from: CommitSha = H0,
+    to: CommitSha = UP,
+    merged?: CommitSha,
+  ): PromotionCommand => ({
     _tag: "Sync",
     by: RELEASER,
     from,
     to,
+    ...(merged === undefined ? {} : { merged }),
   });
+  const FORK_OF = makeId("prj", ulid(2));
+  const forkedInit: PromotionCommand = {
+    _tag: "Initialize",
+    head: H0,
+    by: "seed",
+    origin: { kind: "forked", project: FORK_OF, commit: H0 },
+  };
   it("[sync.transitions] in every phase the sync's walk reaches, every command lands where the docs' table says, or is refused", () => {
     const tried = reached();
     const off = tried.filter(({ before, probe }) => {
@@ -2088,7 +2101,7 @@ describe("a sync from upstream", { timeout: PROPERTY_TIMEOUT }, () => {
     );
   });
 
-  it("[sync.imported-only] only an imported trunk syncs: an empty, forked or template start, or one with no origin, is NotImported", () => {
+  it("[sync.upstream-only] only an imported or forked trunk syncs: an empty or template start, or one with no origin, is NotImported", () => {
     const origins: readonly (TrunkOrigin | undefined)[] = [
       undefined,
       { kind: "empty" },
@@ -2109,8 +2122,35 @@ describe("a sync from upstream", { timeout: PROPERTY_TIMEOUT }, () => {
           ]).results[1],
         ) ?? "taken",
     );
-    expect(refused).toEqual(["NotImported", "NotImported", "NotImported", "NotImported"]);
+    expect(refused).toEqual(["NotImported", "NotImported", "taken", "NotImported"]);
     expect(drive([importedInit, sync()]).tags[1]).toEqual(["TrunkSyncStarted"]);
+  });
+
+  it("[fork-sync.points] a fork's sync names the project it syncs from and the upstream head a merge took; each one lands a point where the fork met its upstream, newest first and ending at the fork point, and an import keeps none", () => {
+    const MERGE = sha(0x4001);
+    const UP2 = sha(0x3002);
+    const synced = drive([forkedInit, sync(), readBack(UP), sync(UP, MERGE, UP2), readBack(MERGE)]);
+    expect(synced.tags.slice(1)).toEqual([
+      ["TrunkSyncStarted"],
+      ["TrunkSynced"],
+      ["TrunkSyncStarted"],
+      ["TrunkSynced"],
+    ]);
+    expect(eventsOf(synced.results[4]!)[0]).toMatchObject({
+      from: UP,
+      to: MERGE,
+      upstream: { project: FORK_OF },
+      merged: UP2,
+      height: 2,
+    });
+    expect(eventsOf(synced.results[2]!)[0]).not.toHaveProperty("merged");
+    expect(synced.state === undefined ? [] : upstreamPointsOf(synced.state)).toEqual([
+      { at: MERGE, upstream: UP2 },
+      { at: UP, upstream: UP },
+      { at: H0, upstream: H0 },
+    ]);
+    const imported = drive([importedInit, sync(), readBack(UP)]);
+    expect(imported.state === undefined ? undefined : upstreamPointsOf(imported.state)).toEqual([]);
   });
 
   it("[sync.phases] a sync starts from idle or debouncing at trunk's own head, and is refused while a group is in flight, a freeze holds or another sync is open", () => {

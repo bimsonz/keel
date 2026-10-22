@@ -43,6 +43,8 @@ export type Route =
   | { at: "issue"; number: number }
   /** The form that opens an issue. */
   | { at: "new-issue" }
+  /** On a fork, the form that proposes one of its commits back to the project it was forked from. */
+  | { at: "new-proposal" }
   | { at: "changes"; filter: ChangeFilter; shown: number }
   | { at: "change"; name: string; tab: ChangeTab }
   | { at: "conflicts"; filter: ConflictFilter; shown: number }
@@ -125,6 +127,8 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       return more.length > 0 ? MISSING : { at: "commits", ref: first ?? TRUNK };
     case "commit":
       return first === undefined || more.length > 0 ? MISSING : { at: "commit", sha: first };
+    case "propose":
+      return first === undefined ? { at: "new-proposal" } : MISSING;
     case "issues": {
       if (first === undefined)
         return { at: "issues", state: query.get("state") === "closed" ? "closed" : "open" };
@@ -245,6 +249,8 @@ function pathOf(route: Route): string[] {
       return ["issues", String(route.number)];
     case "new-issue":
       return ["issues", "new"];
+    case "new-proposal":
+      return ["propose"];
     case "change":
       return ["changes", route.name, ...(route.tab === "overview" ? [] : [route.tab])];
     case "conflict":

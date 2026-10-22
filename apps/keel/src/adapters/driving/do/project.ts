@@ -1,8 +1,10 @@
 import {
   hearLiveChange,
+  hearProposal,
   liveAnchors,
   liveGoalOf,
   liveNear,
+  reserveProposal,
 } from "@keeltown/core/application/coordination";
 import {
   acceptProjectInvitation,
@@ -59,6 +61,7 @@ import {
   type ProjectRpc,
   PutSettingsCommand,
   RecordDeploymentCommand,
+  ReserveProposalCommand,
   SetDeployTargetCommand,
 } from "../../../rpc/index.ts";
 import { scheduleAlarm, type StartedAlarm } from "./alarm.ts";
@@ -207,10 +210,12 @@ export class ProjectDO
   /**
    * The live-change index: each change of the project subscribes it, scoped,
    * at declare, and every event folds in the transaction that receives it. The
-   * notices it gives (a change's alternatives) go on the project.
+   * notices it gives (a change's alternatives) go on the project. The
+   * proposal ledger hears each proposal and its end in the same transaction.
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const projectId = projectIdOf(this.ctx.id.name);
+    hearProposal(tx.store, event);
     // Read before the index forgets the change: a landing closes the issues its goal names.
     const closing = event.type === "ChangeLanded" ? closedBy(tx, projectId, event) : [];
     const drafts = [...hearLiveChange(tx, projectId, event), ...closing];
@@ -227,6 +232,18 @@ export class ProjectDO
       Schema.decodeUnknownEffect(OpenIssueCommand)(command).pipe(
         Effect.orDie,
         Effect.flatMap((opening) => openIssue(projectId, opening)),
+      ),
+    );
+  }
+
+  /** Reserves a proposal's change id by its proposer's key; ProposalLimit past what one proposer may have open. */
+  async reserveProposal(command: typeof ReserveProposalCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    return this.answer(
+      ProjectCodecs.reserveProposal,
+      Schema.decodeUnknownEffect(ReserveProposalCommand)(command).pipe(
+        Effect.orDie,
+        Effect.flatMap((reservation) => reserveProposal(projectId, reservation)),
       ),
     );
   }

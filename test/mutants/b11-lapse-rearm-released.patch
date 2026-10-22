@@ -2,17 +2,18 @@
 # kills: b11.lapse
 # why: the lease deadline is armed whatever the lease's state, so a released or lapsed lease keeps an alarm
 diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
-index af520182..499ddaaa 100644
+index cbff72f2..8443d5af 100644
 --- a/apps/keel/src/adapters/driving/do/change.ts
 +++ b/apps/keel/src/adapters/driving/do/change.ts
-@@ -340,9 +340,8 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+@@ -390,10 +390,9 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     */
    private async armLease(): Promise<void> {
      const change = await this.runtime.runPromise(Effect.option(getChange(this.changeId)));
 -    const held =
 -      Option.isSome(change) && isAgentOwned(change.value.state) ? change.value : undefined;
--    const active = held?.lease.state === "active" ? held.lease : undefined;
 +    const held = Option.isSome(change) ? change.value : undefined;
+     // A proposal has no lease: no agent holds it, so nothing lapses.
+-    const active = held?.lease?.state === "active" ? held.lease : undefined;
 +    const active = held?.lease;
      const keep = active === undefined ? undefined : leaseDeadline(active.id);
      for (const armed of armedAlarms(this.ctx.storage)) {

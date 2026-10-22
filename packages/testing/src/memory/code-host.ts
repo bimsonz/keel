@@ -6,6 +6,7 @@ import {
   type CommitInfo,
   type Imported,
   ImportRefused,
+  KEEL_PROPOSAL_REF,
   KEEL_TRUNK_REF,
   ObjectNotFound,
   PathNotFound,
@@ -396,8 +397,10 @@ export function makeCodeHostMemory() {
  * WorkspaceRebaser over a memory code host: the project's trunk objects (its
  * trunk found by `trunkOf`, `projectRepos` by default) are copied into
  * the workspace and its `keel/trunk` moved to the head, as the relay would
- * leave it. A ref already at the head is `unchanged`; a missing workspace is
- * `RepoNotFound`. `pushed` records each move in order.
+ * leave it; a fork's objects likewise into its `keel/proposal`, once `admit`
+ * takes the bytes of the objects the workspace lacked. A ref already there is
+ * `unchanged`; a missing workspace or fork is `RepoNotFound`. `pushed` records
+ * each move in order.
  */
 export function makeWorkspaceRebaserMemory(
   code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
@@ -423,6 +426,26 @@ export function makeWorkspaceRebaserMemory(
             target.refs.set(KEEL_TRUNK_REF, head);
             pushed.push({ workspace, to: head });
             return Effect.succeed("advanced");
+          }),
+        pushProposal: (source, workspace, commit, _haves, admit) =>
+          Effect.gen(function* () {
+            const target = code.repos.get(repoKey(workspace));
+            if (target === undefined)
+              return yield* Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
+            if (target.refs.get(KEEL_PROPOSAL_REF) === commit) return "unchanged" as const;
+            const fork = code.repos.get(repoKey(source));
+            if (fork === undefined)
+              return yield* Effect.fail(new RepoNotFound({ repo: plain(source) }));
+            if (fork.objects.get(commit)?.type !== "commit")
+              return yield* Effect.die(
+                new Error(`fork ${repoKey(source)} does not hold ${commit}`),
+              );
+            const lacked = [...fork.objects].filter(([id]) => !target.objects.has(id));
+            yield* admit(lacked.reduce((bytes, [, o]) => bytes + o.body.length, 0));
+            for (const [id, o] of lacked) target.objects.set(id, o);
+            target.refs.set(KEEL_PROPOSAL_REF, commit);
+            pushed.push({ workspace, to: commit });
+            return "advanced" as const;
           }),
       }),
     ),

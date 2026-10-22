@@ -8,8 +8,10 @@ import type {
   CommitNotInWorkspace,
   LeaseNotLapsed,
   LeaseStale,
+  NotAProposal,
   PoolExhausted,
   Preflight,
+  ProposalCommitMoved,
   RevisionMismatch,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
@@ -24,6 +26,7 @@ import type {
 } from "../../domain/kernel/index.ts";
 import type { PackTooLarge } from "./trunk-writer.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
+import type { QuotaExceeded } from "../../domain/identity/index.ts";
 import type {
   AbandonInput,
   Adopted,
@@ -41,6 +44,11 @@ import type {
   ReviseInput,
   Revised,
   SubmitInput,
+  ApproveProposal,
+  CloseProposal,
+  ProposeChange,
+  RequestProposalChanges,
+  UpdateProposal,
 } from "../coordination/index.ts";
 import type { ObjectNotFound, RepoRef } from "./code-host.ts";
 import type { WorkspaceGrant } from "./workspace-pool.ts";
@@ -259,5 +267,61 @@ export class Changes extends Context.Service<
       changeId: ChangeId,
       waitSeconds: number,
     ) => Effect.Effect<SubmissionStatus, ChangeNotFound>;
+    /**
+     * Proposes a fork's commit to a project as the change the project's
+     * ledger reserved: its Change DO copies the commit into a workspace of
+     * the project, admitted against the project's namespace, and submits it
+     * on `base`, with no agent and no lease. Idempotent by Idempotency-Key;
+     * another body under the key is IdempotencyConflict.
+     */
+    readonly propose: (
+      changeId: ChangeId,
+      input: ProposeChange,
+    ) => Effect.Effect<
+      Change,
+      | ChangeStateRefused
+      | PoolExhausted
+      | IdempotencyConflict
+      | PushRejected
+      | PackTooLarge
+      | QuotaExceeded
+    >;
+    /** Moves a proposal to another commit of its fork, by its proposer: checked again, and waiting for approval again. */
+    readonly updateProposal: (
+      changeId: ChangeId,
+      input: UpdateProposal,
+    ) => Effect.Effect<
+      Change,
+      | ChangeNotFound
+      | ChangeStateRefused
+      | NotAProposal
+      | IdempotencyConflict
+      | PushRejected
+      | PackTooLarge
+      | QuotaExceeded
+    >;
+    /** Approves a proposal at the commit its reviewer read; another is ProposalCommitMoved. */
+    readonly approveProposal: (
+      changeId: ChangeId,
+      input: ApproveProposal,
+    ) => Effect.Effect<Change, ProposalMoveRefused>;
+    /** Asks for changes to a proposal at the commit its reviewer read: it goes on waiting. */
+    readonly requestProposalChanges: (
+      changeId: ChangeId,
+      input: RequestProposalChanges,
+    ) => Effect.Effect<Change, ProposalMoveRefused>;
+    /** Closes a proposal, by its proposer or by someone who may approve it. */
+    readonly closeProposal: (
+      changeId: ChangeId,
+      input: CloseProposal,
+    ) => Effect.Effect<Change, ProposalMoveRefused>;
   }
 >()("keel/Changes") {}
+
+/** Why a proposal was not approved, asked for changes or closed: nothing moved. */
+export type ProposalMoveRefused =
+  | ChangeNotFound
+  | ChangeStateRefused
+  | NotAProposal
+  | ProposalCommitMoved
+  | IdempotencyConflict;

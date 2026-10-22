@@ -2,10 +2,10 @@
 # kills: change.fold-table
 # why: the fold takes ChangeResumed with its guard gone: `from("parked") && change.parkReason === "awaiting-ruling"`.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..f5cdcd8e 100644
+index 916513b7..996cafdd 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1121,13 +1121,11 @@ export const evolveChange = (
+@@ -1390,13 +1390,11 @@ export const evolveChange = (
            }
          : illegal(change, event);
      case "ChangeResumed":
@@ -20,4 +20,4 @@ index f61b7350..f5cdcd8e 100644
 +          ]);
      case "ChangeAdopted": {
        // The lease's own time rule: a log decided under any rule of when a lease lapses folds.
-       if (!deadlinePassed(change.lease, committed.at)) return illegal(change, event);
+       if (change.lease === undefined || !deadlinePassed(change.lease, committed.at))

@@ -35,7 +35,7 @@ import {
   ProbeLedger,
   PROJECTOR,
 } from "@keeltown/core/ports";
-import { makeManualClock } from "@keeltown/testing";
+import { makeManualClock, heldLease } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
@@ -109,7 +109,7 @@ const escalations = <A, E>(use: (port: (typeof Escalations)["Service"]) => Effec
 
 /** Declares with `intent`, pushes, submits and starts Precheck: the change is deriving, awaiting its plan. */
 async function deriving(c: ChangeUnderTest, intent: Parameters<ChangeUnderTest["declare"]>[1]) {
-  const lease = ok(await c.declare(`declare-${c.changeId}`, intent)).change.lease.id;
+  const lease = heldLease(ok(await c.declare(`declare-${c.changeId}`, intent)).change).id;
   await drainOutbox(c.stub);
   const commitSha = await c.push();
   ok(
@@ -599,7 +599,7 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
         await c.stub.rely({
           agentId: c.agentId,
           projectId: c.projectId,
-          leaseId: declared.change.lease.id,
+          leaseId: heldLease(declared.change).id,
           premise: elsewhere,
           idempotencyKey: "rely-c",
         }),
@@ -757,7 +757,7 @@ async function escalatedPair(probes: Awaited<ReturnType<typeof inertProbe>>) {
         await c.stub.abandon({
           authority: {
             _tag: "Lease",
-            leaseId: (await c.current()).lease.id,
+            leaseId: heldLease(await c.current()).id,
             agentId: c.agentId,
             projectId: c.projectId,
           },

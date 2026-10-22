@@ -129,6 +129,13 @@ model ProjectSettings {
    * PUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged.
    */
   visibility?: "private" | "public";
+
+  /**
+   * Whether a fork of the project may propose changes back to it. Absent in a PUT means `open`, and Keel always
+   * answers it; a private project takes no proposals, whatever it says. Every change is audited by
+   * ProjectSettingsChanged.
+   */
+  proposals?: "open" | "closed";
 }
 
 model ProjectPage is Page<ProjectView>;
@@ -229,16 +236,21 @@ interface Operator {
   getSettings(@path projectId: ProjectId): ProjectSettings | NotFound | StandardErrors;
 
   /**
-   * Moves an imported project's trunk forward to the head of the upstream branch its import took, as GitHub's
-   * "Sync fork" does: each upstream commit is kept as it is, and trunk moves only when upstream's head descends from
-   * trunk's. Its owners alone may ask. Refused, with nothing moved: a project that was not imported
-   * (`project.not_imported`); a trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both heads); a
-   * promotion in flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch
+   * Moves an imported or forked project's trunk forward to its upstream, as GitHub's "Sync fork" does: each upstream
+   * commit is kept as it is. An import's trunk moves to the head of the upstream branch its import took, and only
+   * when that head descends from trunk's. A fork's trunk moves to the head of the trunk it was forked from: to that
+   * head itself when it descends from trunk's, otherwise to a merge commit Keel makes and signs, whose second parent
+   * is that head and whose tree holds the fork's own work and upstream's. Its owners alone may ask, and a fork's only
+   * while they may read its upstream. Refused, with nothing moved: a project that was neither imported nor forked
+   * (`project.not_imported`); an import's trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both
+   * heads); a fork whose work and upstream's cannot be merged (`trunk.sync_conflicts`, naming the first path that
+   * stopped the merge: land a change in the fork that takes upstream's version of it, then sync again); a promotion
+   * in flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch
    * (`project.upstream_unreachable`); upstream's new history over what Keel takes in one piece
    * (`project.import_too_large`) or over the namespace's repo bytes (`quota.exceeded`). The feed records the move as
    * `TrunkSynced`.
    */
-  @summary("Sync an imported project's trunk from its upstream")
+  @summary("Sync an imported or forked project's trunk from its upstream")
   @tag("mcp")
   @useAuth(AgentWork | SessionAuth)
   @route("/projects/{projectId}/sync")

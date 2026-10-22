@@ -109,6 +109,17 @@ const RULES: Record<EventType, Rule[]> = {
   ChangeAdopted: [change(["parked"], "working")],
   ChangeWithdrawn: [change(WITHDRAWABLE, "withdrawn")],
   ChangeSuperseded: [change(WITHDRAWABLE, "superseded")],
+  // A proposal is made as it is declared, moves to another commit from anywhere short of its batch, and is
+  // approved or asked for changes while it waits for approval.
+  ChangeProposed: [change(["declared"])],
+  ProposalUpdated: [
+    change(
+      ["submitted", "deriving", "drifted", "verifying", "queued", "bounced", "parked"],
+      "working",
+    ),
+  ],
+  ProposalApproved: [change(["parked"])],
+  ProposalChangesRequested: [change(["parked"])],
   LeaseLapsed: [change(undefined)],
   LeaseRestarted: [change(AGENT_OWNED)],
 

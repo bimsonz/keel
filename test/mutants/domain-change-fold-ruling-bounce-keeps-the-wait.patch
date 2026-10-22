@@ -2,12 +2,12 @@
 # kills: change.ruling-bounces, change.fold-table
 # why: a change bounced by a ruling keeps its park reason, its escalation and where it was parked from: bounced, and still reading as waiting
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2549e49a..1cf56767 100644
+index 916513b7..97e4be49 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1015,9 +1015,6 @@ export const evolveChange = (
-       if (event.decisionId !== undefined)
-         return from("parked") && change.parkReason === "awaiting-ruling"
+@@ -1335,9 +1335,6 @@ export const evolveChange = (
+         return from("parked") &&
+           (change.parkReason === "awaiting-ruling" || change.parkReason === "awaiting-approval")
            ? moveTo(change, "bounced", [
 -              "parkReason",
 -              "escalationId",

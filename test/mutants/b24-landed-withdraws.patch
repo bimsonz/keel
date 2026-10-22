@@ -2,10 +2,10 @@
 # kills: b24.never-acts
 # why: Keel acts on an alternative's landing: the other change is withdrawn instead of told
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index e152f56e..0bf3af00 100644
+index 203b3b42..fbc0338b 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -2135,6 +2135,8 @@ const commandFor = (
+@@ -2745,6 +2745,8 @@ const commandFor = (
            }
          : undefined;
      }
@@ -15,13 +15,13 @@ index e152f56e..0bf3af00 100644
        hearConflict(store, event);
        return provenAgainst(store, change, event);
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index 50c23c55..8fbbdbc1 100644
+index b87eae59..ddba3e4c 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -264,6 +264,7 @@ export function hearLiveChange(
-       putLive(store, changeId, live, { id: declared.changeId, intent, derived: [] });
-       store.put(LIVE_AGENT, changeId, declared.agentId);
-       tx.outbox.subscribe(`agent:${declared.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+@@ -273,6 +273,7 @@ export function hearLiveChange(
+         store.put(LIVE_AGENT, changeId, declared.agentId);
+         tx.outbox.subscribe(`agent:${declared.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+       }
 +      tx.outbox.subscribe(`change:${changeId}`, ["AlternativeLanded"], changeRef(changeId));
        return [];
      }

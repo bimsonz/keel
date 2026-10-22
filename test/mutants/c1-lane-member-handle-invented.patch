@@ -2,15 +2,15 @@
 # kills: lane.member-plain
 # why: An agent with no handle is given its id as one, so the Lane sends the composer a handle the directory never held
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2dfc..93edcfab 100644
+index bf0c698d..0ae165a4 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -970,7 +970,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-           // The run is the one that holds the change.
-           agent: {
-             id: change.agentId,
--            handle: Option.getOrUndefined(agent)?.handle,
-+            handle: Option.getOrUndefined(agent)?.handle ?? change.agentId,
-             run: change.run?.id,
-           },
-         } satisfies CandidateMember;
+@@ -1486,7 +1486,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+             : {
+                 agent: {
+                   id: agentId,
+-                  handle: Option.getOrUndefined(agent)?.handle,
++                  handle: Option.getOrUndefined(agent)?.handle ?? change.agentId,
+                   run: change.run?.id,
+                 },
+               }),

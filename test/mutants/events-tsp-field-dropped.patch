@@ -2,18 +2,18 @@
 # kills: events.conform
 # why: the spec drops IntentDeclared.revision (and the regenerated document with it), so consumers stop seeing a field core still sends
 diff --git a/packages/contracts/openapi.json b/packages/contracts/openapi.json
-index 8bc0b565..bffb0dd0 100644
+index 4f2ba5e2..9c29f8fe 100644
 --- a/packages/contracts/openapi.json
 +++ b/packages/contracts/openapi.json
-@@ -17727,7 +17727,6 @@
+@@ -20127,7 +20127,6 @@
+           "_tag",
            "changeId",
-           "agentId",
            "origin",
 -          "revision",
            "goal",
            "footprint",
            "premises"
-@@ -17756,9 +17755,6 @@
+@@ -20161,9 +20160,6 @@
            "origin": {
              "$ref": "#/components/schemas/ChangeOrigin"
            },
@@ -24,10 +24,10 @@ index 8bc0b565..bffb0dd0 100644
              "type": "string",
              "minLength": 1
 diff --git a/packages/spec/events.tsp b/packages/spec/events.tsp
-index 3d31a074..4ee538c1 100644
+index c120e4e7..763ab821 100644
 --- a/packages/spec/events.tsp
 +++ b/packages/spec/events.tsp
-@@ -301,7 +301,6 @@ model IntentDeclared {
+@@ -309,7 +309,6 @@ model IntentDeclared {
    /** The run of the agent that declared the change, when its token named one: the run that holds it. */
    run?: RunRef;
    origin: ChangeOrigin;

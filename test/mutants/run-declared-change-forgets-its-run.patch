@@ -2,13 +2,13 @@
 # kills: run.change
 # why: a declared change does not keep the run that declared it, so a landed commit's author line cannot say which run wrote it
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 2549e49a..ad2dec09 100644
+index 916513b7..923d4388 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -909,7 +909,6 @@ export const evolveChange = (
+@@ -1190,7 +1190,6 @@ export const evolveChange = (
      return {
        id: event.changeId,
-       agentId: event.agentId,
+       ...(agentId === undefined ? {} : { agentId }),
 -      ...(event.run === undefined ? {} : { run: event.run }),
        origin: event.origin,
        state: "declared",

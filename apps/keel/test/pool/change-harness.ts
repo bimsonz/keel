@@ -19,6 +19,9 @@ import {
   makeWorkspaceRebaserMemory,
   makeWorkspaceWriterMemory,
   sampleProjectId,
+  makeNamespaceUsageMemory,
+  makeEscalationsMemory,
+  makeProjectNamespacesMemory,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -118,7 +121,18 @@ export async function changeUnderTest(
   const trunks = makeTrunksMemory();
   const rebaser = makeWorkspaceRebaserMemory(code);
   const writer = makeWorkspaceWriterMemory(code);
-  const fixed = Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer, writer.layer);
+  // A proposal's commits count against its namespace's repo bytes, and a proposal takes back its questions:
+  // no case here proposes, so any count, gate and place will do.
+  const fixed = Layer.mergeAll(
+    pool.layer,
+    code.layer,
+    trunks.layer,
+    rebaser.layer,
+    writer.layer,
+    makeNamespaceUsageMemory().layer,
+    makeEscalationsMemory().gate,
+    makeProjectNamespacesMemory().layer,
+  );
   await rewire(
     stub,
     (objectEnv) =>

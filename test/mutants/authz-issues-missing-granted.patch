@@ -2,14 +2,14 @@
 # kills: authz.issues
 # why: a close of an issue the project has not got is granted to a maintainer, so the policy answers differently for a number that names nothing
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index dbf68d04..e3c49c74 100644
+index e40376fe..e899edf8 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -939,7 +939,6 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
+@@ -978,7 +978,6 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
    if (principal._tag === "Anonymous") return unauthenticated();
    const read = decide(principal, "read", issue.project);
    if (Result.isFailure(read)) return read;
 -  if (issue.author === undefined) return hidden();
-   const actor =
-     principal._tag === "User"
-       ? userActor(principal.userId)
+   return actorOf(principal) === issue.author
+     ? granted()
+     : decide(principal, "maintain", issue.project);

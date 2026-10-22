@@ -1,19 +1,34 @@
 // One change.
 
 import { useEffect } from "react";
+import type { ProjectView } from "../contract/keel/index.ts";
 import { shownAgent } from "../engine/audience.ts";
 import { changeDrawn } from "../engine/seed.ts";
 import { PAGE, changeNamed } from "../engine/lists.ts";
 import { useHolderCards, usePlayer, useSelected, useWorldVersion } from "../engine/react.tsx";
 import { rulingWords } from "../engine/ruling.ts";
+import { maintains } from "../engine/settings.ts";
 import { changePageOf } from "../engine/select.ts";
 import type { ChangeTab } from "../route.ts";
 import { Link } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Change, EarlyChange } from "../views/Change.tsx";
-import { Notice } from "../views/Frame.tsx";
+import { Notice, type ReaderMark } from "../views/Frame.tsx";
 
-export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; mode: Mode }) {
+export function ChangePage({
+  name,
+  tab,
+  mode,
+  project,
+  reader,
+}: {
+  name: string;
+  tab: ChangeTab;
+  mode: Mode;
+  /** The project as Keel shows it to this reader: whether they maintain it decides who reviews a proposal. */
+  project?: ProjectView;
+  reader?: ReaderMark;
+}) {
   const player = usePlayer();
   const version = useWorldVersion();
   const id = useSelected((world) => changeNamed(world, name)?.id, [name]);
@@ -58,8 +73,12 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
   const drawn = changeDrawn(player, state !== null, summary);
   if (drawn.by === "waiting") return null;
   if (drawn.by === "early") {
-    const card = player.cards.get(drawn.summary.agentId);
-    const agent = shownAgent(player.world.agents.get(drawn.summary.agentId), card);
+    const { agentId } = drawn.summary;
+    const card = agentId === undefined ? undefined : player.cards.get(agentId);
+    const agent = shownAgent(
+      agentId === undefined ? undefined : player.world.agents.get(agentId),
+      card,
+    );
     return (
       <EarlyChange
         summary={drawn.summary}
@@ -76,11 +95,39 @@ export function ChangePage({ name, tab, mode }: { name: string; tab: ChangeTab; 
         </Link>
       </Notice>
     );
+  // A proposal waiting for approval is reviewed here: a maintainer approves it or asks for changes, and its
+  // proposer may close it. Keel decides who may: the page offers what the reader's role allows.
+  const proposals = player.source.proposals;
+  const proposal = state.proposal;
+  const review =
+    proposals === undefined || proposal === undefined
+      ? undefined
+      : {
+          reader:
+            project !== undefined && maintains(project)
+              ? ("maintainer" as const)
+              : reader?.id !== undefined && proposal.proposer === `user:${reader.id}`
+                ? ("proposer" as const)
+                : ("reader" as const),
+          onApprove: async (commit: string) => {
+            await proposals.approve(state.change.id, commit);
+            await player.moved();
+          },
+          onRequestChanges: async (commit: string, comment: string) => {
+            await proposals.requestChanges(state.change.id, commit, comment);
+            await player.moved();
+          },
+          onClose: async () => {
+            await proposals.close(state.change.id);
+            await player.moved();
+          },
+        };
   return (
     <Change
       state={state}
       mode={mode}
       tab={tab}
+      {...(review === undefined ? {} : { review })}
       {...(escalationId === undefined || words === undefined
         ? {}
         : {

@@ -2,15 +2,15 @@
 # kills: lease.lapse-computed-on-read, lease.adopt-iff-lapsed
 # why: A lease counts as lapsed only once the alarm has fired
 diff --git a/packages/core/src/domain/coordination/lease.ts b/packages/core/src/domain/coordination/lease.ts
-index 8afc26e9..cb7153e2 100644
+index e7f03619..04d4c8d6 100644
 --- a/packages/core/src/domain/coordination/lease.ts
 +++ b/packages/core/src/domain/coordination/lease.ts
 @@ -36,7 +36,7 @@ const waitsOnAgent = (change: Change): boolean =>
   * change, under the rule before this one, does not stand either.
   */
  export const isLapsed = (change: Change, now: Instant): boolean =>
--  waitsOnAgent(change) && deadlinePassed(change.lease, now);
-+  waitsOnAgent(change) && change.lease.state === "lapsed";
+-  change.lease !== undefined && waitsOnAgent(change) && deadlinePassed(change.lease, now);
++  change.lease !== undefined && waitsOnAgent(change) && change.lease.state === "lapsed";
  
  /**
   * Whether the change's lease is still its holder's permit: active, or recorded

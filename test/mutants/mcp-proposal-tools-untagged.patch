@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mcp-tools-only.test.ts
+# kills: mcp.proposal-tools
+# why: approveProposal is no MCP tool, so a person's assistant cannot approve the proposal it was told to read
+# regen
+diff --git a/packages/spec/proposals.tsp b/packages/spec/proposals.tsp
+index fb45301c..0bc115c9 100644
+--- a/packages/spec/proposals.tsp
++++ b/packages/spec/proposals.tsp
+@@ -123,7 +123,6 @@ interface Proposals {
+    * Refused unless it waits for approval (409 `change.state_refused`).
+    */
+   @summary("Approve a proposal")
+-  @tag("mcp")
+   @operationId("approveProposal")
+   @useAuth(AgentRead | SessionAuth)
+   @route("/changes/{changeId}/proposal/approval")

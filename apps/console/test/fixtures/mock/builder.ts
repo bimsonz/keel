@@ -229,7 +229,7 @@ export class ScriptBuilder {
   /** Record one event at the current instant. Its id, `seq` and `at` are assigned when the log is built. */
   emit(input: EventInput): AnyEvent {
     const { causation, label, type, entity, payload } = input;
-    if (input.type === "IntentDeclared")
+    if (input.type === "IntentDeclared" && input.payload.agentId !== undefined)
       this.#holders.set(input.payload.changeId, input.payload.agentId);
     // What an agent's command commits is the agent's, as Keel writes it on the entry: who, and under which run.
     const holder =

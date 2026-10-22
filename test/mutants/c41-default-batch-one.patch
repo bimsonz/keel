@@ -2,7 +2,7 @@
 # kills: b12.settings-audit
 # why: a project starts with batches of one, so its lane never batches until someone sets the size
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index 89493ac..6888d58 100644
+index 6d53a7ea..9788b1cb 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
 @@ -36,7 +36,7 @@ export const PROJECT_SETTINGS = "project-settings";
@@ -13,4 +13,4 @@ index 89493ac..6888d58 100644
 +  maxBatchSize: 1,
    verification: "required",
    visibility: "private",
- };
+   proposals: "open",

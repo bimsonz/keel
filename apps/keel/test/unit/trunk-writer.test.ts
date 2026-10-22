@@ -12,8 +12,12 @@ import {
   TrunkWriter,
 } from "@keeltown/core/ports";
 import {
+  decodeCommit,
+  decodeTree,
   importSshSigningKey,
   MAX_RELAY_PACK_BYTES,
+  mergeOnBase,
+  MissingObject,
   rootCommit,
   sshSignature,
   writePack,
@@ -24,7 +28,10 @@ import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
 import { StagingWriterGitCore } from "../../src/adapters/driven/gitcore/staging-writer.ts";
-import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
+import {
+  TrunkWriterGitCore,
+  UPSTREAM_REF,
+} from "../../src/adapters/driven/gitcore/trunk-writer.ts";
 import { gitServer, PACK, type Reply } from "./git-server.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
@@ -40,6 +47,22 @@ const HOST = "keel.test";
 const ADMITTED = () => Effect.void;
 /** A deployment with no signing key: enough for a writer that seeds nothing. */
 const UNSIGNED = { host: HOST, signingKey: undefined, signers: "[]" };
+
+/** gitcore's reads of a memory repo's objects, as the writer opens a repo to merge in it. */
+const openOf = (code: ReturnType<typeof makeCodeHostMemory>) => async (repo: RepoRef) => {
+  const objects = code.repos.get(`${repo.namespace}/${repo.name}`)?.objects;
+  const read = (oid: string, type: string) => {
+    const o = objects?.get(oid);
+    if (o?.type !== type) throw new MissingObject(oid);
+    return o.body;
+  };
+  return {
+    readTree: async (oid: string) => decodeTree(read(oid, "tree")),
+    readBlob: async (oid: string) => read(oid, "blob"),
+    readCommit: async (oid: string) => decodeCommit(read(oid, "commit")),
+    [Symbol.dispose]: () => undefined,
+  };
+};
 
 /** Trunk and staging in memory, trunk's main at a commit that is not FROM, and every minted token recorded. */
 function host() {
@@ -57,7 +80,7 @@ function host() {
       }),
     ),
   ).pipe(Layer.provide(code.layer));
-  const layer = TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED).pipe(
+  const layer = TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED, openOf(code)).pipe(
     Layer.provide(spied),
   );
   const stagingLayer = StagingWriterGitCore({ trunk: TRUNK, staging: STAGING }).pipe(
@@ -399,6 +422,7 @@ const emptyTrunk = (replies: Reply[], pack?: Uint8Array) =>
     const layer = TrunkWriterGitCore(
       { trunk: TRUNK, staging: STAGING },
       { host: HOST, signingKey: keys.signingKey, signers: keys.signers },
+      openOf(code),
     ).pipe(Layer.provide(code.layer));
     /** Trunk's main as the memory host holds it: the recording server takes pushes and moves nothing. */
     const setMain = (to: CommitSha) => {
@@ -409,7 +433,7 @@ const emptyTrunk = (replies: Reply[], pack?: Uint8Array) =>
       yield* (yield* CodeHost).create(SOURCE);
       return yield* code.fixture.commit(SOURCE, MAIN, { "README.md": "the source\n" });
     }).pipe(Effect.provide(code.layer));
-    return { keys, server, layer, setMain, sourced };
+    return { keys, server, layer, setMain, sourced, code };
   });
 
 /** Keel's first commit for `name` at `at`, built here from the key itself. */
@@ -477,7 +501,7 @@ describe("TrunkWriter.seed and adopt", () => {
         const keyless = yield* Effect.exit(
           Effect.flatMap(TrunkWriter, (w) => w.seed("forge", AT)).pipe(
             Effect.provide(
-              TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED).pipe(
+              TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }, UNSIGNED, openOf(code)).pipe(
                 Layer.provide(code.layer),
               ),
             ),
@@ -591,6 +615,87 @@ describe("TrunkWriter.take", () => {
           limit: RELAY_PACK_CAP_BYTES,
         });
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+      }),
+  );
+});
+
+describe("TrunkWriter.fetchProject and mergeUpstream", () => {
+  const AT = Instant(1_760_000_000_999);
+
+  it.effect(
+    "[trunkwriter.fetch-project] relays another project's trunk into trunk's side ref: asked of the source with a read token at the head past the haves, and sent to the side ref, never main",
+    () =>
+      Effect.gen(function* () {
+        const { server, layer, sourced } = yield* emptyTrunk(["ok"]);
+        const tip = yield* sourced;
+        const bytes = yield* Effect.flatMap(TrunkWriter, (w) =>
+          w.fetchProject(SOURCE, tip, [FROM]),
+        ).pipe(Effect.provide(layer));
+        expect(bytes).toBe(PACK.length);
+        expect(
+          server.requests.map(({ auth, ...r }) => ({ ...r, auth: auth?.replace(/_\d+$/, "") })),
+        ).toEqual([
+          {
+            service: "upload-pack",
+            repo: "memory/src.git",
+            auth: "Bearer memrepo_read_memory/src",
+            lines: [expect.stringMatching(new RegExp(`^want ${tip} `)), `have ${FROM}`, "done"],
+          },
+          {
+            service: "receive-pack",
+            repo: "memory/prj.git",
+            auth: "Bearer memrepo_write_memory/prj",
+            lines: [`${ZERO_OID} ${tip} ${UPSTREAM_REF}`],
+          },
+        ]);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.merge-upstream] moves the side ref from the upstream's head to one signed commit by Keel whose parents are trunk's head then the upstream's, merged on the base given; a path both changed apart is MergeRefused naming it, with nothing sent",
+    () =>
+      Effect.gen(function* () {
+        const { keys, server, layer, code } = yield* emptyTrunk(["ok"]);
+        const files = { "README.md": "base\n", "src/a.ts": "a\n", "src/b.ts": "b\n" };
+        const at = (ref: string, tree: Record<string, string>, parents?: readonly CommitSha[]) =>
+          code.fixture.commit(TRUNK, ref, tree, parents).pipe(Effect.provide(code.layer));
+        const base = yield* at(MAIN, files);
+        const ours = yield* at(MAIN, { ...files, "src/a.ts": "a, the fork's\n" });
+        const theirs = yield* at(UPSTREAM_REF, { ...files, "src/b.ts": "b, upstream's\n" }, [base]);
+        const merge = (with_: CommitSha) =>
+          Effect.flatMap(TrunkWriter, (w) =>
+            w.mergeUpstream({ ours, theirs: with_, base, at: AT, message: "Merge upstream" }),
+          ).pipe(Effect.provide(layer));
+        const merged = yield* merge(theirs);
+        const key = yield* Effect.promise(() => importSshSigningKey(keys.signingKey));
+        const keel = { name: "Keel", email: `keel@${HOST}`, time: Math.floor(AT / 1000) };
+        const expected = yield* Effect.promise(async () =>
+          mergeOnBase(await openOf(code)(TRUNK), {
+            base,
+            ours,
+            theirs,
+            author: keel,
+            committer: keel,
+            message: "Merge upstream",
+            sign: (unsigned) => sshSignature(key, unsigned),
+          }),
+        );
+        const pack = yield* Effect.promise(() => writePack(expected.objects));
+        expect(merged).toEqual({ commit: expected.oid, bytes: pack.length });
+        expect(
+          server.requests.map(({ service, repo, lines }) => ({ service, repo, lines })),
+        ).toEqual([
+          {
+            service: "receive-pack",
+            repo: "memory/prj.git",
+            lines: [`${theirs} ${expected.oid} ${UPSTREAM_REF}`],
+          },
+        ]);
+        expect(server.received).toEqual([pack.length]);
+        const clash = yield* at(UPSTREAM_REF, { ...files, "src/a.ts": "a, upstream's\n" }, [base]);
+        const refused = yield* Effect.flip(merge(clash));
+        expect(refused).toMatchObject({ _tag: "MergeRefused", path: "src/a.ts" });
+        expect(server.requests).toHaveLength(1);
       }),
   );
 });

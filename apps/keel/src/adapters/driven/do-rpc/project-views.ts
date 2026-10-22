@@ -28,11 +28,12 @@ export function ProjectViewsRpc(projector: () => ProjectViewsStub): Layer.Layer<
   return Layer.succeed(
     ProjectViews,
     ProjectViews.of({
-      changes: ({ project, state, cursor, limit }) =>
+      changes: ({ project, state, proposals, cursor, limit }) =>
         callObject(ProjectorCodecs.changes, () =>
           projector().changes({
             project,
             ...(state === undefined ? {} : { state }),
+            ...(proposals === undefined ? {} : { proposals }),
             ...(cursor === undefined ? {} : { cursor }),
             ...(limit === undefined ? {} : { limit }),
           }),

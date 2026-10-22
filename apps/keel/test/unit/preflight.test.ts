@@ -13,6 +13,7 @@ import {
   makeWorkspacePoolMemory,
   sampleProjectId,
   ulidOf,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
@@ -126,7 +127,7 @@ describe("[b21.revise-preflight] a revision's preflight reads the intent it leav
       const revised = yield* revise(B, {
         agentId: agentB,
         projectId: sampleProjectId,
-        leaseId: before.change.lease.id,
+        leaseId: heldLease(before.change).id,
         ifMatchRevision: 1,
         premisesAdded: [],
         premisesRetracted: [],
@@ -189,7 +190,7 @@ describe("[b21.canonical] an ordering written from either event is compared and 
         const relied = yield* rely(B, {
           agentId: agentB,
           projectId: sampleProjectId,
-          leaseId: before.change.lease.id,
+          leaseId: heldLease(before.change).id,
           premise: migrateBeforeDeploy,
           idempotencyKey: "rely-b",
         }).pipe(Effect.provide(layerB));

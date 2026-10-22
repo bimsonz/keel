@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type DeclareInput, type SubmitInput } from "@keeltown/core/application/coordination";
-import { FootprintEntry, Proposition } from "@keeltown/core/domain/coordination";
+import { type Change, FootprintEntry, Proposition } from "@keeltown/core/domain/coordination";
 import type { AgentToken } from "@keeltown/core/domain/identity";
 import {
   AgentId,
@@ -13,6 +13,12 @@ import {
 } from "@keeltown/core/kernel";
 import { Changes, type WorkspaceGrant } from "@keeltown/core/ports";
 import { Effect, Fiber, type Layer, Schema } from "effect";
+
+/** The lease of an agent's change: every change the suite declares is an agent's, and holds one. */
+const leaseIdOf = (change: Change) => {
+  if (change.lease === undefined) throw new Error(`${change.id} holds no lease`);
+  return change.lease.id;
+};
 
 /**
  * What the `Changes` suite needs beside the port: a way to put a commit into a
@@ -75,7 +81,7 @@ const declared = (harness: ChangesHarness) =>
     const commitSha = yield* harness.push(result.workspace);
     const submit = (overrides: Partial<SubmitInput> = {}): SubmitInput => ({
       changeId: result.change.id,
-      lease: result.change.lease.id,
+      lease: leaseIdOf(result.change),
       idempotencyKey: `submit-${crypto.randomUUID()}`,
       commitSha,
       ...overrides,
@@ -237,7 +243,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const { who, result } = yield* declared(harness);
           const refreshed = yield* changes.refreshWorkspace(who, {
             changeId: result.change.id,
-            lease: result.change.lease.id,
+            lease: leaseIdOf(result.change),
           });
           expect(refreshed).toMatchObject({
             workspaceId: result.workspace.workspaceId,
@@ -256,7 +262,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         return Effect.gen(function* () {
           const changes = yield* Changes;
           const { who, result } = yield* declared(harness);
-          const input = { changeId: result.change.id, lease: result.change.lease.id };
+          const input = { changeId: result.change.id, lease: leaseIdOf(result.change) };
           const other: AgentToken = {
             ...who,
             agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
@@ -299,7 +305,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
       return Effect.gen(function* () {
         const changes = yield* Changes;
         const { who, result } = yield* declared(harness);
-        const lease = result.change.lease.id;
+        const lease = leaseIdOf(result.change);
         yield* changes.abandon({
           changeId: result.change.id,
           authority: {
@@ -388,7 +394,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             agentId: adopter.agentId,
             lease: { agentId: adopter.agentId, state: "active" },
           });
-          expect(adopted.change.lease.id).not.toBe(result.change.lease.id);
+          expect(leaseIdOf(adopted.change)).not.toBe(leaseIdOf(result.change));
           expect(adopted.workspace?.workspaceId).toBe(result.workspace.workspaceId);
           expect(adopted.workspace?.token).not.toBe("");
           const fenced = yield* Effect.flip(changes.submit(who, submit()));
@@ -414,8 +420,8 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           expect(error).toMatchObject({ _tag: "LeaseNotLapsed", changeId: result.change.id });
           expect(error._tag === "LeaseNotLapsed" ? error.lapsesAt : 0).toBeGreaterThan(Date.now());
           expect(error._tag === "LeaseNotLapsed" ? error.nextActions.length : 0).toBeGreaterThan(0);
-          expect((yield* changes.get(result.change.id)).change.lease.id).toBe(
-            result.change.lease.id,
+          expect(leaseIdOf((yield* changes.get(result.change.id)).change)).toBe(
+            leaseIdOf(result.change),
           );
         }).pipe(Effect.provide(harness.layer));
       },
@@ -434,7 +440,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           };
           const first = yield* changes.adopt(adopter, input);
           const again = yield* changes.adopt(adopter, input);
-          expect(again.change.lease.id).toBe(first.change.lease.id);
+          expect(leaseIdOf(again.change)).toBe(leaseIdOf(first.change));
           expect(again.workspace?.workspaceId).toBe(first.workspace?.workspaceId);
           const other: AgentToken = {
             ...adopter,
@@ -465,8 +471,8 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             changes.adopt(foreign, { changeId: result.change.id, idempotencyKey: "adopt-foreign" }),
           );
           expect(error).toMatchObject({ _tag: "ChangeInOtherProject", changeId: result.change.id });
-          expect((yield* changes.get(result.change.id)).change.lease.id).toBe(
-            result.change.lease.id,
+          expect(leaseIdOf((yield* changes.get(result.change.id)).change)).toBe(
+            leaseIdOf(result.change),
           );
         }).pipe(Effect.provide(harness.layer));
       },
@@ -481,7 +487,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const { who, result } = yield* declared(harness);
           const input = {
             changeId: result.change.id,
-            lease: result.change.lease.id,
+            lease: leaseIdOf(result.change),
             idempotencyKey: `revise-${crypto.randomUUID()}`,
             ifMatchRevision: 1,
             goal: "Cache permission lookups per session",
@@ -525,7 +531,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const { who, result } = yield* declared(harness);
           const input = {
             changeId: result.change.id,
-            lease: result.change.lease.id,
+            lease: leaseIdOf(result.change),
             idempotencyKey: `rely-${crypto.randomUUID()}`,
             premise,
           };
@@ -588,7 +594,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         return Effect.gen(function* () {
           const changes = yield* Changes;
           const { who, result } = yield* declared(harness);
-          const lease = result.change.lease.id;
+          const lease = leaseIdOf(result.change);
           const withdrawn = yield* changes.abandon({
             changeId: result.change.id,
             authority: {
@@ -701,7 +707,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             changeId: result.change.id,
             authority: {
               _tag: "Lease" as const,
-              leaseId: result.change.lease.id,
+              leaseId: leaseIdOf(result.change),
               agentId: who.agentId,
               projectId: who.projectId,
             },

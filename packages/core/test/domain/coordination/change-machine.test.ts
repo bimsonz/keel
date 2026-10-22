@@ -14,6 +14,7 @@ import {
   decideChange,
   type DerivedEffect,
   evolveChange,
+  type Lease,
   type Preflight,
   type Proposition,
   renew,
@@ -33,11 +34,12 @@ import {
   type Json,
   type LeaseId,
   makeId,
+  userActor,
 } from "../../../src/domain/kernel/index.ts";
 import { propositionArb } from "../../arbitraries/coordination.ts";
 import { fc } from "../../support/fast-check.ts";
 import { assertReaching } from "../../support/reach.ts";
-import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
+import { ABSENT, foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { changeChart, leaseChart } from "../../charts/charts.ts";
 import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Fold, type Machine, memo, tour } from "../../support/machine.ts";
@@ -84,7 +86,8 @@ type Key =
   | "none"
   | Exclude<Change["state"], "parked">
   | "parked:awaiting-ruling"
-  | "parked:lease-lapsed";
+  | "parked:lease-lapsed"
+  | "parked:awaiting-approval";
 type Decision = ReturnType<typeof decideChange>;
 
 const ALL: readonly Kind[] = [
@@ -110,8 +113,20 @@ const ALL: readonly Kind[] = [
   "Withdraw",
   "Supersede",
   "NoteConflict",
+  "Propose",
+  "ProposeCommit",
+  "AwaitApproval",
+  "Approve",
+  "RequestChanges",
   "Renew",
 ];
+
+/**
+ * What a run's step may draw anywhere: every kind but a proposal's start, so
+ * every run plays an agent's change, whose properties read its lease. A
+ * proposal is walked by the tour and by its own cases.
+ */
+const AGENTS: readonly Kind[] = ALL.filter((k) => k !== "Propose");
 
 /** Per state, the command that moves a change along the happy path, from state-machines.md. */
 const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
@@ -128,6 +143,7 @@ const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
   bounced: ["Submit"],
   "parked:awaiting-ruling": ["Resume"],
   "parked:lease-lapsed": ["Adopt"],
+  "parked:awaiting-approval": ["Approve"],
   landed: ALL,
   withdrawn: ALL,
   superseded: ALL,
@@ -147,11 +163,23 @@ const SIDE: Readonly<Record<Key, readonly Kind[]>> = {
   bounced: ["Revise", "Rebase", "Lapse", "Adopt", "Renew"],
   "parked:awaiting-ruling": ["Bounce", "Adopt", "Lapse", "Supersede"],
   "parked:lease-lapsed": ["Withdraw", "Supersede"],
+  "parked:awaiting-approval": [
+    "RequestChanges",
+    "ProposeCommit",
+    "Bounce",
+    "Withdraw",
+    "Supersede",
+  ],
   landed: ALL,
   withdrawn: ALL,
   superseded: ALL,
 };
 
+/** An agent's change's lease: every change a plan declares holds one, and only a proposal holds none. */
+const leaseOf = (c: Change): Lease => {
+  if (c.lease === undefined) throw new Error(`${c.id} holds no lease`);
+  return c.lease;
+};
 const keyOf = (c: Change | undefined): Key =>
   c === undefined
     ? "none"
@@ -165,6 +193,7 @@ const agentOwned = (k: Key): boolean =>
 // and a lapse recorded there (under the rule before this one) does not stand.
 const lapsedAt = (c: Change, now: number): boolean =>
   (agentOwned(keyOf(c)) || keyOf(c) === "parked:lease-lapsed") &&
+  c.lease !== undefined &&
   (c.lease.state === "lapsed" || (c.lease.state === "active" && now - c.lease.renewedAt >= TTL));
 
 interface Step {
@@ -258,8 +287,8 @@ class Mint {
 }
 
 const tokenFor = (state: Change | undefined, step: Step, issued: readonly LeaseId[]): LeaseId => {
-  if (state === undefined || !step.stale) return state?.lease.id ?? NEVER_ISSUED;
-  const old = issued.filter((l) => l !== state.lease.id);
+  if (state === undefined || !step.stale) return state?.lease?.id ?? NEVER_ISSUED;
+  const old = issued.filter((l) => l !== state.lease?.id);
   return old[step.pick % (old.length + 1)] ?? NEVER_ISSUED;
 };
 
@@ -426,7 +455,9 @@ const build = (
         _tag: "Withdraw",
         authority: step.operator
           ? { _tag: "Maintainer", by: MAINTAINER }
-          : { _tag: "Lease", leaseId: token },
+          : state?.proposal !== undefined
+            ? { _tag: "Proposal", by: PROPOSER_ID }
+            : { _tag: "Lease", leaseId: token },
       };
     case "Supersede":
       return { _tag: "Supersede", by: mint.next("chg") };
@@ -438,6 +469,23 @@ const build = (
         policy: step.operator ? "advise" : "annotate",
         ...(step.flag ? { evidenceRef: `probe:${makeId("prb", ulid(step.pick % 1000))}` } : {}),
       };
+    case "Propose":
+      return proposing;
+    case "ProposeCommit":
+      // Its first commit, or the other one: a proposal moves between two, and a note now and then.
+      return {
+        _tag: "ProposeCommit",
+        commit: state?.commitSha === SHA ? NEXT : SHA,
+        base: BASE,
+        inWorkspace: step.flag,
+        ...(step.operator ? { note: "took the reviewer's point" } : {}),
+      };
+    case "AwaitApproval":
+      return awaitApproval;
+    case "Approve":
+      return approve(step.flag ? (state?.commitSha ?? SHA) : NEVER_COMMIT);
+    case "RequestChanges":
+      return askChanges(step.flag ? (state?.commitSha ?? SHA) : NEVER_COMMIT);
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -531,7 +579,7 @@ const play = (plan: Plan): Trace => {
         ? PROGRESS[keyOf(state)]
         : step.mode === "side"
           ? SIDE[keyOf(state)]
-          : ALL;
+          : AGENTS;
     const before = state;
     const probes = [
       ...ALL.flatMap((k) =>
@@ -597,10 +645,11 @@ const oracle = (
   parkedFrom: Key,
 ): Key | "refused" | "noop" => {
   const key = keyOf(before);
-  if (before === undefined) return command._tag === "Declare" ? "declared" : "refused";
-  if (terminal(key) || command._tag === "Declare") return "refused";
+  if (before === undefined)
+    return command._tag === "Declare" || command._tag === "Propose" ? "declared" : "refused";
+  if (terminal(key) || command._tag === "Declare" || command._tag === "Propose") return "refused";
   const carried = leaseCarried(command);
-  if (carried !== undefined && (carried !== before.lease.id || lapsedAt(before, now)))
+  if (carried !== undefined && (carried !== before.lease?.id || lapsedAt(before, now)))
     return "refused";
   // Handed back, the change goes to its agent: a lapse recorded under the platform does not park it.
   const intoAgent = (k: Key): Key => k;
@@ -658,9 +707,11 @@ const oracle = (
         return key === "integrating" && batchMatches(command.declined.batchId)
           ? intoAgent("bounced")
           : "refused";
-      // A ruling's decision bounces a change only while it is parked for that ruling.
+      // A ruling's decision bounces a change only while it is parked for a person: that ruling, or an approval.
       if (command.decisionId !== undefined)
-        return key === "parked:awaiting-ruling" ? intoAgent("bounced") : "refused";
+        return key === "parked:awaiting-ruling" || key === "parked:awaiting-approval"
+          ? intoAgent("bounced")
+          : "refused";
       // A conflict bounces a change only before it is batched; a verdict also from a batch or a ruling.
       return key === "deriving" ||
         key === "verifying" ||
@@ -690,17 +741,43 @@ const oracle = (
         : key;
     case "Lapse":
       if (
-        command.leaseId !== before.lease.id ||
-        before.lease.state !== "active" ||
+        command.leaseId !== before.lease?.id ||
+        before.lease?.state !== "active" ||
         !agentOwned(key) ||
-        now - before.lease.renewedAt < TTL
+        now - leaseOf(before).renewedAt < TTL
       )
         return "noop";
       return "parked:lease-lapsed";
     case "Withdraw":
+      if (command.authority._tag === "Proposal" && before.proposal === undefined) return "refused";
       return key === "integrating" ? "refused" : "withdrawn";
     case "Supersede":
       return key === "integrating" ? "refused" : "superseded";
+    // A proposal's own commands: refused on any change that is no proposal.
+    case "ProposeCommit":
+      if (before.proposal === undefined || !command.inWorkspace) return "refused";
+      return key === "declared" ||
+        key === "integrating" ||
+        key === "parked:lease-lapsed" ||
+        key === "submitted" ||
+        key === "deriving"
+        ? "refused"
+        : "submitted";
+    case "AwaitApproval":
+      return before.proposal !== undefined &&
+        (key === "verifying" || key === "queued") &&
+        before.proposal.approved !== before.commitSha
+        ? "parked:awaiting-approval"
+        : "refused";
+    case "Approve":
+    case "RequestChanges":
+      if (
+        before.proposal === undefined ||
+        key !== "parked:awaiting-approval" ||
+        command.commit !== before.commitSha
+      )
+        return "refused";
+      return command._tag === "Approve" ? parkedFrom : key;
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -727,7 +804,11 @@ const comparable = (c: Change | undefined): string =>
   c === undefined
     ? "none"
     : canonicalJson(
-        asJson(Schema.encodeSync(Change)({ ...c, lease: { ...c.lease, renewedAt: Instant(0) } })),
+        asJson(
+          Schema.encodeSync(Change)(
+            c.lease === undefined ? c : { ...c, lease: { ...c.lease, renewedAt: Instant(0) } },
+          ),
+        ),
       );
 
 const Wire = Schema.Array(Schema.Struct({ at: Schema.Number, payload: Schema.Unknown }));
@@ -987,7 +1068,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
         const renewalBehind =
           trace.final === undefined ||
           replayed === undefined ||
-          replayed.lease.renewedAt <= trace.final.lease.renewedAt;
+          leaseOf(replayed).renewedAt <= leaseOf(trace.final).renewedAt;
         return comparable(replayed) === comparable(trace.final) && renewalBehind;
       }),
     );
@@ -1029,7 +1110,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
           const owned =
             r.after === undefined ||
             !agentOwned(keyOf(r.after)) ||
-            r.after.lease.state === "active";
+            r.after.lease?.state === "active";
           const handBack =
             r.before !== undefined &&
             !agentOwned(keyOf(r.before)) &&
@@ -1039,7 +1120,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
             r.kind !== "Adopt";
           if (!handBack) return owned;
           handBacks++;
-          return owned && r.after?.lease.renewedAt === r.now;
+          return owned && r.after?.lease?.renewedAt === r.now;
         }),
       ),
     );
@@ -1072,7 +1153,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       at: recordedAt,
       payload: LeaseLapsed.make({ changeId: CHANGE, leaseId: LEASE, renewedAt: Instant(held.now) }),
     });
-    expect(recorded.lease.state).toBe("lapsed");
+    expect(recorded.lease?.state).toBe("lapsed");
     const now = Instant(recordedAt + 1);
     const context = { now, changeId: CHANGE };
     // While the platform holds it, its holder may still withdraw it, and nobody may adopt it.
@@ -1112,7 +1193,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
               from !== "parked:lease-lapsed" &&
               !terminal(from) &&
               r.before !== undefined &&
-              r.now - r.before.lease.renewedAt >= TTL
+              r.now - leaseOf(r.before).renewedAt >= TTL
             )
               quietUnderPlatform++;
             return !r.threw && eventsOf(r).length === 0 && keyOf(r.after) === from;
@@ -1699,7 +1780,7 @@ describe("rebasing a change", { timeout: PROPERTY_TIMEOUT }, () => {
         rebasesTried(run(plan)).every(({ before, now, command, result }) => {
           const key = keyOf(before);
           if (before === undefined || (key !== "working" && key !== "bounced")) return true;
-          if (command.leaseId !== before.lease.id || lapsedAt(before, now)) return true;
+          if (command.leaseId !== before.lease?.id || lapsedAt(before, now)) return true;
           if (command.from !== before.baseSha) stale++;
           else if (command.onto === command.from) onto++;
           else return true;
@@ -1763,7 +1844,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
               r.before !== undefined &&
               !terminal(keyOf(r.before)) &&
               carried !== undefined &&
-              carried !== r.before.lease.id
+              carried !== r.before.lease?.id
             );
           })
           .every((r) => {
@@ -1805,7 +1886,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
             (r) =>
               r.before !== undefined &&
               !terminal(keyOf(r.before)) &&
-              leaseCarried(r.command) === r.before.lease.id,
+              leaseCarried(r.command) === r.before.lease?.id,
           )
           .every((r) => {
             const failure = refusal(r);
@@ -1857,8 +1938,8 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
             adoptions++;
             return (
               accepted(r) &&
-              r.after?.lease.id === command.leaseId &&
-              r.after.lease.state === "active" &&
+              r.after?.lease?.id === command.leaseId &&
+              r.after.lease?.state === "active" &&
               r.after.agentId === command.agentId
             );
           }),
@@ -1889,7 +1970,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
       [adopt, TTL],
     ]);
     expect(ruling.keys.at(-1)).toBe("parked:awaiting-ruling");
-    expect(ruling.state?.lease.id).toBe(LEASE);
+    expect(ruling.state?.lease?.id).toBe(LEASE);
     const refused = ruling.results.at(-1);
     const notLapsed =
       refused !== undefined &&
@@ -1932,9 +2013,9 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
           if (r.after === undefined) return true;
           const k = keyOf(r.after);
           if (!terminal(k))
-            return r.after.lease.state === "active" || r.after.lease.state === "lapsed";
+            return r.after.lease?.state === "active" || r.after.lease?.state === "lapsed";
           finished++;
-          return r.after.lease.state === "released";
+          return r.after.lease?.state === "released";
         }),
       ),
     );
@@ -1944,7 +2025,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
       [start, 1],
       [{ _tag: "Withdraw", authority: { _tag: "Lease", leaseId: LEASE } }, 1],
     ]);
-    expect(withdrawn.state?.lease.state).toBe("released");
+    expect(withdrawn.state?.lease?.state).toBe("released");
     expect(
       failureTag(
         drive([
@@ -1975,15 +2056,19 @@ const chartKey = (c: Change): string =>
   c.state === "parked"
     ? c.parkReason === "lease-lapsed"
       ? "parked.leaseLapsed"
-      : "parked.awaitingRuling"
+      : c.parkReason === "awaiting-approval"
+        ? "parked.awaitingApproval"
+        : "parked.awaitingRuling"
     : c.state;
 
-/** Where one lease is: adoption supersedes the old lease, whatever state it was in. */
-const leaseFrom = (f: Fold<Change, ChangeEvent>): string => f.before?.lease.state ?? "none";
+/** Where one lease is: adoption supersedes the old lease, whatever state it was in. A proposal holds none. */
+const leaseFrom = (f: Fold<Change, ChangeEvent>): string => f.before?.lease?.state ?? ABSENT;
 const leaseTo = (f: Fold<Change, ChangeEvent>): string =>
-  f.before !== undefined && f.after.lease.id !== f.before.lease.id
-    ? "superseded"
-    : f.after.lease.state;
+  f.after.lease === undefined
+    ? ABSENT
+    : f.before !== undefined && f.after.lease.id !== f.before.lease?.id
+      ? "superseded"
+      : f.after.lease.state;
 
 /** Every event a run committed or tried, folded one at a time. */
 const foldsIn = (r: Played): readonly Fold<Change, ChangeEvent>[] =>
@@ -2034,10 +2119,18 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
     signature: (c) =>
       c === undefined
         ? "none"
-        : `${chartKey(c)}|${c.parkedFrom ?? ""}|${c.workspaceId !== undefined}|${c.lease.state}`,
+        : `${chartKey(c)}|${c.parkedFrom ?? ""}|${c.workspaceId !== undefined}|${c.lease?.state ?? "no lease"}|${proposalMark(c)}`,
   });
   return walkedTour;
 };
+
+/** Whether a change is a proposal, and whether the commit it carries is approved. */
+const proposalMark = (c: Change): string =>
+  c.proposal === undefined
+    ? ""
+    : c.proposal.approved !== undefined && c.proposal.approved === c.commitSha
+      ? "approved"
+      : "proposal";
 
 const changeView: View<Change, ChangeEvent> = {
   from: (f) => (f.before === undefined ? "none" : chartKey(f.before)),
@@ -2640,13 +2733,15 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(offChart(changeChart, walked, changeView)).toEqual([]);
     expect(uncovered(changeChart, walked, changeView)).toEqual([]);
     // The edge out of the wait for a ruling is walked by a ruling's decision, and by nothing else a decision causes.
-    expect([
-      ...new Set(
-        walked
-          .filter((f) => f.event._tag === "ChangeBounced" && f.event.decisionId !== undefined)
-          .map((f) => `${changeView.from(f)} to ${changeView.to(f)}`),
-      ),
-    ]).toEqual(["parked.awaitingRuling to bounced"]);
+    expect(
+      [
+        ...new Set(
+          walked
+            .filter((f) => f.event._tag === "ChangeBounced" && f.event.decisionId !== undefined)
+            .map((f) => `${changeView.from(f)} to ${changeView.to(f)}`),
+        ),
+      ].toSorted(),
+    ).toEqual(["parked.awaitingApproval to bounced", "parked.awaitingRuling to bounced"]);
   });
 
   it("[lease.chart] every change a run makes to a lease is an edge of the Lease chart, and a tour of the machine exercises every edge", () => {
@@ -2676,12 +2771,16 @@ interface FoldedChange {
   readonly agent: Change["agentId"];
   readonly run: Change["run"];
   readonly revision: number;
-  readonly lease: {
-    readonly id: LeaseId;
-    readonly agent: Change["agentId"];
-    readonly state: Change["lease"]["state"];
-    readonly renewed: number;
-  };
+  /** None on a proposal, which no agent holds. */
+  readonly lease:
+    | {
+        readonly id: LeaseId;
+        readonly agent: Change["agentId"];
+        readonly state: Lease["state"];
+        readonly renewed: number;
+      }
+    | undefined;
+  readonly proposal: Change["proposal"];
   readonly workspace: Change["workspaceId"];
   readonly base: Change["baseSha"];
   readonly commit: Change["commitSha"];
@@ -2702,12 +2801,16 @@ const foldedChange = (c: Change): FoldedChange => ({
   agent: c.agentId,
   run: c.run,
   revision: c.intent.revision,
-  lease: {
-    id: c.lease.id,
-    agent: c.lease.agentId,
-    state: c.lease.state,
-    renewed: c.lease.renewedAt,
-  },
+  lease:
+    c.lease === undefined
+      ? undefined
+      : {
+          id: c.lease.id,
+          agent: c.lease.agentId,
+          state: c.lease.state,
+          renewed: c.lease.renewedAt,
+        },
+  proposal: c.proposal,
   workspace: c.workspaceId,
   base: c.baseSha,
   commit: c.commitSha,
@@ -2749,7 +2852,12 @@ const changeFolds = (
           agent: event.agentId,
           run: event.run,
           revision: event.revision,
-          lease: { id: event.leaseId, agent: event.agentId, state: "active", renewed: at },
+          // A proposal's declaration names no agent and no lease: it holds none.
+          lease:
+            event.agentId === undefined || event.leaseId === undefined
+              ? undefined
+              : { id: event.leaseId, agent: event.agentId, state: "active", renewed: at },
+          proposal: undefined,
           workspace: undefined,
           base: undefined,
           commit: undefined,
@@ -2764,16 +2872,54 @@ const changeFolds = (
   const inState = (...states: readonly Change["state"][]): boolean => states.includes(f.state);
   if (inState("landed", "withdrawn", "superseded")) return "illegal";
   const awaitsRuling = inState("parked") && f.park === "awaiting-ruling";
+  const awaitsApproval = inState("parked") && f.park === "awaiting-approval";
+  const { lease } = f;
   // An adoption folds by the lease's own time rule, so a log decided under any rule folds.
   const leaseLapsed =
-    f.lease.state === "lapsed" || (f.lease.state === "active" && at >= f.lease.renewed + TTL);
+    lease !== undefined &&
+    (lease.state === "lapsed" || (lease.state === "active" && at >= lease.renewed + TTL));
   const when = (legal: boolean, lands: () => FoldedChange): FoldedChange | "illegal" =>
     legal ? lands() : "illegal";
-  const released = { ...f.lease, state: "released" } as const;
+  const released = lease === undefined ? undefined : ({ ...lease, state: "released" } as const);
 
   switch (event._tag) {
     case "IntentDeclared":
       return "illegal";
+    case "ChangeProposed":
+      return when(
+        inState("declared") && f.origin === "proposal" && f.proposal === undefined,
+        () => ({
+          ...f,
+          proposal: { fork: event.fork, proposer: event.proposer },
+        }),
+      );
+    case "ProposalUpdated": {
+      // Another commit, anywhere but in a batch: back to work, holding nothing it waited with, unapproved.
+      const { proposal } = f;
+      if (proposal === undefined || !inState("drifted", "verifying", "queued", "bounced", "parked"))
+        return "illegal";
+      return {
+        ...f,
+        ...LEFT,
+        state: "working",
+        proposal: { fork: proposal.fork, proposer: proposal.proposer },
+      };
+    }
+    case "ProposalApproved": {
+      // The commit it carries, and no other, back to where it waited.
+      const { proposal } = f;
+      if (proposal === undefined || !awaitsApproval || event.commit !== f.commit) return "illegal";
+      return {
+        ...f,
+        state: f.parkedFrom ?? "queued",
+        park: undefined,
+        escalation: undefined,
+        parkedFrom: undefined,
+        proposal: { ...proposal, approved: event.commit },
+      };
+    }
+    case "ProposalChangesRequested":
+      return when(awaitsApproval, () => f);
     case "PreflightIssued":
       return when(inState("declared", "working") && event.revision === f.revision, () => f);
     case "IntentRevised":
@@ -2843,7 +2989,7 @@ const changeFolds = (
         event.declined !== undefined
           ? inState("integrating") && event.declined.batchId === f.batch
           : event.decisionId !== undefined
-            ? awaitsRuling
+            ? awaitsRuling || awaitsApproval
             : event.conflictId !== undefined
               ? beforeBatch
               : beforeBatch || inState("integrating") || awaitsRuling;
@@ -2853,12 +2999,19 @@ const changeFolds = (
       return f;
     case "ChangeParked":
       if (event.reason === "lease-lapsed")
-        return when(inState("declared", "working", "drifted", "bounced"), () => ({
-          ...f,
-          state: "parked",
-          park: "lease-lapsed",
-          lease: { ...f.lease, state: "lapsed" },
-        }));
+        return lease === undefined
+          ? "illegal"
+          : when(inState("declared", "working", "drifted", "bounced"), () => ({
+              ...f,
+              state: "parked",
+              park: "lease-lapsed",
+              lease: { ...lease, state: "lapsed" },
+            }));
+      // A proposal waits for its approval from where Precheck read it and queued it.
+      if (event.reason === "awaiting-approval")
+        return f.proposal !== undefined && (f.state === "verifying" || f.state === "queued")
+          ? { ...f, state: "parked", park: "awaiting-approval", parkedFrom: f.state }
+          : "illegal";
       // Already waiting: only another question moves it, and only the question it waits on.
       if (awaitsRuling)
         return when(
@@ -2912,18 +3065,22 @@ const changeFolds = (
         lease: released,
       }));
     case "LeaseLapsed":
-      return when(
-        f.lease.state === "active" && event.leaseId === f.lease.id && at >= f.lease.renewed + TTL,
-        () => ({ ...f, lease: { ...f.lease, state: "lapsed" } }),
-      );
+      return lease === undefined
+        ? "illegal"
+        : when(
+            lease.state === "active" && event.leaseId === lease.id && at >= lease.renewed + TTL,
+            () => ({ ...f, lease: { ...lease, state: "lapsed" } }),
+          );
     case "LeaseRestarted":
       // A hand-back's restart, once the change waits on its agent again: a lapse recorded under the platform too.
-      return when(
-        (f.lease.state === "active" || f.lease.state === "lapsed") &&
-          event.leaseId === f.lease.id &&
-          inState("declared", "working", "drifted", "bounced"),
-        () => ({ ...f, lease: { ...f.lease, state: "active", renewed: at } }),
-      );
+      return lease === undefined
+        ? "illegal"
+        : when(
+            (lease.state === "active" || lease.state === "lapsed") &&
+              event.leaseId === lease.id &&
+              inState("declared", "working", "drifted", "bounced"),
+            () => ({ ...f, lease: { ...lease, state: "active", renewed: at } }),
+          );
     default: {
       const unreachable: never = event;
       return unreachable;
@@ -2961,7 +3118,10 @@ const pastTheTour = (
   toured: readonly Fold<Change, ChangeEvent>[],
 ): readonly Fold<Change, ChangeEvent>[] => {
   const park = toured.find(
-    (f) => f.before?.state === "verifying" && f.event._tag === "ChangeParked",
+    (f) =>
+      f.before?.state === "verifying" &&
+      f.event._tag === "ChangeParked" &&
+      f.event.reason === "awaiting-ruling",
   );
   const resume = toured.find((f) => f.event._tag === "ChangeResumed");
   const question = park?.after.escalationId;
@@ -2991,7 +3151,8 @@ const changeShape = (c: Change | undefined): string =>
     ? "none"
     : [
         chartKey(c),
-        `lease ${c.lease.state}`,
+        `lease ${c.lease?.state ?? "none"}`,
+        ...(c.proposal === undefined ? [] : [proposalMark(c)]),
         ...(c.parkedFrom === undefined ? [] : [`from ${c.parkedFrom}`]),
         ...(c.workspaceId === undefined ? [] : ["workspace"]),
         ...(c.baseSha === undefined ? [] : ["base"]),
@@ -3029,7 +3190,8 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
   const held = <T>(read: (c: Change) => T | undefined): readonly T[] => [
     ...new Set([...rows.values()].flatMap((c) => read(c) ?? [])),
   ];
-  const leases = [...held((c) => c.lease.id), NEVER_ISSUED];
+  const leases = [...held((c) => c.lease?.id), NEVER_ISSUED];
+  const commits = [...held((c) => c.commitSha), NEVER_COMMIT];
   const batches = [...held((c) => c.batchId), ANOTHER_BATCH];
   const questions = [...held((c) => c.escalationId), ANOTHER_QUESTION];
   const bases = [...held((c) => c.baseSha), NEVER_BASE];
@@ -3076,6 +3238,7 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
         const { escalationId: _question, ...bare } = event;
         return [
           { ...bare, reason: "lease-lapsed" },
+          { ...bare, reason: "awaiting-approval" },
           { ...bare, reason: "awaiting-ruling" },
           ...questions.map((escalationId) => ({
             ...bare,
@@ -3091,6 +3254,9 @@ const changeForms = (walked: readonly Fold<Change, ChangeEvent>[]) => {
       case "LeaseLapsed":
       case "LeaseRestarted":
         return leases.map((leaseId) => ({ ...event, leaseId }));
+      case "ProposalApproved":
+      case "ProposalChangesRequested":
+        return commits.map((commit) => ({ ...event, commit }));
       default:
         return [event];
     }
@@ -3135,7 +3301,7 @@ describe("logs decided under an earlier rule of when a lease lapses", () => {
     });
     const replayed = (tail: readonly Committed<ChangeEvent>[]) => {
       const change = replayChange([...held.log, ...tail]);
-      return { state: change?.state, lease: change?.lease.id, holder: change?.lease.state };
+      return { state: change?.state, lease: change?.lease?.id, holder: change?.lease?.state };
     };
     // A: adopted while Verifying, past the deadline, before the alarm made the lapse visible.
     expect(replayed([{ at: after(TTL), payload: adopted }])).toEqual({
@@ -3174,7 +3340,7 @@ describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked = [...toured, ...driftedRun(), ...pastTheTour(toured)];
     // The first lease of the tour lapses a TTL after the change is declared: every event is
     // folded long before, the instant before, at that instant and long after.
-    const lapses = (walked[0]?.after.lease.renewedAt ?? T0) + TTL;
+    const lapses = (walked[0]?.after.lease?.renewedAt ?? T0) + TTL;
     const cases = foldCases<Change, ChangeEvent, FoldedChange>({
       evolve: evolveChange,
       walked,
@@ -3191,11 +3357,281 @@ describe("the Change fold", { timeout: PROPERTY_TIMEOUT }, () => {
     });
     const { folded, table } = foldLines(cases);
     expect(folded).toEqual(table);
-    // Thirty shapes of change, nothing among them and two of them one fold past the tour (no lease
-    // lapses while the platform holds a change), each meeting the first two events of a kind at
-    // each revision, sixty-four in all their forms, at four instants: 30 × 64 × 4 = 7680 folds.
-    // The table takes 1208 of them and refuses the rest.
+    // Sixty-five shapes of change, an agent's and a proposal's, nothing among them and two of them
+    // one fold past the tour (no lease lapses while the platform holds a change), each meeting the
+    // first two events of a kind at each revision, eighty-two in all their forms, at four instants:
+    // 65 × 82 × 4 = 21320 folds. The table takes 2724 of them and refuses the rest.
     const shape = foldShape(cases);
-    expect({ ...shape, rows: shape.rows.length }).toEqual({ folds: 7680, refused: 6472, rows: 30 });
+    expect({ ...shape, rows: shape.rows.length }).toEqual({
+      folds: 21320,
+      refused: 18596,
+      rows: 65,
+    });
+  });
+});
+
+// Proposals from a fork: a change no agent holds, which its proposer moves and a maintainer approves.
+
+const FORK = makeId("prj", ulid(5));
+const PROPOSER_ID = makeId("usr", ulid(5));
+const PROPOSER = userActor(PROPOSER_ID);
+const APPROVER = userActor(MAINTAINER);
+/** A later commit of the fork, proposed after the first. */
+const NEXT = CommitSha.make("a".repeat(40));
+/** A commit no proposal carries: what a reviewer names who read another. */
+const NEVER_COMMIT = CommitSha.make("7".repeat(40));
+const proposing: ChangeCommand = {
+  _tag: "Propose",
+  changeId: CHANGE,
+  proposer: PROPOSER,
+  fork: FORK,
+  commit: SHA,
+  goal: "retry a refused push",
+  footprint: [],
+  preflight,
+};
+const proposeCommit = (commit: CommitSha, base: CommitSha = BASE): ChangeCommand => ({
+  _tag: "ProposeCommit",
+  commit,
+  base,
+  inWorkspace: true,
+});
+const awaitApproval: ChangeCommand = { _tag: "AwaitApproval" };
+const approve = (commit: CommitSha): ChangeCommand => ({ _tag: "Approve", commit, by: APPROVER });
+const askChanges = (commit: CommitSha): ChangeCommand => ({
+  _tag: "RequestChanges",
+  commit,
+  by: APPROVER,
+  comment: "add a test for the retry",
+});
+/** A proposal Precheck read, queued and parked for approval, as the Change DO commits it. */
+const awaiting: readonly (readonly [ChangeCommand, number])[] = [
+  [proposing, 0],
+  [start, 0],
+  [proposeCommit(SHA), 0],
+  [precheck, 0],
+  [compile, 0],
+  [queue, 0],
+  [awaitApproval, 0],
+];
+const failureOf = (result: Decision | undefined) =>
+  result !== undefined && Result.isFailure(result) ? result.failure : undefined;
+
+describe("a proposal from a fork", () => {
+  it("[machine.proposal] no agent holds a proposal: Precheck reads it, it parks for approval as it is queued, an approval of its commit takes it back to the queue, and it lands; asking for changes leaves it waiting, and an agent's change takes none of it", () => {
+    const parked = drive(awaiting);
+    expect(parked.keys).toEqual([
+      "declared",
+      "working",
+      "submitted",
+      "deriving",
+      "verifying",
+      "queued",
+      "parked:awaiting-approval",
+    ]);
+    expect(tagsOf(parked.log)).toEqual([
+      "IntentDeclared",
+      "PreflightIssued",
+      "ChangeProposed",
+      "ChangeStarted",
+      "ChangeSubmitted",
+      "PrecheckStarted",
+      "PlanCompiled",
+      "ChangeQueued",
+      "ChangeParked",
+    ]);
+    expect(parked.log[0]).toMatchObject({ origin: "proposal" });
+    expect(parked.log[0]).not.toHaveProperty("agentId");
+    expect(parked.log[0]).not.toHaveProperty("leaseId");
+    expect(parked.log[2]).toMatchObject({ fork: FORK, commit: SHA, proposer: PROPOSER });
+    expect(parked.state).toMatchObject({
+      origin: "proposal",
+      proposal: { fork: FORK, proposer: PROPOSER },
+      parkReason: "awaiting-approval",
+      parkedFrom: "queued",
+      commitSha: SHA,
+    });
+    expect(parked.state?.agentId).toBeUndefined();
+    expect(parked.state?.lease).toBeUndefined();
+
+    const landed = drive([...awaiting, [approve(SHA), 0], [batch, 0], [land, 0]]);
+    expect(landed.keys.slice(-3)).toEqual(["queued", "integrating", "landed"]);
+    expect(landed.log.find((e) => e._tag === "ProposalApproved")).toMatchObject({
+      commit: SHA,
+      by: APPROVER,
+    });
+    expect(landed.state?.proposal?.approved).toBe(SHA);
+
+    const asked = drive([...awaiting, [askChanges(SHA), 0]]);
+    expect(asked.keys.at(-1)).toBe("parked:awaiting-approval");
+    expect(asked.log.at(-1)).toMatchObject({
+      _tag: "ProposalChangesRequested",
+      commit: SHA,
+      by: APPROVER,
+      comment: "add a test for the retry",
+    });
+
+    const agents = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [queue, 0],
+      [awaitApproval, 0],
+      [approve(SHA), 0],
+      [askChanges(SHA), 0],
+      [proposeCommit(NEXT), 0],
+    ]);
+    expect(agents.results.slice(-4).map((r) => failureOf(r)?._tag)).toEqual([
+      "NotAProposal",
+      "NotAProposal",
+      "NotAProposal",
+      "NotAProposal",
+    ]);
+    expect(agents.keys.at(-1)).toBe("queued");
+  });
+
+  it("[machine.proposal-approval-binds] an approval names the commit it approves: another is refused, naming the one it carries; a new commit puts it back through Precheck to wait again with no approval; while it is integrated no commit moves it", () => {
+    const moved = drive([...awaiting, [approve(NEXT), 0]]);
+    expect(failureOf(moved.results.at(-1))).toMatchObject({
+      _tag: "ProposalCommitMoved",
+      commit: NEXT,
+      current: SHA,
+    });
+    expect(moved.keys.at(-1)).toBe("parked:awaiting-approval");
+    expect(failureOf(drive([...awaiting, [askChanges(NEXT), 0]]).results.at(-1))?._tag).toBe(
+      "ProposalCommitMoved",
+    );
+
+    const updated = drive([...awaiting, [approve(SHA), 0], [proposeCommit(NEXT), 0]]);
+    expect(updated.keys.at(-1)).toBe("submitted");
+    expect(tagsOf(updated.log).slice(-2)).toEqual(["ProposalUpdated", "ChangeSubmitted"]);
+    expect(updated.log.at(-1)).toMatchObject({ commitSha: NEXT });
+    expect(updated.state?.commitSha).toBe(NEXT);
+    expect(updated.state?.proposal?.approved).toBeUndefined();
+    expect(updated.state?.laneId).toBeUndefined();
+
+    const again = drive([
+      ...awaiting,
+      [approve(SHA), 0],
+      [proposeCommit(NEXT), 0],
+      [{ _tag: "StartPrecheck", instanceId: "precheck-2" }, 0],
+      [compile, 0],
+      [queue, 0],
+      [awaitApproval, 0],
+      [approve(SHA), 0],
+    ]);
+    expect(again.keys.at(-2)).toBe("parked:awaiting-approval");
+    expect(failureOf(again.results.at(-1))?._tag).toBe("ProposalCommitMoved");
+
+    // Approved at its commit, it parks for approval no more.
+    const approved = drive([...awaiting, [approve(SHA), 0], [awaitApproval, 0]]);
+    expect(failureOf(approved.results.at(-1))?._tag).toBe("ChangeStateRefused");
+    expect(approved.keys.at(-1)).toBe("queued");
+
+    const integrating = drive([
+      ...awaiting,
+      [approve(SHA), 0],
+      [batch, 0],
+      [proposeCommit(NEXT), 0],
+    ]);
+    expect(failureOf(integrating.results.at(-1))?._tag).toBe("ChangeStateRefused");
+    expect(integrating.keys.at(-1)).toBe("integrating");
+
+    // Waiting on a person's ruling once approved, or sent back by a verdict: a new commit is checked again.
+    for (const waiting of [
+      [...awaiting, [approve(SHA), 0], [{ _tag: "Park", escalationId: QUESTION }, 0]],
+      [...awaiting, [approve(SHA), 0], [bounce, 0]],
+    ] as const) {
+      const resubmitted = drive([...waiting, [proposeCommit(NEXT), 0]]);
+      expect(resubmitted.keys.at(-1)).toBe("submitted");
+      expect(tagsOf(resubmitted.log).slice(-2)).toEqual(["ProposalUpdated", "ChangeSubmitted"]);
+    }
+  });
+
+  it("[machine.proposal-update-waits-precheck] a new commit waits until Precheck has answered the last: while a pass reads one, submitted or deriving, another is refused, so no pass can judge a commit other than the one the proposal carries", () => {
+    const submitted = [
+      [proposing, 0],
+      [start, 0],
+      [proposeCommit(SHA), 0],
+    ] as const;
+    for (const during of [submitted, [...submitted, [precheck, 0]]] as const) {
+      const moved = drive([...during, [proposeCommit(NEXT), 0]]);
+      expect(failureOf(moved.results.at(-1))?._tag).toBe("ChangeStateRefused");
+      expect(moved.state?.commitSha).toBe(SHA);
+    }
+    // Once the pass answered (a plan, a drift, a refusal), the proposer moves it.
+    const answered = drive([...awaiting, [proposeCommit(NEXT), 0]]);
+    expect(answered.keys.at(-1)).toBe("submitted");
+  });
+
+  it("[machine.proposal-update-rebased] a new commit on another base takes the proposal's base with it: ProposalUpdated, ChangeRebased from the base it had, and ChangeSubmitted on the new one; on the same base, no rebase", () => {
+    const moved = drive([...awaiting, [proposeCommit(NEXT, REBASED), 0]]);
+    expect(tagsOf(moved.log).slice(-3)).toEqual([
+      "ProposalUpdated",
+      "ChangeRebased",
+      "ChangeSubmitted",
+    ]);
+    expect(moved.log.at(-2)).toMatchObject({ from: BASE, to: REBASED });
+    expect(moved.log.at(-1)).toMatchObject({ commitSha: NEXT, baseSha: REBASED });
+    expect(moved.state?.baseSha).toBe(REBASED);
+    const same = drive([...awaiting, [proposeCommit(NEXT), 0]]);
+    expect(tagsOf(same.log).slice(-2)).toEqual(["ProposalUpdated", "ChangeSubmitted"]);
+    expect(same.state?.baseSha).toBe(BASE);
+  });
+
+  it("[machine.proposal-no-lease] a proposal takes no lease: every call under one is stale, no adoption takes it and no lapse parks it; a ruling against it while it waits for approval sends it back; every bounce points its proposer to their fork; its proposer or an approver withdraws it", () => {
+    const bounced = drive([...awaiting.slice(0, 6), [bounce, 0]]);
+    expect(bounced.keys.at(-1)).toBe("bounced");
+    const sentBack = bounced.log.at(-1);
+    expect(
+      sentBack?._tag === "ChangeBounced" && sentBack.nextActions?.map((n) => n.operationId),
+    ).toEqual(["updateProposal", "closeProposal"]);
+    for (const underLease of [
+      submit,
+      {
+        _tag: "Revise",
+        leaseId: LEASE,
+        ifMatchRevision: 1,
+        premisesAdded: [],
+        premisesRetracted: [],
+        preflight,
+      },
+      { _tag: "Rebase", leaseId: LEASE, from: BASE, onto: REBASED },
+      { _tag: "Withdraw", authority: { _tag: "Lease", leaseId: LEASE } },
+    ] satisfies ChangeCommand[]) {
+      const refused = drive([...awaiting.slice(0, 6), [bounce, 0], [underLease, 0]]);
+      expect(failureOf(refused.results.at(-1))?._tag).toBe("LeaseStale");
+      expect(refused.keys.at(-1)).toBe("bounced");
+    }
+    const adopted = drive([...awaiting.slice(0, 6), [bounce, 0], [adopt, TTL * 2]]);
+    expect(failureOf(adopted.results.at(-1))?._tag).toBe("ChangeStateRefused");
+    const lapsed = drive([...awaiting.slice(0, 6), [bounce, 0], [lapse, TTL * 2]]);
+    expect(lapsed.results.at(-1)).toEqual(Result.succeed([]));
+    expect(lapsed.keys.at(-1)).toBe("bounced");
+
+    const ruled = drive([...awaiting, [ruledAgainst, 0]]);
+    expect(ruled.keys.at(-1)).toBe("bounced");
+    expect(ruled.log.at(-1)).toMatchObject({ decisionId: RULING });
+
+    const closed = drive([
+      ...awaiting,
+      [{ _tag: "Withdraw", authority: { _tag: "Proposal", by: PROPOSER_ID } }, 0],
+    ]);
+    expect(closed.keys.at(-1)).toBe("withdrawn");
+    expect(closed.log.at(-1)).toMatchObject({ _tag: "ChangeWithdrawn", by: PROPOSER_ID });
+    const notTheirs = drive([
+      [declare, 0],
+      [{ _tag: "Withdraw", authority: { _tag: "Proposal", by: PROPOSER_ID } }, 0],
+    ]);
+    expect(failureOf(notTheirs.results.at(-1))?._tag).toBe("NotAProposal");
+
+    // Its log replays to the same proposal, through the wire.
+    expect(
+      comparable(
+        replayChange(throughTheWire(drive(awaiting).log.map((payload) => ({ at: T0, payload })))),
+      ),
+    ).toBe(comparable(drive(awaiting).state));
   });
 });

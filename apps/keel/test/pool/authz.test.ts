@@ -13,7 +13,7 @@ import {
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { CodeHost } from "@keeltown/core/ports";
-import { makeCodeHostMemory, makeProjectsMemory } from "@keeltown/testing";
+import { makeCodeHostMemory, makeProjectsMemory, heldLease } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
@@ -527,7 +527,7 @@ describe("[authz.lease-foreign] a change's lease moves it only from the change's
   it("[authz.lease-foreign] an agent of another org holding a change's id and lease is answered not found on revise, rely, rebase and submit, over REST and MCP, and the change is untouched; its own project's agents move it, after an adoption too", async () => {
     const projectId = makeId("prj", ulid());
     const c = await changeUnderTest(projectId, "project");
-    const declared = ok(await c.declare("declare-1")).change.lease.id;
+    const declared = heldLease(ok(await c.declare("declare-1")).change).id;
     const sha = await c.push();
     const own = await tokenFor(await seedAgent({ projectId, id: c.agentId }));
     const ofProject = await seedAgent({ projectId });
@@ -645,7 +645,7 @@ describe("[authz.lease-holder] only the agent holding a change acts under its le
   it("[authz.lease-holder] another agent of the change's project, holding its id and lease, is 409 change.held_by_other naming the holder, with when the lease lapses and adopt to call then, on revise, rely, rebase, submit, commit and abandon over REST, revise over MCP, and distinguish and a fresh workspace token at the change's object; an agent of another org is still 404; nothing moves; once the colleague adopts the change it moves it, and its former holder is told who holds it now, whichever lease it sends", async () => {
     const projectId = makeId("prj", ulid());
     const c = await changeUnderTest(projectId, "project");
-    const declared = ok(await c.declare("declare-1")).change.lease;
+    const declared = heldLease(ok(await c.declare("declare-1")).change);
     const sha = await c.push();
     const holder = await tokenFor(
       await seedAgent({ projectId, id: c.agentId, name: "cache-holder" }),
@@ -758,7 +758,7 @@ describe("[authz.lease-holder] only the agent holding a change acts under its le
         body: { goal: "Cache permission lookups per request, as its adopter put it" },
       },
     );
-    const adoptedLease = (await c.current()).lease;
+    const adoptedLease = heldLease(await c.current());
     const formerOld = await move(
       holder,
       `/changes/${c.changeId}/revisions`,

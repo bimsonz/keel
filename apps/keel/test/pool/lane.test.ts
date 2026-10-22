@@ -25,6 +25,7 @@ import {
 } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
+  makeNamespacesMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
@@ -163,6 +164,11 @@ async function lane(
       declare: () => Effect.die(new Error("the Lane never declares")),
       submit: () => Effect.die(new Error("the Lane never submits")),
       awaitSubmission: () => Effect.die(new Error("the Lane never waits on a submission")),
+      propose: () => Effect.die(new Error("the Lane never proposes")),
+      updateProposal: () => Effect.die(new Error("the Lane never moves a proposal")),
+      approveProposal: () => Effect.die(new Error("the Lane never approves a proposal")),
+      requestProposalChanges: () => Effect.die(new Error("the Lane never asks for changes")),
+      closeProposal: () => Effect.die(new Error("the Lane never closes a proposal")),
     }),
   );
   const driven: Layer.Layer<LaneServices> = Layer.mergeAll(
@@ -172,6 +178,7 @@ async function lane(
     changes,
     options.composer ?? makeCandidateComposerMemory().layer,
     makeAgentDirectoryMemory().layer,
+    makeNamespacesMemory().layer,
     options.bundles ?? makeCandidateBundlesMemory().layer,
     verification.layer,
     makeStagingWriterMemory({

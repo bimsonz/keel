@@ -2,15 +2,15 @@
 # kills: seed.snapshot
 # why: a change drawn from the snapshot is labelled by its id, not by its number as the log's fold labels it
 diff --git a/apps/console/src/engine/seed.ts b/apps/console/src/engine/seed.ts
-index 935f79f1..a42afef8 100644
+index b65cbbf5..7e67810e 100644
 --- a/apps/console/src/engine/seed.ts
 +++ b/apps/console/src/engine/seed.ts
-@@ -35,7 +35,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
+@@ -44,7 +44,7 @@ export function provisionalWorld(snapshot: FeedSnapshot): World {
    for (const change of snapshot.changes.toSorted((a, b) => a.number - b.number)) {
      world.changes.set(change.changeId, {
        id: change.changeId,
 -      label: `#${change.number}`,
 +      label: change.changeId,
-       agentId: change.agentId,
-       goal: change.goal,
-       state: change.state,
+       ...(change.agentId === undefined ? {} : { agentId: change.agentId }),
+       ...(change.proposal === undefined
+         ? {}

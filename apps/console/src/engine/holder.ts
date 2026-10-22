@@ -5,7 +5,7 @@
 
 import type { AgentCard } from "../contract/keel/index.ts";
 import type { HeldUnder } from "../domain/state.ts";
-import type { ChangeEntry, World } from "./world.ts";
+import { authorAgentOf, type ChangeEntry, type World } from "./world.ts";
 
 /** Keel's public card of each agent asked for, by its id: null where Keel knows none by that id. */
 export type Cards = ReadonlyMap<string, AgentCard | null>;
@@ -17,7 +17,8 @@ export function holdersOf(world: World, changeIds: readonly string[]): string[] 
   const holders = new Set<string>();
   for (const changeId of changeIds) {
     const change = world.changes.get(changeId);
-    if (change !== undefined) holders.add(change.agentId);
+    const holder = change === undefined ? undefined : authorAgentOf(change);
+    if (holder !== undefined) holders.add(holder);
   }
   return [...holders];
 }
@@ -35,7 +36,8 @@ export function holdersShown(
 }
 
 export function heldUnder(cards: Cards, change: ChangeEntry): HeldUnder {
-  const handle = cards.get(change.agentId)?.handle;
+  const agentId = authorAgentOf(change);
+  const handle = agentId === undefined ? undefined : cards.get(agentId)?.handle;
   return {
     ...(handle === undefined ? {} : { handle }),
     ...(change.run === undefined

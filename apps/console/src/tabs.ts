@@ -28,6 +28,7 @@ export function tabOf(route: Route): TabId | undefined {
       return "issues";
     case "changes":
     case "change":
+    case "new-proposal":
     case "conflict":
     case "escalation":
       return "changes";
@@ -63,6 +64,8 @@ function placeTitle(route: Route): string | undefined {
       return `Issue #${route.number}`;
     case "new-issue":
       return "New issue";
+    case "new-proposal":
+      return "New proposal";
     case "changes":
       return "Changes";
     case "change":

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.proposals
+# why: anyone who can read a proposal moves it to another commit, not only its proposer
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e40376fe..7876abea 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -1039,7 +1039,7 @@ const onProposalChange = (
+   const theirs = proposed.proposer !== undefined && proposed.proposer === actorOf(principal);
+   switch (need) {
+     case "proposer":
+-      return theirs ? granted() : refused("proposer-only");
++      return granted();
+     case "proposerOrApprove":
+       return theirs ? granted() : approver(principal, proposed.project);
+     case "approve":

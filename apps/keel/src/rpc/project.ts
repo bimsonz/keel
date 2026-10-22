@@ -2,6 +2,7 @@ import {
   DerivedEffect,
   Intent,
   PreflightCompared,
+  ProposalLimit,
   SubjectKey,
 } from "@keeltown/core/domain/coordination";
 import {
@@ -57,17 +58,21 @@ export const Verification = Schema.Literals(["required", "off"]);
 /** Who may read the project: `public` lets anonymous readers in; `private` is the default. */
 export const Visibility = Schema.Literals(["private", "public"]);
 
-/** The project's settings as the Project DO answers them: `verification` and `visibility` always present. */
+/** Whether a fork may propose to the project: `open` is the default; a private project takes none. */
+export const Proposals = Schema.Literals(["open", "closed"]);
+
+/** The project's settings as the Project DO answers them: `verification`, `visibility` and `proposals` always present. */
 export const ProjectSettings = Schema.Struct({
   protectedPaths: Schema.Array(Glob),
   maxBatchSize: Schema.Int,
   verification: Verification,
   visibility: Visibility,
+  proposals: Proposals,
 });
 
 /**
  * Replace the project's settings (an absent `verification` is `required`, an
- * absent `visibility` `private`). `by` is the actor's id, a person's or an
+ * absent `visibility` `private`, absent `proposals` `open`). `by` is the actor's id, a person's or an
  * agent's in a namespace of its own; `actor` is the same actor as the envelope
  * names it, and `run` the run an agent changes them in, when its token named
  * one. The Project DO commits one ProjectSettingsChanged naming every changed
@@ -81,6 +86,7 @@ export const PutSettingsCommand = Schema.Struct({
     maxBatchSize: Schema.Int,
     verification: Schema.optional(Verification),
     visibility: Schema.optional(Visibility),
+    proposals: Schema.optional(Proposals),
   }),
   by: Schema.NonEmptyString,
   actor: CommandActor,
@@ -307,6 +313,17 @@ export const OpenIssueCommand = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/**
+ * Reserve the change id of a proposal to the project (core's
+ * `reserveProposal`), by its proposer's Idempotency-Key: `fingerprint` hashes
+ * the request, so a reused key is told apart from a retry.
+ */
+export const ReserveProposalCommand = Schema.Struct({
+  proposer: CommandActor,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
 /** What is done to an issue by its `#n` (core's `IssueMove`). */
 export const IssueMove = Schema.Union([
   Schema.TaggedStruct("Comment", { body: CommentText }),
@@ -376,6 +393,7 @@ export const ProjectCodecs = {
   deploymentPromoted: exitCodec(Schema.Void, ProjectNotFound),
   deliveryRefused: exitCodec(Schema.Void, ProjectNotFound),
   openIssue: exitCodec(Issue, IdempotencyConflict),
+  reserveProposal: exitCodec(ChangeId, Schema.Union([ProposalLimit, IdempotencyConflict])),
   moveIssue: exitCodec(IssueMovedView, Schema.Union([IssueNotFound, IdempotencyConflict])),
   issues: exitCodec(IssuePageView, Schema.Never),
   issue: exitCodec(IssueThreadView, IssueNotFound),
@@ -421,6 +439,8 @@ export interface ProjectRpc extends EventReceiverRpc {
   endInvitation(command: typeof EndProjectInvitationCommand.Encoded): Promise<ExitJson>;
   /** Opens an issue with the project's next `#n`, idempotent by its author's key. */
   openIssue(command: typeof OpenIssueCommand.Encoded): Promise<ExitJson>;
+  /** Reserves a proposal's change id by its proposer's key, within what one proposer may have open. */
+  reserveProposal(command: typeof ReserveProposalCommand.Encoded): Promise<ExitJson>;
   /** Comments on, closes or reopens issue `#n`, idempotent by the caller's key. */
   moveIssue(command: typeof MoveIssueCommand.Encoded): Promise<ExitJson>;
   /** A page of the project's issues, newest first, with the open and closed totals. */

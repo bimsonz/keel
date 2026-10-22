@@ -2,11 +2,11 @@
 # kills: lease.chart
 # why: A lapse releases the lease instead of marking it lapsed
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c9f50e0..4973e9c4 100644
+index 916513b7..ae3f25b7 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1159,7 +1159,7 @@ export const evolveChange = (
-       return change.lease.state === "active" &&
+@@ -1429,7 +1429,7 @@ export const evolveChange = (
+         change.lease.state === "active" &&
          event.leaseId === change.lease.id &&
          committed.at >= lapsesAt(change.lease)
 -        ? { ...change, lease: { ...change.lease, state: "lapsed" } }

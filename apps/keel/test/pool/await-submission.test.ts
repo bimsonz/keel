@@ -1,6 +1,7 @@
 // awaitSubmission on the real Change DO, as the Probe Workflow calls it:
 // the change at once when there is a submission to read or it has ended,
 // otherwise a one-shot subscription for the instance, taken with the read.
+import { heldLease } from "@keeltown/testing";
 import { runInDurableObject } from "cloudflare:test";
 import { EventOutbox } from "@keeltown/core/ports";
 import { Effect } from "effect";
@@ -29,7 +30,7 @@ const hearing = (c: ChangeUnderTest, type: string) =>
 
 async function submitted(c: ChangeUnderTest, key: string) {
   const commitSha = await c.push();
-  const lease = (await c.current()).lease.id;
+  const lease = heldLease(await c.current()).id;
   return ok(
     decodeExit(
       ChangeCodecs.submit,
@@ -51,7 +52,7 @@ const withdrawn = async (c: ChangeUnderTest) =>
       await c.stub.abandon({
         authority: {
           _tag: "Lease",
-          leaseId: (await c.current()).lease.id,
+          leaseId: heldLease(await c.current()).id,
           agentId: c.agentId,
           projectId: c.projectId,
         },

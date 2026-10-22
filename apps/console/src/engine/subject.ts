@@ -14,7 +14,7 @@ import { agentName } from "./audience.ts";
 import { doubtsOf } from "./doubts.ts";
 import type { Cards } from "./holder.ts";
 import { type Tone, glossOf, subjectOf } from "./lanes.ts";
-import type { World } from "./world.ts";
+import { authorAgentOf, authorEntryOf, type World } from "./world.ts";
 
 export interface SubjectDetail {
   id: string;
@@ -121,7 +121,7 @@ export function subjectDetailOf(
       ? 0
       : change.state === "parked" || change.state === "bounced"
         ? 1
-        : world.agents.get(change.agentId)?.class === "real"
+        : authorEntryOf(world, change)?.class === "real"
           ? 2
           : 3;
 
@@ -188,14 +188,16 @@ export function subjectDetailOf(
         .toSorted((a, b) => weight(a) - weight(b))
         .slice(0, LISTED)
         .map((change) => {
-          const by = world.agents.get(change.agentId);
+          const by = authorEntryOf(world, change);
+          const author = authorAgentOf(change);
           return {
             id: change.id,
             label: change.label,
             goal: change.goal,
             state: change.state,
             ruling: waitsOnARuling(change),
-            agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
+            agent:
+              agentName(by, author === undefined ? undefined : cards.get(author)) ?? "an agent",
             agentClass: by?.class ?? "unnamed",
             doubts: doubtsOf(world, change, entry.id),
           };

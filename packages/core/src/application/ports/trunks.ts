@@ -5,8 +5,10 @@ import type {
   NotImported,
   PromotionState,
   PromotionStateRefused,
+  SyncConflicts,
   TrunkNotInitialized,
   TrunkOrigin,
+  UpstreamPoint,
 } from "../../domain/integration/index.ts";
 import type {
   BatchId,
@@ -81,7 +83,8 @@ export type SyncRefused =
   | PromotionStateRefused
   | UpstreamUnreachable
   | ImportTooLarge
-  | QuotaExceeded;
+  | QuotaExceeded
+  | SyncConflicts;
 
 /** A trunk as a reader of its project is shown it: its head, when that last changed, and what its promotion is doing. */
 export interface TrunkStanding {
@@ -161,14 +164,18 @@ export class Trunks extends Context.Service<
     /**
      * Moves trunk's main forward to the head of the upstream branch its import
      * took, as its owner asked, keeping each upstream commit as it is. Only
-     * an imported trunk has an upstream (NotImported otherwise), and only one
-     * whose head upstream's descends from moves (NotFastForward otherwise,
-     * naming both). It starts between groups only (PromotionStateRefused
-     * while a group is in flight, a freeze holds or another sync is open).
-     * Upstream's new history is weighed and admitted against the namespace's
-     * repo bytes first: over what one relay carries it is ImportTooLarge, over
-     * what is left QuotaExceeded. Each refusal moves nothing. Upstream already
-     * at trunk's head answers `synced: false` and records nothing.
+     * an imported or forked trunk has an upstream (NotImported otherwise). An
+     * import moves only when upstream's head descends from trunk's
+     * (NotFastForward otherwise, naming both). A fork takes its upstream
+     * trunk's head as it is when it holds nothing of its own, and otherwise
+     * Keel's signed merge of it, made on where the fork last met its
+     * upstream: a path both changed apart is SyncConflicts, naming it. It
+     * starts between groups only (PromotionStateRefused while a group is in
+     * flight, a freeze holds or another sync is open). Upstream's new history
+     * is weighed and admitted against the namespace's repo bytes first: over
+     * what one relay carries it is ImportTooLarge, over what is left
+     * QuotaExceeded. Each refusal moves nothing. Upstream already at trunk's
+     * head, or already merged, answers `synced: false` and records nothing.
      */
     readonly syncUpstream: (
       projectId: ProjectId,
@@ -184,6 +191,12 @@ export class Trunks extends Context.Service<
       projectId: ProjectId,
       cancel: BatchCancel,
     ) => Effect.Effect<CancelAnswer, TrunkNotInitialized>;
+    /**
+     * Every point where a fork met its upstream, newest first: each sync its
+     * trunk remembers (the head it left, and the upstream head it took), then
+     * the fork point. A project that is no fork, or has no trunk yet, met none.
+     */
+    readonly upstreamPoints: (projectId: ProjectId) => Effect.Effect<readonly UpstreamPoint[]>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
     readonly sync: (projectId: ProjectId) => Effect.Effect<ReposSynced>;
     /**

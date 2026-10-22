@@ -1,11 +1,13 @@
 import {
   abandon,
   adopt,
+  approveProposal,
   awaitPlan,
   awaitSubmission,
   CHANGE_WORKSPACE,
   changeRead,
   changeWorkspace,
+  closeProposal,
   declare,
   effectsDerived,
   getChange,
@@ -15,16 +17,19 @@ import {
   planCompiled,
   precheckRefused,
   precheckStarted,
+  propose,
   reactToBatch,
   rebase,
   commitEdits,
   refreshWorkspace,
   rely,
   distinguish,
+  requestProposalChanges,
   revise,
   submissionMoved,
   submissionStatus,
   submit,
+  updateProposal,
 } from "@keeltown/core/application/coordination";
 import { tellPreview } from "@keeltown/core/application/delivery";
 import { isAgentOwned, lapsesAt } from "@keeltown/core/domain/coordination";
@@ -39,10 +44,12 @@ import {
 import {
   AbandonCommand,
   AdoptCommand,
+  ApproveProposalCommand,
   AwaitPlanCommand,
   AwaitSubmissionCommand,
   ChangeCodecs,
   type ChangeRpc,
+  CloseProposalCommand,
   DeclareCommand,
   EffectsDerivedCommand,
   NearbyCommand,
@@ -50,14 +57,17 @@ import {
   PlanCompiledCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
+  ProposeCommand,
   RebaseCommand,
   CommitCommand,
   RefreshCommand,
   RelyCommand,
   DistinguishCommand,
+  RequestProposalChangesCommand,
   ReviseCommand,
   SubmitCommand,
   TellPreviewCommand,
+  UpdateProposalCommand,
 } from "../../../rpc/index.ts";
 import { armedAlarms, cancelAlarm, scheduleAlarm, type StartedAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
@@ -205,6 +215,46 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     return this.answer(ChangeCodecs.abandon, program);
   }
 
+  async propose(command: typeof ProposeCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(ProposeCommand, command).pipe(
+      Effect.flatMap((proposing) => propose(changeId, { ...proposing, changeId })),
+    );
+    return this.answer(ChangeCodecs.propose, program);
+  }
+
+  async updateProposal(command: typeof UpdateProposalCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(UpdateProposalCommand, command).pipe(
+      Effect.flatMap((moving) => updateProposal(changeId, moving)),
+    );
+    return this.answer(ChangeCodecs.updateProposal, program);
+  }
+
+  async approveProposal(command: typeof ApproveProposalCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(ApproveProposalCommand, command).pipe(
+      Effect.flatMap((approving) => approveProposal(changeId, approving)),
+    );
+    return this.answer(ChangeCodecs.approveProposal, program);
+  }
+
+  async requestProposalChanges(command: typeof RequestProposalChangesCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(RequestProposalChangesCommand, command).pipe(
+      Effect.flatMap((asking) => requestProposalChanges(changeId, asking)),
+    );
+    return this.answer(ChangeCodecs.requestProposalChanges, program);
+  }
+
+  async closeProposal(command: typeof CloseProposalCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(CloseProposalCommand, command).pipe(
+      Effect.flatMap((closing) => closeProposal(changeId, closing)),
+    );
+    return this.answer(ChangeCodecs.closeProposal, program);
+  }
+
   async adopt(command: typeof AdoptCommand.Encoded) {
     const changeId = this.changeId;
     const program = decoded(AdoptCommand, command).pipe(
@@ -342,7 +392,8 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     const change = await this.runtime.runPromise(Effect.option(getChange(this.changeId)));
     const held =
       Option.isSome(change) && isAgentOwned(change.value.state) ? change.value : undefined;
-    const active = held?.lease.state === "active" ? held.lease : undefined;
+    // A proposal has no lease: no agent holds it, so nothing lapses.
+    const active = held?.lease?.state === "active" ? held.lease : undefined;
     const keep = active === undefined ? undefined : leaseDeadline(active.id);
     for (const armed of armedAlarms(this.ctx.storage)) {
       if (LEASE_DEADLINE.test(armed.reason) && armed.reason !== keep)

@@ -27,6 +27,7 @@ const MAIN: { id: ChangeFilter; label: string; Icon: typeof GitPullRequestIcon }
 
 /** The narrower filters beside them. */
 const NARROW: { id: ChangeFilter; label: string }[] = [
+  { id: "proposals", label: "Proposals" },
   { id: "parked", label: "Waiting on a ruling" },
   { id: "bounced", label: "Bounced" },
   { id: "landed", label: "Landed" },
@@ -38,6 +39,7 @@ const EMPTY: Record<ChangeFilter, string> = {
   landed: "No landed changes",
   parked: "No changes waiting on a ruling",
   bounced: "No bounced changes",
+  proposals: "No open proposals from forks",
 };
 
 /** Where an open change stands, in a word or two, as a code host labels a pull request's status. */
@@ -72,10 +74,14 @@ function PullMark({ state }: { state: ChangeState }) {
 /** A change parked because its agent's lease lapsed waits on its agent, not on a person. */
 const AGENT_LAPSED = { label: "Waiting on its agent" };
 
-/** What an open change waits on, beside its row: its checks, a ruling, or its agent. */
+/** A proposal from a fork waits for a maintainer's review, as a code host labels a pull request awaiting one. */
+const REVIEW_REQUIRED = { label: "Review required", tone: "person" };
+
+/** What an open change waits on, beside its row: its checks, a ruling, a review, or its agent. */
 function Waiting({ state, parkedOn }: { state: ChangeState; parkedOn?: ParkReason }) {
-  const lapsed = state === "parked" && parkedOn !== "awaiting-ruling";
-  const shown = lapsed ? AGENT_LAPSED : OPEN_LABEL[state];
+  const reviewed = state === "parked" && parkedOn === "awaiting-approval";
+  const lapsed = state === "parked" && parkedOn === "lease-lapsed";
+  const shown = reviewed ? REVIEW_REQUIRED : lapsed ? AGENT_LAPSED : OPEN_LABEL[state];
   if (shown === undefined) return null;
   return (
     <span className="a-chip" data-tone={"tone" in shown ? shown.tone : "quiet"}>

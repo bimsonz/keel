@@ -2,15 +2,15 @@
 # kills: lane.member-plain
 # why: A member whose agent the directory does not hold stops the compose, so one such change holds its lane for good
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2dfc..cb14a109 100644
+index bf0c698d..7ecb6bc8 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -970,7 +970,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-           // The run is the one that holds the change.
-           agent: {
-             id: change.agentId,
--            handle: Option.getOrUndefined(agent)?.handle,
-+            handle: Option.getOrThrow(agent).handle,
-             run: change.run?.id,
-           },
-         } satisfies CandidateMember;
+@@ -1486,7 +1486,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+             : {
+                 agent: {
+                   id: agentId,
+-                  handle: Option.getOrUndefined(agent)?.handle,
++                  handle: Option.getOrThrow(agent).handle,
+                   run: change.run?.id,
+                 },
+               }),

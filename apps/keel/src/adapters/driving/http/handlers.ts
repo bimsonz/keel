@@ -97,6 +97,7 @@ import {
   authorizeHandlers,
   decideEach,
   decideFork,
+  decideUpstreamRead,
   projectResource,
   refusalResult,
   RESOLVERS,
@@ -127,6 +128,7 @@ import {
   settingsOk,
   syncUpstreamError,
   syncUpstreamOk,
+  upstreamUnread,
   settingsProject,
   sourceNotFound,
   sourceRefused,
@@ -206,6 +208,7 @@ import {
 } from "./invitations.ts";
 import { deliveryHandlers } from "./delivery.ts";
 import { issueHandlers } from "./issues.ts";
+import { proposalHandlers } from "./proposals.ts";
 import { problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -852,6 +855,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         ...verdictHandlers(run),
         ...deliveryHandlers(run),
         ...issueHandlers(run),
+        ...proposalHandlers(run),
         Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
           run(
             caller,
@@ -1591,6 +1595,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           );
         },
         // The policy let an owner of the project's namespace ask: a person, or an agent in a namespace of its own.
+        // A fork's owners sync it only while they may read its upstream, which Keel reads for them.
         Operator_syncUpstream: (caller: Caller, input: Input<"Operator_syncUpstream">) => {
           const projectId = settingsProject(input.projectId);
           if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
@@ -1598,12 +1603,20 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           const by = actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
           return run(
             caller,
-            Trunks.use((trunks) => trunks.syncUpstream(projectId.success, by)).pipe(
-              Effect.match({
-                onSuccess: syncUpstreamOk,
-                onFailure: (error) => syncUpstreamError(caller, error),
-              }),
-            ),
+            Effect.gen(function* () {
+              const origin = yield* Trunks.use((trunks) => trunks.origin(projectId.success));
+              if (Option.isSome(origin) && origin.value.kind === "forked") {
+                const upstream = yield* projectResource(origin.value.project);
+                if (Result.isFailure(decideUpstreamRead(caller.principal, upstream)))
+                  return upstreamUnread(caller);
+              }
+              return yield* Trunks.use((trunks) => trunks.syncUpstream(projectId.success, by)).pipe(
+                Effect.match({
+                  onSuccess: syncUpstreamOk,
+                  onFailure: (error) => syncUpstreamError(caller, error),
+                }),
+              );
+            }),
           );
         },
         Operator_enrolAgent: (caller: Caller, input: Input<"Operator_enrolAgent">) => {

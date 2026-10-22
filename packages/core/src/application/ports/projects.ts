@@ -75,20 +75,29 @@ export type Verification = "required" | "off";
 /** Who may read the project: `public` lets anonymous readers in through the repo read API; `private` (the default) does not. */
 export type Visibility = "private" | "public";
 
+/** Whether a fork of the project may propose to it: a private project takes none, whatever this says. */
+export type ProposalsSetting = "open" | "closed";
+
 /** A project's settings, as its Project DO keeps them. `protectedPaths` is their one home. */
 export interface ProjectSettings {
   readonly protectedPaths: readonly Glob[];
   readonly maxBatchSize: number;
   readonly verification: Verification;
   readonly visibility: Visibility;
+  readonly proposals: ProposalsSetting;
 }
 
-/** Settings as an operator puts them, replacing the project's: an absent `verification` is `required`, an absent `visibility` `private`. */
+/**
+ * Settings as an operator puts them, replacing the project's: an absent
+ * `verification` is `required`, an absent `visibility` `private`, and absent
+ * `proposals` `open`.
+ */
 export interface PutProjectSettings {
   readonly protectedPaths: readonly Glob[];
   readonly maxBatchSize: number;
   readonly verification?: Verification | undefined;
   readonly visibility?: Visibility | undefined;
+  readonly proposals?: ProposalsSetting | undefined;
 }
 
 /**

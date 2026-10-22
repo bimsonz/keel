@@ -7,6 +7,8 @@ import {
   ChangeResumed,
   ChangeSuperseded,
   ChangeWithdrawn,
+  ProposalApproved,
+  ProposalUpdated,
 } from "../../domain/coordination/index.ts";
 import {
   attribute,
@@ -32,9 +34,11 @@ import {
   VerificationStarted,
 } from "../../domain/integration/index.ts";
 import {
+  actorParts,
   BatchId,
   CandidateId,
   ChangeId,
+  type CommandActor,
   CommitSha,
   ContentHash,
   type Counterpart,
@@ -80,6 +84,7 @@ import {
   EventOutbox,
   Ids,
   Lanes,
+  Namespaces,
   PlanStore,
   Projects,
   REDELIVERY_CAP_MS,
@@ -571,12 +576,13 @@ const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
 const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
 const decodeParked = Schema.decodeUnknownSync(ChangeParked);
 const decodeResumed = Schema.decodeUnknownSync(ChangeResumed);
+const decodeApproved = Schema.decodeUnknownSync(ProposalApproved);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
 const decodeSynced = Schema.decodeUnknownSync(TrunkSynced);
 const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
 const decodeStarted = Schema.decodeUnknownSync(VerificationStarted);
 const decodeEnded = Schema.decodeUnknownSync(
-  Schema.Union([ChangeWithdrawn, ChangeSuperseded, ChangeBounced]),
+  Schema.Union([ChangeWithdrawn, ChangeSuperseded, ChangeBounced, ProposalUpdated]),
 );
 
 /**
@@ -584,9 +590,10 @@ const decodeEnded = Schema.decodeUnknownSync(
  * joins the queue's back, ChangeRequeued its front (it re-enters with no
  * blame), each keeping the plan hash its event names, a change parked for a
  * person's ruling while queued leaves the queue with its plan kept and
- * rejoins at the front when it is resumed, a change withdrawn,
- * superseded or bounced while queued leaves the queue (one in the batch in
- * flight finishes its batch),
+ * rejoins at the front when it is resumed, as a proposal parked for approval
+ * does when it is approved, a change withdrawn, superseded or bounced while
+ * queued, or a proposal moved to another commit, leaves the queue (one in
+ * the batch in flight finishes its batch),
  * TrunkAdvanced is noted for staging to follow and names trunk's head (as is
  * TrunkSynced, an advance no change made), and a
  * PromotionDeclined of the batch in flight marks it to be invalidated. State
@@ -621,11 +628,20 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         return runsAlone(requeued.reason) ? withAlone(back, [requeued.changeId]) : back;
       }
       case "ChangeParked": {
-        // Held for a person's ruling: out of the queue, its plan kept for when it resumes.
+        // Held for a person's ruling or approval: out of the queue, its plan kept for when it resumes.
         const parked = decodeParked(event.payload);
-        return parked.reason === "awaiting-ruling" && lane.queue.includes(parked.changeId)
+        return (parked.reason === "awaiting-ruling" || parked.reason === "awaiting-approval") &&
+          lane.queue.includes(parked.changeId)
           ? { ...lane, queue: lane.queue.filter((id) => id !== parked.changeId) }
           : undefined;
+      }
+      case "ProposalApproved": {
+        // Back to the front, with the plan it was queued under: it waited for a person, not for its turn.
+        const { changeId } = decodeApproved(event.payload);
+        const queuedHere = (lane.plans ?? []).some((plan) => plan.changeId === changeId);
+        return !queuedHere || holds(tx.store, lane, changeId)
+          ? undefined
+          : { ...lane, queue: [changeId, ...lane.queue] };
       }
       case "ChangeResumed": {
         // Back to the front, with the plan it was queued under: it waited for a person, not for its turn.
@@ -647,7 +663,9 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
       }
       case "ChangeWithdrawn":
       case "ChangeSuperseded":
-      case "ChangeBounced": {
+      case "ChangeBounced":
+      // A proposal at another commit is checked again and waits for its own approval: it joins at the back.
+      case "ProposalUpdated": {
         const ended = decodeEnded(event.payload);
         // One held for a ruling is in no queue, and its kept plan goes with it.
         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
@@ -1424,6 +1442,14 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
   }
   const changes = yield* Changes;
   const directory = yield* AgentDirectory;
+  const namespaces = yield* Namespaces;
+  // A person by the handle of their own namespace, an agent by the one the directory gave it.
+  const handleOf = (actor: CommandActor) => {
+    const parts = actorParts(actor);
+    return parts.kind === "agent"
+      ? Effect.map(directory.findAgent(parts.id), (agent) => Option.getOrUndefined(agent)?.handle)
+      : Effect.map(namespaces.byId(parts.id), (place) => Option.getOrUndefined(place)?.handle);
+  };
   const members = yield* Effect.forEach(
     batch.members,
     (changeId) =>
@@ -1432,9 +1458,19 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
           [changes.get(changeId), changes.workspace(changeId)],
           { concurrency: 2 },
         );
-        const agent = yield* directory.findAgent(change.agentId);
+        const { agentId, proposal } = change;
+        const agent = agentId === undefined ? Option.none() : yield* directory.findAgent(agentId);
         if (change.commitSha === undefined)
           return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
+        // A proposal is its proposer's, by the commit of the fork it was approved at.
+        const proposer =
+          proposal === undefined
+            ? undefined
+            : {
+                actor: proposal.proposer,
+                handle: yield* handleOf(proposal.proposer),
+                from: { project: proposal.fork, commit: change.commitSha },
+              };
         return {
           changeId,
           repo: workspace.repo,
@@ -1445,11 +1481,16 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
           // Its handle is the directory's: given at sign-up and never after, so every compose of a
           // member reads the same one (an agent a person enrolled has none, and is written by its id).
           // The run is the one that holds the change.
-          agent: {
-            id: change.agentId,
-            handle: Option.getOrUndefined(agent)?.handle,
-            run: change.run?.id,
-          },
+          ...(agentId === undefined
+            ? {}
+            : {
+                agent: {
+                  id: agentId,
+                  handle: Option.getOrUndefined(agent)?.handle,
+                  run: change.run?.id,
+                },
+              }),
+          ...(proposer === undefined ? {} : { proposer }),
         } satisfies CandidateMember;
       }).pipe(Effect.orDie),
     { concurrency: "unbounded" },

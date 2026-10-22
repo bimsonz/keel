@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.proposals
+# why: an agent nobody sponsors proposes from a fork it works in
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e40376fe..3cd9a942 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -1010,7 +1010,7 @@ const onProposal = (principal: Principal, proposal: ProposalResource): Decision
+   if (principal._tag === "User") return decide(principal, "member", proposal.fork);
+   const works = decide(principal, "work", proposal.fork);
+   if (Result.isFailure(works)) return works;
+-  return principal.sponsored === true ? granted() : refused("sponsor-required");
++  return granted();
+ };
+ 
+ /**

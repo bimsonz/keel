@@ -84,6 +84,11 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   AlternativeLanded: "public",
   ChangeParked: "public",
   ChangeResumed: "public",
+  // A proposal is made to a public project, and what is done with it is as public as the change.
+  ChangeProposed: "public",
+  ProposalUpdated: "public",
+  ProposalApproved: "public",
+  ProposalChangesRequested: "public",
   ChangeAdopted: "public",
   ChangeWithdrawn: "public",
   ChangeSuperseded: "public",

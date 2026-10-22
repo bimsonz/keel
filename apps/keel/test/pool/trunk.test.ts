@@ -5,7 +5,8 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
-import { projectRepos, promote } from "@keeltown/core/application/integration";
+import { projectRepos, promote, trunkOf } from "@keeltown/core/application/integration";
+import { Trunk } from "@keeltown/core/domain/integration";
 import {
   CommitSha,
   EventEnvelope,
@@ -31,6 +32,7 @@ import {
 import {
   freshNamespace,
   makeAgentDirectoryMemory,
+  makeNamespacesMemory,
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
@@ -72,7 +74,9 @@ const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
 /**
  * A fresh project's Trunk DO with memory adapters in its runtime: a trunk
  * writer at `head`, and the project's place in a namespace of its own, which
- * `initialize` reads before it names a head and counts the history into.
+ * `initialize` reads before it names a head and counts the history into. Its
+ * other projects' trunks are the real objects, as a fork's sync reads its
+ * upstream's.
  */
 async function placedTrunk(head: string) {
   const projectId: ProjectId = makeId("prj", ulid());
@@ -91,12 +95,33 @@ async function placedTrunk(head: string) {
           writer.layer,
           placedIn(projectId, namespace).layer,
           usage.layer,
+          TrunksRpc(env.TRUNK),
         ),
       ),
     );
   });
   return { projectId, stub, writer, namespace, usage };
 }
+
+/** A commit id of one repeated character. */
+const repeated = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
+
+/** Puts a trunk's recorded head at `head`, as a landing the case does not run would leave it. */
+const landedAt = (stub: DurableObjectStub<TrunkDO>, projectId: ProjectId, head: CommitSha) =>
+  runInDurableObject(stub, (instance: TrunkDO) =>
+    Reflect.get(instance, "runtime").runPromise(
+      Effect.gen(function* () {
+        const store = yield* EntityStore;
+        const trunk = trunkOf(store, projectId);
+        if (trunk === undefined) throw new Error(`${projectId} has no trunk`);
+        store.put(
+          "trunk",
+          projectId,
+          Schema.encodeSync(Schema.toCodecJson(Trunk))({ ...trunk, head }),
+        );
+      }),
+    ),
+  );
 
 // The port's own suite, through the real object: each case's project is placed, its trunk not yet initialized.
 PORTS.Trunks.contract("do-rpc", () => ({
@@ -153,6 +178,69 @@ describe("the Trunk DO", () => {
       await trunkStub(projectId).initialize(head, "seed", EMPTY),
     );
     expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", origin: EMPTY }));
+  });
+
+  it("[fork-sync.do] a fork's Trunk DO takes its upstream's head from the upstream's own object: a fast-forward, then Keel's merge once the fork holds work of its own, a conflict refused across the RPC naming its path, and where it met its upstream read back", async () => {
+    const owner = userActor(makeId("usr", ulid()));
+    const upstream = await placedTrunk(repeated("c"));
+    const fork = await placedTrunk(repeated("a"));
+    const source = projectRepos(upstream.projectId).trunk;
+    await upstream.stub.initialize(repeated("c"), "seed", EMPTY);
+    await fork.stub.initialize(repeated("a"), "fork", {
+      kind: "forked",
+      project: upstream.projectId,
+      commit: repeated("a"),
+    });
+    fork.writer.offersProject(source, repeated("c"), [
+      { sha: repeated("b"), parents: [repeated("a")] },
+      { sha: repeated("c"), parents: [repeated("b")] },
+    ]);
+    const sync = async () =>
+      decodeExit(TrunkCodecs.syncUpstream, await fork.stub.syncUpstream(owner));
+    expect(await sync()).toEqual(
+      Exit.succeed({ from: repeated("a"), to: repeated("c"), synced: true }),
+    );
+
+    // The fork lands work of its own, and the upstream moves on.
+    await landedAt(fork.stub, fork.projectId, repeated("f"));
+    fork.writer.interfere(repeated("f"));
+    await landedAt(upstream.stub, upstream.projectId, repeated("e"));
+    fork.writer.offersProject(source, repeated("e"), [
+      { sha: repeated("d"), parents: [repeated("c")] },
+      { sha: repeated("e"), parents: [repeated("d")] },
+    ]);
+    const merged = await sync();
+    const [merge] = fork.writer.merges();
+    expect(merge).toMatchObject({
+      ours: repeated("f"),
+      theirs: repeated("e"),
+      base: repeated("c"),
+    });
+    expect(merged).toEqual(Exit.succeed({ from: repeated("f"), to: merge?.commit, synced: true }));
+    expect(
+      await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.upstreamPoints(fork.projectId))),
+    ).toEqual(
+      Exit.succeed([
+        { at: merge?.commit, upstream: repeated("e") },
+        { at: repeated("c"), upstream: repeated("c") },
+        { at: repeated("a"), upstream: repeated("a") },
+      ]),
+    );
+
+    await landedAt(upstream.stub, upstream.projectId, repeated("9"));
+    fork.writer.offersProject(source, repeated("9"), [
+      { sha: repeated("9"), parents: [repeated("e")] },
+    ]);
+    fork.writer.conflicts("src/a.ts", "both-modified");
+    const refused = await viaTrunks(
+      Effect.flatMap(Trunks, (trunks) => trunks.syncUpstream(fork.projectId, owner)),
+    );
+    expect(Exit.isFailure(refused) ? JSON.stringify(refused.cause) : "synced").toContain(
+      '"_tag":"SyncConflicts"',
+    );
+    expect(Exit.isFailure(refused) ? JSON.stringify(refused.cause) : "synced").toContain(
+      '"path":"src/a.ts"',
+    );
   });
 
   it("[trunks.rpc.head] the Trunks port reads trunk's head as its Trunk DO records it", async () => {
@@ -340,6 +428,7 @@ async function promoting(
     code.layer,
     makePlanStoreMemory().layer,
     makeAgentDirectoryMemory().layer,
+    makeNamespacesMemory().layer,
     Layer.succeed(
       Changes,
       Changes.of({
@@ -357,6 +446,11 @@ async function promoting(
         declare: () => Effect.die(new Error("the Lane never declares")),
         submit: () => Effect.die(new Error("the Lane never submits")),
         awaitSubmission: () => Effect.die(new Error("the Lane never waits on a submission")),
+        propose: () => Effect.die(new Error("the Lane never proposes")),
+        updateProposal: () => Effect.die(new Error("the Lane never moves a proposal")),
+        approveProposal: () => Effect.die(new Error("the Lane never approves a proposal")),
+        requestProposalChanges: () => Effect.die(new Error("the Lane never asks for changes")),
+        closeProposal: () => Effect.die(new Error("the Lane never closes a proposal")),
       }),
     ),
     makeCandidateComposerMemory().layer,

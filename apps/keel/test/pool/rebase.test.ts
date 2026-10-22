@@ -2,6 +2,7 @@
 // the change is the harness's (an in-memory pool, code host, Trunk head and
 // rebaser), reached over RPC from the deployed fetch handler as any change is.
 // Trunk has moved past the change's base, as it has after a textual bounce.
+import { heldLease } from "@keeltown/testing";
 import { exports } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { type CommitSha, makeId, type ProjectId } from "@keeltown/core/kernel";
@@ -66,7 +67,7 @@ const keelTrunkOf = (c: ChangeUnderTest, repo: { namespace: string; name: string
 describe("rebasing a change through the doorways", () => {
   it("[rebase.rest] REST puts trunk's head on the workspace's keel/trunk and moves the base; MCP's retry with the key answers the same", async () => {
     const { c, declared, landed, token } = await bouncedOntoMovedTrunk();
-    const lease = declared.change.lease.id;
+    const lease = heldLease(declared.change).id;
 
     const response = await rebaseRest(c, token, lease, "rebase-key-0001");
     const body = await response.json<{

@@ -2,15 +2,15 @@
 # kills: sync.settles
 # why: batches queued during a sync wait for a debounce nothing arms
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index a14057d8..f86c5c58 100644
+index de8db2ba..17b467c0 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -733,7 +733,7 @@ export const evolvePromotion = (
+@@ -814,7 +814,7 @@ export const evolvePromotion = (
              head: event.to,
              advancedAt: committed.at,
              // Batches queued during the sync wait for the debounce, as after an advance.
 -            phase: settled(trunk.queue),
 +            phase: "idle",
              ...(event.height === undefined ? {} : { height: event.height }),
-           }
-         : illegal(trunk, event);
+             // A fork remembers where it met its upstream: a proposal from it is based on the newest such point.
+             ...("project" in sync.upstream

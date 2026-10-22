@@ -7,7 +7,9 @@ import {
   type TrunkOrigin,
   NotFastForward,
   NotImported,
+  SyncConflicts,
   UnexpectedHead,
+  type UpstreamPoint,
 } from "@keeltown/core/domain/integration";
 import type { QuotaExceeded } from "@keeltown/core/domain/identity";
 import {
@@ -26,6 +28,7 @@ import {
   CandidateComposer,
   type CandidateRequest,
   Lanes,
+  MergeRefused,
   PackTooLarge,
   RELAY_PACK_CAP_BYTES,
   RepoNotFound,
@@ -171,6 +174,30 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     }
   >();
   const unreachable = new Set<string>();
+  /** Other projects' trunks a fork's sync relays from: each one's head, its commits past the fork, and its pack. */
+  const projects = new Map<
+    string,
+    {
+      readonly head: CommitSha;
+      readonly commits: ReadonlyMap<CommitSha, readonly CommitSha[]>;
+      readonly bytes: number;
+    }
+  >();
+  const fetchedProjects: {
+    readonly source: RepoRef;
+    readonly to: CommitSha;
+    readonly haves: readonly CommitSha[];
+  }[] = [];
+  const merges: {
+    readonly ours: CommitSha;
+    readonly theirs: CommitSha;
+    readonly base: CommitSha;
+    readonly at: Instant;
+    readonly message: string;
+    readonly commit: CommitSha;
+  }[] = [];
+  let mergeBytes = EMPTY_PACK_BYTES;
+  let conflict: { readonly path: string; readonly reason: string } | undefined;
   let side: CommitSha | undefined;
   let busyFor = 0;
   const fetched: { readonly to: CommitSha; readonly haves: readonly CommitSha[] }[] = [];
@@ -233,6 +260,38 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
         bytes,
       });
     },
+    /**
+     * Another project's trunk, `source`, is at `head`, with `commits` (each
+     * with its parents) past what this trunk holds, in a pack of `bytes` (an
+     * empty pack's 32 when not said): what `fetchProject` brings in. A
+     * source never offered is RepoNotFound.
+     */
+    offersProject: (
+      source: RepoRef,
+      head: CommitSha,
+      commits: readonly { readonly sha: CommitSha; readonly parents: readonly CommitSha[] }[],
+      bytes: number = EMPTY_PACK_BYTES,
+    ) => {
+      projects.set(repoKey(source), {
+        head,
+        commits: new Map(commits.map((c) => [c.sha, c.parents])),
+        bytes,
+      });
+    },
+    /** Every fetch from another project's trunk, in order. */
+    fetchedProjects: () => [...fetchedProjects],
+    /** Every merge `mergeUpstream` made, in order, with the commit it answered. */
+    merges: () => [...merges],
+    /** Each merge's pack weighs `bytes` from here on (an empty pack's 32 until said). */
+    mergeWeighs: (bytes: number) => {
+      mergeBytes = bytes;
+    },
+    /** Every merge from here on is refused at `path`, for `reason`. */
+    conflicts: (path: string, reason: string) => {
+      conflict = { path, reason };
+    },
+    /** A commit's parents, as trunk holds them. */
+    parentsOf: (commit: CommitSha) => graph.get(commit),
     /** The upstream at `url` answers nothing Keel can read. */
     unreachable: (upstream: { readonly url: string; readonly ref: string }) => {
       unreachable.add(upstreamKey(upstream));
@@ -326,6 +385,34 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             side = to;
             return Effect.succeed(offered.bytes);
           }),
+        fetchProject: (source, to, haves) =>
+          Effect.suspend((): Effect.Effect<number, PackTooLarge | RepoNotFound> => {
+            const offered = projects.get(repoKey(source));
+            if (offered === undefined) return Effect.fail(new RepoNotFound({ repo: source }));
+            if (offered.bytes > RECEIVE_PACK_CAP_BYTES)
+              return Effect.fail(overTheCap(offered.bytes));
+            for (const [commit, parents] of offered.commits) graph.set(commit, parents);
+            fetchedProjects.push({ source, to, haves });
+            side = to;
+            return Effect.succeed(offered.bytes);
+          }),
+        mergeUpstream: (merge) =>
+          Effect.suspend(
+            (): Effect.Effect<
+              { readonly commit: CommitSha; readonly bytes: number },
+              MergeRefused
+            > => {
+              if (conflict !== undefined) return Effect.fail(new MergeRefused(conflict));
+              // Made of its parents alone, so the same merge answers the same commit.
+              const commit = Schema.decodeUnknownSync(CommitSha)(
+                `${merge.ours.slice(0, 20)}${merge.theirs.slice(20)}`,
+              );
+              graph.set(commit, [merge.ours, merge.theirs]);
+              merges.push({ ...merge, commit });
+              side = commit;
+              return Effect.succeed({ commit, bytes: mergeBytes });
+            },
+          ),
         descends: (from, to, stopAt) =>
           Effect.sync(() => {
             const seen = new Set<CommitSha>();
@@ -446,6 +533,9 @@ export function makeTrunksMemory(
   >();
   const syncedUp: { readonly projectId: ProjectId; readonly by: string; readonly to: CommitSha }[] =
     [];
+  /** Each fork's syncs, newest first, as its trunk remembers them. */
+  const met = new Map<ProjectId, readonly UpstreamPoint[]>();
+  const syncConflicts = new Map<ProjectId, string>();
   const destroyed = new Map<ProjectId, string>();
   const cancels: (BatchCancel & { readonly projectId: ProjectId })[] = [];
   const cancelAnswers = new Map<string, CancelAnswer>();
@@ -495,6 +585,14 @@ export function makeTrunksMemory(
     },
     /** Every sync from upstream that moved a trunk, in order. */
     syncedUp: () => [...syncedUp],
+    /** A fork's trunk remembers it met its upstream at `points`, newest first, before the fork point. */
+    meets: (projectId: ProjectId, points: readonly UpstreamPoint[]) => {
+      met.set(projectId, points);
+    },
+    /** A fork's sync is refused from here on: its work and its upstream's both changed `path`. */
+    conflictsOnSync: (projectId: ProjectId, path: string) => {
+      syncConflicts.set(projectId, path);
+    },
     /** Every cancel the trunks were asked for, in order. */
     cancelled: () => [...cancels],
     /** A cancel of `batchId` answers `answer` from here on; every other answers `dropped`. */
@@ -591,6 +689,20 @@ export function makeTrunksMemory(
             const from = heads.get(projectId);
             if (from === undefined) return Effect.die(new Error(`trunk ${projectId} has no head`));
             const origin = origins.get(projectId);
+            if (origin?.kind === "forked") {
+              // A fork takes its upstream trunk's head, as a fast-forward stands in for Keel's merge here.
+              const to = heads.get(origin.project);
+              if (to === undefined) return Effect.die(new Error(`${origin.project} has no trunk`));
+              const path = syncConflicts.get(projectId);
+              if (path !== undefined)
+                return Effect.fail(new SyncConflicts({ projectId, path, reason: "both-modified" }));
+              if (to === from || met.get(projectId)?.[0]?.upstream === to)
+                return Effect.succeed({ from, to: from, synced: false });
+              heads.set(projectId, to);
+              met.set(projectId, [{ at: to, upstream: to }, ...(met.get(projectId) ?? [])]);
+              syncedUp.push({ projectId, by, to });
+              return Effect.succeed({ from, to, synced: true });
+            }
             if (origin?.kind !== "imported") return Effect.fail(new NotImported({ projectId }));
             const upstream = upstreamHeads.get(projectId);
             if (upstream === undefined)
@@ -609,6 +721,13 @@ export function makeTrunksMemory(
             heads.set(projectId, upstream.head);
             syncedUp.push({ projectId, by, to: upstream.head });
             return Effect.succeed({ from, to: upstream.head, synced: true });
+          }),
+        upstreamPoints: (projectId) =>
+          Effect.sync((): readonly UpstreamPoint[] => {
+            const origin = origins.get(projectId);
+            return origin?.kind === "forked"
+              ? [...(met.get(projectId) ?? []), { at: origin.commit, upstream: origin.commit }]
+              : [];
           }),
         sync: (projectId) =>
           Effect.suspend(() => {

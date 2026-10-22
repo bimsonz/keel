@@ -34,6 +34,28 @@ export function describeTrunksContract(adapter: string, make: () => TrunksHarnes
         }).pipe(Effect.provide(harness.layer));
       },
     );
+    it.live(
+      "[trunks.contract.upstream-points] a project that is no fork met no upstream; a fork with no sync met its upstream at the fork point alone",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const trunks = yield* Trunks;
+          const plain = yield* harness.fresh();
+          expect(yield* trunks.upstreamPoints(plain.projectId)).toEqual([]);
+          yield* trunks.initialize(plain.projectId, plain.head, "seed", { kind: "empty" });
+          expect(yield* trunks.upstreamPoints(plain.projectId)).toEqual([]);
+          const fork = yield* harness.fresh();
+          yield* trunks.initialize(fork.projectId, fork.head, "fork", {
+            kind: "forked",
+            project: plain.projectId,
+            commit: fork.head,
+          });
+          expect(yield* trunks.upstreamPoints(fork.projectId)).toEqual([
+            { at: fork.head, upstream: fork.head },
+          ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
     for (const method of ["initialize", "sync"]) it.todo(`Trunks.${method}`);
   });
 }

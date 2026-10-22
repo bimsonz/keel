@@ -3,6 +3,7 @@ import { CommitSha } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   CodeHost,
+  MergeRefused,
   PackTooLarge,
   type RepoRef,
   type SyncOutcome,
@@ -14,9 +15,11 @@ import {
   advertisement,
   type GitObject,
   type GitRemote,
+  mergeOnBase,
   PackTooLarge as GitPackTooLarge,
   receivePack,
   ReceivePackBusy,
+  Refusal,
   type RelayMove,
   relay,
   relayPack,
@@ -27,6 +30,7 @@ import {
   ZERO_OID,
 } from "@keeltown/gitcore";
 import { Effect, Layer, Schema } from "effect";
+import type { OpenObjects } from "./candidate-composer.ts";
 import { type CommitSigningConfig, commitSigner, keelCommitter } from "./commit-signing.ts";
 
 export const MAIN = "refs/heads/main";
@@ -77,12 +81,14 @@ export const tooLarge =
  * length, and that very pack is sent. The first commit of an empty project is
  * Keel's own, signed with the deployment's key: no key, or one the signers
  * file does not vouch for at that time, is a defect before anything is
- * pushed. Tokens are minted per call and never leave this adapter; remotes
- * carry the account id, so neither is ever put in an error or a log.
+ * pushed; so is its merge of a fork's upstream, read through `open`. Tokens
+ * are minted per call and never leave this adapter; remotes carry the
+ * account id, so neither is ever put in an error or a log.
  */
 export const TrunkWriterGitCore = (
   { trunk, staging }: { trunk: RepoRef; staging: RepoRef },
   signing: CommitSigningConfig,
+  open: OpenObjects,
 ) =>
   Layer.effect(
     TrunkWriter,
@@ -113,6 +119,27 @@ export const TrunkWriterGitCore = (
 
       /** Trunk's main, or null before it has one. Trunk's own repo missing is a defect, never a source's. */
       const ownHead = headOf(trunk).pipe(Effect.catchTag("RepoNotFound", Effect.die));
+
+      /**
+       * Sends a fetched pack to trunk's side ref, which may hold an earlier
+       * sync's fetch: it is moved from whatever it holds, read again if it
+       * moved. Answers the pack's length.
+       */
+      const toSide = (move: RelayMove, pack: Uint8Array) =>
+        Effect.gen(function* () {
+          const target = yield* remoteOf(trunk, "write").pipe(
+            Effect.catchTag("RepoNotFound", Effect.die),
+          );
+          for (let attempt = 0; attempt <= STALE_RETRIES; attempt += 1) {
+            const held = yield* sideHead;
+            const outcome = yield* Effect.tryPromise({
+              try: () => relaySend(target, { ...move, from: held }, pack),
+              catch: (cause) => cause,
+            }).pipe(Effect.orDie);
+            if (outcome.kind !== "rejected") return pack.length;
+          }
+          return yield* Effect.die(new Error("trunk's upstream ref kept moving during a sync"));
+        });
 
       /** A promotion's move, built once so that weighing it and pushing it ask staging for the same pack. */
       const promotion = (from: CommitSha, to: CommitSha): RelayMove => ({ ref: MAIN, from, to });
@@ -279,19 +306,68 @@ export const TrunkWriterGitCore = (
                   : Effect.fail(new UpstreamUnreachable({ ...upstream, reason: "unreachable" })),
               ),
             );
+            return yield* toSide(move, pack);
+          }),
+        // Another project's trunk is Keel's own repo: it is read with a token Keel mints for the one fetch.
+        fetchProject: (source, to, haves) =>
+          Effect.gen(function* () {
+            const move: RelayMove = { ref: UPSTREAM_REF, from: null, to, haves };
+            const from = yield* remoteOf(source, "read");
+            const pack = yield* Effect.tryPromise({
+              try: () => relayPack(from, move),
+              catch: (cause) => cause,
+            }).pipe(Effect.catch(tooLarge(source)));
+            return yield* toSide(move, pack);
+          }),
+        mergeUpstream: ({ ours, theirs, base, at, message }) =>
+          Effect.gen(function* () {
+            const keel = keelCommitter(signing.host, at);
+            const sign = yield* Effect.promise(() => signerAt(keel.time));
+            const merged = yield* Effect.acquireUseRelease(
+              Effect.promise(() => open(trunk)),
+              (reader) =>
+                Effect.tryPromise({
+                  try: () =>
+                    mergeOnBase(reader, {
+                      base,
+                      ours,
+                      theirs,
+                      author: keel,
+                      committer: keel,
+                      message,
+                      sign,
+                    }),
+                  catch: (cause) => cause,
+                }),
+              (reader) => Effect.sync(() => reader[Symbol.dispose]()),
+            ).pipe(
+              Effect.catch((cause) =>
+                cause instanceof Refusal
+                  ? Effect.fail(new MergeRefused({ path: cause.path, reason: cause.reason }))
+                  : Effect.die(cause),
+              ),
+            );
+            const commit = toCommitSha(merged.oid);
             const target = yield* remoteOf(trunk, "write").pipe(
               Effect.catchTag("RepoNotFound", Effect.die),
             );
-            // The side ref may hold an earlier sync's fetch: it is moved from whatever it holds, read again if it moved.
-            for (let attempt = 0; attempt <= STALE_RETRIES; attempt += 1) {
-              const held = yield* sideHead;
-              const outcome = yield* Effect.tryPromise({
-                try: () => relaySend(target, { ...move, from: held }, pack),
-                catch: (cause) => cause,
-              }).pipe(Effect.orDie);
-              if (outcome.kind !== "rejected") return pack.length;
+            // Trunk holds both parents (main and the side ref): only the merged trees and the commit are sent.
+            const pack = yield* Effect.promise(() => writePack(merged.objects));
+            for (let attempt = 0; attempt <= BUSY_RETRIES; attempt += 1) {
+              const outcome = yield* Effect.promise(() =>
+                receivePack(target, [{ ref: UPSTREAM_REF, old: theirs, new: commit }], pack),
+              );
+              if (outcome.kind === "applied") return { commit, bytes: pack.length };
+              if (outcome.kind === "busy") {
+                yield* Effect.sleep(50 * 2 ** attempt);
+                continue;
+              }
+              // A retry of the same merge finds it there: the same parents, time and message make the same commit.
+              if (outcome.kind === "rejected" && (yield* sideHead) === commit)
+                return { commit, bytes: pack.length };
+              return yield* Effect.die(new Error(`sending Keel's merge was ${outcome.kind}`));
             }
-            return yield* Effect.die(new Error("trunk's upstream ref kept moving during a sync"));
+            return yield* Effect.die(new Error("trunk stayed busy while Keel's merge was sent"));
           }),
         descends: (from, to, stopAt) => host.isAncestor(trunk, from, to, stopAt).pipe(Effect.orDie),
         fastForward: (from, to) =>

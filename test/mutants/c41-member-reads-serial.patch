@@ -2,11 +2,11 @@
 # kills: c41.member-reads
 # why: a batch reads its members one after another before composing them, so a batch of many waits on every member's reads in turn
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2df..ac85436 100644
+index bf0c698d..055f8312 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -975,7 +975,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-           },
+@@ -1493,7 +1493,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+           ...(proposer === undefined ? {} : { proposer }),
          } satisfies CandidateMember;
        }).pipe(Effect.orDie),
 -    { concurrency: "unbounded" },

@@ -2,14 +2,14 @@
 # kills: carded.intent
 # why: the changes with the same intent name their agents from the log's enrolment alone, and never from Keel's card
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 0ce015a6..e5e4d84d 100644
+index 50082ce7..10c072e2 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -553,7 +553,7 @@ function intentRowOf(world: World, cards: Cards, change: ChangeEntry): IntentRow
+@@ -619,7 +619,7 @@ function intentRowOf(world: World, cards: Cards, change: ChangeEntry): IntentRow
      id: change.id,
      label: change.label,
      goal: change.goal,
--    agent: shownAgent(by, cards.get(change.agentId)),
+-    agent: shownAgent(by, cardOfAuthor(cards, change)),
 +    agent: shownAgent(by),
      state: change.state,
      revision: change.revision,

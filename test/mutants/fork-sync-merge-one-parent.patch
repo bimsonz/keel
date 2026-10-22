@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/gitcore/test/compose.test.ts
+# kills: gitcore.merge-on-base
+# why: a fork's sync commits the merged tree with the fork's head as its one parent, so the upstream's history is not in the fork's
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index 4a69e9cf..52734545 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -201,7 +201,7 @@ export async function mergeOnBase(
+   const merged = await mergeTrees(r, base.tree, ours.tree, theirs.tree, spec);
+   const commit: CommitSpec = {
+     tree: merged.tree,
+-    parents: [spec.ours, spec.theirs],
++    parents: [spec.ours],
+     author: spec.author,
+     committer: spec.committer,
+     message: spec.message,

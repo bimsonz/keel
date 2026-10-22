@@ -2,14 +2,20 @@
 # kills: composer.agent-author
 # why: The composer names the agent in trailers and still leaves the pushed commit's author on the author line
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index cba379e..9e59059 100644
+index 4c3c382d..00d40142 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -68,7 +68,6 @@ export function restackSpec(
-         ...(m.agent === undefined ? [] : [["Keel-Agent", m.agent.id] as const]),
-         ...(m.agent?.run === undefined ? [] : [["Keel-Run", m.agent.run] as const]),
+@@ -101,12 +101,7 @@ export function restackSpec(
+               ["Proposed-From", `${m.proposer.from.project}@${m.proposer.from.commit}`],
+             ] as const)),
        ],
--      author: m.agent === undefined ? undefined : agentAuthor(m.agent, host),
+-      author:
+-        m.agent !== undefined
+-          ? agentAuthor(m.agent, host)
+-          : m.proposer !== undefined
+-            ? proposerAuthor(m.proposer, host)
+-            : undefined,
++      author: m.proposer !== undefined ? proposerAuthor(m.proposer, host) : undefined,
      })),
    };
  }

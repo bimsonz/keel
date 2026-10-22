@@ -3,7 +3,7 @@
 // subscription for the instance, taken with the read, to whatever ends it.
 import { runInDurableObject } from "cloudflare:test";
 import { EventOutbox } from "@keeltown/core/ports";
-import { CodeHostFixture } from "@keeltown/testing";
+import { CodeHostFixture, heldLease } from "@keeltown/testing";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
@@ -31,7 +31,7 @@ const hearing = (c: ChangeUnderTest, type: string) =>
 
 async function submitted(c: ChangeUnderTest, key: string, commitSha?: string) {
   const sha = commitSha ?? (await c.push());
-  const lease = (await c.current()).lease.id;
+  const lease = heldLease(await c.current()).id;
   ok(
     decodeExit(
       ChangeCodecs.submit,
@@ -93,7 +93,7 @@ const withdrawn = async (c: ChangeUnderTest) =>
       await c.stub.abandon({
         authority: {
           _tag: "Lease",
-          leaseId: (await c.current()).lease.id,
+          leaseId: heldLease(await c.current()).id,
           agentId: c.agentId,
           projectId: c.projectId,
         },

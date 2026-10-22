@@ -1,3 +1,4 @@
+import { heldLease } from "@keeltown/testing";
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
@@ -110,7 +111,7 @@ const partyRow = (c: ChangeUnderTest, conflictId: string) =>
 
 /** Declares, pushes, submits and starts Precheck: the change is deriving, awaiting its plan. */
 async function deriving(c: ChangeUnderTest) {
-  const lease = ok(await c.declare()).change.lease.id;
+  const lease = heldLease(ok(await c.declare()).change).id;
   const commitSha = await c.push();
   ok(
     decodeExit(

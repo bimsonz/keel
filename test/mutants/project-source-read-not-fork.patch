@@ -2,15 +2,15 @@
 # kills: project.source-private
 # why: the source is decided as a read of it alone, so a member of a private project's org copies it into any other org they belong to
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index f26c0fbd..b06089c2 100644
+index 8023ce39..d4147fa9 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -586,7 +586,7 @@ export const decideFork = (
+@@ -670,7 +670,7 @@ export const decideFork = (
    principal: Principal,
    source: ProjectResource | MissingResource,
    target: NamespaceResource,
 -): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
 +): Decision => authorize(principal, "Namespaces_getProject", source);
  
- /**
-  * An agent refused for where its token stands, said as that: its token names no
+ /** Whether the caller may read a fork's upstream: Keel syncs a fork only for owners who still may. */
+ export const decideUpstreamRead = (

@@ -26,6 +26,8 @@ import {
   type NamespaceUsageHarness,
 } from "./contracts/namespace-usage.ts";
 import { describeLanesContract } from "./contracts/lanes.ts";
+import { describeProposalLedgerContract } from "./contracts/proposal-ledger.ts";
+import * as proposalLedger from "./memory/proposal-ledger.ts";
 import { describeTrunksContract, type TrunksHarness } from "./contracts/trunks.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import {
@@ -359,6 +361,7 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           repo: { namespace: "keel-ws-00", name: `ws-${changeId.slice(4).toLowerCase()}` },
           baseSha: GENESIS,
           grantedSha: GENESIS,
+          flowAt: GENESIS,
           projectId: freshId("prj"),
           subjects: [Schema.decodeUnknownSync(SubjectKey)("authz.sessions")],
           intent: { revision: 1, goal: "cache the sessions", footprint: [], premises: [] },
@@ -625,6 +628,10 @@ export const PORTS = {
   ProbeLedger: harnessed<ProbeLedger, ProbeLedgerHarness>(
     memoryProbeLedgerHarness,
     describeProbeLedgerContract,
+  ),
+  ProposalLedger: port(
+    () => proposalLedger.makeProposalLedgerMemory().layer,
+    describeProposalLedgerContract,
   ),
   Sessions: harnessed<Sessions | Enrolments | AgentDirectory, SessionsHarness>(
     memorySessionsHarness,

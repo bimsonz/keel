@@ -12,10 +12,12 @@ import {
   type PromotionCommand,
   pushTarget,
   type QueuedBatch,
+  SyncConflicts,
   Trunk,
   TrunkEvent,
   TrunkNotInitialized,
   type TrunkOrigin,
+  upstreamPointsOf,
 } from "../../domain/integration/index.ts";
 import type {
   BatchId,
@@ -39,6 +41,7 @@ import {
   NamespaceUsage,
   RELAY_PACK_CAP_BYTES,
   type Transaction,
+  Trunks,
   type TrunkStanding,
   TrunkWriter,
   type UpstreamSynced,
@@ -805,44 +808,33 @@ export const cancelBatch = Effect.fn("integration/cancelBatch")(function* (
   return answer;
 });
 
+/** What a sync brought into trunk's side ref: the commit main moves to, the upstream head a merge took, and what trunk grew by. */
+interface Fetched {
+  readonly to: CommitSha;
+  readonly merged?: CommitSha;
+  readonly admitted: number;
+}
+
 /**
- * An owner's sync of an imported trunk from its upstream, the URL and branch
- * its import took, kept on its origin. In order, each step before the move
- * refusing with nothing moved:
- * 1. trunk is initialized, was imported, and is between groups;
- * 2. upstream's head is read with no credential; one at trunk's head answers
- *    `synced: false` and records nothing;
- * 3. what upstream's head reaches past trunk's head and the import's commit
- *    is brought into trunk's side ref and weighed: over what one relay
- *    carries it is ImportTooLarge;
- * 4. upstream's head must descend from trunk's (NotFastForward otherwise,
- *    with the side ref dropped). The walk stops at the import's commit:
- *    trunk's head descends from it, so nothing older can lead there;
- * 5. the pack is admitted against the namespace's repo bytes once, under
- *    `sync:<to>` (QuotaExceeded otherwise, with the side ref dropped);
- * 6. TrunkSyncStarted is committed, the main lane is told of syncs, and main
- *    is moved by its CAS and read back (`finishUpstreamSync`). A refused start gives
- *    the admitted bytes back.
- * Answers `synced` false with `from ≠ to` when the move is still open (the
- * push stayed busy): the Trunk DO's deadline finishes it.
+ * An import's upstream: its branch's head, read with no credential (gone is
+ * UpstreamUnreachable); at trunk's head, nothing. Otherwise what it reaches
+ * past trunk's head and the import's commit, brought into the side ref and
+ * weighed (over what one relay carries, ImportTooLarge), and it must descend
+ * from trunk's head (NotFastForward otherwise, with the side ref dropped).
+ * The walk stops at the import's commit: trunk's head descends from it, so
+ * nothing older can lead there.
  */
-export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(function* (
+const fetchImport = Effect.fn("integration/fetchImport")(function* (
   projectId: ProjectId,
-  by: CommandActor,
+  origin: Extract<TrunkOrigin, { readonly kind: "imported" }>,
+  from: CommitSha,
 ) {
-  const trunk = trunkOf(yield* EntityStore, projectId);
-  if (trunk === undefined) return yield* new TrunkNotInitialized({ projectId });
-  const { origin } = trunk;
-  if (origin?.kind !== "imported") return yield* new NotImported({ projectId });
-  if (trunk.phase !== "idle" && trunk.phase !== "debouncing")
-    return yield* new PromotionStateRefused({ projectId, phase: trunk.phase, command: "Sync" });
   const upstream = { url: origin.url, ref: origin.ref };
   const writer = yield* TrunkWriter;
   const to = yield* writer.upstreamHead(upstream);
   if (to === undefined)
     return yield* new UpstreamUnreachable({ ...upstream, reason: "branch-gone" });
-  const from = trunk.head;
-  if (to === from) return { from, to, synced: false } satisfies UpstreamSynced;
+  if (to === from) return undefined;
   const haves = from === origin.commit ? [from] : [from, origin.commit];
   const bytes = yield* writer
     .fetchUpstream(upstream, to, haves)
@@ -858,9 +850,101 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
     yield* writer.dropUpstream;
     return yield* new NotFastForward({ projectId, trunk: from, upstream: to });
   }
+  return { to, admitted: bytes - PACK_OVERHEAD_BYTES } satisfies Fetched;
+});
+
+/**
+ * A fork's upstream: the head its upstream's Trunk records, which the fork
+ * already holds when it is trunk's head or the head its newest sync took.
+ * Otherwise the upstream's trunk is relayed into the side ref past where the
+ * fork last met it (over what one relay carries, ImportTooLarge). A fork with
+ * nothing of its own since then moves to that head; one with work of its own
+ * moves to Keel's merge of it, made on where they last met, so the merge
+ * carries exactly the fork's work and the upstream's since. A path both
+ * changed apart is SyncConflicts naming it, with the side ref dropped.
+ */
+const fetchFork = Effect.fn("integration/fetchFork")(function* (
+  trunk: Trunk,
+  origin: Extract<TrunkOrigin, { readonly kind: "forked" }>,
+) {
+  const { projectId, head: from } = trunk;
+  const [met = { at: origin.commit, upstream: origin.commit }] = upstreamPointsOf(trunk);
+  const to = yield* (yield* Trunks).head(origin.project);
+  if (to === from || to === met.upstream) return undefined;
+  const writer = yield* TrunkWriter;
+  const haves = met.upstream === origin.commit ? [met.upstream] : [met.upstream, origin.commit];
+  const bytes = yield* writer.fetchProject(projectRepos(origin.project).trunk, to, haves).pipe(
+    Effect.catchTags({
+      PackTooLarge: (tooLarge) =>
+        Effect.fail(
+          new ImportTooLarge({ projectId, bytes: tooLarge.bytes, limit: RELAY_PACK_CAP_BYTES }),
+        ),
+      // The doorway reads the upstream before it asks: one gone since is a defect of the race.
+      RepoNotFound: Effect.die,
+    }),
+  );
+  const admitted = bytes - PACK_OVERHEAD_BYTES;
+  if (yield* writer.descends(from, to, [met.upstream])) return { to, admitted } satisfies Fetched;
+  const merge = yield* writer
+    .mergeUpstream({
+      ours: from,
+      theirs: to,
+      base: met.upstream,
+      at: yield* (yield* Clock).now,
+      message: `Merge ${origin.project} at ${to}`,
+    })
+    .pipe(
+      Effect.catchTag("MergeRefused", (refused) =>
+        Effect.andThen(
+          writer.dropUpstream,
+          Effect.fail(new SyncConflicts({ projectId, path: refused.path, reason: refused.reason })),
+        ),
+      ),
+    );
+  return {
+    to: merge.commit,
+    merged: to,
+    admitted: admitted + merge.bytes - PACK_OVERHEAD_BYTES,
+  } satisfies Fetched;
+});
+
+/**
+ * An owner's sync of a trunk from its upstream: the URL and branch its import
+ * took, or the project its fork was taken from, kept on its origin. In order,
+ * each step before the move refusing with nothing moved:
+ * 1. trunk is initialized, was imported or forked, and is between groups;
+ * 2. upstream's history is brought into trunk's side ref (`fetchImport`,
+ *    `fetchFork`); one trunk already holds answers `synced: false` and
+ *    records nothing;
+ * 3. what it adds is admitted against the namespace's repo bytes once, under
+ *    `sync:<to>` (QuotaExceeded otherwise, with the side ref dropped);
+ * 4. TrunkSyncStarted is committed, the main lane is told of syncs, and main
+ *    is moved by its CAS and read back (`finishUpstreamSync`). A refused start gives
+ *    the admitted bytes back.
+ * Answers `synced` false with `from ≠ to` when the move is still open (the
+ * push stayed busy): the Trunk DO's deadline finishes it.
+ */
+export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(function* (
+  projectId: ProjectId,
+  by: CommandActor,
+) {
+  const trunk = trunkOf(yield* EntityStore, projectId);
+  if (trunk === undefined) return yield* new TrunkNotInitialized({ projectId });
+  const { origin } = trunk;
+  if (origin?.kind !== "imported" && origin?.kind !== "forked")
+    return yield* new NotImported({ projectId });
+  if (trunk.phase !== "idle" && trunk.phase !== "debouncing")
+    return yield* new PromotionStateRefused({ projectId, phase: trunk.phase, command: "Sync" });
+  const from = trunk.head;
+  const fetched: Fetched | undefined =
+    origin.kind === "imported"
+      ? yield* fetchImport(projectId, origin, from)
+      : yield* fetchFork(trunk, origin);
+  if (fetched === undefined) return { from, to: from, synced: false } satisfies UpstreamSynced;
+  const { to, merged, admitted } = fetched;
+  const writer = yield* TrunkWriter;
   const namespace = yield* namespaceOf(projectId);
   const usage = yield* NamespaceUsage;
-  const admitted = bytes - PACK_OVERHEAD_BYTES;
   yield* usage
     .admit(namespace, REPO_BYTES, admitted, `sync:${to}`)
     .pipe(Effect.tapError(() => writer.dropUpstream));
@@ -872,7 +956,12 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
       return Result.succeed({ value: undefined, drafts: [] });
     },
   );
-  yield* promote(projectId, { _tag: "Sync", by, from, to }, `sync:${to}`, from).pipe(
+  yield* promote(
+    projectId,
+    { _tag: "Sync", by, from, to, ...(merged === undefined ? {} : { merged }) },
+    `sync:${to}`,
+    from,
+  ).pipe(
     Effect.catchTags({
       TrunkNotInitialized: Effect.die,
       CompositionMismatch: Effect.die,
@@ -888,4 +977,12 @@ export const syncFromUpstream = Effect.fn("integration/syncFromUpstream")(functi
   yield* finishUpstreamSync(projectId);
   const after = trunkOf(yield* EntityStore, projectId);
   return { from, to, synced: after?.head === to } satisfies UpstreamSynced;
+});
+
+/** Every point where a fork met its upstream, newest first, ending at the fork point; none for a trunk that is no fork. */
+export const upstreamPoints = Effect.fn("integration/upstreamPoints")(function* (
+  projectId: ProjectId,
+) {
+  const trunk = trunkOf(yield* EntityStore, projectId);
+  return trunk === undefined ? [] : upstreamPointsOf(trunk);
 });

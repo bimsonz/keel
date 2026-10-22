@@ -2,16 +2,14 @@
 # kills: lane.drops-bounced
 # why: the lane keeps a bounced change in its queue and batches it
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index cf247bce..7ecf441f 100644
+index bf0c698d..41009856 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -645,8 +645,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
-         };
+@@ -663,7 +663,6 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
        }
        case "ChangeWithdrawn":
--      case "ChangeSuperseded":
--      case "ChangeBounced": {
-+      case "ChangeSuperseded": {
+       case "ChangeSuperseded":
+-      case "ChangeBounced":
+       // A proposal at another commit is checked again and waits for its own approval: it joins at the back.
+       case "ProposalUpdated": {
          const ended = decodeEnded(event.payload);
-         // One held for a ruling is in no queue, and its kept plan goes with it.
-         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);

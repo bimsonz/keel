@@ -228,6 +228,29 @@ export interface ForkResource {
   readonly target: NamespaceResource;
 }
 
+/**
+ * Proposing a commit of `fork` back to `upstream`: the project proposed to,
+ * the fork it comes from, and whether `upstream` takes proposals by its
+ * settings. Whether the fork was really taken from `upstream` is no question
+ * of who may ask: the proposal itself refuses one that was not.
+ */
+export interface ProposalResource {
+  readonly _tag: "Proposal";
+  readonly upstream: ProjectResource | MissingResource;
+  readonly fork: ProjectResource | MissingResource;
+  readonly proposalsOpen: boolean;
+}
+
+/**
+ * A proposed change, as an action on the proposal itself is decided: its
+ * project, and who proposed it. No `proposer`: the change is no proposal.
+ */
+export interface ProposalChangeResource {
+  readonly _tag: "ProposalChange";
+  readonly project: ProjectResource | MissingResource;
+  readonly proposer?: CommandActor;
+}
+
 export type Resource =
   | InstanceResource
   | SelfResource
@@ -236,4 +259,6 @@ export type Resource =
   | AgentResource
   | MissingResource
   | ForkResource
-  | IssueResource;
+  | IssueResource
+  | ProposalResource
+  | ProposalChangeResource;

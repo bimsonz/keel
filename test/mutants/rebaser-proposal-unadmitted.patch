@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/workspace-rebaser.test.ts
+# kills: rebaser.proposal
+# why: a fork's commits are copied into a proposal's workspace without counting against the upstream's repo bytes
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+index 57ab4dba..6c0ad6b0 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+@@ -100,7 +100,6 @@ export const WorkspaceRebaserGitCore = (
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(workspace)));
+             // Admitted on the pack in hand, before the workspace is asked for anything: a refusal mints no write token.
+-            yield* admit(pack.length);
+             const target = yield* remoteOf(workspace, "write");
+             for (let attempt = 0; attempt <= STALE_RETRIES; attempt += 1) {
+               const held = yield* heldAt(workspace, KEEL_PROPOSAL_REF);

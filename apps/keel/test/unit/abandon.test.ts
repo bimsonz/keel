@@ -7,7 +7,7 @@ import {
 import type { AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, makeId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { Changes } from "@keeltown/core/ports";
-import { makeChangesMemory } from "@keeltown/testing";
+import { makeChangesMemory, heldLease } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -60,14 +60,14 @@ describe("abandonChange", () => {
         const { change } = yield* declared;
         const withdrawn = yield* abandonChange(agent, {
           changeId: change.id,
-          lease: change.lease.id,
+          lease: heldLease(change).id,
           idempotencyKey: "abandon-1",
         });
         expect(withdrawn.state).toBe("withdrawn");
         expect(sent.map((input) => input.authority)).toEqual([
           {
             _tag: "Lease",
-            leaseId: change.lease.id,
+            leaseId: heldLease(change).id,
             agentId: token.agentId,
             projectId: token.projectId,
           },

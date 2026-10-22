@@ -2,14 +2,14 @@
 # kills: change.ruling-bounces, change.transitions
 # why: a ruling's decision bounces a change parked for a lapsed lease, which waits for adoption and not for a ruling
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index f61b7350..b959b250 100644
+index 916513b7..0f73e171 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -766,7 +766,7 @@ export const decideChange = (
+@@ -964,7 +964,7 @@ export const decideChange = (
        }
        if (command.decisionId !== undefined) {
-         // A ruling goes against a change only while the change waits for it.
--        if (!awaitingRuling) return refuse(change, command);
+         // A ruling goes against a change only while the change waits for a person.
+-        if (!awaitingPerson) return refuse(change, command);
 +        if (!at("parked")) return refuse(change, command);
          return intoAgentOwned(
            change,

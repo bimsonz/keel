@@ -1,6 +1,7 @@
 // Adoption through the isolate's doorways, REST and MCP, on a real Change DO:
 // the change is the harness's (an in-memory pool and code host, a manual
 // clock), reached over RPC from the deployed fetch handler as any change is.
+import { heldLease } from "@keeltown/testing";
 import { exports } from "cloudflare:workers";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { makeId, type ProjectId } from "@keeltown/core/kernel";
@@ -60,13 +61,13 @@ describe("adopting a change through the doorways", () => {
 
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
-    expect(body.result.lease.id).not.toBe(declared.change.lease.id);
-    expect(body.result.lease.id).toBe(stored.lease.id);
+    expect(body.result.lease.id).not.toBe(heldLease(declared.change).id);
+    expect(body.result.lease.id).toBe(heldLease(stored).id);
     expect(body.result.change).toMatchObject({ id: c.changeId, agentId: stored.agentId });
     expect(stored.agentId).not.toBe(declared.change.agentId);
     expect(body.result.workspace?.id).toBe(declared.grant.workspaceId);
     expect(body.result.workspace?.token).toEqual(expect.any(String));
-    expect(replayed).toMatchObject({ ok: true, result: { lease: { id: stored.lease.id } } });
+    expect(replayed).toMatchObject({ ok: true, result: { lease: { id: heldLease(stored).id } } });
   });
 
   it("[b11.adopt-early] refuses MCP's adopt while the lease is alive: 409 change.lease_not_lapsed, waiting until it lapses", async () => {
@@ -80,7 +81,7 @@ describe("adopting a change through the doorways", () => {
     expect(rest.status).toBe(409);
     expect(problem.code).toBe("change.lease_not_lapsed");
     expect(problem.nextActions).toEqual([expect.objectContaining({ kind: "wait" })]);
-    expect((await c.current()).lease.id).toBe(declared.change.lease.id);
+    expect(heldLease(await c.current()).id).toBe(heldLease(declared.change).id);
   });
 
   it("[b11.adopt-foreign] refuses an agent bound to another project with 403, though the lease lapsed", async () => {
@@ -94,7 +95,7 @@ describe("adopting a change through the doorways", () => {
     expect(response.status).toBe(403);
     expect(problem.code).toBe("auth.forbidden");
     expect(problem.detail).toMatch(/^Refused: foreign-project\. /);
-    expect((await c.current()).lease.id).toBe(declared.change.lease.id);
+    expect(heldLease(await c.current()).id).toBe(heldLease(declared.change).id);
   });
 
   it("[b11.adopt-replay] answers the key from another agent with 409 request.idempotency_conflict", async () => {

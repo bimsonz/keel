@@ -2,12 +2,12 @@
 # kills: change.fold-table
 # why: a declared change is folded as an agent's whatever origin its declaration names, so a change an auditor declared reads as an agent's
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..fc1cac2f 100644
+index 916513b7..c49d173f 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -942,7 +942,7 @@ export const evolveChange = (
+@@ -1191,7 +1191,7 @@ export const evolveChange = (
        id: event.changeId,
-       agentId: event.agentId,
+       ...(agentId === undefined ? {} : { agentId }),
        ...(event.run === undefined ? {} : { run: event.run }),
 -      origin: event.origin,
 +      origin: "agent",

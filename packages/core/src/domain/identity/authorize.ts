@@ -22,6 +22,8 @@ import type {
   NamespaceResource,
   Principal,
   ProjectResource,
+  ProposalChangeResource,
+  ProposalResource,
   Resource,
   Role,
   SelfResource,
@@ -62,7 +64,15 @@ import type {
  *   project; an agent on a project it stands on, and elsewhere one a person
  *   sponsors, on a project it reads;
  * - `authorOrMaintain`: an issue's own action: whoever opened it, or whoever
- *   maintains its project.
+ *   maintains its project;
+ * - `propose`: proposes a commit of a fork back to the project it was taken
+ *   from: a person who is a member of the fork's namespace, or an agent
+ *   working in the fork that a person sponsors, to a public project that
+ *   takes proposals;
+ * - `approve`: approves a proposal, or asks for changes to it: a person who
+ *   maintains its project, or an agent that does and a person sponsors;
+ *   `proposerOrApprove`: that, or whoever proposed it; `proposer`: whoever
+ *   proposed it, and nobody else.
  */
 export type Need =
   | "anyone"
@@ -88,14 +98,20 @@ export type Need =
   | "sponsor"
   | "sponsorOrSelf"
   | "participate"
-  | "authorOrMaintain";
+  | "authorOrMaintain"
+  | "propose"
+  | "approve"
+  | "proposerOrApprove"
+  | "proposer";
 
 /**
  * The kind of resource an action is decided on. `Org` is a namespace asked for
  * what only an org has: its members, its owners, its deletion.
  * `PersonalProject` is a project asked for what only a person's own namespace
  * gives it: an agent invited to that one project (an org takes an agent whole).
- * `Issue` is one issue of a project, with who opened it.
+ * `Issue` is one issue of a project, with who opened it. `Proposal` is a
+ * project proposed to and the fork proposed from; `ProposalChange` a proposed
+ * change, with who proposed it.
  */
 export type ResourceKind =
   | "Instance"
@@ -106,7 +122,9 @@ export type ResourceKind =
   | "PersonalProject"
   | "Agent"
   | "Fork"
-  | "Issue";
+  | "Issue"
+  | "Proposal"
+  | "ProposalChange";
 
 export interface ActionRule {
   readonly resource: ResourceKind;
@@ -221,6 +239,13 @@ export const SPEC_ACTIONS = {
   commentOnIssue: rule("Project", "participate"),
   closeIssue: rule("Issue", "authorOrMaintain"),
   reopenIssue: rule("Issue", "authorOrMaintain"),
+
+  propose: rule("Proposal", "propose"),
+  proposals: rule("Project", "read"),
+  updateProposal: rule("ProposalChange", "proposer"),
+  approveProposal: rule("ProposalChange", "approve"),
+  requestProposalChanges: rule("ProposalChange", "approve"),
+  closeProposal: rule("ProposalChange", "proposerOrApprove"),
 } as const satisfies Record<string, ActionRule>;
 
 /**
@@ -263,6 +288,8 @@ interface ResourceOfKind {
   readonly Agent: AgentResource | MissingResource;
   readonly Fork: ForkResource;
   readonly Issue: IssueResource;
+  readonly Proposal: ProposalResource;
+  readonly ProposalChange: ProposalChangeResource;
 }
 export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["resource"]];
 
@@ -532,7 +559,7 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   "sponsor-required": {
     kind: "call",
     title:
-      "Ask a person to sponsor you: an agent nobody sponsors opens no issue on a project it does not stand on",
+      "Ask a person to sponsor you: an agent nobody sponsors opens no issue on a project it does not stand on, and proposes or approves nothing",
     operationId: "askSponsor",
   },
   "org-project": {
@@ -540,6 +567,16 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     title:
       "An org takes an agent into the whole of it, not one project: invite the agent into the org instead",
     operationId: "Namespaces_inviteAgent",
+  },
+  "proposals-closed": {
+    kind: "escalate",
+    title:
+      "This project takes no proposals from forks: open an issue on it instead, or ask whoever maintains it to open proposals",
+  },
+  "proposer-only": {
+    kind: "escalate",
+    title:
+      "Only its proposer moves a proposal to another commit: propose your own commit from your fork",
   },
 };
 
@@ -908,6 +945,8 @@ export const authorize = <A extends Action>(
   )
     return refused("org-project");
   if (resource._tag === "Issue") return onIssue(principal, resource);
+  if (resource._tag === "Proposal") return onProposal(principal, resource);
+  if (resource._tag === "ProposalChange") return onProposalChange(principal, need, resource);
   const on: Resource =
     noOrg(asked, resource) || notPersonal(asked, resource) ? { _tag: "Missing" } : resource;
   return decide(principal, need, on);
@@ -940,11 +979,72 @@ const onIssue = (principal: Principal, issue: IssueResource): Decision => {
   const read = decide(principal, "read", issue.project);
   if (Result.isFailure(read)) return read;
   if (issue.author === undefined) return hidden();
-  const actor =
-    principal._tag === "User"
-      ? userActor(principal.userId)
-      : principal._tag === "Agent"
-        ? agentActor(principal.agentId)
-        : undefined;
-  return actor === issue.author ? granted() : decide(principal, "maintain", issue.project);
+  return actorOf(principal) === issue.author
+    ? granted()
+    : decide(principal, "maintain", issue.project);
+};
+
+/** The principal as an issue's author or a proposal's proposer is named; nobody for a visitor. */
+const actorOf = (principal: Principal) =>
+  principal._tag === "User"
+    ? userActor(principal.userId)
+    : principal._tag === "Agent"
+      ? agentActor(principal.agentId)
+      : undefined;
+
+/**
+ * Proposing a commit of a fork back to the project it was taken from. The
+ * project is read first, as any read of it is; one that is private, or whose
+ * settings take no proposals, is closed to them. Then the fork: a person must
+ * be a member of its namespace, and an agent work in it, and a person must
+ * sponsor the agent, as for an issue on a project it does not stand on.
+ */
+const onProposal = (principal: Principal, proposal: ProposalResource): Decision => {
+  if (principal._tag === "Anonymous") return unauthenticated();
+  const read = decide(principal, "read", proposal.upstream);
+  if (Result.isFailure(read)) return read;
+  const { upstream } = proposal;
+  if (upstream._tag !== "Project") return hidden();
+  if (upstream.visibility !== "public" || !proposal.proposalsOpen)
+    return refused("proposals-closed");
+  if (principal._tag === "User") return decide(principal, "member", proposal.fork);
+  const works = decide(principal, "work", proposal.fork);
+  if (Result.isFailure(works)) return works;
+  return principal.sponsored === true ? granted() : refused("sponsor-required");
+};
+
+/**
+ * Approving a proposal, or asking for changes: a person who maintains its
+ * project; an agent that maintains it, while a person sponsors it.
+ */
+const approver = (principal: Principal, project: ProposalChangeResource["project"]): Decision => {
+  const maintains = decide(principal, "maintain", project);
+  if (Result.isFailure(maintains) || principal._tag !== "Agent") return maintains;
+  return principal.sponsored === true ? granted() : refused("sponsor-required");
+};
+
+/**
+ * A proposal's own action. Its project is read first, so a proposal of a
+ * project the caller may not see is not there; then its proposer alone moves
+ * it to another commit, and closes it as whoever may approve it does.
+ */
+const onProposalChange = (
+  principal: Principal,
+  need: Need,
+  proposed: ProposalChangeResource,
+): Decision => {
+  if (principal._tag === "Anonymous") return unauthenticated();
+  const read = decide(principal, "read", proposed.project);
+  if (Result.isFailure(read)) return read;
+  const theirs = proposed.proposer !== undefined && proposed.proposer === actorOf(principal);
+  switch (need) {
+    case "proposer":
+      return theirs ? granted() : refused("proposer-only");
+    case "proposerOrApprove":
+      return theirs ? granted() : approver(principal, proposed.project);
+    case "approve":
+      return approver(principal, proposed.project);
+    default:
+      return hidden();
+  }
 };

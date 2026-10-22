@@ -2,11 +2,11 @@
 # kills: charts.docs-match
 # why: A diagram is edited by hand and loses an edge its chart has
 diff --git a/docs/domain/state-machines.md b/docs/domain/state-machines.md
-index 7f7970c6..d8599243 100644
+index 6fd396a8..7df13221 100644
 --- a/docs/domain/state-machines.md
 +++ b/docs/domain/state-machines.md
-@@ -83,7 +83,6 @@ stateDiagram-v2
-   Queued --> Bounced: ChangeBounced
+@@ -91,7 +91,6 @@ stateDiagram-v2
+   Queued --> Working: ProposalUpdated
    Queued --> Withdrawn: ChangeWithdrawn
    Queued --> Superseded: ChangeSuperseded
 -  Integrating --> Queued: ChangeRequeued

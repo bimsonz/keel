@@ -4,7 +4,11 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Caller } from "../../src/adapters/driving/http/caller.ts";
-import { onlyTools, toolsOnly } from "../../src/adapters/driving/mcp/server.ts";
+import {
+  onlyTools,
+  PERSON_INSTRUCTIONS,
+  toolsOnly,
+} from "../../src/adapters/driving/mcp/server.ts";
 import { TOOL_NAMES } from "../../src/generated/mcp/mcp.gen.ts";
 
 /**
@@ -107,5 +111,24 @@ describe("what an MCP agent is told to do next", () => {
     // The list holds no operation that has since become a tool or left the code.
     expect(Object.keys(NOT_TOOLS).filter((op) => tools.has(op) || !named.has(op))).toEqual([]);
     expect(named.size).toBeGreaterThan(30);
+  });
+});
+
+describe("proposals over MCP", () => {
+  it("[mcp.proposal-tools] every proposal operation is a tool, and a person's assistant is told to read a proposal before approving it, naming the commit, on their word alone", () => {
+    const tools = new Set<string>(TOOL_NAMES);
+    expect(
+      [
+        "propose",
+        "proposals",
+        "updateProposal",
+        "approveProposal",
+        "requestProposalChanges",
+        "closeProposal",
+      ].filter((op) => !tools.has(op)),
+    ).toEqual([]);
+    for (const named of ["`proposals`", "`approveProposal`", "`change`", "`diff`"])
+      expect(PERSON_INSTRUCTIONS).toContain(named);
+    expect(PERSON_INSTRUCTIONS).toMatch(/commit/);
   });
 });

@@ -39,6 +39,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   maxBatchSize: 8,
   verification: "required",
   visibility: "private",
+  proposals: "open",
 };
 
 /**
@@ -50,16 +51,23 @@ export const SETTINGS_REQUEST = "settings-request";
 
 const SettingsRequest = Schema.Struct({ fingerprint: Schema.String });
 
-/** Settings stored before `visibility` existed hold none, and read as `private`. */
+/** Settings stored before `visibility` existed hold none, and read as `private`; before `proposals`, as `open`. */
 const StoredSettings = Schema.Struct({
   protectedPaths: Schema.Array(Glob),
   maxBatchSize: Schema.Int,
   verification: Schema.Literals(["required", "off"]),
   visibility: Schema.optional(Schema.Literals(["private", "public"])),
+  proposals: Schema.optional(Schema.Literals(["open", "closed"])),
 });
 
 /** The fields a PUT replaces, in the order ProjectSettingsChanged lists them. */
-const FIELDS = ["protectedPaths", "maxBatchSize", "verification", "visibility"] as const;
+const FIELDS = [
+  "protectedPaths",
+  "maxBatchSize",
+  "verification",
+  "visibility",
+  "proposals",
+] as const;
 
 export interface ChangeSettings {
   readonly projectId: ProjectId;
@@ -91,7 +99,11 @@ const held = (store: Store, projectId: ProjectId): ProjectSettings => {
   const value = store.get(PROJECT_SETTINGS, projectId);
   if (value === undefined) return DEFAULT_SETTINGS;
   const stored = decodeSettings(value);
-  return { ...stored, visibility: stored.visibility ?? "private" };
+  return {
+    ...stored,
+    visibility: stored.visibility ?? "private",
+    proposals: stored.proposals ?? "open",
+  };
 };
 
 /** Each field whose JSON value differs between the two, with both values. */
@@ -118,7 +130,7 @@ export const settingsOf: (
 /**
  * Replaces the project's settings as whoever governs it, a person or an agent
  * in a namespace of its own (an absent `verification` is `required`, an absent
- * `visibility` `private`). One ProjectSettingsChanged audits every field the
+ * `visibility` `private`, absent `proposals` `open`). One ProjectSettingsChanged audits every field the
  * PUT changes, from and to, under the actor and the run the command names; an
  * unchanged PUT commits nothing, so a retry
  * is a no-op by content. The cause is `settings:<requestId>`: a replay of the
@@ -143,6 +155,7 @@ export const changeSettings: (
     maxBatchSize: command.settings.maxBatchSize,
     verification: command.settings.verification ?? "required",
     visibility: command.settings.visibility ?? "private",
+    proposals: command.settings.proposals ?? "open",
   };
   const fingerprint = contentHashOf(asJson(next));
   const conflict = new IdempotencyConflict({ idempotencyKey: requestId });

@@ -88,9 +88,48 @@ model Workspace {
   baseSha: CommitSha;
 }
 
+/**
+ * Where a proposal comes from and where it stands: a change on this project whose code comes from a fork of it.
+ * Keel holds it, and its proposer moves it to another commit or closes it.
+ */
+model ChangeProposal {
+  /** The fork the commit was proposed from. */
+  fork: ProjectId;
+
+  /** Where the fork is, to a reader who may read it: a private fork is named to nobody outside it. */
+  forkRef?: ProjectRef;
+
+  /** The commit of the fork's trunk the proposal carries now. */
+  commit: CommitSha;
+
+  /** Who proposed it: `user:<id>` or `agent:<id>`. */
+  proposer: CommandActor;
+
+  /** The proposer's handle, where they have one. */
+  proposerHandle?: string;
+
+  /** The commit an approval names, while it stands: a new commit clears it. */
+  approved?: CommitSha;
+
+  /** The paths it touches that need a person's ruling once it is approved. */
+  humanClassPaths?: string[];
+
+  /** The fork's own change that landed `commit` there, when Keel landed it: its verdict is the fork's. */
+  forkChange?: ChangeId;
+}
+
 model Change {
   id: ChangeId;
-  agentId: AgentId;
+
+  /** The agent holding the change: the adopter after an adoption. Absent on a proposal, which no agent holds. */
+  agentId?: AgentId;
+
+  /** Where the change started: `agent` for an agent's declare, `proposal` for a proposal from a fork. */
+  origin: ChangeOrigin;
+
+  /** Where a proposal comes from and where it stands: on a proposal alone. */
+  proposal?: ChangeProposal;
+
   state: ChangeState;
   revision: int32;
   goal: string;

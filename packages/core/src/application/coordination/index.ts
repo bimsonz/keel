@@ -133,6 +133,7 @@ export * from "./live-index.ts";
 export * from "./party-conflicts.ts";
 export * from "./preflight.ts";
 export * from "./probe-ledger.ts";
+export * from "./proposal-ledger.ts";
 export * from "./read-scope.ts";
 export * from "./subject.ts";
 export * from "./subject-fallout.ts";

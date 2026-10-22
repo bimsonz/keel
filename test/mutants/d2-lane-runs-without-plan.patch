@@ -2,10 +2,10 @@
 # kills: d21.no-hash-refused
 # why: A change queued with no compiled plan goes on to composition, so the lane tries to verify a candidate no plan describes instead of asking for a resubmission
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 373b53ed..d8bd1202 100644
+index bf0c698d..82d9afef 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -1138,14 +1138,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+@@ -1432,14 +1432,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
    active: ActiveBatch,
    batch: Batch,
  ) {
@@ -19,4 +19,4 @@ index 373b53ed..d8bd1202 100644
 -  }
    const changes = yield* Changes;
    const directory = yield* AgentDirectory;
-   const members = yield* Effect.forEach(
+   const namespaces = yield* Namespaces;

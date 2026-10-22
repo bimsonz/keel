@@ -40,9 +40,11 @@ import type { Agent } from "@keeltown/core/domain/identity";
 import { unionPlans, type VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
   type AgentId,
+  agentActor,
   BatchId,
   type CandidateId,
   type ChangeId,
+  type CommandActor,
   CommitSha,
   type ContentHash,
   type EntityRef,
@@ -51,6 +53,7 @@ import {
   Instant,
   makeId,
   type NamespaceId,
+  userActor,
 } from "@keeltown/core/kernel";
 import {
   type BatchVerdict,
@@ -78,6 +81,7 @@ import {
   makeIdsMemory,
   makeLanesMemory,
   makeManualClock,
+  makeNamespacesMemory,
   makePlacedProject,
   makePlanStoreMemory,
   makeProjectsMemory,
@@ -85,6 +89,7 @@ import {
   sampleNamespace,
   suitePlan,
   workerAppPlan,
+  heldLease,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
 import { TestClock } from "effect/testing";
@@ -98,6 +103,10 @@ const MAIN = "refs/heads/main";
 const AGENT = makeId("agt", "01J9AAAAAAAAAAAAAAAAAAAAAA");
 const OTHER_AGENT = makeId("agt", "01J9BBBBBBBBBBBBBBBBBBBBBB");
 const RUN = makeId("run", "01J9RRRRRRRRRRRRRRRRRRRRRR");
+/** The fork a proposal comes from, and the people who propose and approve. */
+const FORK = makeId("prj", "01J9FFFFFFFFFFFFFFFFFFFFFF");
+const PERSON = makeId("usr", "01J9PPPPPPPPPPPPPPPPPPPPPP");
+const MAINTAINER = makeId("usr", "01J9MMMMMMMMMMMMMMMMMMMMMM");
 const FAR = Instant(9_999_999_999_999);
 /** An agent as the directory holds one that signed up by key: with the handle it was given. */
 const signedUp = (id: AgentId, handle: string): Agent => ({
@@ -215,6 +224,11 @@ function world(options: WorldOptions = {}) {
       declare: () => Effect.die(new Error("the Lane never declares")),
       submit: () => Effect.die(new Error("the Lane never submits")),
       awaitSubmission: () => Effect.die(new Error("the Lane never waits on a submission")),
+      propose: () => Effect.die(new Error("the Lane never proposes")),
+      updateProposal: () => Effect.die(new Error("the Lane never moves a proposal")),
+      approveProposal: () => Effect.die(new Error("the Lane never approves a proposal")),
+      requestProposalChanges: () => Effect.die(new Error("the Lane never asks for changes")),
+      closeProposal: () => Effect.die(new Error("the Lane never closes a proposal")),
     }),
   );
   // What the batch's state is when KeelVerify is started: it must already be Verifying.
@@ -257,6 +271,8 @@ function world(options: WorldOptions = {}) {
       : { retryAfterMs: options.refuseRetryAfterMs }),
   });
   const directory = makeAgentDirectoryMemory();
+  /** The namespaces the Lane reads a person's handle from: none until a test seeds a person. */
+  const people = makeNamespacesMemory();
   const composer = composing.layer;
   // The project's maintainers, as the shrink rule puts a drop in tests to them.
   const escalations = makeEscalationsMemory(clock);
@@ -292,6 +308,7 @@ function world(options: WorldOptions = {}) {
     projects.layer,
     makePlacedProject(PROJECT, options.namespace).layer,
     directory.layer,
+    people.layer,
     changesLayer,
     plans.layer,
     escalations.layer,
@@ -317,6 +334,7 @@ function world(options: WorldOptions = {}) {
     reads,
     /** The agent directory the Lane reads handles from: empty until a test writes an agent. */
     agents: directory.agents,
+    people,
     startedIn,
     hooks,
     layer,
@@ -415,6 +433,56 @@ const resumed = (id: ChangeId) =>
       decisionId: makeId("dec", "01J9KKKKKKKKKKKKKKKKKKKKKK"),
     }),
   );
+
+/** Queues a proposal from FORK at commit `c…`, which no agent holds, under PLAN. */
+const queueProposal = (w: World, id: ChangeId, proposer: CommandActor) =>
+  Effect.gen(function* () {
+    w.changes.set(id, {
+      id,
+      origin: "proposal",
+      proposal: { fork: FORK, proposer },
+      state: "queued",
+      intent: { revision: 1, goal: `goal of ${id}`, footprint: [], premises: [] },
+      createdAt: Instant(0),
+      baseSha: sha("0"),
+      commitSha: sha("c"),
+      laneId: LANE,
+    });
+    return yield* deliver(
+      envelope(changeRef(id), {
+        _tag: "ChangeQueued",
+        changeId: id,
+        laneId: LANE,
+        planHash: PLAN.planHash,
+      }),
+    );
+  });
+const approved = (id: ChangeId) =>
+  deliver(
+    envelope(changeRef(id), {
+      _tag: "ProposalApproved",
+      changeId: id,
+      commit: sha("c"),
+      by: userActor(MAINTAINER),
+    }),
+  );
+const updated = (id: ChangeId) =>
+  deliver(envelope(changeRef(id), { _tag: "ProposalUpdated", changeId: id, commit: sha("d") }));
+
+/** What the composer is told of a lone proposal by `proposer`, with one person and one agent known by handle. */
+const composedFor = (proposer: CommandActor) => {
+  const w = world();
+  return Effect.gen(function* () {
+    yield* w.seeded;
+    w.people.seed({ users: [{ id: PERSON, username: "stranger" }] });
+    w.agents.set(AGENT, signedUp(AGENT, "agent-01j9aaaaaaaaaaaa"));
+    yield* queueProposal(w, change(1), proposer);
+    yield* toVerifying(w);
+    return w.composed.flatMap((request) =>
+      request.members.map((m) => ({ agent: m.agent, proposer: m.proposer })),
+    );
+  }).pipe(Effect.provide(w.layer));
+};
 
 const advance = (from: string, to: string, members: readonly ChangeId[]) =>
   deliver(
@@ -766,6 +834,80 @@ describe("the Lane", () => {
   );
 
   it.effect(
+    "[lane.proposal-parked] a proposal parked for approval as it is queued leaves the queue with its plan kept, and is never batched",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queueProposal(w, change(1), userActor(PERSON));
+        yield* queue(w, change(2));
+        yield* parked(change(1), "awaiting-approval");
+        const held = laneOf(yield* EntityStore, LANE);
+        yield* stepped(LANE);
+
+        expect(held?.queue).toEqual([change(2)]);
+        expect(held?.plans?.map((plan) => plan.changeId)).toContain(change(1));
+        expect((yield* payloads("BatchFormed")).flatMap((p) => p["members"])).not.toContain(
+          change(1),
+        );
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.proposal-approved] an approved proposal rejoins at the queue's front under the plan it was queued with; the approval of one this lane never queued moves nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queueProposal(w, change(1), userActor(PERSON));
+        yield* queue(w, change(2));
+        yield* parked(change(1), "awaiting-approval");
+        yield* approved(change(9));
+        const unmoved = laneOf(yield* EntityStore, LANE);
+        yield* approved(change(1));
+        const back = laneOf(yield* EntityStore, LANE);
+
+        expect(unmoved?.queue).toEqual([change(2)]);
+        expect(back?.queue).toEqual([change(1), change(2)]);
+        expect(back?.plans?.find((plan) => plan.changeId === change(1))?.planHash).toBe(
+          PLAN.planHash,
+        );
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.proposal-updated-dropped] a proposal moved to another commit leaves the lane, queued after its approval or parked before it, its plan with it: no approval of the commit it left puts it back",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queueProposal(w, change(1), userActor(PERSON));
+        yield* queueProposal(w, change(3), userActor(PERSON));
+        yield* queue(w, change(2));
+        yield* parked(change(1), "awaiting-approval");
+        yield* parked(change(3), "awaiting-approval");
+        yield* approved(change(1));
+        const queued = laneOf(yield* EntityStore, LANE);
+        yield* updated(change(1));
+        yield* updated(change(3));
+        const left = laneOf(yield* EntityStore, LANE);
+        yield* approved(change(1));
+        yield* approved(change(3));
+        const stale = laneOf(yield* EntityStore, LANE);
+        yield* stepped(LANE);
+
+        expect(queued?.queue).toEqual([change(1), change(2)]);
+        expect(left?.queue).toEqual([change(2)]);
+        expect(left?.plans?.map((plan) => plan.changeId)).toEqual([change(2)]);
+        expect(stale?.queue).toEqual([change(2)]);
+        expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(2)]]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[lane.drops-bounced] a change bounced while queued leaves the queue, and the next step forms the change behind it",
     () => {
       const w = world();
@@ -831,7 +973,7 @@ describe("the Lane", () => {
         w.changes.set(change(1), {
           ...queued,
           run: { id: RUN },
-          lease: { ...queued.lease, agentId: OTHER_AGENT },
+          lease: { ...heldLease(queued), agentId: OTHER_AGENT },
         });
         w.agents.set(AGENT, signedUp(AGENT, "agent-01j9aaaaaaaaaaaa"));
         w.agents.set(OTHER_AGENT, signedUp(OTHER_AGENT, "agent-01j9bbbbbbbbbbbb"));
@@ -855,6 +997,30 @@ describe("the Lane", () => {
           [{ id: AGENT, handle: undefined, run: undefined }],
         ]);
       }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.proposal-author] names a proposal's proposer to the composer, with the handle a person's namespace or the directory holds (none: by its id), and the fork and commit it came from, and no agent",
+    () => {
+      return Effect.gen(function* () {
+        const from = { project: FORK, commit: sha("c") };
+        expect(yield* composedFor(userActor(PERSON))).toStrictEqual([
+          {
+            agent: undefined,
+            proposer: { actor: userActor(PERSON), handle: "stranger", from },
+          },
+        ]);
+        expect(yield* composedFor(agentActor(AGENT))).toStrictEqual([
+          {
+            agent: undefined,
+            proposer: { actor: agentActor(AGENT), handle: "agent-01j9aaaaaaaaaaaa", from },
+          },
+        ]);
+        expect(yield* composedFor(userActor(MAINTAINER))).toStrictEqual([
+          { agent: undefined, proposer: { actor: userActor(MAINTAINER), handle: undefined, from } },
+        ]);
+      });
     },
   );
 

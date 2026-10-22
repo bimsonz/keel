@@ -2,7 +2,7 @@
 # kills: kernel.actor-shape
 # why: userActor writes `agent:<user id>`, which no envelope takes, and which reads as an agent to anything that only looks at the prefix.
 diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
-index 83c6135e..38083e4a 100644
+index 5375241a..4a4aaa79 100644
 --- a/packages/core/src/domain/kernel/event.ts
 +++ b/packages/core/src/domain/kernel/event.ts
 @@ -47,7 +47,7 @@ export const byAgent = (
@@ -12,5 +12,5 @@ index 83c6135e..38083e4a 100644
 -export const userActor = (userId: UserId): CommandActor => `user:${userId}`;
 +export const userActor = (userId: UserId): CommandActor => `agent:${userId}` as CommandActor;
  
- /**
-  * The envelope every event is committed in (docs/domain/events.md). The payload
+ /** Who an actor is: an agent or a user, by id. */
+ export const actorParts = (

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fork-sync-http.test.ts
+# kills: fork-sync.upstream-unread
+# why: a fork's owner syncs from an upstream they may no longer read
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 95f8a8b7..a3be2e1d 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -1607,8 +1607,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+               const origin = yield* Trunks.use((trunks) => trunks.origin(projectId.success));
+               if (Option.isSome(origin) && origin.value.kind === "forked") {
+                 const upstream = yield* projectResource(origin.value.project);
+-                if (Result.isFailure(decideUpstreamRead(caller.principal, upstream)))
+-                  return upstreamUnread(caller);
+               }
+               return yield* Trunks.use((trunks) => trunks.syncUpstream(projectId.success, by)).pipe(
+                 Effect.match({

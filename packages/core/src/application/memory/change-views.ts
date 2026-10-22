@@ -4,6 +4,7 @@ import {
   ChangeEvent,
   ChangeLanded,
   evolveChange,
+  TERMINAL,
 } from "../../domain/coordination/index.ts";
 import { TrunkAdvanced, TrunkInitialized } from "../../domain/integration/index.ts";
 import {
@@ -148,7 +149,20 @@ function foldChange(store: Store, event: EventEnvelope): string | undefined {
     number,
     state: change.state,
     ...(change.parkReason === undefined ? {} : { parkReason: change.parkReason }),
-    agentId: change.agentId,
+    ...(change.agentId === undefined ? {} : { agentId: change.agentId }),
+    origin: change.origin,
+    ...(change.proposal === undefined || change.commitSha === undefined
+      ? {}
+      : {
+          proposal: {
+            fork: change.proposal.fork,
+            commit: change.commitSha,
+            proposer: change.proposal.proposer,
+            ...(change.proposal.approved === undefined
+              ? {}
+              : { approved: change.proposal.approved }),
+          },
+        }),
     goal: change.intent.goal,
     revision: change.intent.revision,
     declaredAt: change.createdAt,
@@ -204,7 +218,12 @@ const summariesOf = (store: Store, project: ProjectId): ChangeSummary[] =>
     .map(({ value }) => decodeSummary(value))
     .toSorted((a, b) => b.number - a.number);
 
-/** A project's changes, newest `#n` first, in one state when asked, from below `cursor`. */
+/** Whether a summary is one of the project's proposals asked for: open ones, or those that landed or were closed. */
+const proposalAsked = (summary: ChangeSummary, asked: "open" | "closed" | undefined): boolean =>
+  asked === undefined ||
+  (summary.origin === "proposal" && TERMINAL.has(summary.state) === (asked === "closed"));
+
+/** A project's changes, newest `#n` first, in one state when asked, its proposals alone when asked, from below `cursor`. */
 export const listChanges: (
   read: ChangeListRead,
 ) => Effect.Effect<ChangeListPage, never, EntityStore> = Effect.fn("memory/listChanges")(function* (
@@ -216,6 +235,7 @@ export const listChanges: (
   const matching = summariesOf(store, read.project).filter(
     (summary) =>
       (read.state === undefined || summary.state === read.state) &&
+      proposalAsked(summary, read.proposals) &&
       (below === undefined || summary.number < below),
   );
   const items = matching.slice(0, limit);

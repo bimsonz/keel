@@ -29,6 +29,15 @@ export interface TakenTrunk {
   readonly bytes?: number;
 }
 
+/**
+ * GitCore will not merge a fork's work with its upstream's: `path` is the
+ * first path it stopped at, and `reason` GitCore's refusal. Nothing was written.
+ */
+export class MergeRefused extends Schema.TaggedError<MergeRefused>()("MergeRefused", {
+  path: Schema.String,
+  reason: Schema.String,
+}) {}
+
 /** What one sync did to a target: it already held trunk's head, or its main moved there. */
 export type SyncOutcome = "unchanged" | "advanced";
 
@@ -136,6 +145,35 @@ export class TrunkWriter extends Context.Service<
       to: CommitSha,
       haves: readonly CommitSha[],
     ) => Effect.Effect<number, PackTooLarge | UpstreamUnreachable>;
+    /**
+     * Brings into trunk what `to` reaches in `source`, another project's
+     * trunk on this code host, past `haves`, under the side ref as
+     * `fetchUpstream` does, read with a token Keel mints: how a fork takes
+     * its upstream's trunk. Answers the pack's length. A pack over the
+     * receive-pack cap is PackTooLarge with nothing sent; a source that is
+     * gone is RepoNotFound. Idempotent: the side ref is set to `to`.
+     */
+    readonly fetchProject: (
+      source: RepoRef,
+      to: CommitSha,
+      haves: readonly CommitSha[],
+    ) => Effect.Effect<number, PackTooLarge | RepoNotFound>;
+    /**
+     * Merges `theirs` (the side ref's head, which `fetchProject` brought) into
+     * `ours` (trunk's head) on `base`, a commit both reach, never on a
+     * merge-base walk, and moves the side ref from `theirs` to one commit
+     * with parents `ours` then `theirs`, made and signed by Keel at `at` with
+     * `message`. Answers the commit, and the length of the pack that carried
+     * its new trees and blobs, as `push` weighs one. A path GitCore will not
+     * merge is MergeRefused, and nothing is written.
+     */
+    readonly mergeUpstream: (merge: {
+      readonly ours: CommitSha;
+      readonly theirs: CommitSha;
+      readonly base: CommitSha;
+      readonly at: Instant;
+      readonly message: string;
+    }) => Effect.Effect<{ readonly commit: CommitSha; readonly bytes: number }, MergeRefused>;
     /**
      * Moves trunk's main `from → to` in one push, `from` sent as the explicit
      * old value: `to` must already be in trunk (`fetchUpstream`), so no

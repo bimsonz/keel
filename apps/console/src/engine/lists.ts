@@ -16,7 +16,15 @@ import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../do
 import { agentName } from "./audience.ts";
 import { type Cards, type HeldUnder, heldUnder } from "./holder.ts";
 import { subjectOf } from "./lanes.ts";
-import type { ChangeEntry, ConflictEntry, DecisionEntry, EscalationEntry, World } from "./world.ts";
+import {
+  authorAgentOf,
+  authorEntryOf,
+  type ChangeEntry,
+  type ConflictEntry,
+  type DecisionEntry,
+  type EscalationEntry,
+  type World,
+} from "./world.ts";
 
 /** How many rows a list shows before it is asked for more. */
 export const PAGE = 50;
@@ -25,7 +33,7 @@ export const PAGE = 50;
  * A code host's pull request list: open and closed, then the open ones parked on a ruling or bounced back to
  * their agent, and the closed ones that landed.
  */
-export type ChangeFilter = "open" | "closed" | "landed" | "parked" | "bounced";
+export type ChangeFilter = "open" | "closed" | "landed" | "parked" | "bounced" | "proposals";
 export type ConflictFilter = "open" | "settled";
 /** Closed: answered by a person, or withdrawn before anyone answered. */
 export type EscalationFilter = "open" | "closed";
@@ -242,11 +250,18 @@ function listing<Entry, Row, Filter extends string>(
  * the change moves on, submitted again or adopted, whether or not its agent is still there to revise it.
  */
 export function filtersOfChange(
-  change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom">,
+  change: Pick<ChangeEntry, "state" | "parkedOn" | "parkedFrom" | "proposal">,
 ): readonly ChangeFilter[] {
-  if (change.state === "parked" && change.parkedOn !== "awaiting-ruling")
-    return change.parkedFrom === "bounced" ? FILTERS_OF_CHANGE.bounced : ["open"];
-  return FILTERS_OF_CHANGE[change.state];
+  const filters =
+    change.state === "parked" && change.parkedOn !== "awaiting-ruling"
+      ? change.parkedFrom === "bounced"
+        ? FILTERS_OF_CHANGE.bounced
+        : (["open"] as const)
+      : FILTERS_OF_CHANGE[change.state];
+  // An open proposal from a fork is one of the project's proposals too, as a code host lists a fork's pull requests.
+  return change.proposal !== undefined && filters.includes("open")
+    ? [...filters, "proposals"]
+    : filters;
 }
 
 /** Whether a change counts as bounced: Keel bounced it, and it has not moved on since. */
@@ -267,6 +282,7 @@ export const CHANGE_FILTERS = [
   "landed",
   "parked",
   "bounced",
+  "proposals",
 ] as const satisfies readonly ChangeFilter[];
 export const CONFLICT_FILTERS = ["open", "settled"] as const satisfies readonly ConflictFilter[];
 export const ESCALATION_FILTERS = ["open", "closed"] as const satisfies readonly EscalationFilter[];
@@ -285,7 +301,8 @@ export function changesOf(
     filter,
     shown,
     (change): ChangeRow => {
-      const by = world.agents.get(change.agentId);
+      const by = authorEntryOf(world, change);
+      const author = authorAgentOf(change);
       const subject = subjectOf(change);
       const escalation = question(world, change.escalationId, names);
       return {
@@ -295,7 +312,9 @@ export function changesOf(
         goal: change.goal,
         state: change.state,
         // An agent the reader has no name for is one all the same.
-        agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
+        agent:
+          agentName(by, author === undefined ? undefined : cards.get(author)) ??
+          (author === undefined && change.proposal !== undefined ? "a person" : "an agent"),
         agentClass: by?.class ?? "unnamed",
         held: heldUnder(cards, change),
         ...(subject === undefined ? {} : { subject }),

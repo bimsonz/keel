@@ -70,6 +70,7 @@ const CONTRACT_PORTS = [
   "Memberships",
   "LiveChanges",
   "ProbeLedger",
+  "ProposalLedger",
   "MfpWriter",
   "HumanGate",
   "QuestionRaisers",

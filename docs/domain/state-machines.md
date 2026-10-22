@@ -46,6 +46,7 @@ stateDiagram-v2
   [*] --> Declared: IntentDeclared
   state Parked {
     AwaitingRuling
+    AwaitingApproval
     LeaseLapsed
   }
   Declared --> Working: ChangeStarted
@@ -71,16 +72,21 @@ stateDiagram-v2
   Drifted --> Working: IntentRevised
   Drifted --> LeaseLapsed: ChangeParked
   Drifted --> Drifted: ChangeAdopted
+  Drifted --> Working: ProposalUpdated
   Drifted --> Withdrawn: ChangeWithdrawn
   Drifted --> Superseded: ChangeSuperseded
   Verifying --> Queued: ChangeQueued
-  Verifying --> AwaitingRuling: ChangeParked
+  Verifying --> AwaitingRuling: ChangeParked [for a ruling]
+  Verifying --> AwaitingApproval: ChangeParked [a proposal, for its approval]
   Verifying --> Bounced: ChangeBounced
+  Verifying --> Working: ProposalUpdated
   Verifying --> Withdrawn: ChangeWithdrawn
   Verifying --> Superseded: ChangeSuperseded
   Queued --> Integrating: ChangeBatched
-  Queued --> AwaitingRuling: ChangeParked
+  Queued --> AwaitingRuling: ChangeParked [for a ruling]
+  Queued --> AwaitingApproval: ChangeParked [a proposal, for its approval]
   Queued --> Bounced: ChangeBounced
+  Queued --> Working: ProposalUpdated
   Queued --> Withdrawn: ChangeWithdrawn
   Queued --> Superseded: ChangeSuperseded
   Integrating --> Queued: ChangeRequeued
@@ -91,6 +97,7 @@ stateDiagram-v2
   Bounced --> Bounced: ChangeRebased
   Bounced --> LeaseLapsed: ChangeParked
   Bounced --> Bounced: ChangeAdopted
+  Bounced --> Working: ProposalUpdated
   Bounced --> Withdrawn: ChangeWithdrawn
   Bounced --> Superseded: ChangeSuperseded
   Parked --> Withdrawn: ChangeWithdrawn
@@ -99,6 +106,11 @@ stateDiagram-v2
   AwaitingRuling --> Queued: ChangeResumed [parked from Queued]
   AwaitingRuling --> Bounced: ChangeBounced
   AwaitingRuling --> AwaitingRuling: ChangeParked
+  AwaitingRuling --> Working: ProposalUpdated
+  AwaitingApproval --> Verifying: ProposalApproved [parked from Verifying]
+  AwaitingApproval --> Queued: ProposalApproved [parked from Queued]
+  AwaitingApproval --> Bounced: ChangeBounced
+  AwaitingApproval --> Working: ProposalUpdated
   LeaseLapsed --> Working: ChangeAdopted [has-workspace]
   LeaseLapsed --> Declared: ChangeAdopted [no-workspace]
   Landed --> [*]
@@ -409,6 +421,10 @@ The Trunk DO's state is folded from its own events and from the `BatchVerified` 
 | Promoting | Idle, or Debouncing | Artifacts refuses the group's push, or the composed pack would take the repo past its quota | The group is composed, and the head is still `old` (a push that may have landed is read back instead) | `PromotionDeclined {reason: pack-too-large or repo-bytes-quota, nextActions}` for each batch of the group, the last ending it; trunk does not move and never freezes. A batch refused alone as too large, and every batch of a full repo, has `reverify` empty: its members bounce. A group of several refused as too large names each batch's members in `reverify`, and from then on each group is one batch, until a push lands |
 | Frozen | Idle, or Debouncing | An operator releases the freeze, confirming trunk's head | Scope `operator` | `PromotionDeclined {reason: frozen}` for each batch of the stopped group, then `PromotionResumed {head}` |
 | Any | The same, or Idle | The Lane cancels a batch speculation verified behind a failed one | The batch is not in the group being pushed and none of its members landed (otherwise refused as too late) | `BatchDropped {batchId, because}`: the batch leaves the queue, Idle when it leaves a debounce with none, or is remembered before its verdict arrives. A batch dropped already is answered the same again, with nothing recorded |
+| Idle, or Debouncing | Syncing | An owner syncs an imported or forked trunk from its upstream | Trunk's head is `from`; for an import, upstream's branch head descends from it (refused 409 `trunk.not_fast_forward` otherwise); for a fork, upstream's trunk head is taken as it is when the fork holds nothing of its own since it last met upstream, and otherwise Keel merges it on that point into one commit it signs, with the fork's head and upstream's as its parents (refused 409 `trunk.sync_conflicts`, naming the first path both changed apart, with nothing moved). Either way the new history is admitted against the namespace's repo bytes first | `TrunkSyncStarted {from, to, upstream, merged?}`: the WAL entry of the move (`groupId` `sync:<to>`) |
+| Syncing | Syncing | A `BatchVerified` arrives, or a batch is dropped | — | the batch only queues: no group starts while a sync is open |
+| Syncing | Idle, or Debouncing | Read-back shows the head is `to` | — | `TrunkSynced {from, to, upstream, merged?, height}`; a fork's trunk remembers it as a point where it met upstream (`to`, and the upstream head it took), newest first |
+| Syncing | Frozen | Read-back shows any other head | — | `PromotionFrozen {reason: readback-mismatch}` |
 
 The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. On red it bisects across commutation-promoted commits and declares a revert change with `origin: auditor`, which lands like any other change.
 
@@ -417,6 +433,7 @@ The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. O
 - Every WAL group ends exactly once, in `TrunkAdvanced` or `PromotionFrozen`. Nothing promotes from Frozen until `PromotionResumed`.
 - A dropped batch never promotes: a `BatchVerified` for it is refused however late it arrives, so its members, queued again, land once.
 - Artifacts' own compare-and-swap, if it exists, is a second fence and never the only one.
+- A sync never rewrites trunk: it moves main forward to upstream's head or to Keel's merge of it, whose first parent is trunk's head. A fork remembers at most 32 of its syncs; a proposal from it is based on the newest one its commit holds, or on the fork point.
 
 ---
 

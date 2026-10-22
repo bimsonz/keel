@@ -2,14 +2,14 @@
 # kills: change.fold-table
 # why: the fold makes a change from any event, where only IntentDeclared may create one.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..f05b0eba 100644
+index 916513b7..b97cca4c 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -937,7 +937,6 @@ export const evolveChange = (
+@@ -1184,7 +1184,6 @@ export const evolveChange = (
  ): Change => {
    const event = committed.payload;
    if (state === undefined) {
 -    if (event._tag !== "IntentDeclared") return illegal(state, event);
+     // A change an agent declared holds its lease from here; a proposal, which no agent holds, never holds one.
+     const { agentId, leaseId } = event;
      return {
-       id: event.changeId,
-       agentId: event.agentId,

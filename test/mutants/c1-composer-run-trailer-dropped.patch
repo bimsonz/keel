@@ -2,14 +2,14 @@
 # kills: composer.agent-author
 # why: The landed commit does not name the run it was made in
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index cba379e..d7d44e5 100644
+index 4c3c382d..0e5474f6 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -66,7 +66,6 @@ export function restackSpec(
+@@ -93,7 +93,6 @@ export function restackSpec(
        trailers: [
          ["Change-Id", m.changeId],
          ...(m.agent === undefined ? [] : [["Keel-Agent", m.agent.id] as const]),
 -        ...(m.agent?.run === undefined ? [] : [["Keel-Run", m.agent.run] as const]),
-       ],
-       author: m.agent === undefined ? undefined : agentAuthor(m.agent, host),
-     })),
+         ...(m.proposer === undefined
+           ? []
+           : ([

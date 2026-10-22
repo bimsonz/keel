@@ -2,10 +2,10 @@
 # kills: wire.finite
 # why: PlanCompiled.costEstimate decodes as NaN or Infinity
 diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
-index b8a8e57..229371c 100644
+index 100895d0..dec49a82 100644
 --- a/packages/core/src/domain/coordination/events.ts
 +++ b/packages/core/src/domain/coordination/events.ts
-@@ -98,7 +98,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
+@@ -168,7 +168,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
    revision: Schema.Int,
    planHash: ContentHash,
    steps: Schema.Int,
@@ -13,4 +13,4 @@ index b8a8e57..229371c 100644
 +  costEstimate: Schema.Number,
    /** The predicate policy compiled for the change; the Change DO applies it to a proven conflict. Absent, or a predicate left out, is `advise`. */
    predicatePolicy: Schema.optional(PredicatePolicies),
- });
+   /** The paths the change touches that need a person's ruling (its plan holds the human-class gate); absent when none do. */

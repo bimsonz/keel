@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.proposal-parked
+# why: a proposal parked for approval stays in its lane's queue and is batched before anyone approves it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index bf0c698d..da8a7897 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -630,7 +630,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+       case "ChangeParked": {
+         // Held for a person's ruling or approval: out of the queue, its plan kept for when it resumes.
+         const parked = decodeParked(event.payload);
+-        return (parked.reason === "awaiting-ruling" || parked.reason === "awaiting-approval") &&
++        return parked.reason === "awaiting-ruling" &&
+           lane.queue.includes(parked.changeId)
+           ? { ...lane, queue: lane.queue.filter((id) => id !== parked.changeId) }
+           : undefined;

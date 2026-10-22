@@ -11,6 +11,8 @@ import { Effect, Layer, Schema } from "effect";
 import {
   AbandonCommand,
   AdoptCommand,
+  ApproveProposalCommand,
+  CloseProposalCommand,
   CommitCommand,
   type DescribeSession,
   NearbyCommand,
@@ -18,7 +20,10 @@ import {
   RefreshCommand,
   RelyCommand,
   DistinguishCommand,
+  ProposeCommand,
+  RequestProposalChangesCommand,
   ReviseCommand,
+  UpdateProposalCommand,
   AgentSessionCodecs,
   ChangeCodecs,
   DeclareCommand,
@@ -45,6 +50,11 @@ export interface ChangeStub {
   commit(command: typeof CommitCommand.Encoded): Promise<unknown>;
   refreshWorkspace(command: typeof RefreshCommand.Encoded): Promise<unknown>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<unknown>;
+  propose(command: typeof ProposeCommand.Encoded): Promise<unknown>;
+  updateProposal(command: typeof UpdateProposalCommand.Encoded): Promise<unknown>;
+  approveProposal(command: typeof ApproveProposalCommand.Encoded): Promise<unknown>;
+  requestProposalChanges(command: typeof RequestProposalChangesCommand.Encoded): Promise<unknown>;
+  closeProposal(command: typeof CloseProposalCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
   workspace(): Promise<unknown>;
@@ -77,6 +87,11 @@ const encodeRely = Schema.encodeSync(RelyCommand);
 const encodeDistinguish = Schema.encodeSync(DistinguishCommand);
 const encodeNearby = Schema.encodeSync(NearbyCommand);
 const encodeAbandon = Schema.encodeSync(AbandonCommand);
+const encodePropose = Schema.encodeSync(ProposeCommand);
+const encodeUpdateProposal = Schema.encodeSync(UpdateProposalCommand);
+const encodeApprove = Schema.encodeSync(ApproveProposalCommand);
+const encodeRequestChanges = Schema.encodeSync(RequestProposalChangesCommand);
+const encodeClose = Schema.encodeSync(CloseProposalCommand);
 
 /**
  * `Changes` over Durable Object RPC. A declare first asks the agent's
@@ -264,6 +279,66 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           objects.change(input.changeId).abandon(
             encodeAbandon({
               authority: input.authority,
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ),
+      propose: (changeId, input) =>
+        callObject(ChangeCodecs.propose, () =>
+          objects.change(changeId).propose(
+            encodePropose({
+              projectId: input.projectId,
+              fork: input.fork,
+              proposer: input.proposer,
+              commit: input.commit,
+              base: input.base,
+              namespace: input.namespace,
+              goal: input.goal,
+              idempotencyKey: input.idempotencyKey,
+              fingerprint: input.fingerprint,
+            }),
+          ),
+        ).pipe(
+          // The RPC carries PackTooLarge by shape (rule R15); the port's is its class.
+          Effect.catchTag("PackTooLarge", (e) =>
+            Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
+          ),
+        ),
+      updateProposal: (changeId, input) =>
+        callObject(ChangeCodecs.updateProposal, () =>
+          objects.change(changeId).updateProposal(
+            encodeUpdateProposal({
+              proposer: input.proposer,
+              projectId: input.projectId,
+              fork: input.fork,
+              commit: input.commit,
+              base: input.base,
+              ...(input.note === undefined ? {} : { note: input.note }),
+              namespace: input.namespace,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ).pipe(
+          // The RPC carries PackTooLarge by shape (rule R15); the port's is its class.
+          Effect.catchTag("PackTooLarge", (e) =>
+            Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
+          ),
+        ),
+      approveProposal: (changeId, input) =>
+        callObject(ChangeCodecs.approveProposal, () =>
+          objects.change(changeId).approveProposal(encodeApprove(input)),
+        ),
+      requestProposalChanges: (changeId, input) =>
+        callObject(ChangeCodecs.requestProposalChanges, () =>
+          objects.change(changeId).requestProposalChanges(encodeRequestChanges(input)),
+        ),
+      closeProposal: (changeId, input) =>
+        callObject(ChangeCodecs.closeProposal, () =>
+          objects.change(changeId).closeProposal(
+            encodeClose({
+              by: input.by,
+              projectId: input.projectId,
               ...(input.reason === undefined ? {} : { reason: input.reason }),
               idempotencyKey: input.idempotencyKey,
             }),

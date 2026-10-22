@@ -96,6 +96,8 @@ function Source({ source }: { source: SourceMark }) {
 
 /** Who is reading, where Keel serves accounts: a visitor, or a user by what a page calls them. */
 export interface ReaderMark {
+  /** The reader's user id, once Keel has said who is reading. Absent for a visitor. */
+  id?: string;
   /** Absent for a visitor. */
   name?: string;
   /** The reader's own handle, once they have chosen one. */

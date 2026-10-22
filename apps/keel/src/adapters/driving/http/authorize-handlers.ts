@@ -12,6 +12,8 @@ import {
   personOwns,
   type Principal,
   type ProjectResource,
+  type ProposalChangeResource,
+  type ProposalResource,
   type Resource,
   type ResourceFor,
   SPEC_ACTIONS,
@@ -194,6 +196,50 @@ const changeProject = (id: unknown) =>
       Changes.use((changes) => changes.get(changeId)).pipe(
         Effect.flatMap((read) => projectResource(read.projectId)),
         Effect.catchTag("ChangeNotFound", () => Effect.succeed(MISSING)),
+      ),
+  });
+
+/**
+ * A proposal from `fork` to the project named: both projects as the policy
+ * sees them, and whether the project takes proposals by its settings.
+ */
+const proposalOf = (projectId: unknown, fork: unknown) =>
+  Effect.gen(function* () {
+    const upstream = yield* projectNamed(projectId);
+    const from = yield* projectNamed(fork);
+    const settings =
+      upstream._tag === "Project"
+        ? yield* Projects.use((projects) => projects.settings(upstream.projectId)).pipe(
+            Effect.option,
+          )
+        : Option.none();
+    return {
+      _tag: "Proposal",
+      upstream,
+      fork: from,
+      proposalsOpen: Option.isSome(settings) && settings.value.proposals === "open",
+    } satisfies ProposalResource;
+  });
+
+/** A proposed change, by the change itself: its project, and who proposed it when it is a proposal. */
+const proposalChange = (id: unknown) =>
+  Option.match(decodeChangeId(id), {
+    onNone: () =>
+      Effect.succeed<ProposalChangeResource>({ _tag: "ProposalChange", project: MISSING }),
+    onSome: (changeId) =>
+      Changes.use((changes) => changes.get(changeId)).pipe(
+        Effect.flatMap((read) =>
+          Effect.map(projectResource(read.projectId), (project): ProposalChangeResource => ({
+            _tag: "ProposalChange",
+            project,
+            ...(read.change.proposal === undefined
+              ? {}
+              : { proposer: read.change.proposal.proposer }),
+          })),
+        ),
+        Effect.catchTag("ChangeNotFound", () =>
+          Effect.succeed<ProposalChangeResource>({ _tag: "ProposalChange", project: MISSING }),
+        ),
       ),
   });
 
@@ -395,6 +441,12 @@ export const RESOLVERS: Resolvers = {
     ),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
+  propose: (input) => proposalOf(input.projectId, input.fork),
+  proposals: (input) => projectNamed(input.projectId),
+  updateProposal: (input) => proposalChange(input.changeId),
+  approveProposal: (input) => proposalChange(input.changeId),
+  requestProposalChanges: (input) => proposalChange(input.changeId),
+  closeProposal: (input) => proposalChange(input.changeId),
   change: (input) => changeProject(input.changeId),
   diff: (input) => changeProject(input.changeId),
   status: (input) => changeProject(input.changeId),
@@ -619,6 +671,12 @@ export const decideFork = (
   source: ProjectResource | MissingResource,
   target: NamespaceResource,
 ): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
+
+/** Whether the caller may read a fork's upstream: Keel syncs a fork only for owners who still may. */
+export const decideUpstreamRead = (
+  principal: Principal,
+  upstream: ProjectResource | MissingResource,
+): Decision => authorize(principal, "Namespaces_getProject", upstream);
 
 /**
  * An agent refused for where its token stands, said as that: its token names no

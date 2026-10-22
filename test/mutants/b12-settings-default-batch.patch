@@ -2,7 +2,7 @@
 # kills: b12.settings-audit
 # why: the default batch size is 16, not the 8 a project starts with
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index 89493ac6..432d0157 100644
+index 6d53a7ea..a1848528 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
 @@ -36,7 +36,7 @@ export const PROJECT_SETTINGS = "project-settings";
@@ -13,4 +13,4 @@ index 89493ac6..432d0157 100644
 +  maxBatchSize: 16,
    verification: "required",
    visibility: "private",
- };
+   proposals: "open",

@@ -78,8 +78,11 @@ export function makeProjectsMemory(
     },
     /** Where each project made here started. */
     starts,
-    setSettings: (projectId: ProjectId, value: ProjectSettings) =>
-      void settings.set(projectId, value),
+    /** Seeds a project's settings: proposals left out are `open`, as a project's stored settings read. */
+    setSettings: (
+      projectId: ProjectId,
+      value: Omit<ProjectSettings, "proposals"> & Partial<Pick<ProjectSettings, "proposals">>,
+    ) => void settings.set(projectId, { proposals: "open", ...value }),
     projects: () => [...byKey.values()].map((keyed) => keyed.made),
     layer: Layer.succeed(
       Projects,
@@ -135,6 +138,7 @@ export function makeProjectsMemory(
                 maxBatchSize: put.maxBatchSize,
                 verification: put.verification ?? "required",
                 visibility: put.visibility ?? "private",
+                proposals: put.proposals ?? "open",
               };
               const fingerprint = JSON.stringify(replaced);
               const key = `${projectId}\u0000${requestId}`;

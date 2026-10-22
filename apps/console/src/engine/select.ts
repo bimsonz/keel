@@ -1,7 +1,7 @@
 // What each view shows, read off the folded world. These are pure: the same
 // world and the same instant always give the same picture.
 
-import { shownAgent } from "./audience.ts";
+import { agentName, shownAgent } from "./audience.ts";
 import { type Cards, heldUnder } from "./holder.ts";
 import type {
   ConflictDetail,
@@ -33,7 +33,54 @@ import { chainThrough, valueIdOf } from "./lattice.ts";
 import { conflictDetailOf } from "./conflict.ts";
 import { doubtsOf } from "./doubts.ts";
 import { contradictionsOf } from "./sides.ts";
-import { type ChangeEntry, type ConflictEntry, type EscalationEntry, type World } from "./world.ts";
+import {
+  authorAgentOf,
+  authorEntryOf,
+  type ChangeEntry,
+  type ConflictEntry,
+  type EscalationEntry,
+  type World,
+} from "./world.ts";
+
+/** What the page calls an actor a proposal names: an agent by its card or enrolment, a person by their id. */
+const actorName = (world: World, cards: Cards, actor: string): string => {
+  if (actor.startsWith("agent:")) {
+    const agentId = actor.slice("agent:".length);
+    return agentName(world.agents.get(agentId), cards.get(agentId)) ?? agentId;
+  }
+  return actor.replace(/^user:/, "");
+};
+
+/** A proposal as its page shows it, on a change that is one. */
+const proposalOf = (world: World, cards: Cards, change: ChangeEntry) => {
+  const { proposal } = change;
+  if (proposal === undefined) return {};
+  return {
+    proposal: {
+      fork: proposal.fork,
+      commit: proposal.commit,
+      proposer: proposal.proposer,
+      proposerName: actorName(world, cards, proposal.proposer),
+      ...(proposal.approved === undefined ? {} : { approved: proposal.approved }),
+      ...(proposal.requested === undefined
+        ? {}
+        : {
+            requested: {
+              byName: actorName(world, cards, proposal.requested.by),
+              comment: proposal.requested.comment,
+              commit: proposal.requested.commit,
+            },
+          }),
+      ruledPaths: change.ruledPaths ?? [],
+    },
+  };
+};
+
+/** The card of the agent a change is shown as made by, where Keel gave one. */
+const cardOfAuthor = (cards: Cards, change: ChangeEntry) => {
+  const agentId = authorAgentOf(change);
+  return agentId === undefined ? undefined : cards.get(agentId);
+};
 
 /** What the console has fetched from Keel's read models, on demand, beside the log. */
 export interface Resources {
@@ -128,7 +175,7 @@ function party(
     agent:
       change === undefined
         ? shownAgent(undefined)
-        : shownAgent(world.agents.get(change.agentId), cards.get(change.agentId)),
+        : shownAgent(authorEntryOf(world, change), cardOfAuthor(cards, change)),
     proposition: {
       role: side.role,
       relation: proposition.relation,
@@ -566,13 +613,13 @@ function annotationsOf(world: World, change: ChangeEntry, diff: ChangeDiff): Dif
 
 /** One change among several with the same intent, as it stands now. */
 function intentRowOf(world: World, cards: Cards, change: ChangeEntry): IntentRow {
-  const by = world.agents.get(change.agentId);
+  const by = authorEntryOf(world, change);
   const verdict = world.verdicts.get(change.verdictIds.at(-1) ?? "");
   return {
     id: change.id,
     label: change.label,
     goal: change.goal,
-    agent: shownAgent(by, cards.get(change.agentId)),
+    agent: shownAgent(by, cardOfAuthor(cards, change)),
     state: change.state,
     revision: change.revision,
     declaredAt: change.declaredAt,
@@ -649,7 +696,7 @@ export function changePageOf(
   if (change === undefined) return null;
   const cards: Cards = resources.cards ?? new Map();
   const sameIntent = sameIntentOf(world, cards, change);
-  const by = world.agents.get(change.agentId);
+  const by = authorEntryOf(world, change);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
   // A bounce it has moved on from is still Keel's record of it: a withdrawal or another try does not undo it.
   const past = change.state === "bounced" ? undefined : change.bounce;
@@ -696,7 +743,7 @@ export function changePageOf(
       ...(change.submittedAt === undefined ? {} : { submittedAt: change.submittedAt }),
       ...(change.laneId === undefined ? {} : { lane: laneName(change.laneId) }),
     },
-    agent: { ...shownAgent(by, cards.get(change.agentId)), model: by?.model ?? "" },
+    agent: { ...shownAgent(by, cardOfAuthor(cards, change)), model: by?.model ?? "" },
     held: heldUnder(cards, change),
     session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },
     intent: {
@@ -727,6 +774,7 @@ export function changePageOf(
     ...(change.state === "parked" && change.parkedOn !== undefined
       ? { parkedOn: change.parkedOn }
       : {}),
+    ...proposalOf(world, cards, change),
     drift: change.drift,
     ...(verdict === undefined
       ? {}

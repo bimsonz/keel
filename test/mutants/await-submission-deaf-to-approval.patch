@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/await-submission.test.ts
+# kills: b21.await-proposal
+# why: a Probe waiting on a proposal never hears its approval, so it waits out its deadline and probes nothing
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1ac93f65..814d89c2 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -907,7 +907,6 @@ export const changeRead: (
+ /** What a waiter on a change's submission hears, once: its next submission, a proposal's approval, or its end before one. */
+ export const AWAIT_SUBMISSION_HEARS = [
+   "ChangeSubmitted",
+-  "ProposalApproved",
+   "ChangeWithdrawn",
+   "ChangeSuperseded",
+ ] as const;

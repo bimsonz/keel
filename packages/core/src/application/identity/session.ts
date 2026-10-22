@@ -220,7 +220,7 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
   switch (event.type) {
     case "IntentDeclared": {
       const declared = Schema.decodeUnknownSync(IntentDeclared)(event.payload);
-      if (declared.agentId === agentId) {
+      if (declared.agentId === agentId && declared.leaseId !== undefined) {
         store.put(HELD_LEASE, changeId, declared.leaseId);
         heldBy(store, changeId, declared.run);
       }

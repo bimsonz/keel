@@ -2,15 +2,15 @@
 # kills: lane.member-author
 # why: The Lane asks the directory for nothing it uses: a landing by an agent with a handle is still written by its id
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index b93c2dfc..00c641db 100644
+index bf0c698d..39f3b06b 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -970,7 +970,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
-           // The run is the one that holds the change.
-           agent: {
-             id: change.agentId,
--            handle: Option.getOrUndefined(agent)?.handle,
-+            handle: undefined,
-             run: change.run?.id,
-           },
-         } satisfies CandidateMember;
+@@ -1486,7 +1486,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+             : {
+                 agent: {
+                   id: agentId,
+-                  handle: Option.getOrUndefined(agent)?.handle,
++                  handle: undefined,
+                   run: change.run?.id,
+                 },
+               }),

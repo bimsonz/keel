@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposals.test.ts
+# kills: proposals.fork-pays
+# why: a proposal's copy is counted against the repo bytes of the project it is proposed to, so a stranger proposing again and again fills its quota and stops its landings
+diff --git a/packages/core/src/application/integration/proposals.ts b/packages/core/src/application/integration/proposals.ts
+index e9a732a9..a7557e28 100644
+--- a/packages/core/src/application/integration/proposals.ts
++++ b/packages/core/src/application/integration/proposals.ts
+@@ -104,7 +104,7 @@ export const proposeFromFork = Effect.fn("integration/proposeFromFork")(function
+     return yield* new NotAForkOf({ fork: input.fork, upstream: input.upstream });
+   const trunk = projectRepos(input.fork).trunk;
+   const base = yield* baseOf(input.fork, origin.commit, input.commit);
+-  const namespace = yield* namespaceOf(input.fork);
++  const namespace = yield* namespaceOf(input.upstream);
+   const changeId = yield* (yield* ProposalLedger).reserve(input.upstream, {
+     proposer: input.proposer,
+     idempotencyKey: input.idempotencyKey,
+@@ -160,7 +160,7 @@ export const updateFromFork = Effect.fn("integration/updateFromFork")(function*
+     commit: input.commit,
+     base,
+     ...(input.note === undefined ? {} : { note: input.note }),
+-    namespace: yield* namespaceOf(fork),
++    namespace: yield* namespaceOf(input.upstream),
+     idempotencyKey: input.idempotencyKey,
+   });
+   return moved;

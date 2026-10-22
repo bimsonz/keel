@@ -4,7 +4,7 @@ import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { TrunkAdvanced } from "@keeltown/core/domain/integration";
 import { type CommitSha, makeId, type NextAction } from "@keeltown/core/kernel";
 import { EventOutbox } from "@keeltown/core/ports";
-import { sampleProjectId } from "@keeltown/testing";
+import { sampleProjectId, heldLease } from "@keeltown/testing";
 import * as fc from "fast-check";
 import { Effect, Exit, Schema } from "effect";
 import { ulid } from "ulid";
@@ -153,7 +153,7 @@ type Step = (typeof STEPS)[number];
 async function take(c: ChangeUnderTest, step: Step, i: number, sha: string): Promise<void> {
   const change = await c.current();
   const { revision } = change.intent;
-  const lease = change.lease.id;
+  const lease = heldLease(change).id;
   switch (step) {
     case "revise":
       return void (await revise(c, lease, revision, `k${i}`));
@@ -209,7 +209,9 @@ describe("the Change DO over real RPC", () => {
 
               const stored = await expectStateIsTheLog(c);
               // No orphaned change: one waiting on its agent holds an active lease, or it is parked.
-              expect(isAgentOwned(stored.state) ? stored.lease.state : "active").toBe("active");
+              expect(isAgentOwned(stored.state) ? heldLease(stored).state : "active").toBe(
+                "active",
+              );
             },
           ),
           { numRuns: 25, ...seed },
@@ -226,7 +228,7 @@ describe("the Change DO over real RPC", () => {
     const c = await changeUnderTest();
     const declared = ok(await c.declare());
     const sha = await c.push();
-    const submitted = await submit(c, declared.change.lease.id, sha, "submit-1");
+    const submitted = await submit(c, heldLease(declared.change).id, sha, "submit-1");
 
     expect(declared.change.state).toBe("working");
     expect(declared.change.baseSha).toBe(declared.grant.baseSha);
@@ -240,9 +242,9 @@ describe("the Change DO over real RPC", () => {
     c.clock.advance(LEASE_TTL_MS);
     // Its own agent adopts it: another agent's adoption would leave it told who holds the change instead.
     const adopted = ok(await adopt(c, c.agentId, "adopt-1"));
-    const stale = await revise(c, declared.change.lease.id, 1, "revise-1");
+    const stale = await revise(c, heldLease(declared.change).id, 1, "revise-1");
 
-    expect(adopted.lease.id).not.toBe(declared.change.lease.id);
+    expect(heldLease(adopted).id).not.toBe(heldLease(declared.change).id);
     expect(Exit.isFailure(stale) && refusal(stale)).toContain('"_tag":"LeaseStale"');
     expect(refusal(stale)).toContain('"reason":"stale"');
     expect(refusal(stale)).toMatch(/"nextActions":\[\{/);
@@ -253,7 +255,7 @@ describe("ten concurrent calls on one change", () => {
   it("[b11.racers] revising and submitting under one lease leave exactly the state the log says", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     const sha = await c.push();
     const answers = await Promise.all([
       ...Array.from({ length: 5 }, (_, i) => revise(c, lease, 1, `revise-${i}`)),
@@ -274,7 +276,7 @@ describe("ten concurrent calls on one change", () => {
     const c = await changeUnderTest();
     const declared = ok(await c.declare());
     const sha = await c.push();
-    const oldLease = declared.change.lease.id;
+    const oldLease = heldLease(declared.change).id;
     c.clock.advance(LEASE_TTL_MS);
     const adopters = Array.from({ length: 4 }, () => makeId("agt", ulid()));
     const [adoptions, revisions, submissions] = await Promise.all([
@@ -288,7 +290,7 @@ describe("ten concurrent calls on one change", () => {
 
     expect(won).toHaveLength(1);
     expect((await c.log()).filter((event) => event.type === "ChangeAdopted")).toHaveLength(1);
-    expect(stored.lease).toMatchObject({ id: winner?.lease.id, state: "active" });
+    expect(heldLease(stored)).toMatchObject({ id: winner?.lease?.id, state: "active" });
     expect([...revisions, ...submissions].filter((answer) => answer._tag === "Success")).toEqual(
       [],
     );
@@ -301,10 +303,10 @@ describe("the lease's deadline", () => {
   it("[b11.lapse] is armed 15 minutes after each renewal, and not at all once the lease is released", async () => {
     const c = await changeUnderTest();
     const declared = ok(await c.declare());
-    const lease = declared.change.lease;
+    const lease = heldLease(declared.change);
     const atDeclare = await leaseAlarms(c);
     c.clock.advance(5 * 60_000);
-    const renewed = ok(await revise(c, lease.id, 1, "revise-1")).change.lease;
+    const renewed = heldLease(ok(await revise(c, lease.id, 1, "revise-1")).change);
     const atRenewal = await leaseAlarms(c);
     ok(await abandon(c, lease.id, "abandon-1"));
 
@@ -324,7 +326,7 @@ describe("the lease's deadline", () => {
 
   it("[b11.lapse] parks the change when its deadline comes due through the object's alarm, and arms nothing after", async () => {
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     c.clock.advance(LEASE_TTL_MS);
     // The deadline is 15 real minutes away. Bring its row to now and run the object's own alarm
     // handler in the same turn, so the platform's timer (and a fresh, unrewired instance it may
@@ -357,7 +359,7 @@ describe("the lease's deadline", () => {
 
   it("[b11.lapse] commits nothing when it fires on a renewed lease, and re-arms for the renewal", async () => {
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     c.clock.advance(LEASE_TTL_MS - 1);
     ok(await revise(c, lease, 1, "revise-1"));
     const before = await c.log();
@@ -372,7 +374,7 @@ describe("the lease's deadline", () => {
   it("[b11.lapse-held] arms no deadline while the platform holds the change, records no lapse past it, and arms one 15 minutes after the hand-back", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
     const whileHeld = await leaseAlarms(c);
     c.clock.advance(LEASE_TTL_MS);
@@ -404,7 +406,7 @@ describe("Precheck and the change", () => {
   it("[b11.precheck-once] starts one Precheck instance per submission, named for its ChangeSubmitted", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
     const submitted = (await c.log()).find((event) => event.type === "ChangeSubmitted");
     if (submitted === undefined) throw new Error("no ChangeSubmitted was committed");
@@ -418,7 +420,7 @@ describe("a Precheck refusal over RPC", () => {
   it("[b11.precheck-refused] bounces the change and answers the verdict it issued", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
     ok(
       decodeExit(
@@ -444,7 +446,7 @@ describe("a compiled change and its lane", () => {
   it("[b13.queued] delivers the change's ChangeQueued to its project's lane", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
     ok(
       decodeExit(
@@ -487,7 +489,7 @@ describe("a compiled change and its lane", () => {
 
 /** Queues the change under test: declared, submitted, Precheck started and its plan compiled, all by hand. */
 async function queue(c: ChangeUnderTest) {
-  const lease = ok(await c.declare()).change.lease.id;
+  const lease = heldLease(ok(await c.declare()).change).id;
   ok(await submit(c, lease, await c.push(), "submit-1"));
   ok(
     decodeExit(
@@ -690,7 +692,9 @@ describe("a parked change's next actions", () => {
 
     await queue(c);
     await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
-    const { lease, batchId } = await c.current();
+    const integrating = await c.current();
+    const { batchId } = integrating;
+    const lease = heldLease(integrating);
     await lane.verdict(batchId, "bounce", ["test-failed: test/auth.test.ts"], RED_REMEDY);
     await vi.waitFor(async () => expect((await c.current()).state).toBe("bounced"), WAIT);
     const bounced = await statusRest(c, token);
@@ -728,7 +732,7 @@ describe("waiting on a submission", () => {
   it("[b11.waiter] answers as soon as the change is submitted, well before the deadline", async () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
-    const lease = ok(await c.declare()).change.lease.id;
+    const lease = heldLease(ok(await c.declare()).change).id;
     const sha = await c.push();
     const started = Date.now();
     const waiting = c.stub.submission(20_000);

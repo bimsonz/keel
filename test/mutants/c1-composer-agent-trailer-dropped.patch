@@ -2,14 +2,14 @@
 # kills: composer.agent-author
 # why: The landed commit does not name its agent in a Keel-Agent trailer
 diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-index cba379e..ff96569 100644
+index 4c3c382d..0db8c759 100644
 --- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
-@@ -65,7 +65,6 @@ export function restackSpec(
+@@ -92,7 +92,6 @@ export function restackSpec(
        message: m.title,
        trailers: [
          ["Change-Id", m.changeId],
 -        ...(m.agent === undefined ? [] : [["Keel-Agent", m.agent.id] as const]),
          ...(m.agent?.run === undefined ? [] : [["Keel-Run", m.agent.run] as const]),
-       ],
-       author: m.agent === undefined ? undefined : agentAuthor(m.agent, host),
+         ...(m.proposer === undefined
+           ? []

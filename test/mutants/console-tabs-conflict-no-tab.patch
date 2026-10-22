@@ -2,13 +2,13 @@
 # kills: tabs.of
 # why: a conflict's page lights no tab, though it is a change's
 diff --git a/apps/console/src/tabs.ts b/apps/console/src/tabs.ts
-index 8c178b3f..3fcc9791 100644
+index fa04ad7d..631e4188 100644
 --- a/apps/console/src/tabs.ts
 +++ b/apps/console/src/tabs.ts
-@@ -28,7 +28,6 @@ export function tabOf(route: Route): TabId | undefined {
-       return "issues";
+@@ -29,7 +29,6 @@ export function tabOf(route: Route): TabId | undefined {
      case "changes":
      case "change":
+     case "new-proposal":
 -    case "conflict":
      case "escalation":
        return "changes";

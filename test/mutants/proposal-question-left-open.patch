@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/proposal-change.test.ts
+# kills: change.proposal-question-withdrawn
+# why: a proposal that moves or closes leaves its questions open, so a stranger fills the maintainers' questions by moving it back and forth
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 1ac93f65..1c9d6795 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -312,7 +312,7 @@ const withdrawFlowQuestions = (changeId: ChangeId, projectId: ProjectId, reason:
+     const open = store
+       .list(CHANGE_FLOW_ASKED)
+       .filter(({ value }) => decodeFlowAsked(value).heard === undefined);
+-    if (open.length === 0) return;
++    if (open.length >= 0) return;
+     const place = yield* (yield* ProjectNamespaces).byId(projectId);
+     if (Option.isNone(place)) return;
+     const gate = yield* HumanGate;

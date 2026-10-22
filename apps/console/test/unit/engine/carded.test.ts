@@ -126,8 +126,8 @@ describe("an agent named from Keel's card of it, on every page that names one", 
     const same = folded(generateS5(42), Number.POSITIVE_INFINITY, "visitor");
     const named: Cards = new Map(
       [...same.changes.values()].map((change) => [
-        change.agentId,
-        { id: change.agentId, name: `Card of ${change.label}` },
+        change.agentId ?? "",
+        { id: change.agentId ?? "", name: `Card of ${change.label}` },
       ]),
     );
     const told = [...same.changes.values()].find((change) => change.alternatives.length > 0);

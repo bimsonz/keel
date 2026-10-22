@@ -2,18 +2,14 @@
 # kills: change.fold-table
 # why: the fold takes LeaseLapsed without the check `event.leaseId === change.lease.id`.
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 6c9f50e0..25e8de8a 100644
+index 916513b7..4314e09f 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1156,10 +1156,7 @@ export const evolveChange = (
-     case "ChangeSuperseded":
-       return from("integrating") ? illegal(change, event) : released(change, "superseded");
+@@ -1427,7 +1427,6 @@ export const evolveChange = (
      case "LeaseLapsed":
--      return change.lease.state === "active" &&
+       return change.lease !== undefined &&
+         change.lease.state === "active" &&
 -        event.leaseId === change.lease.id &&
--        committed.at >= lapsesAt(change.lease)
--        ? { ...change, lease: { ...change.lease, state: "lapsed" } }
-+      return change.lease.state === "active" && committed.at >= lapsesAt(change.lease) ? { ...change, lease: { ...change.lease, state: "lapsed" } }
+         committed.at >= lapsesAt(change.lease)
+         ? { ...change, lease: { ...change.lease, state: "lapsed" } }
          : illegal(change, event);
-     case "LeaseRestarted":
-       // A lease recorded Lapsed while the platform held the change is active again: the same lease, the same holder.

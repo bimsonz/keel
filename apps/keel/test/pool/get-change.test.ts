@@ -1,6 +1,7 @@
 // A change read by id through the deployed fetch handler: the change is a real
 // Change DO (on in-memory code and pool) read for itself and its project, and
 // whether that project is public is its real Project DO's setting.
+import { heldLease } from "@keeltown/testing";
 import { LEASE_TTL_MS, Proposition } from "@keeltown/core/domain/coordination";
 import { makeId, type ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -97,7 +98,7 @@ describe("[b12.get-change] a change by id, from its own DO", () => {
     // The submission starts a real Precheck; held inert, it never reaches a code host.
     await using precheck = await inertPrecheck();
     const commitSha = await c.push();
-    const lease = (await c.current()).lease.id;
+    const lease = heldLease(await c.current()).id;
     ok(
       decodeExit(
         ChangeCodecs.submit,
@@ -130,7 +131,7 @@ describe("[b12.held-lease] the lease, read back by the agent holding it", () => 
     const p = await project();
     const { c, member } = await declaredIn(p.projectId);
     const user = (await seedUser(uniqueHandle("member"))).token;
-    const { lease } = await c.current();
+    const lease = heldLease(await c.current());
     const own = await (await read(c.changeId, member)).json<ChangeBody>();
     expect(own.lease).toEqual({
       id: lease.id,

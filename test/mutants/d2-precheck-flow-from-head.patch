@@ -2,14 +2,14 @@
 # kills: d21.flow-from-base
 # why: Precheck reads the flow at the submitted commit instead of its base, so a change can edit the checks it is judged by
 diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
-index 7f0b4f3..21d8953 100644
+index d9ded55a..71496555 100644
 --- a/packages/core/src/application/verification/precheck.ts
 +++ b/packages/core/src/application/verification/precheck.ts
-@@ -241,7 +241,7 @@ export const precheckReads = (
+@@ -274,7 +274,7 @@ export const precheckReads = (
  ) => ({
    touched: diffSubmission(workspace, ancestry.base, submission.commitSha),
    policy: precheckPolicy(workspace),
--  flow: readFlowSources(workspace, ancestry.base),
+-  flow: readFlowSources(workspace, workspace.flowAt),
 +  flow: readFlowSources(workspace, submission.commitSha),
    guards: listGuards(workspace),
  });

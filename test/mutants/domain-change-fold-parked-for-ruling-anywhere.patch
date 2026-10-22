@@ -2,10 +2,10 @@
 # kills: change.fold-table
 # why: the fold parks a change for a ruling from any state, where only a Verifying or Queued change is parked for one
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 49027283..290bb9b1 100644
+index 916513b7..c11e6b0e 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -1075,14 +1075,12 @@ export const evolveChange = (
+@@ -1373,14 +1373,12 @@ export const evolveChange = (
              ? { ...change, escalationId: event.escalationId }
              : illegal(change, event);
          // It keeps its lane and its plan: the ruling puts it back where it waited.
@@ -20,5 +20,5 @@ index 49027283..290bb9b1 100644
 -          : illegal(change, event);
 +            };
        }
-       return isAgentOwned(change.state)
+       return isAgentOwned(change.state) && change.lease !== undefined
          ? {

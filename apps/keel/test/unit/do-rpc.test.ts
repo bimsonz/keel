@@ -67,6 +67,7 @@ const granted = {
   repo: grant.repo,
   baseSha: grant.baseSha,
   grantedSha: grant.baseSha,
+  flowAt: grant.baseSha,
   projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V5",
   subjects: ["authz.permissions"],
   intent: { revision: 1, goal: "Cache permission lookups", footprint: [], premises: [] },
@@ -163,6 +164,16 @@ function objects(answers: {
           Exit.succeed(Schema.decodeUnknownSync(ChangeWorkspace)(granted)),
         );
       },
+      // No case here proposes: a proposal's calls are proven in proposals-http and the pool.
+      propose: async () => encodeExit(ChangeCodecs.propose, Exit.die("no proposal here")),
+      updateProposal: async () =>
+        encodeExit(ChangeCodecs.updateProposal, Exit.die("no proposal here")),
+      approveProposal: async () =>
+        encodeExit(ChangeCodecs.approveProposal, Exit.die("no proposal here")),
+      requestProposalChanges: async () =>
+        encodeExit(ChangeCodecs.requestProposalChanges, Exit.die("no proposal here")),
+      closeProposal: async () =>
+        encodeExit(ChangeCodecs.closeProposal, Exit.die("no proposal here")),
     }),
   };
   return { fake, sent };

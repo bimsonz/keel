@@ -1,6 +1,7 @@
 // Committing through the isolate's doorways, REST and MCP, on a real Change
 // DO: the change is the harness's (an in-memory pool, code host and writer),
 // reached over RPC from the deployed fetch handler as any change is.
+import { heldLease } from "@keeltown/testing";
 import { exports } from "cloudflare:workers";
 import { type CommitSha, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost } from "@keeltown/core/ports";
@@ -90,7 +91,7 @@ interface CommitBody {
 describe("committing to a change's workspace through the doorways", () => {
   it("[commit.rest] REST commits the edits on the head and offers submit; MCP's call with the same edits answers the same commit", async () => {
     const { c, declared, head, token } = await declaredWithWorkspace();
-    const lease = declared.change.lease.id;
+    const lease = heldLease(declared.change).id;
 
     const response = await commitRest(c, token, lease, "commit-key-0001", request(head));
     const body = await response.json<CommitBody>();
@@ -115,7 +116,7 @@ describe("committing to a change's workspace through the doorways", () => {
       "commit-key-0002",
       request(head),
     );
-    const both = await commitRest(c, token, declared.change.lease.id, "commit-key-0003", {
+    const both = await commitRest(c, token, heldLease(declared.change).id, "commit-key-0003", {
       ...request(head),
       edits: [{ path: "src/a.ts", content: "x", delete: true }],
     });
@@ -131,7 +132,7 @@ describe("committing to a change's workspace through the doorways", () => {
 
   it("[commit.rest-head-moved] a commit on a head that moved is 409 workspace.head_moved naming the head now, and nothing is written", async () => {
     const { c, declared, head, token } = await declaredWithWorkspace();
-    const lease = declared.change.lease.id;
+    const lease = heldLease(declared.change).id;
 
     const first = await (
       await commitRest(c, token, lease, "commit-key-0004", request(head))
@@ -158,7 +159,7 @@ describe("committing to a change's workspace through the doorways", () => {
     const response = await commitRest(
       c,
       other,
-      declared.change.lease.id,
+      heldLease(declared.change).id,
       "commit-key-0006",
       request(head),
     );
@@ -172,7 +173,7 @@ describe("committing to a change's workspace through the doorways", () => {
 
   it("[commit.rest-decides-again] an abandon that lands on the Change DO while the commit is pushed answers the commit 409 change.state_refused, not its commit", async () => {
     const { c, declared, head, token } = await declaredWithWorkspace();
-    const lease = declared.change.lease.id;
+    const lease = heldLease(declared.change).id;
     const hold = c.writer.holdNext();
 
     const pending = commitRest(c, token, lease, "commit-key-0007", request(head));

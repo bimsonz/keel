@@ -2,13 +2,13 @@
 # kills: sync.readback
 # why: a sync leaves trunk's height unknown
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index a14057d8..411e2dce 100644
+index de8db2ba..280cef22 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -236,7 +236,6 @@ const readBackSync = (
-         to: sync.to,
+@@ -254,7 +254,6 @@ const readBackSync = (
          by: sync.by,
          upstream: sync.upstream,
+         ...(sync.merged === undefined ? {} : { merged: sync.merged }),
 -        ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),
        }),
      ]);

@@ -55,6 +55,7 @@ import {
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
@@ -197,6 +198,7 @@ describe("declare", () => {
           repo: declared.grant.repo,
           baseSha: BASE,
           grantedSha: BASE,
+          flowAt: BASE,
           projectId: sampleProjectId,
           subjects: [],
           intent: declared.change.intent,
@@ -219,7 +221,7 @@ describe("declare", () => {
       const sha = yield* pushToWorkspace;
       const submitted = yield* submit(
         changeId,
-        submitting(declared.change.lease.id, sha, "submit-1"),
+        submitting(heldLease(declared.change).id, sha, "submit-1"),
       );
       expect(submitted.state).toBe("submitted");
       expect(submitted.commitSha).toBe(sha);
@@ -263,7 +265,7 @@ describe("declare", () => {
           Schema.decodeUnknownSync(AbandonCommand)({
             authority: {
               _tag: "Lease",
-              leaseId: declared.change.lease.id,
+              leaseId: heldLease(declared.change).id,
               agentId,
               projectId: sampleProjectId,
             },
@@ -326,7 +328,7 @@ describe("leases", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const oldLease = declared.change.lease.id;
+        const oldLease = heldLease(declared.change).id;
         clock.advance(LEASE_TTL_MS);
         const lapsed = yield* Effect.exit(revise(changeId, revising(oldLease, 1, "revise-1")));
         const adopted = yield* adopt(
@@ -343,10 +345,13 @@ describe("leases", () => {
         const stale = yield* Effect.exit(
           revise(changeId, revising(oldLease, 1, "revise-4", adopterId)),
         );
-        const fresh = yield* revise(changeId, revising(adopted.lease.id, 1, "revise-3", adopterId));
+        const fresh = yield* revise(
+          changeId,
+          revising(heldLease(adopted).id, 1, "revise-3", adopterId),
+        );
 
         expect(failureTag(lapsed)).toContain('"reason":"lapsed"');
-        expect(adopted.lease.id).not.toBe(oldLease);
+        expect(heldLease(adopted).id).not.toBe(oldLease);
         expect(adopted.agentId).toBe(adopterId);
         expect(failureTag(formerHolder)).toContain("ChangeHeldByOther");
         expect(failureTag(formerHolder)).toContain(adopterId);
@@ -408,7 +413,7 @@ describe("leases", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const lease = declared.change.lease.id;
+        const lease = heldLease(declared.change).id;
         clock.advance(LEASE_TTL_MS - 1);
         const revised = yield* revise(changeId, revising(lease, 1, "revise-1"));
         clock.advance(LEASE_TTL_MS - 1);
@@ -416,9 +421,9 @@ describe("leases", () => {
         clock.advance(1);
         const parked = yield* lapseLease(changeId, lease, "due");
 
-        expect(revised.change.lease.renewedAt).toBe(clock.now() - LEASE_TTL_MS);
+        expect(heldLease(revised.change).renewedAt).toBe(clock.now() - LEASE_TTL_MS);
         expect(early.state).toBe("working");
-        expect(early.lease.state).toBe("active");
+        expect(heldLease(early).state).toBe("active");
         expect(parked.state).toBe("parked");
         expect(parked.parkReason).toBe("lease-lapsed");
         expect((yield* types).slice(-2)).toEqual(["LeaseLapsed", "ChangeParked"]);
@@ -432,7 +437,7 @@ describe("leases", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const lease = declared.change.lease.id;
+        const lease = heldLease(declared.change).id;
         const sha = yield* pushToWorkspace;
         yield* submit(changeId, submitting(lease, sha, "submit-1"));
         yield* precheckStarted(changeId, starting(1, "p-1"));
@@ -447,7 +452,7 @@ describe("leases", () => {
         const parked = yield* lapseLease(changeId, lease, "due-again");
 
         expect(held.state).toBe("deriving");
-        expect(held.lease.state).toBe("active");
+        expect(heldLease(held).state).toBe("active");
         expect(handedBack.state).toBe("bounced");
         expect(handedBack.lease).toMatchObject({
           state: "active",
@@ -466,14 +471,14 @@ describe("leases", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const lease = declared.change.lease.id;
+        const lease = heldLease(declared.change).id;
         clock.advance(60_000);
         const mismatched = yield* Effect.exit(revise(changeId, revising(lease, 7, "revise-1")));
-        const renewed = (yield* getChange(changeId)).lease.renewedAt;
+        const renewed = heldLease(yield* getChange(changeId)).renewedAt;
         clock.advance(60_000);
         const other = "lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9";
         const stale = yield* Effect.exit(revise(changeId, revising(other, 1, "revise-2")));
-        const kept = (yield* getChange(changeId)).lease.renewedAt;
+        const kept = heldLease(yield* getChange(changeId)).renewedAt;
 
         expect(failureTag(mismatched)).toContain("RevisionMismatch");
         expect(renewed).toBe(clock.now() - 60_000);
@@ -489,11 +494,11 @@ describe("leases", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const leaseId = declared.change.lease.id;
+        const leaseId = heldLease(declared.change).id;
         const agent = Schema.decodeUnknownSync(AgentId)(agentId);
         clock.advance(60_000);
         yield* refreshWorkspace(changeId, { agentId: agent, projectId: sampleProjectId, leaseId });
-        const refreshed = (yield* getChange(changeId)).lease.renewedAt;
+        const refreshed = heldLease(yield* getChange(changeId)).renewedAt;
         clock.advance(60_000);
         const distinguished = yield* distinguish(changeId, {
           agentId: agent,
@@ -505,8 +510,8 @@ describe("leases", () => {
         });
 
         expect(refreshed).toBe(clock.now() - 60_000);
-        expect(distinguished.lease.renewedAt).toBe(clock.now());
-        expect((yield* getChange(changeId)).lease.renewedAt).toBe(clock.now());
+        expect(heldLease(distinguished).renewedAt).toBe(clock.now());
+        expect(heldLease(yield* getChange(changeId)).renewedAt).toBe(clock.now());
       }).pipe(Effect.provide(layer));
     },
   );
@@ -519,7 +524,7 @@ describe("submit", () => {
       const declared = yield* declare(declaring());
       yield* pushToWorkspace;
       const elsewhere = yield* Effect.exit(
-        submit(changeId, submitting(declared.change.lease.id, "c".repeat(40), "submit-1")),
+        submit(changeId, submitting(heldLease(declared.change).id, "c".repeat(40), "submit-1")),
       );
       expect(failureTag(elsewhere)).toContain("CommitNotInWorkspace");
     }).pipe(Effect.provide(layer));
@@ -530,7 +535,7 @@ describe("submit", () => {
     return Effect.gen(function* () {
       const declared = yield* declare(declaring());
       const sha = yield* pushToWorkspace;
-      const lease = declared.change.lease.id;
+      const lease = heldLease(declared.change).id;
       yield* submit(changeId, submitting(lease, sha, "submit-1"));
       const retried = yield* submit(changeId, submitting(lease, sha, "submit-1"));
       const reused = yield* Effect.exit(revise(changeId, revising(lease, 1, "submit-1")));
@@ -547,7 +552,7 @@ describe("Precheck's commands", () => {
     return Effect.gen(function* () {
       const declared = yield* declare(declaring());
       const sha = yield* pushToWorkspace;
-      yield* submit(changeId, submitting(declared.change.lease.id, sha, "submit-1"));
+      yield* submit(changeId, submitting(heldLease(declared.change).id, sha, "submit-1"));
       const started = Schema.decodeUnknownSync(PrecheckStartedCommand)({
         revision: 1,
         instanceId: "precheck-1",
@@ -571,9 +576,9 @@ const deriving = (instanceId: string) =>
   Effect.gen(function* () {
     const declared = yield* declare(declaring());
     const sha = yield* pushToWorkspace;
-    yield* submit(changeId, submitting(declared.change.lease.id, sha, "submit-1"));
+    yield* submit(changeId, submitting(heldLease(declared.change).id, sha, "submit-1"));
     yield* precheckStarted(changeId, starting(1, instanceId));
-    return { lease: declared.change.lease.id, sha };
+    return { lease: heldLease(declared.change).id, sha };
   });
 
 describe("a compiled plan", () => {
@@ -1334,7 +1339,7 @@ describe("the remedy a status read carries", () => {
       const { layer, clock } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const lease = declared.change.lease.id;
+        const lease = heldLease(declared.change).id;
         const sha = yield* pushToWorkspace;
         yield* submit(changeId, submitting(lease, sha, "submit-1"));
         yield* precheckStarted(changeId, starting(1, "p-1"));
@@ -1351,7 +1356,10 @@ describe("the remedy a status read carries", () => {
             idempotencyKey: "adopt-1",
           }),
         );
-        yield* submit(changeId, submitting(adopted.change.lease.id, sha, "submit-2", adopterId));
+        yield* submit(
+          changeId,
+          submitting(heldLease(adopted.change).id, sha, "submit-2", adopterId),
+        );
         const resubmitted = yield* submissionStatus(changeId);
 
         const asked = refusing(1, "p-1");
@@ -1757,7 +1765,7 @@ describe("the run an agent's command names", () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring({ run: RUN }));
-        const { lease } = declared.change;
+        const lease = heldLease(declared.change);
         const shown = leaseShown(declared.change, claims(agentId, RUN));
         expect(shown).toEqual({
           id: lease.id,
@@ -1781,11 +1789,17 @@ describe("the run an agent's command names", () => {
             idempotencyKey: "submit-1",
           }),
         );
-        const held = { id: lease.id, renewedAt: new Date(submitted.lease.renewedAt).toISOString() };
+        const held = {
+          id: lease.id,
+          renewedAt: new Date(heldLease(submitted).renewedAt).toISOString(),
+        };
         expect(leaseShown(submitted, claims(agentId, RUN))).toEqual(held);
         // Recorded Lapsed while the platform held the change, under the rule before this one: the lapse does
         // not stand, and the lease is still its holder's. Parked for a lapse, the change is nobody's until adopted.
-        const recorded = { ...submitted, lease: { ...submitted.lease, state: "lapsed" as const } };
+        const recorded = {
+          ...submitted,
+          lease: { ...heldLease(submitted), state: "lapsed" as const },
+        };
         expect(leaseShown(recorded, claims(agentId, RUN))).toEqual(held);
         expect(
           leaseShown(
@@ -1812,7 +1826,7 @@ describe("the run an agent's command names", () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
         const declared = yield* declare(declaring({ run: RUN }));
-        const leaseId = declared.change.lease.id;
+        const leaseId = heldLease(declared.change).id;
         expect(declared.change.run).toEqual(RUN);
         yield* revise(
           changeId,
@@ -1981,7 +1995,7 @@ describe("a rely racing a revise", () => {
       );
       return Effect.gen(function* () {
         const declared = yield* declare(declaring());
-        const leaseId = declared.change.lease.id;
+        const leaseId = heldLease(declared.change).id;
         const services = yield* Effect.context<
           Clock | EntityStore | EventOutbox | LiveChanges | Decisions
         >();

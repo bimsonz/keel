@@ -4,8 +4,10 @@ import type {
   AgentId,
   CandidateId,
   ChangeId,
+  CommandActor,
   CommitSha,
   Instant,
+  ProjectId,
   Tier,
 } from "../../domain/kernel/index.ts";
 import type { RepoRef } from "./code-host.ts";
@@ -17,6 +19,17 @@ export interface MemberAgent {
   readonly handle?: string | undefined;
   /** The run the change was made in, once runs exist. */
   readonly run?: string | undefined;
+}
+
+/**
+ * Who proposed a change from a fork, which no agent holds: a person or a
+ * sponsored agent, Keel's name for them, and the fork's commit it came from.
+ */
+export interface MemberProposer {
+  readonly actor: CommandActor;
+  /** A person's handle, or an agent's given one. Neither ever changes; absent, they are written by id. */
+  readonly handle?: string | undefined;
+  readonly from: { readonly project: ProjectId; readonly commit: CommitSha };
 }
 
 /** One queued change: where its commits live, the trunk commit it was made on, and what it lands as. */
@@ -31,10 +44,13 @@ export interface CandidateMember {
   readonly title: string;
   /**
    * The change's agent, which Keel writes as its commit's author; what the
-   * submitted commit said of its own author is kept as a trailer. Absent only
-   * for a probe's world, which never lands and keeps its submitted authors.
+   * submitted commit said of its own author is kept as a trailer. Absent for
+   * a proposal, which `proposer` authors, and for a probe's world, which
+   * never lands and keeps its submitted authors.
    */
   readonly agent?: MemberAgent | undefined;
+  /** A proposal's proposer, whom Keel writes as its commit's author. */
+  readonly proposer?: MemberProposer | undefined;
 }
 
 export interface CandidateRequest {

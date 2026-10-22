@@ -72,6 +72,7 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
                 ? {}
                 : { predicatePolicy: plan.predicatePolicy }),
               ...(plan.needsRuling === true ? { needsRuling: true } : {}),
+              ...(plan.ruledPaths === undefined ? {} : { ruledPaths: plan.ruledPaths }),
             }),
           ),
         ).pipe(Effect.asVoid),

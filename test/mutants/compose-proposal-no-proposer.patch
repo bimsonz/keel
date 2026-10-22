@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.proposal-author
+# why: the lane names no proposer to the composer, so a proposal lands as its fork's commit's author with no trailer saying where it came from
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index bf0c698d..49d56412 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1490,7 +1490,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+                   run: change.run?.id,
+                 },
+               }),
+-          ...(proposer === undefined ? {} : { proposer }),
+         } satisfies CandidateMember;
+       }).pipe(Effect.orDie),
+     { concurrency: "unbounded" },

@@ -2,12 +2,12 @@
 # kills: doubt.panel
 # why: a subject's list of changes says nothing of a premise in doubt
 diff --git a/apps/console/src/engine/subject.ts b/apps/console/src/engine/subject.ts
-index 61cf91d7..b34127b5 100644
+index a470cce7..a55827f0 100644
 --- a/apps/console/src/engine/subject.ts
 +++ b/apps/console/src/engine/subject.ts
-@@ -197,7 +197,7 @@ export function subjectDetailOf(
-             ruling: waitsOnARuling(change),
-             agent: agentName(by, cards.get(change.agentId)) ?? "an agent",
+@@ -199,7 +199,7 @@ export function subjectDetailOf(
+             agent:
+               agentName(by, author === undefined ? undefined : cards.get(author)) ?? "an agent",
              agentClass: by?.class ?? "unnamed",
 -            doubts: doubtsOf(world, change, entry.id),
 +            doubts: [],

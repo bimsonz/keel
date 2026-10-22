@@ -8,6 +8,7 @@ import {
   sshPublicKey,
   sshSignature,
 } from "@keeltown/gitcore";
+import { actorParts, type CommandActor } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 
 /** What a deployment says of the commits Keel composes: its own settings, as its Worker holds them. */
@@ -53,6 +54,22 @@ export const agentAuthor = (
   name: agent.handle ?? agent.id,
   email: `${agent.id}@agents.${host}`,
 });
+
+/**
+ * A proposal's proposer as the author of what it landed: an agent as
+ * `agentAuthor` writes it, a person by their handle (their id while they have
+ * none) at an address under Keel's own `people.` domain, which no submitted
+ * commit can claim either.
+ */
+export const proposerAuthor = (
+  proposer: { readonly actor: CommandActor; readonly handle?: string | undefined },
+  host: string,
+): { readonly name: string; readonly email: string } => {
+  const who = actorParts(proposer.actor);
+  return who.kind === "agent"
+    ? agentAuthor({ id: who.id, handle: proposer.handle }, host)
+    : { name: proposer.handle ?? who.id, email: `${who.id}@people.${host}` };
+};
 
 /** Keel as the committer of what it composes at `at` (milliseconds). */
 export const keelCommitter = (host: string, at: number): Signature => ({

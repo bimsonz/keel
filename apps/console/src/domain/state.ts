@@ -356,6 +356,19 @@ export interface ChangePageState {
   requeued?: { reason: ChangeRequeued["reason"]; at: string; times: number };
   /** Why Keel parked it, where it is parked: a person's ruling to wait on, or its agent's lapsed lease. */
   parkedOn?: ParkReason;
+  /**
+   * Where a proposal from a fork comes from and where it stands: the fork, the commit it carries, who proposed
+   * it, the commit approved while that stands, the last request for changes, and the paths a person rules on.
+   */
+  proposal?: {
+    fork: string;
+    commit: string;
+    proposer: string;
+    proposerName: string;
+    approved?: string;
+    requested?: { byName: string; comment: string; commit: string };
+    ruledPaths: string[];
+  };
   /** What the page calls a step whose id is not a name: a guard's step, by the guard's label. */
   stepNames: Record<string, string>;
   agent: { label: string; class: ShownClass; harness: string; model: string };

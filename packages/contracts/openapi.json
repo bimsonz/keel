@@ -62,6 +62,9 @@
     },
     {
       "name": "Issues"
+    },
+    {
+      "name": "Proposals"
     }
   ],
   "paths": {
@@ -3757,6 +3760,602 @@
             "OAuth2Auth": [
               "agent:work"
             ]
+          }
+        ]
+      }
+    },
+    "/changes/{changeId}/proposal/approval": {
+      "post": {
+        "operationId": "approveProposal",
+        "summary": "Approve a proposal",
+        "description": "Approve a proposal at the commit you read: it goes back into the queue to be verified and landed. A person holding\n`maintain` on the project may, or an agent holding it that a person sponsors. The approval names that commit\nalone: a proposal at another one is 409 `proposal.commit_moved`, naming the commit it carries now, and a later\ncommit clears it. A change to how Keel verifies is still put to a person as its own question once approved.\nRefused unless it waits for approval (409 `change.state_refused`).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Change"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveProposalRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/changes/{changeId}/proposal/changes-requested": {
+      "post": {
+        "operationId": "requestProposalChanges",
+        "summary": "Request changes to a proposal",
+        "description": "Ask the proposer for changes, at the commit you read: the proposal goes on waiting, and its proposer is told what\nyou asked. Who may, and the refusals, are as for an approval.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Change"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestProposalChangesRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/changes/{changeId}/proposal/close": {
+      "post": {
+        "operationId": "closeProposal",
+        "summary": "Close a proposal",
+        "description": "Close a proposal: the change is withdrawn and its workspace let go. Its proposer may, and whoever may approve it.\nRefused while it is being integrated, or once it has ended (409 `change.state_refused`).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Change"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseProposalRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/changes/{changeId}/proposal/commits": {
+      "post": {
+        "operationId": "updateProposal",
+        "summary": "Propose another commit",
+        "description": "Move your open proposal to another commit of the fork's trunk: Keel copies it, checks it again, and it waits for\napproval again, whatever was approved before. Its proposer alone may (403 reason `proposer-only`). Refused while it\nis being integrated, or once it has ended (409 `change.state_refused`); a change that is no proposal is 409\n`change.not_a_proposal`; a commit not on the fork's trunk 409 `proposal.commit_not_on_fork`.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Change"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProposalRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          },
+          {
+            "BearerAuth": []
           }
         ]
       }
@@ -9653,6 +10252,309 @@
         ]
       }
     },
+    "/projects/{projectId}/proposals": {
+      "post": {
+        "operationId": "propose",
+        "summary": "Propose a commit of a fork",
+        "description": "Propose a commit of your fork's trunk back to the project it was forked from: it becomes a change here, `#n` and\nall, that waits for approval (parked, `awaiting-approval`) once Precheck has read it. Keel copies the fork's\ncommits itself, so you need no token for this project. Who may: a person who is a member of the fork's namespace,\nor an agent working in the fork that a person sponsors (403 `auth.forbidden`, reason `sponsor-required`, with\n`askSponsor` as the way on). The project must be public and take proposals (403 reason `proposals-closed`).\nRefused: a project not forked from this one (409 `proposal.not_a_fork`), a commit not on the fork's trunk (409\n`proposal.commit_not_on_fork`), a commit with nothing upstream lacks (409 `proposal.empty`), a sixth open proposal\nof yours here (409 `proposal.limit`), no workspace free (503 `workspace.pool_exhausted`, retry after the time it\nnames). A retry with the same Idempotency-Key answers the same change.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Change"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "proposals",
+        "summary": "List a project's proposals",
+        "description": "A project's proposals, newest `#n` first: `open` (the default) for those not yet landed, withdrawn or superseded,\n`closed` for the rest. Whoever reads the project reads them; a private or unknown project is the same 404.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "explode": false
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeSummaryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Proposals",
+          "mcp"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects/{projectId}/repo/blob": {
       "get": {
         "operationId": "Repo_getBlob",
@@ -10673,8 +11575,8 @@
     "/projects/{projectId}/sync": {
       "post": {
         "operationId": "Operator_syncUpstream",
-        "summary": "Sync an imported project's trunk from its upstream",
-        "description": "Moves an imported project's trunk forward to the head of the upstream branch its import took, as GitHub's\n\"Sync fork\" does: each upstream commit is kept as it is, and trunk moves only when upstream's head descends from\ntrunk's. Its owners alone may ask. Refused, with nothing moved: a project that was not imported\n(`project.not_imported`); a trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both heads); a\npromotion in flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch\n(`project.upstream_unreachable`); upstream's new history over what Keel takes in one piece\n(`project.import_too_large`) or over the namespace's repo bytes (`quota.exceeded`). The feed records the move as\n`TrunkSynced`.",
+        "summary": "Sync an imported or forked project's trunk from its upstream",
+        "description": "Moves an imported or forked project's trunk forward to its upstream, as GitHub's \"Sync fork\" does: each upstream\ncommit is kept as it is. An import's trunk moves to the head of the upstream branch its import took, and only\nwhen that head descends from trunk's. A fork's trunk moves to the head of the trunk it was forked from: to that\nhead itself when it descends from trunk's, otherwise to a merge commit Keel makes and signs, whose second parent\nis that head and whose tree holds the fork's own work and upstream's. Its owners alone may ask, and a fork's only\nwhile they may read its upstream. Refused, with nothing moved: a project that was neither imported nor forked\n(`project.not_imported`); an import's trunk with commits upstream lacks (`trunk.not_fast_forward`, naming both\nheads); a fork whose work and upstream's cannot be merged (`trunk.sync_conflicts`, naming the first path that\nstopped the merge: land a change in the fork that takes upstream's version of it, then sync again); a promotion\nin flight (`trunk.busy`, ask again shortly); an upstream that does not answer or lost the branch\n(`project.upstream_unreachable`); upstream's new history over what Keel takes in one piece\n(`project.import_too_large`) or over the namespace's repo bytes (`quota.exceeded`). The feed records the move as\n`TrunkSynced`.",
         "parameters": [
           {
             "name": "projectId",
@@ -13668,6 +14570,21 @@
         "additionalProperties": {},
         "description": "An app's registration (RFC 7591), such as an MCP client: a public client,\nholding no secret, that a person then signs in through with the\nauthorization code grant and PKCE (RFC 7636). Its token acts as that person\nat Keel's MCP server and nowhere else, carrying the one scope `person`. A\nfield Keel does not take is ignored (RFC 7591 §2)."
       },
+      "ApproveProposalRequest": {
+        "type": "object",
+        "required": [
+          "commit"
+        ],
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An approval names the commit it approves: the one the reviewer read."
+      },
       "ApproveSponsorRequest": {
         "type": "object",
         "required": [
@@ -14188,7 +15105,7 @@
         "type": "object",
         "required": [
           "id",
-          "agentId",
+          "origin",
           "state",
           "revision",
           "goal",
@@ -14201,7 +15118,28 @@
             "$ref": "#/components/schemas/ChangeId"
           },
           "agentId": {
-            "$ref": "#/components/schemas/AgentId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              }
+            ],
+            "description": "The agent holding the change: the adopter after an adoption. Absent on a proposal, which no agent holds."
+          },
+          "origin": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeOrigin"
+              }
+            ],
+            "description": "Where the change started: `agent` for an agent's declare, `proposal` for a proposal from a fork."
+          },
+          "proposal": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeProposal"
+              }
+            ],
+            "description": "Where a proposal comes from and where it stands: on a proposal alone."
           },
           "state": {
             "$ref": "#/components/schemas/ChangeState"
@@ -14680,7 +15618,8 @@
         "enum": [
           "agent",
           "auditor",
-          "operator"
+          "operator",
+          "proposal"
         ]
       },
       "ChangeParked": {
@@ -14710,6 +15649,128 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ChangeProposal": {
+        "type": "object",
+        "required": [
+          "fork",
+          "commit",
+          "proposer"
+        ],
+        "properties": {
+          "fork": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The fork the commit was proposed from."
+          },
+          "forkRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectRef"
+              }
+            ],
+            "description": "Where the fork is, to a reader who may read it: a private fork is named to nobody outside it."
+          },
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit of the fork's trunk the proposal carries now."
+          },
+          "proposer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommandActor"
+              }
+            ],
+            "description": "Who proposed it: `user:<id>` or `agent:<id>`."
+          },
+          "proposerHandle": {
+            "type": "string",
+            "description": "The proposer's handle, where they have one."
+          },
+          "approved": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit an approval names, while it stands: a new commit clears it."
+          },
+          "humanClassPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The paths it touches that need a person's ruling once it is approved."
+          },
+          "forkChange": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              }
+            ],
+            "description": "The fork's own change that landed `commit` there, when Keel landed it: its verdict is the fork's."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Where a proposal comes from and where it stands: a change on this project whose code comes from a fork of it.\nKeel holds it, and its proposer moves it to another commit or closes it."
+      },
+      "ChangeProposed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "fork",
+          "commit",
+          "proposer"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeProposed"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "fork": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The fork the commit was proposed from."
+          },
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit on the fork's trunk the proposal carries."
+          },
+          "proposer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommandActor"
+              }
+            ],
+            "description": "Who proposed it: a person, or an agent a person sponsors."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A change on a project whose code comes from a fork of it: committed beside its `IntentDeclared`."
       },
       "ChangeQueued": {
         "type": "object",
@@ -14944,7 +16005,6 @@
           "changeId",
           "number",
           "state",
-          "agentId",
           "goal",
           "revision",
           "declaredAt",
@@ -14976,7 +16036,23 @@
                 "$ref": "#/components/schemas/AgentId"
               }
             ],
-            "description": "The agent holding it now: the adopter after an adoption."
+            "description": "The agent holding it now: the adopter after an adoption. Absent on a proposal, which no agent holds."
+          },
+          "origin": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeOrigin"
+              }
+            ],
+            "description": "Where the change started; absent on a summary read before origins were kept, which is `agent`."
+          },
+          "proposal": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeProposal"
+              }
+            ],
+            "description": "Where a proposal comes from and where it stands: on a proposal alone."
           },
           "goal": {
             "type": "string"
@@ -15198,6 +16274,18 @@
               }
             ],
             "description": "`completed` when it is not said."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CloseProposalRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why it is closed, kept on the change's ChangeWithdrawn."
           }
         },
         "additionalProperties": {
@@ -18807,6 +19895,21 @@
         },
         "description": "The trunk of a project the caller may fork. A public project forks into the caller's own namespace or any org\nthe caller is a member of; a private one only into its own namespace."
       },
+      "ForkUpstream": {
+        "type": "object",
+        "required": [
+          "project"
+        ],
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The upstream a fork syncs from: the project it was forked from, on this Keel."
+      },
       "GuardAdmitted": {
         "type": "object",
         "required": [
@@ -19023,7 +20126,6 @@
         "required": [
           "_tag",
           "changeId",
-          "agentId",
           "origin",
           "revision",
           "goal",
@@ -19041,7 +20143,12 @@
             "$ref": "#/components/schemas/ChangeId"
           },
           "agentId": {
-            "$ref": "#/components/schemas/AgentId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              }
+            ],
+            "description": "The agent that declared the change and holds it. Absent on a proposal, which no agent holds: its `ChangeProposed` names its proposer."
           },
           "run": {
             "allOf": [
@@ -19660,6 +20767,18 @@
           },
           {
             "$ref": "#/components/schemas/ChangeResumed"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeProposed"
+          },
+          {
+            "$ref": "#/components/schemas/ProposalUpdated"
+          },
+          {
+            "$ref": "#/components/schemas/ProposalApproved"
+          },
+          {
+            "$ref": "#/components/schemas/ProposalChangesRequested"
           },
           {
             "$ref": "#/components/schemas/ChangeAdopted"
@@ -23360,7 +24479,8 @@
         "type": "string",
         "enum": [
           "awaiting-ruling",
-          "lease-lapsed"
+          "lease-lapsed",
+          "awaiting-approval"
         ]
       },
       "Party": {
@@ -23458,6 +24578,13 @@
               }
             ],
             "description": "The predicate policy compiled for the change; the Change DO applies it to a proven conflict."
+          },
+          "ruledPaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The paths the change touches that need a person's ruling (its plan holds the human-class gate); absent when none do."
           }
         },
         "additionalProperties": {
@@ -24319,7 +25446,14 @@
           "project.not_imported",
           "project.upstream_unreachable",
           "trunk.not_fast_forward",
+          "trunk.sync_conflicts",
           "trunk.busy",
+          "proposal.not_a_fork",
+          "proposal.commit_not_on_fork",
+          "proposal.empty",
+          "proposal.limit",
+          "proposal.commit_moved",
+          "change.not_a_proposal",
           "namespace.halted",
           "deploy_target.refused",
           "deploy_target.unreachable",
@@ -24740,6 +25874,14 @@
               "public"
             ],
             "description": "Who may read the project. `public` lets anonymous readers see it through the repo read API; absent in a\nPUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged."
+          },
+          "proposals": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "description": "Whether a fork of the project may propose changes back to it. Absent in a PUT means `open`, and Keel always\nanswers it; a private project takes no proposals, whatever it says. Every change is audited by\nProjectSettingsChanged."
           }
         },
         "additionalProperties": {
@@ -25080,6 +26222,138 @@
           "not": {}
         },
         "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
+      },
+      "ProposalApproved": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "commit",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProposalApproved"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "by": {
+            "$ref": "#/components/schemas/CommandActor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Someone holding `maintain` approved the proposal at this commit, and only this one: it goes back into the queue to be verified."
+      },
+      "ProposalChangesRequested": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "commit",
+          "by",
+          "comment"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProposalChangesRequested"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "by": {
+            "$ref": "#/components/schemas/CommandActor"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Someone holding `maintain` asked the proposer for changes to the proposal at this commit: it stays where it waits."
+      },
+      "ProposalUpdated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "commit"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProposalUpdated"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "What the proposer said of the new commit."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Its proposer moved the proposal to another commit of the fork: it is checked again and waits for approval again."
+      },
+      "ProposeRequest": {
+        "type": "object",
+        "required": [
+          "fork",
+          "commit",
+          "goal"
+        ],
+        "properties": {
+          "fork": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The fork: a project forked from this one, which the caller owns or works in."
+          },
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "A commit on the fork's trunk: its head, or one before it."
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the change achieves, in one or two sentences. \"Fixes #n\" closes issue #n when it lands."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A commit of a fork's trunk, proposed back to the project the fork was taken from."
       },
       "PublicJwk": {
         "anyOf": [
@@ -25836,6 +27110,32 @@
           "not": {}
         },
         "description": "A directory at a commit, its entries in git order."
+      },
+      "RequestProposalChangesRequest": {
+        "type": "object",
+        "required": [
+          "commit",
+          "comment"
+        ],
+        "properties": {
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit the request is about: the one the reviewer read."
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536,
+            "description": "What the proposer should change. Markdown."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "ResolveRequest": {
         "type": "object",
@@ -27416,13 +28716,28 @@
             "type": "string"
           },
           "upstream": {
-            "$ref": "#/components/schemas/SyncUpstream"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncUpstream"
+              },
+              {
+                "$ref": "#/components/schemas/ForkUpstream"
+              }
+            ]
+          },
+          "merged": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The fork's upstream trunk head that `to` merges, when `to` is Keel's merge commit of it; absent when `to` is upstream's head itself."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "An owner asked for trunk's main to move from `from` to `to`, its upstream branch's head, which descends from it: written before the move, resolved by one `TrunkSynced` or `PromotionFrozen`."
+        "description": "An owner asked for trunk's main to move from `from` to `to`, which descends from it: an import's upstream branch's\nhead, or a fork's upstream trunk head or Keel's merge of it. Written before the move, resolved by one `TrunkSynced`\nor `PromotionFrozen`."
       },
       "TrunkSynced": {
         "type": "object",
@@ -27454,7 +28769,22 @@
             "type": "string"
           },
           "upstream": {
-            "$ref": "#/components/schemas/SyncUpstream"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncUpstream"
+              },
+              {
+                "$ref": "#/components/schemas/ForkUpstream"
+              }
+            ]
+          },
+          "merged": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The fork's upstream trunk head that `to` merges, when `to` is Keel's merge commit of it; absent when `to` is upstream's head itself."
           },
           "height": {
             "type": "integer",
@@ -27465,7 +28795,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "Trunk's main moved forward to its upstream branch's head, each upstream commit kept as upstream made it. No change landed, so none is named."
+        "description": "Trunk's main moved forward to its upstream's head, each upstream commit kept as upstream made it: for a fork that\nheld work of its own, to a merge commit Keel made and signed, whose second parent is that head (`merged`). No change\nlanded, so none is named."
       },
       "TrunkView": {
         "type": "object",
@@ -27495,6 +28825,26 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "UpdateProposalRequest": {
+        "type": "object",
+        "required": [
+          "commit"
+        ],
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "What changed since the last commit, for whoever reviews it."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Another commit of the fork's trunk for an open proposal."
       },
       "UpstreamSync": {
         "type": "object",

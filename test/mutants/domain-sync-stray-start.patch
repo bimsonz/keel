@@ -2,12 +2,12 @@
 # kills: sync.phases
 # why: a sync starts from a head trunk does not hold
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index a14057d8..8238e11e 100644
+index de8db2ba..4a7a88ad 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -487,7 +487,7 @@ export const decidePromotion = (
-       const { origin } = trunk;
-       if (origin?.kind !== "imported") return Result.fail(new NotImported({ projectId }));
+@@ -521,7 +521,7 @@ export const decidePromotion = (
+       if (origin?.kind !== "imported" && origin?.kind !== "forked")
+         return Result.fail(new NotImported({ projectId }));
        // A sync starts only between groups, from the head trunk holds, and never during another sync.
 -      if ((trunk.phase !== "idle" && trunk.phase !== "debouncing") || command.from !== trunk.head)
 +      if (trunk.phase !== "idle" && trunk.phase !== "debouncing")

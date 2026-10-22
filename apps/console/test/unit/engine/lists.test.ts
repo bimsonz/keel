@@ -11,7 +11,9 @@ import {
   conflictsOf,
   escalationNamed,
   escalationsOf,
+  filtersOfChange,
   openCounts,
+  waitsOnARuling,
 } from "../../../src/engine/lists.ts";
 import { World } from "../../../src/engine/world.ts";
 import { showing } from "../showing.ts";
@@ -63,6 +65,26 @@ function worldOf(changes: { id: string; label?: string }[]): World {
 }
 
 describe("the list of changes", () => {
+  it("[lists.proposals] an open proposal is filed under Proposals as well as Open; waiting for approval, it waits on no ruling; landed or closed, it is no open proposal", () => {
+    const proposal = {
+      fork: "prj_01J9FFFFFFFFFFFFFFFFFFFFFF",
+      commit: "c".repeat(40),
+      proposer: "user:usr_1",
+    };
+    const waiting = {
+      state: "parked" as const,
+      parkedOn: "awaiting-approval" as const,
+      parkedFrom: "queued" as const,
+      proposal,
+    };
+    expect(filtersOfChange(waiting)).toEqual(["open", "proposals"]);
+    expect(waitsOnARuling(waiting)).toBe(false);
+    expect(filtersOfChange({ state: "queued", proposal })).toEqual(["open", "proposals"]);
+    expect(filtersOfChange({ state: "landed", proposal })).toEqual(["closed", "landed"]);
+    expect(filtersOfChange({ state: "withdrawn", proposal })).toEqual(["closed"]);
+    expect(filtersOfChange({ state: "queued" })).toEqual(["open"]);
+  });
+
   it("[lists.filed] files each change as open or closed, and under its narrower filter, newest first, with what it is tied to", async () => {
     const held = await worldAt("s1", 472, "live");
     const parked = changesOf(held, "parked");
@@ -72,6 +94,8 @@ describe("the list of changes", () => {
       landed: 0,
       parked: 2,
       bounced: 0,
+      // The story's changes are its agents': none is a proposal from a fork.
+      proposals: 0,
     });
     expect(parked.rows.map((row) => row.label)).toEqual(["#2", "#1"]);
     expect(parked.rows[1]).toMatchObject({
@@ -92,6 +116,7 @@ describe("the list of changes", () => {
       landed: 2,
       parked: 0,
       bounced: 0,
+      proposals: 0,
     });
     expect(changesOf(done, "closed").rows.map((row) => row.label)).toEqual(["#2", "#1"]);
     expect(changesOf(done, "landed").rows[0]?.escalation).toMatchObject({

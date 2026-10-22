@@ -31,6 +31,7 @@ import {
   makeWorkspacePoolMemory,
   sampleProjectId,
   ulidOf,
+  heldLease,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
@@ -135,7 +136,7 @@ function world() {
       }).pipe(Effect.provide(layer));
       objects.set(changeId, {
         layer,
-        leaseId: answer.change.lease.id,
+        leaseId: heldLease(answer.change).id,
         revision: answer.change.intent.revision,
         known: 0,
         queue: [],

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: machine.proposal-update-waits-precheck
+# why: a proposal takes a new commit while Precheck reads the last, whose pass then judges a commit it no longer carries
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index f7d15215..466b81e2 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -659,7 +659,7 @@ export const decideChange = (
+       // Its first commit once its workspace holds it; another anywhere but in a batch, which lands as it
+       // was, or while Precheck reads the last, whose pass would then judge a commit the proposal no longer carries.
+       const first = at("working");
+-      const again = at("drifted", "verifying", "queued", "bounced", "parked");
++      const again = at("submitted", "deriving", "drifted", "verifying", "queued", "bounced", "parked");
+       if (!(first || again) || change.workspaceId === undefined) return refuse(change, command);
+       if (!command.inWorkspace)
+         return Result.fail(

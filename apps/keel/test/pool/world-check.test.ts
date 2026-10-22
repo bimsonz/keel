@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import type { FlowWorld } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { EventOutbox, PlanStore, WorldChecks } from "@keeltown/core/ports";
-import { suitePlan } from "@keeltown/testing";
+import { suitePlan, heldLease } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import { PlanStoreR2 } from "../../src/adapters/driven/r2/plan-store.ts";
@@ -89,7 +89,7 @@ async function submittedChange(precheck: Awaited<ReturnType<typeof inertPrecheck
       await c.stub.submit({
         agentId: c.agentId,
         projectId: c.projectId,
-        leaseId: (await c.current()).lease.id,
+        leaseId: heldLease(await c.current()).id,
         commitSha,
         idempotencyKey: "submit-1",
       }),

@@ -26,6 +26,7 @@ import {
   makeSessionsMemory,
   invitationsMemoryLayer,
   makeIssuesMemory,
+  makeProposalLedgerMemory,
   makeSponsorshipsMemory,
   makeStandingsMemory,
   makeEventFeedMemory,
@@ -100,6 +101,7 @@ const runtime = ManagedRuntime.make(
     makeSponsorshipsMemory().layer.pipe(Layer.provide(directory)),
     invitationsMemoryLayer(),
     makeIssuesMemory().layer,
+    makeProposalLedgerMemory().layer,
     deliveryMemoryLayer(),
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
@@ -132,6 +134,7 @@ const settings = (visibility: "private" | "public"): ProjectSettings => ({
   protectedPaths: [],
   maxBatchSize: 1,
   verification: "required",
+  proposals: "open",
   visibility,
 });
 for (const [projectId, visibility] of [

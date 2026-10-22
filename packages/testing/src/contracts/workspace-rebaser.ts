@@ -1,10 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, KEEL_TRUNK_REF, type RepoRef, WorkspaceRebaser } from "@keeltown/core/ports";
-import { Effect, type Layer } from "effect";
+import {
+  CodeHost,
+  KEEL_PROPOSAL_REF,
+  KEEL_TRUNK_REF,
+  type RepoRef,
+  WorkspaceRebaser,
+} from "@keeltown/core/ports";
+import { Effect, type Layer, Schema } from "effect";
 import { CodeHostFixture } from "../code-host-fixture.ts";
 
 const MAIN = "refs/heads/main";
+
+/** What an admission refused fails with, in the suite: the push's own failure. */
+class Refused extends Schema.TaggedError<Refused>()("Refused", { bytes: Schema.Number }) {}
+const refuse = (bytes: number) => Effect.fail(new Refused({ bytes }));
 
 /**
  * A rebaser that finds `projectId`'s trunk at `trunk`, beside the code host it
@@ -59,6 +69,48 @@ export function describeWorkspaceRebaserContract(
             [later],
           );
           expect(yield* host.isAncestor(workspace, later, merged, [base])).toBe(true);
+        }).pipe(Effect.provide(layer));
+      },
+    );
+
+    it.live(
+      "[rebaser.contract.proposal] a fork's commit lands on the workspace's keel/proposal and nowhere else, admitted on a pack of some bytes first; again is unchanged and admits nothing; a refused admission moves nothing",
+      () => {
+        const { layer, trunk } = make();
+        return Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const rebaser = yield* WorkspaceRebaser;
+          yield* host.create(trunk);
+          const base = yield* fixture.commit(trunk, MAIN, { "README.md": "base\n" });
+          // A fork of trunk with work of its own, and a workspace of trunk granted later.
+          const fork = yield* host.fork(trunk, fixture.scratch());
+          const proposed = yield* fixture.commit(fork, MAIN, { "README.md": "base\n", p: "1\n" });
+          const workspace = yield* host.fork(trunk, fixture.scratch());
+          const admitted: number[] = [];
+          const admit = (bytes: number) => Effect.sync(() => void admitted.push(bytes));
+
+          expect(yield* rebaser.pushProposal(fork, workspace, proposed, [base], admit)).toBe(
+            "advanced",
+          );
+          expect(admitted).toHaveLength(1);
+          expect(admitted[0]).toBeGreaterThan(0);
+          expect(yield* host.head(workspace, KEEL_PROPOSAL_REF)).toBe(proposed);
+          expect(yield* host.readTree(workspace, proposed)).toEqual(
+            yield* host.readTree(fork, proposed),
+          );
+          expect(yield* host.head(workspace, MAIN)).toBe(base);
+          expect(yield* host.isAncestor(workspace, base, proposed, [])).toBe(true);
+          expect(yield* rebaser.pushProposal(fork, workspace, proposed, [base], admit)).toBe(
+            "unchanged",
+          );
+          expect(admitted).toHaveLength(1);
+
+          const later = yield* fixture.commit(fork, MAIN, { "README.md": "base\n", p: "2\n" });
+          expect(
+            yield* Effect.flip(rebaser.pushProposal(fork, workspace, later, [base], refuse)),
+          ).toMatchObject({ _tag: "Refused" });
+          expect(yield* host.head(workspace, KEEL_PROPOSAL_REF)).toBe(proposed);
         }).pipe(Effect.provide(layer));
       },
     );

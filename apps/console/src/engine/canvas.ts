@@ -14,7 +14,7 @@ import {
   waitsOnItsAgent,
 } from "./flow.ts";
 import type { Cards } from "./holder.ts";
-import type { ChangeEntry, World } from "./world.ts";
+import { authorAgentOf, type ChangeEntry, type World } from "./world.ts";
 
 /** Live changes past which every stage is drawn as one lane of dots. */
 export const DENSE_AT = 150;
@@ -48,7 +48,8 @@ export interface CanvasChange {
   /** `#n`. */
   label: string;
   goal: string;
-  agentId: string;
+  /** The agent it is shown as made by; none for a person's proposal. */
+  agentId?: string;
   /** The run it is held under, where its holder's token named one. */
   runId?: string;
   /** Its run's colour, or its agent's where it names no run: who is changing what, without an edge. */
@@ -256,6 +257,12 @@ function factsOf(change: ChangeEntry): string[] {
   ].filter((fact) => fact !== "");
 }
 
+/** The agent a chip is drawn as made by, where one made it. */
+const agentOfChip = (change: ChangeEntry): { agentId?: string } => {
+  const agentId = authorAgentOf(change);
+  return agentId === undefined ? {} : { agentId };
+};
+
 function chipOf(world: World, flow: FlowChange, now: number): CanvasChange | undefined {
   const change = world.changes.get(flow.id);
   if (change === undefined) return undefined;
@@ -264,9 +271,9 @@ function chipOf(world: World, flow: FlowChange, now: number): CanvasChange | und
     id: change.id,
     label: change.label,
     goal: change.goal,
-    agentId: change.agentId,
+    ...agentOfChip(change),
     ...(change.run === undefined ? {} : { runId: change.run.id }),
-    hue: hueOf(change.run?.id ?? change.agentId),
+    hue: hueOf(change.run?.id ?? authorAgentOf(change) ?? change.id),
     stage: flow.stage,
     since: flow.since,
     ...(flow.from === undefined ? {} : { from: flow.from }),
@@ -359,6 +366,8 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
   // Agents: each one that holds a live change, with the runs it holds them under.
   const agentsById = new Map<string, CanvasAgent>();
   for (const chip of chips) {
+    // A person's proposal is no agent's: it adds to nobody's count.
+    if (chip.agentId === undefined) continue;
     let agent = agentsById.get(chip.agentId);
     if (agent === undefined) {
       const card = cards.get(chip.agentId);
@@ -445,7 +454,9 @@ export function canvasOf(world: World, now: number, cards: Cards = new Map()): C
       return {
         id,
         label: change?.label ?? id.slice(-4),
-        hue: hueOf(change?.run?.id ?? change?.agentId ?? id),
+        hue: hueOf(
+          change?.run?.id ?? (change === undefined ? undefined : authorAgentOf(change)) ?? id,
+        ),
       };
     }),
   }));
