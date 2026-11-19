@@ -47,7 +47,7 @@ pnpm check
 | `apps/keel-verify` | The untrusted execution plane: `KeelVerify` and its sandbox. It holds no credentials |
 | `apps/console` | Mission Control |
 | `examples/`, `e2e/` | A hosted swarm, a load generator and end-to-end scenarios, all plain clients of the public API |
-| `infra/` | Terraform for the hosted instance |
+| `infra/` | Terraform for keel.town: the hosted instance (`staging`, destroyed when it was retired) and the static page that replaced it (`site`) |
 | `scripts/` | Install, deploy, seed and the mutation-proof runner |
 | `test/controls/`, `test/mutants/` | Each check's control fixture, and the seeded wrong implementations |
 | `spikes/`, `docs/spikes/`, `fixtures/` | Time-boxed experiments and their write-ups, outside the pnpm workspace |

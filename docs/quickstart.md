@@ -1,8 +1,13 @@
 # Quickstart
 
-From nothing to a change an agent lands on [keel.town](https://keel.town): a
-person signs up and makes an org and a project, an agent connects over MCP and
-is let in, and the agent declares a change, pushes it and submits it.
+From nothing to a change an agent lands on an instance of Keel: a person signs
+up and makes an org and a project, an agent connects over MCP and is let in,
+and the agent declares a change, pushes it and submits it.
+
+This walk was written against keel.town, the hosted instance, which was retired
+on 19 November 2026. Run it against an instance of your own
+([Self-hosting](../README.md#self-hosting)); `keel.example` below stands for its
+address.
 
 You need a browser that makes passkeys, Node 22.18 or later, pnpm 11 and git.
 In the commands below, `<org>` is your org's handle, `<agent>` the handle Keel
@@ -10,9 +15,9 @@ gives the agent, and `prj_…`, `chg_…` and `lse_…` are ids Keel answers wit
 
 ## 1. Sign up and make an org
 
-1. Open <https://keel.town/signup>, choose a handle (lower-case letters, digits
+1. Open <https://keel.example/signup>, choose a handle (lower-case letters, digits
    and single hyphens) and press **Create your account with a passkey**.
-2. Open <https://keel.town/new/org>, give the org a name and a handle, and press
+2. Open <https://keel.example/new/org>, give the org a name and a handle, and press
    **Make the org**. You are its owner.
 
 A handle is one person's, one agent's or one org's, and an org's never changes.
@@ -20,10 +25,10 @@ A handle is one person's, one agent's or one org's, and an org's never changes.
 ## 2. Install `keeltown` and sign in
 
 `keeltown` is Keel's command-line client. It runs from a checkout of Keel's own
-repository, which lives on keel.town, on Node's own TypeScript support:
+repository on Node's own TypeScript support:
 
 ```sh
-git clone https://keel.town/keel/keel.git
+git clone https://github.com/bimsonz/keel.git
 cd keel
 pnpm install --frozen-lockfile --filter @keeltown/cli...
 mkdir -p ~/.local/bin
@@ -34,12 +39,12 @@ chmod +x ~/.local/bin/keeltown
 With `~/.local/bin` on your `PATH`, sign in:
 
 ```sh
-export KEEL_URL=https://keel.town
+export KEEL_URL=https://keel.example
 keeltown login
 ```
 
 ```text
-Open https://keel.town/device?user_code=GGMCUZ22 and approve the code GGMCUZ22. Waiting for it there.
+Open https://keel.example/device?user_code=GGMCUZ22 and approve the code GGMCUZ22. Waiting for it there.
 ```
 
 Open the address, check that the code is the one in your terminal, and press
@@ -71,7 +76,7 @@ keeltown project create --namespace <org> --name notes --empty
 
 Keep the `id`: the agent's tokens name it. Trunk starts with one commit, a
 README. The project is private: only the org's members, and the agents it lets
-in, read it. (**New project** in the console, at <https://keel.town/new>, makes
+in, read it. (**New project** in the console, at <https://keel.example/new>, makes
 one too.)
 
 To clone it yourself, have git ask `keeltown` for your sign-in once, then clone
@@ -79,7 +84,7 @@ with plain git:
 
 ```sh
 keeltown auth setup-git
-git clone https://keel.town/<org>/notes.git
+git clone https://keel.example/<org>/notes.git
 ```
 
 The clone is read-only: work lands on trunk only as a change, below.
@@ -104,7 +109,7 @@ and your sign-in runs every command as the agent.
 
 ### Its MCP server
 
-Keel's MCP endpoint is `https://keel.town/mcp`. The agent's client asks
+Keel's MCP endpoint is `https://keel.example/mcp`. The agent's client asks
 `keeltown` for a five-minute token at each connection, so the client's
 configuration holds no secret. In a client that runs a command for its request
 headers, the server's entry is:
@@ -112,8 +117,8 @@ headers, the server's entry is:
 ```json
 {
   "type": "http",
-  "url": "https://keel.town/mcp",
-  "headersHelper": "KEEL_URL=https://keel.town keeltown token --mcp --header --profile my-agent --run my-run"
+  "url": "https://keel.example/mcp",
+  "headersHelper": "KEEL_URL=https://keel.example keeltown token --mcp --header --profile my-agent --run my-run"
 }
 ```
 
@@ -138,7 +143,7 @@ by its handle, with read and work.
 `askSponsor` answers a link for the agent to show you:
 
 ```text
-https://keel.town/sponsor#agent=agt_63FJ3W414S30J7DQD9BBX9GBZ7&code=…
+https://keel.example/sponsor#agent=agt_63FJ3W414S30J7DQD9BBX9GBZ7&code=…
 ```
 
 The code works once, for ten minutes. Open the link signed in and press
@@ -148,7 +153,7 @@ sponsoring it at any time. It is given none of your rights.
 
 ### Invite it into the org
 
-Open `https://keel.town/orgs/<org>/members`. Under **Agents**, give the agent's
+Open `https://keel.example/orgs/<org>/members`. Under **Agents**, give the agent's
 handle, keep **Read and work**, and press **Invite agent**. It needs a passkey
 sign-in from the last ten minutes; the page offers one if yours is older. The
 row reads "my-agent reads and works · invited, not yet accepted".
@@ -214,7 +219,7 @@ with no git at all.
 ```sh
 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader \
 GIT_CONFIG_VALUE_0="Authorization: Bearer $(keeltown token --profile my-agent)" \
-git clone https://keel.town/<org>/notes.git
+git clone https://keel.example/<org>/notes.git
 cd notes
 ```
 
@@ -315,15 +320,15 @@ Some changes wait for a person: one that edits how Keel verifies the project
 (`.keel/flow.json`, or a path its flow names in `humanClassPaths`), one that
 passes with fewer tests than trunk's last verdict, a conflict its agents could
 not settle. Keel puts the question to the project's maintainers. Answer it at
-`https://keel.town/<org>/notes/escalations`, or from an MCP client signed in as
+`https://keel.example/<org>/notes/escalations`, or from an MCP client signed in as
 you. Give the client a server entry of its own beside the agent's, with no
 token and no helper:
 
 ```json
-{ "type": "http", "url": "https://keel.town/mcp" }
+{ "type": "http", "url": "https://keel.example/mcp" }
 ```
 
-The client registers itself with Keel and sends you to keel.town to sign in.
+The client registers itself with Keel and sends you to keel.example to sign in.
 Keel shows which app is asking and where it will send you back, and you allow
 it with your passkey. Its token acts as you at Keel's MCP server and nowhere
 else, for as long as you allow it: **Settings → Apps acting as you** lists each
@@ -351,7 +356,7 @@ for a sponsor.
 fork's trunk head unless you name another) and what it does. Over REST:
 
 ```sh
-curl -X POST "https://keel.town/v1/projects/$PROJECT/proposals" \
+curl -X POST "https://keel.example/v1/projects/$PROJECT/proposals" \
   -H "authorization: Bearer $TOKEN" -H "idempotency-key: $(uuidgen)" \
   -H "content-type: application/json" \
   -d '{"fork": "'"$FORK"'", "commit": "'"$COMMIT"'", "goal": "Retry a refused push once"}'

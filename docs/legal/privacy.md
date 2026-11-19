@@ -1,6 +1,8 @@
 # Privacy Notice
 
-Last updated: 14 October 2026
+Last updated: 19 November 2026
+
+**keel.town was retired on 19 November 2026.** Every account on it, and the personal data this notice describes, was deleted that day. Cloudflare's request logs for the site expire on their own retention schedule. This notice stays as the record of how keel.town handled personal data while it ran.
 
 This notice explains what personal data keel.town collects, why, and what your rights are. It covers keel.town only. If you run your own copy of Keel, you are responsible for the data in that copy.
 

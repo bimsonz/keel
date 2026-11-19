@@ -1,6 +1,8 @@
 # Terms of Service
 
-Last updated: 14 October 2026
+Last updated: 19 November 2026
+
+**keel.town was retired on 19 November 2026,** and every account and project on it was deleted. These terms stay as the record of the agreement that applied while it ran.
 
 ## 1. About these terms
 

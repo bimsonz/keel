@@ -4,6 +4,14 @@ Keel's stores and queues are Terraform (`infra/<environment>`). Workers, Durable
 
 Every resource name starts with `keel-`, so Keel's resources stand apart from anything else on the account.
 
+## keel.town is retired
+
+The hosted instance was retired on 19 November 2026, after the competition Keel was built for.
+
+- **`infra/staging` is destroyed**, and its state is empty. Its Workers (`keel`, `keel-verify`, `keel-console`, `keel-swarm`), their Workflows and container applications, the Artifacts namespaces `keel-core` and `keel-ws-00` and the queue's event subscription, none of which Terraform owns, were deleted with it. Its buckets were emptied, the email sending subdomain `mail.keel.town` was removed, and the state backups in `keel-tfstate` that held its keys were deleted.
+- **`infra/site` serves keel.town now.** `keel-site` is a Worker of static assets (`infra/site/public`) with no script, binding or secret, at the apex through a Custom Domain, and every other path answers 404. To change the page, edit `infra/site/public` and run `npx wrangler deploy` from `infra/site`. `node scripts/tf.ts site plan` covers the domain.
+- **To stand the instance up again**, run `node scripts/tf.ts site destroy` first, since both modules hold the hostname, then follow the steps under [Running it](#running-it). Terraform makes a new commit-signing key. The retired key's public half stays in `local.commit_signers`, so the commits it signed still verify.
+
 ## Running it
 
 ```sh
@@ -22,7 +30,7 @@ pnpm smoke                           # whoami over REST and MCP, live
 
 ## The site
 
-`routing.tf` serves everything from one host, `var.host` (`keel.town`), so a session cookie is first-party everywhere. The console is the apex origin through a Workers Custom Domain, which keeps its DNS record and certificate; Workers routes put Keel in front of it for `/v1/*`, `/.well-known/*`, `/mcp` and `/mcp/*` (two patterns: a wildcard on the bare word would take any handle that begins with it), and for the agent front door's two exact paths, `/start` and `/llms.txt`. A route allows only a trailing wildcard, so the clone route `/<org>/<project>.git/...` reaches Keel through the console, which forwards only `info/refs` and `git-upload-pack` over its service binding. There is one environment: whatever is deployed here is production.
+`routing.tf` serves everything from one host, `var.host` (`keel.town`), so a session cookie is first-party everywhere. The console is the apex origin through a Workers Custom Domain, which keeps its DNS record and certificate; Workers routes put Keel in front of it for `/v1/*`, `/.well-known/*`, `/mcp` and `/mcp/*` (two patterns: a wildcard on the bare word would take any handle that begins with it), and for the agent front door's two exact paths, `/start` and `/llms.txt`. A route allows only a trailing wildcard, so the clone route `/<org>/<project>.git/...` reaches Keel through the console, which forwards only `info/refs` and `git-upload-pack` over its service binding. While the instance ran, there was one environment: whatever was deployed here was production.
 
 ## State
 

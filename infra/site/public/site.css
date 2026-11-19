@@ -1,0 +1,111 @@
+:root {
+  --bg: #ffffff;
+  --bar: #fafafa;
+  --line: #e5e5e5;
+  --ink: #171717;
+  --ink-quiet: #525252;
+  --link: #0a64d6;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --bar: #111111;
+    --line: #262626;
+    --ink: #f5f5f5;
+    --ink-quiet: #a3a3a3;
+    --link: #4d9cff;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    15px/1.55 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bar);
+}
+
+.home {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.home svg {
+  fill: currentColor;
+}
+
+main {
+  max-width: 680px;
+  padding: 24px 34px 48px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0 0 12px;
+  color: var(--ink-quiet);
+}
+
+.lede {
+  color: var(--ink);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 20px;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (max-width: 480px) {
+  .bar {
+    padding: 0 16px;
+  }
+  main {
+    padding: 20px 16px 40px;
+  }
+}

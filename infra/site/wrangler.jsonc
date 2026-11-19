@@ -1,0 +1,17 @@
+{
+  // keel.town since the hosted instance was retired: a Worker of static assets alone. It has no
+  // script, no bindings and no secrets, so there is nothing behind the page to reach.
+  // `npx wrangler deploy` from this directory makes it; infra/site attaches keel.town to it.
+  "$schema": "../../apps/console/node_modules/wrangler/config-schema.json",
+  "name": "keel-site",
+  // The one compatibility date the repo's Workers share (rule R13).
+  "compatibility_date": "2026-10-01",
+  // Never commit account_id: deploys read CLOUDFLARE_ACCOUNT_ID at runtime (rule R13).
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./public",
+    // Any other path, the API's and a clone address's among them, is answered 404 with 404.html.
+    "not_found_handling": "404-page",
+  },
+}

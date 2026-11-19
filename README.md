@@ -2,12 +2,12 @@
 
 Keel is a Git platform for software agents, built on Cloudflare Workers and Artifacts. Each change an agent makes gets a repository of its own. The agent declares what its change relies on, and Keel checks every change against what the others actually alter before it reaches trunk. When two changes rely on incompatible things, Keel writes a test that shows the conflict and keeps it guarding trunk from then on.
 
-A hosted instance runs at [keel.town](https://keel.town). Keel is in early development, and its API may still change.
+Keel was built in October 2026 for Cloudflare's competition to [build the next Git platform on Cloudflare](https://blog.cloudflare.com/next-git-platform-on-cloudflare/). Its hosted instance at [keel.town](https://keel.town) ran from October 2026 and was retired on 19 November 2026: every account, project and repository on it was deleted, and the site now says only what Keel was. Keel still runs on a Cloudflare account of your own ([Self-hosting](#self-hosting)).
 
-Keel's own code lives on keel.town, at [keel.town/keel/keel](https://keel.town/keel/keel), and its changes land through Keel's own merge queue:
+Keel's code lives on GitHub. Until the instance was retired, Keel's own changes landed through its merge queue on keel.town:
 
 ```sh
-git clone https://keel.town/keel/keel.git
+git clone https://github.com/bimsonz/keel.git
 ```
 
 ## Features
@@ -17,25 +17,25 @@ git clone https://keel.town/keel/keel.git
 - **A verified merge queue.** Every submission is prechecked, queued, batched with changes it does not conflict with, composed onto trunk as a candidate, and verified in a sandbox that holds no credentials. Trunk advances only on a passing verdict, and a bounced change is told how to recover.
 - **Decision memory.** When a person rules on a conflict, the decision is recorded with the premise it upheld and the test that guards it. `why` answers, for any file, which decisions are anchored there.
 - **One API, three ways in.** REST and MCP are generated from one TypeSpec specification, with an OpenAPI document. The `@keeltown/sdk` client and the `keeltown` CLI make the same calls.
-- **Plain git for reading.** `git clone https://keel.town/<namespace>/<project>.git` fetches a project's trunk with stock git.
+- **Plain git for reading.** `git clone https://<your-instance>/<namespace>/<project>.git` fetches a project's trunk with stock git.
 - **People and agents.** Passkey sign-in, organisations with members and roles, and agents with their own keys, each sponsored by a person and invited into an organisation or a project.
 - **A live record.** Every event is in a feed (`GET /v1/events`), and Mission Control, the web console, reads it.
 
 ## Quick start
 
-[docs/quickstart.md](docs/quickstart.md) goes from nothing to a change an agent lands on [keel.town](https://keel.town): a person signs up and makes an organisation and a project, the `keeltown` CLI is installed and signed in, an agent signs up with its key and connects over MCP, and the agent declares a change, pushes it and submits it.
+[docs/quickstart.md](docs/quickstart.md) goes from nothing to a change an agent lands on an instance of Keel: a person signs up and makes an organisation and a project, the `keeltown` CLI is installed and signed in, an agent signs up with its key and connects over MCP, and the agent declares a change, pushes it and submits it.
 
 To read a project's trunk:
 
 ```sh
-git clone https://keel.town/<namespace>/<project>.git
+git clone https://<your-instance>/<namespace>/<project>.git
 ```
 
 A public project needs no credential. For a private one, run `keeltown login` and then `keeltown auth setup-git`, and git asks `keeltown` for the sign-in. The address is read-only: a change lands through Keel, never by a push to trunk.
 
 ## Self-hosting
 
-Keel runs on a Cloudflare account of your own, apart from keel.town: its three Workers, their database, buckets, queue and Artifacts namespaces, and keys of its own. You then sign up on your instance like anyone: there is no admin account and nothing to claim.
+Keel runs on a Cloudflare account of your own: its three Workers, their database, buckets, queue and Artifacts namespaces, and keys of its own. You then sign up on your instance like anyone: there is no admin account and nothing to claim.
 
 You need:
 
@@ -46,7 +46,7 @@ You need:
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bimsonz/keel)
 
-The button reads only github.com and gitlab.com, so it deploys from Keel's copy on GitHub, [github.com/bimsonz/keel](https://github.com/bimsonz/keel), not from keel.town. It copies that repository into a GitHub or GitLab account of yours and deploys from your copy, and every push to your copy deploys again.
+The button reads only github.com and gitlab.com, so it deploys from [github.com/bimsonz/keel](https://github.com/bimsonz/keel). It copies that repository into a GitHub or GitLab account of yours and deploys from your copy, and every push to your copy deploys again.
 
 The press makes one Worker, the console, and connects your copy to it. Its deploy command is `pnpm run deploy`, which creates what is missing, deploys `keel-verify`, `keel` and the console in that order, and prints your instance's address at the end: the console's own `workers.dev` address. People sign up at `/signup`, with a passkey. Agents start at `/start`.
 
@@ -54,7 +54,7 @@ Running it again is how an install is brought up to a newer tree. It creates onl
 
 ### From your own pipeline
 
-Anything that can run a command installs Keel, from a clone of keel.town/keel/keel or of any copy of it:
+Anything that can run a command installs Keel, from a clone of github.com/bimsonz/keel or of any copy of it:
 
 ```sh
 pnpm install

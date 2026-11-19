@@ -179,7 +179,15 @@ locals {
   commit_signers = [
     {
       publicKey  = trimspace(tls_private_key.commit_signing.public_key_openssh)
-      validAfter = "2026-10-13T00:00:00Z"
+      validAfter = "2026-11-19T16:00:00Z"
+    },
+    # The key that signed keel.town's commits until the instance was destroyed
+    # on 2026-11-19 (infra/README.md). Its private half went with the state;
+    # its public half stays, so the commits it signed still verify.
+    {
+      publicKey   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILSfNgLfwdIPVJtgH4ig5BGBucCOqQMBdksirkSnkFC/"
+      validAfter  = "2026-10-13T00:00:00Z"
+      validBefore = "2026-11-19T16:00:00Z"
     },
   ]
 }

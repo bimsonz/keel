@@ -13,8 +13,8 @@ import { Markdown } from "../../src/views/Markdown.tsx";
  * beside it to the day the new text is published.
  */
 const PUBLISHED: Record<Legal, { updated: string; digest: string }> = {
-  terms: { updated: "14 October 2026", digest: "8dc24081a8412469" },
-  privacy: { updated: "14 October 2026", digest: "f3b6eeeb6d1dd958" },
+  terms: { updated: "19 November 2026", digest: "39ea9ca96a508af1" },
+  privacy: { updated: "19 November 2026", digest: "209fd4c886229c26" },
 };
 
 const DATED = /^Last updated: (.+)$/m;

@@ -1,0 +1,6 @@
+# A page with no script, no form and nothing to fetch but its own stylesheet.
+/*
+  Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: interest-cohort=()

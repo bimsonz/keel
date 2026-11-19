@@ -7,7 +7,7 @@ Thank you for helping. This page says how to propose a change. [AGENTS.md](AGENT
 You need Node 22.18 or later and pnpm 11.
 
 ```sh
-git clone https://keel.town/keel/keel.git
+git clone https://github.com/bimsonz/keel.git
 cd keel
 pnpm install
 pnpm gen
@@ -39,21 +39,10 @@ Write plain, imperative subjects that say what changed, such as "Refuse a lease 
 
 ## Proposing a change
 
-A change to Keel lands through Keel, never through a pull request: trunk takes no push, and Keel verifies every change before trunk advances. [docs/quickstart.md](docs/quickstart.md#5-land-a-change) walks through the steps with the `keeltown` CLI; each one is also an MCP tool of the same name.
+Until keel.town's hosted instance was retired on 19 November 2026, every change to Keel landed through Keel itself. Now a change comes as a pull request against `main` on [GitHub](https://github.com/bimsonz/keel), once `pnpm check` is green.
 
-Declaring a change on keel/keel takes a place in the `keel` org: its members, and the agents they invite, land changes here. If you are not a member, you can still help:
-
-- **Report a bug or ask for something** in an issue at [keel.town/keel/keel/issues](https://keel.town/keel/keel/issues): any signed-in person may open one, and so may an agent a person sponsors, by the `openIssue` tool or `POST /v1/projects/{projectId}/issues`. A change whose goal says "Fixes #n" closes issue #n when it lands.
-- **Propose a change from a fork** of keel/keel: fork it on keel.town, land your change in the fork as its member does below, then propose the commit it landed as, by **Propose** on the fork's code, the `propose` tool or `POST /v1/projects/{projectId}/proposals`. A maintainer approves the commit before Keel verifies anything of it; once approved, it is verified and lands as any change does. **Sync fork** on the fork's code keeps it up with keel/keel. [docs/quickstart.md](docs/quickstart.md#7-propose-a-change-from-a-fork) walks through it.
+- **Report a bug or ask for something** in an issue on [GitHub](https://github.com/bimsonz/keel/issues).
 - **Report a vulnerability** privately, as [SECURITY.md](SECURITY.md) says, never in an issue.
-
-The steps below are a member's.
-
-1. **Ask `why`** about each file you mean to change. Keel answers with the decisions anchored there and the guards that hold them, so your change does not undo what was decided. Read the relevant [ADR](docs/adr) before changing a boundary one fixes.
-2. **Declare** the change before you write code: a goal that says what it does and why, its footprint (the paths it edits, creates or deletes), and any premises it relies on about code it does not own. Keel answers with a workspace of the change's own, starting at trunk's head, a lease, and a preflight that names the changes near yours; `nearby` asks again later. Leave alone what a neighbour is already changing.
-3. **Commit** to the change's workspace: push to its remote with its token, or call `commit`, which needs no clone. The message follows the rules above; say in its body how you checked the change.
-4. **Submit** the commit under the lease once `pnpm check` is green. A push alone lands nothing.
-5. **Wait in the inbox.** Keel tells you there as the change moves through precheck, the queue and verification. It has landed only when the inbox says `ChangeLanded`. A `ChangeBounced` notice says what to do: fix what it names, `revise` the footprint if the change has grown, commit, and submit again under the same lease.
 
 A change to a contract (the API in `packages/spec`, the ports, the DO RPC contracts or the runner protocol) adds a changelog fragment, a file of its own in `changes/unreleased/` ([changes/README.md](changes/README.md)), rather than a line in [CHANGELOG.md](CHANGELOG.md), which a release writes. Contract changes are additive; a breaking change says so in its entry and in its goal.
 

@@ -1,4 +1,4 @@
-// Keel's own project on keel.town: its source, and its quickstart read in the Code view.
+// Keel's own source and its quickstart, on GitHub since keel.town's hosted instance was retired.
 
-export const KEEL_SOURCE = "https://keel.town/keel/keel";
-export const KEEL_QUICKSTART = "https://keel.town/keel/keel/blob/trunk/docs/quickstart.md";
+export const KEEL_SOURCE = "https://github.com/bimsonz/keel";
+export const KEEL_QUICKSTART = "https://github.com/bimsonz/keel/blob/main/docs/quickstart.md";
